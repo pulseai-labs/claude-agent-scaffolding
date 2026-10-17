@@ -2,6 +2,19 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.4.5 — 2026-10-17
+
+- **Scratch work costs one turn, not several** (#844). A friction review of 88 OMP sessions found 12 write denials
+  and 8 rm denials on scratch work.
+  - OMP: a guarded seat may `write` an exact `local://<name>` file (letters, digits, `.`, `_`, `-` and `/`, no `.`
+    or `..` segment). That is omp's per-session scratch, which omp itself confines: it refuses absolute paths and
+    `..`, and checks real-path containment under the session's local root. Every other `local://` spelling, and
+    every other tool, still places a scheme outside.
+  - `/tmp` and `xd://report_issue` stay denied. A write denied outside now names the `SEAT_MODS_ALLOW` folders as
+    the place for scratch files such as a commit message.
+  - An `rm` operand the guard cannot read (`$VAR`, `` `…` ``, `{…}`, a relative path after `cd`) gets its own deny
+    text, which says to spell the path out literally. The rail still does not resolve shell variables.
+
 ## 0.4.4
 
 - **OMP: no subagents from an orchestrator** (#798). Under `SEAT_MODS_ROLE=orchestrator` the omp guard blocks the `task` tool and every `before_subagent_spawn` (eval `agent()`, workpool). Other tools stay free; coordinator and every guarded role are unchanged. The Claude Code hook is unchanged.

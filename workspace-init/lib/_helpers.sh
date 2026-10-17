@@ -178,13 +178,25 @@ wi_render_template() {
   fi
   local content
   content="$(cat "$tmpl")"
-  local pair var val
+  local pair var val ph rendered rest
   while (( $# > 0 )); do
     pair="$1"; shift
     var="${pair%%=*}"
     val="${pair#*=}"
-    # Replace every literal ${VAR} with val. Bash 3.2-safe pattern expansion.
-    content="${content//\$\{${var}\}/${val}}"
+    # Replace every literal ${VAR} with val, splicing left-to-right with
+    # %%/# ops, NOT ${content//…} or sed. Under bash 5.2+ patsub_replacement
+    # (and always under sed), a `&` in the replacement expands to the matched
+    # text, so a canonical path like `/srv/R&D` would be corrupted and leave
+    # the placeholder in the rendered file. Building a fresh accumulator also
+    # means a value that itself contains the placeholder text terminates
+    # cleanly, because the value is never rescanned. Bash 3.2-safe.
+    ph="\${${var}}"
+    rendered=""; rest="$content"
+    while [[ "$rest" == *"$ph"* ]]; do
+      rendered+="${rest%%"$ph"*}${val}"
+      rest="${rest#*"$ph"}"
+    done
+    content="${rendered}${rest}"
   done
   local outdir
   outdir="$(dirname "$out")"

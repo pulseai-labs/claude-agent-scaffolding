@@ -77,6 +77,17 @@ assert_not_contains() { [[ "$2" != *"$1"* ]] || { echo "    forbidden substring 
 assert_file_exists() { [[ -f "$1" ]] || { echo "    missing file: $1"; return 1; }; }
 assert_file_absent() { [[ ! -f "$1" ]] || { echo "    unexpected file: $1"; return 1; }; }
 assert_dir_exists() { [[ -d "$1" ]] || { echo "    missing dir: $1"; return 1; }; }
+# count_matches <pattern> <file> — a single integer, always.
+# `grep -c … || echo 0` yields two lines ("0\n0") on no match, and two identical
+# two-line strings compare equal, so a count assertion written that way passes
+# vacuously whenever the log is empty (D10). awk prints one number for both
+# cases, including a missing file.
+count_matches() { # $1=pattern $2=file
+  [[ -f "$2" ]] || { echo 0; return 0; }
+  awk -v p="$1" 'BEGIN{n=0}
+    { s=$0; while ((i=index(s,p))>0) { n++; s=substr(s,i+length(p)) } }
+    END{ print n }' "$2" 2>/dev/null
+}
 assert_exits_with() { # $1=expected_code $2...=command
   local expected="$1"; shift
   "$@"; local actual=$?

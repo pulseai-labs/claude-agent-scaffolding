@@ -21,8 +21,10 @@ Every command's syntax comes from `herdr --skill`.
    `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer
    loop every other write takes.
    Every creation and every bind writes `run.orchestrator.machine` beside its pane — this server's
-   machine, per `herdr-mechanics.md`, Machines.
-   Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind.
+   machine, per `herdr-mechanics.md`, Machines — and `run.orchestrator.session`, herdr's `agent_session` for
+   that pane as `{agent, id}` (`herdr pane get "$HERDR_PANE_ID"`: `.result.pane.agent_session.agent` and `.result.pane.agent_session.value`);
+   with none returned, none is written. A hard stop's resume finds the dead top's transcript by it (#810).
+   Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind. Binding one whose top died with no handoff runs **A hard stop**'s three steps before it.
 1b. **Ossify spine planned here?** If this session just completed `/ossify:plan-spine`
    against a concrete spine directory with a run bound, step 2 is replaced by
    `references/ossify-execution.md`: agree one implementer/verifier seat per work
@@ -93,7 +95,6 @@ Every command's syntax comes from `herdr --skill`.
    and its full locator before the brief goes, writing an existing `REPORT_PATH` file's current generation
    `{hash, identity}` as the new attempt's `locator.seen` and leaving `seen` absent only when the file is absent,
    and sets `phase: delivered` once the send is confirmed.
-   **Enrolled OMP only:** new material assignments require ending the old process and fresh trusted issuance/launch, even in retained panes; same-assignment corrections/rechecks retain only unchanged approvals/grants/lifetime. Keep this attempt's phase/locator.seen/generation and no-auto-relaunch ownership: the authority rule never starts a duplicate worker on a live attempt. Revocation/completion invalidates, never rebinds.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
@@ -169,7 +170,7 @@ Every command's syntax comes from `herdr --skill`.
    verifier; a second fail on the same item goes to the operator. The verifier is
    released only at pass or escalation.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
-   at the PR head, brief `/code-review <PR>`, every finding returned in the report file.
+   at the PR head, brief its review command (`config.md`, `review:`; `/code-review <PR> <LEVEL>` by default), every finding returned in the report file.
    **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from
    its seat over the fix range alone — one scoped delta re-review — and its findings enter the
    disposition baseline like any other, so a repository whose bot does not review a push still
@@ -201,7 +202,7 @@ Every command's syntax comes from `herdr --skill`.
     bot or human finding that arrives after the disposition returns to the
     orchestrator, and the implementer waits — it
     resolves the finding only after the orchestrator's decision (#410). No second
-    `/code-review`. Bot comments after each push stay in this stream, and review
+    review. Bot comments after each push stay in this stream, and review
     bodies and top-level PR conversation comments are part of it too —
     `reviewThreads` does not return them — refreshed after each push alongside the
     thread count. With ossify installed, this
@@ -218,19 +219,21 @@ Every command's syntax comes from `herdr --skill`.
     the deferrable work and examines process, not code; blocking remediation continues
     past round five until each finding is fixed or rejected with evidence.
 12. **Merge gate.** Fetch the full gate set against `--repo <owner/repo>` for the head
-    SHA immediately before asking: `isDraft`, `mergeable`, `mergeStateStatus`, every
+    SHA immediately before deciding: `isDraft`, `mergeable`, `mergeStateStatus`, every
     relevant check-run and status context — all must be successful — the unresolved
     threads, and the non-thread signals of review bodies and PR conversation comments,
     which are clean when every finding in them has a terminal state recorded in the
     disposition comment (step 10).
-    Ask only when every one is clean: a non-mergeable state is surfaced to the operator
-    as the blocker instead of asking, and a new actionable finding returns to step 10.
-    Ask the operator for the merge word naming that SHA.
+    Act only when every one is clean: a non-mergeable state is surfaced to the operator
+    as the blocker, and a new actionable finding returns to step 10.
+    The run's `run.merge_word` decides where the merge word comes from. With `standing`, the operator's
+    standing word is it: a clean gate set on that SHA is the agreed condition, so merge with no ask (#837).
+    With `operator`, the ask says that this run's brief or the operator set an operator merge gate, so
+    autonomic routes it to the operator: ask for the merge word naming that SHA. Under either word, a dispatch whose
+    merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator: tell them the word and the
+    SHA, and they land it.
     **Enrolled OMP precedence:** only actual operator acknowledgment of that head can satisfy this gate. `standing`, a missing legacy merge_word, a role, plan approval, shared standing-policy merge prose or confidence is not that acknowledgment. Spec/design/plan/release gates likewise stay operator-owned. This scoped rule does not rewrite Claude Code or legacy routing below.
-    The run's `run.merge_word` decides who answers: with `standing`, the ask goes to whoever
-    answers this session's questions, as for any top. With `operator`, the ask says that this run's
-    brief or the operator set an operator merge gate, so autonomic routes it to the operator.
-    Merge only on that word, as a merge commit, never a squash, bound to the approved
+    Merge only on that word, as a merge commit, never a squash, bound to that
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
     the orchestrator often sits outside the PR's repository, so every
@@ -261,7 +264,7 @@ Every command's syntax comes from `herdr --skill`.
 
 A role the operator defines in the project file (`config.md`) runs at a named point of
 the run above: `after-implementer` (after step 6), `before-review` (before step 8),
-`after-disposition` (after step 9), `before-merge-ask` (before step 12's ask),
+`after-disposition` (after step 9), `before-merge-ask` (before step 12's merge word: its ask, or under `standing` its merge),
 `at-teardown` (step 12's teardown — release and branch deletion, not step 13's
 handoff). `at: on-demand` has no fixed point, dispatched when wanted — its seat
 counts against the allowance the project file declares, one by default. A declared
@@ -316,13 +319,28 @@ Confirm its turn started, then **stand down**: kill this session's armed
 background waits and its heartbeat, write nothing more to the run file and take no dispatch action. One report must
 wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use and that this one can close.
-A hard stop — the top died with no handoff — has no resume procedure yet (#810): the new top tells the operator and
-continues only as the operator directs.
+**A hard stop** — the top died with no handoff (#810) — is resumed only on the operator's word that it died, after
+three steps a rotation does not need:
+1. Read `run.orchestrator` — pane, machine, session — before any write: the resume's rebind overwrites it.
+2. Stand the old top down. If `herdr pane get <pane>` on its machine (`herdr-mechanics.md`, Machines) still finds the pane, the old top may still hold
+   armed waits: ask the operator to confirm it is dead and to close its pane, or close it on the operator's word,
+   before binding. Never two tops on one run. A pane already gone needs no ask.
+3. Read its transcript, found by `run.orchestrator.session` on its machine: Claude `~/.claude/projects/*/<id>.jsonl`,
+   OMP `~/.omp/agent/sessions/*/*_<id>.jsonl`. Read back from the end to the last step it named: that step, the task
+   or PR in hand, operator words and decisions since its last handoff, and the last action it started. It is context:
+   where it and `run.json` disagree on a fact, `run.json` wins. With no session recorded, no file found, or the old top
+   on another machine, ask the operator once for the transcript path or the next step.
+
+Then **The resume** runs with the transcript in the fresh handoff's place: step 1 reads the file and the transcript,
+and step 6 continues at the step the transcript shows. A dispatch whose attempt the run records is never sent again: step 4
+settles it (an attempt is recorded before its send). Any other action it shows started but not confirmed — an answer or message to a worker, a merge, a tag, a
+branch delete — is checked for its effect first (the worker's pane for a send, GitHub for the rest) and redone only
+when the effect is absent.
 
 **The resume.** The new top resumes by naming the parent's `run.json` path — there is no CLI call:
 1. It reads the file and the fresh handoff.
 2. A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr's stable-agent fallback otherwise — in the same producer loop every other write takes.
-   It writes `run.orchestrator.machine` beside the pane.
+   It writes `run.orchestrator.machine` and `.session` beside the pane (step 1).
    From here every worker's next ping comes to this pane.
 3. If `run.question` is present, it asks it once again.
 4. Per working attempt, first run the generation check against `locator.seen`, for both `phase: recorded` and
@@ -345,8 +363,6 @@ confirms it belongs to the live attempt. A fresh handoff's noted hash and identi
 A live worker dispatched under 0.2.20 or earlier keeps pinging its fixed pane until that dispatch ends; the heartbeat
 covers it.
 
-**Enrolled OMP takeover/clear:** a new top or materially new worker assignment needs fresh trusted launch; editing a running process's env/report/policy cannot enroll it. An enrolled in-place Molt suspends and cancels predecessor work. Current public host events/lineage/stage cannot prove Molt's private pending ownership, so autonomous continuation remains unavailable until a fresh trusted launch. This changes no legacy/Claude Code wait/heartbeat/resume bookkeeping below, and authorizes no automatic relaunch; parent-handback children still end their unit.
-
 **Where molt runs, you molt in place instead.** The top is molt's root: it is never marked a
 molt child, and molt's active marker silences this plugin's hook (0.2.6). molt's two warnings
 (40% and 50% of the window by default) mean: take your next fully acknowledged delivery with
@@ -358,13 +374,15 @@ operator question you are holding. Start no dispatch after it; a wake or message
 you after it is added to it verbatim, never acted on, and end that reply with
 `MOLT-HANDOFF: <path>`. molt runs `/clear` in this pane and seeds the fresh session with the
 handoff. There is no stand-down and no successor launch: the pane, its `HERDR_PANE_ID`, its
-seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and every armed wait
+seat marking (`herdr-mechanics.md` step 2, "A molt is not a launch") and, on Claude Code, every armed wait
 survive the clear, and every worker's ping still reaches this pane, which `run.orchestrator` still names. The resumed top
 reads the handoff and confirms `run.orchestrator` names its own `$HERDR_PANE_ID`, rewriting it
-only where it does not. It arms no wait and no heartbeat the handoff lists: they keep running,
+only where it does not; it always rewrites `run.orchestrator.session` (step 1), since molt's `/clear` starts a new session in this pane. On Claude Code it arms no wait and no heartbeat the handoff lists: they keep running,
 and their notifications are its own. A heartbeat tick the handoff carries means that heartbeat
 has ended: the resumed top arms a fresh one. It runs the generation check once per live
 dispatch against the attempt's `locator.seen`, a carried wake included, so a report
 that landed across the clear is acted on once and retires its listed wait by id; the later
-notification for that generation retires nothing. With `/molt off` the marker goes, the hook
+notification for that generation retires nothing. On OMP the clear cancels every background job the old session
+ran, and molt's seed says so (#855): after that check the resumed top re-arms the wait of each dispatch still live
+and one fresh heartbeat; there is no listed wait left to retire. With `/molt off` the marker goes, the hook
 speaks again, and the rotation above applies.

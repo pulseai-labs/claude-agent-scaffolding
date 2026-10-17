@@ -204,26 +204,27 @@ mode; omit the flags and the `tooling_repo` key is left out entirely (unchanged)
 
 Expected init-log entry: `file <ai_root>/.workspace/pairing.json`.
 
-### 5.5 — Task 8.5: Write CLAUDE.md stub
+### 5.5 — Task 8.5: Write the AGENTS.md stub
 
-Renders the topology-only CLAUDE.md stub. Ossify onboarding owns the
-project-specific router that follows.
-
-```
-"$wi_bin" stub_claude_md "$ai_root" "$name"
-```
-
-Expected init-log entry: `file <ai_root>/CLAUDE.md`.
-
-### 5.6 — Task 8.6: Write AGENTS.md stub
-
-Renders the cross-tool AGENTS.md stub.
+Renders the one instruction file, `AGENTS.md`. Claude Code 2.1.277 or later
+loads it when the workspace has no `CLAUDE.md`; an older Claude Code reads only
+`CLAUDE.md` and sees none of it. Codex and OMP read it directly. Its first
+line is the marker `<!-- workspace-init stub: ossify:start replaces this file -->`;
+ossify 1.24.0 or later replaces a file that starts with it, with no question.
+Continue into ossify 1.24.0 or later: on an older ossify, stop after pairing — do
+not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair until 1.24.0 is
+installed. workspace-init writes no `CLAUDE.md`.
 
 ```
-"$wi_bin" stub_agents_md "$ai_root"
+"$wi_bin" stub_agents_md "$ai_root" "$name"
 ```
 
 Expected init-log entry: `file <ai_root>/AGENTS.md`.
+
+### 5.6 — Task 8.6: (merged into 5.5)
+
+Since 0.10.0 the `AGENTS.md` stub is the only instruction file. There is no
+separate `CLAUDE.md` task.
 
 ### 5.7 — Task 8.7: Write README.md
 
@@ -276,6 +277,10 @@ Next steps:
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
+                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub, and
+                                           # adopt merges its loop section into AGENTS.md; continue into ossify 1.24.0
+                                           # or later — on an older ossify, stop after pairing: do not run
+                                           # /ossify:start, /ossify:adopt or the doctor repair until 1.24.0 is installed
 
 Manifest at: /abs/path/{name}-ai/.workspace/pairing.json
 Init log at: /abs/path/{name}-ai/.workspace/init-log (rollback record)

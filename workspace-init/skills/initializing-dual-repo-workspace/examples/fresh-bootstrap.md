@@ -45,10 +45,9 @@ The skill verifies (per SPEC §8.1):
 2. **Task 8.2: Create root dir pair** — `wi_skeleton_create_root_pair` creates both `/Users/example/projects/foo-ai` and `/Users/example/projects/foo` (empty directories)
 3. **Task 8.3: Seed AI workspace subdirs** — `wi_skeleton_seed_subdirs` creates `.workspace/`, `.claude/`, `docs/`, `docs/specs/`, `.superpowers/`, `.archive/` with `.gitkeep` files; renders `.gitignore`
 4. **Task 8.4: Write pairing manifest** — `wi_manifest_write` writes the v1.0 schema to `.workspace/pairing.json` with fresh-mode defaults (git_remote: null, default_branch: "main")
-5. **Task 8.5: Write CLAUDE.md stub** — `wi_stub_claude_md` renders the router stub at the AI workspace root
-6. **Task 8.6: Write AGENTS.md stub** — `wi_stub_agents_md` renders the cross-tool agents reference
-7. **Task 8.7: Write README.md** — `wi_stub_readme` renders the AI workspace README with project name and next-steps guidance
-8. **Task 8.8: Git init + hooks + stage** — three sub-steps:
+5. **Task 8.5: Write the AGENTS.md stub** — `wi_stub_agents_md` renders the one instruction file at the AI workspace root, marker on line 1
+6. **Task 8.7: Write README.md** — `wi_stub_readme` renders the AI workspace README with project name and next-steps guidance
+7. **Task 8.8: Git init + hooks + stage** — three sub-steps:
    - `wi_git_init_pair` initializes both repos with `git init`
    - `wi_trace_filter_install_pair` installs `commit-msg` hook in both `.git/hooks/` directories
    - `wi_git_stage_ai_workspace` stages all files in the AI workspace (canonical stays empty)
@@ -62,8 +61,7 @@ After bootstrap completes, the AI workspace at `/Users/example/projects/foo-ai` 
 - `docs/.gitkeep`, `docs/specs/.gitkeep`
 - `.superpowers/.gitkeep`
 - `.archive/.gitkeep`
-- `CLAUDE.md` — topology stub
-- `AGENTS.md` — cross-tool agents reference
+- `AGENTS.md` — the one instruction file (temporary stub)
 - `README.md` — AI workspace guide
 - `.gitignore` — rendered from template
 - `.git/hooks/commit-msg` — trace filter (executable; not tracked by git)
@@ -173,6 +171,10 @@ Next steps:
   4. /ossify:start                         # bare canonical; routes to /ossify:adopt if source or history is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # a recorded tooling repo that already carries history refuses it too, with no supported ossify continuation yet
+                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub, and
+                                           # adopt merges its loop section into AGENTS.md; continue into ossify 1.24.0
+                                           # or later — on an older ossify, stop after pairing: do not run
+                                           # /ossify:start, /ossify:adopt or the doctor repair until 1.24.0 is installed
 
 Manifest at: /Users/example/projects/foo-ai/.workspace/pairing.json
 Init log at: /Users/example/projects/foo-ai/.workspace/init-log (rollback record)

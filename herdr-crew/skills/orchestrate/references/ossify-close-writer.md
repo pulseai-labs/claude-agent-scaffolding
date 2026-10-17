@@ -36,12 +36,12 @@ PLACEMENT: REPO_ROOT — the worktree holding this repo's spine branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 SPINE_ID=<spine id>
 REPO=<the declared `target_repo` identifier for this writer's repo — it exists
 for remote and remote-less repos alike>
 REPO_ROOT=<abs path of this repo's spine worktree>
-WRITER_COMMAND=<the command this seat was launched with, as the operator named it>
+WRITER_COMMAND=<the command this seat was launched with, as the operator named it> — a record of your own launch: you are already that seat, never run it
 WRITER_EXPECTED_MODEL=<the model the banner or screen must show>
 WRITER_EFFORT=<the effort this seat was launched at>
 ACCEPTED_LEDGER=<the accepted fix-now findings whose `target_repo` is this

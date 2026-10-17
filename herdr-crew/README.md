@@ -5,7 +5,7 @@ The orchestrator/worker session model over herdr. One prose skill, no runtime li
 One orchestrator session keeps its context for decisions and dispatches everything else
 to worker sessions launched by seat name through herdr — the seats defined in the
 operator's own files, not in this plugin. A planned-work seat and a bounded-work seat
-implement by complexity class, one reviewer seat runs `/code-review` once per PR and
+implement by complexity class, one reviewer seat runs its review command (`/code-review` by default) once per PR and
 returns its findings through its report file, the retained implementer works GitHub
 threads to zero, and the merge waits for the operator's word.
 
@@ -63,7 +63,7 @@ verifier session.
 | Orchestrator | this session — the operator launches it | |
 | Implementer, planned | a seat the project file names | `contract`, and the default when unclassified |
 | Implementer, fast | a seat the project file names | `bounded` |
-| Reviewer | a seat with `slash-commands`, `/code-review <PR>` once | |
+| Reviewer | a seat with `slash-commands` for `/code-review <PR>`, or its agent's `review:` command; once | |
 | Verifier | a seat the project file names — the work-item verify; read-only probes and mechanical runs may take a lighter one. Read-only | |
 | Operator | the human: the merge word | |
 
@@ -121,13 +121,13 @@ Every launch that places a seat in a herdr pane marks it, in the pane, before th
 marked with its role and `SEAT_MODS_ALLOW`; a coordinator seat — the spine, close or work-PR
 session, the doctor session, the lane driver — with `SEAT_MODS_ROLE=coordinator`; and
 the top's rotation successor with `SEAT_MODS_ROLE=orchestrator`. The two free roles
-carry no `SEAT_MODS_ALLOW` except for an OMP lane driver, close or doctor coordinator (config.md), which adds each hosting repo's `.worktrees` root (colon-separated roots). Never through `settings.json`'s `env`, a shell profile or a
+carry no `SEAT_MODS_ALLOW` except for an OMP coordinator (config.md), which adds each hosting repo's `.worktrees` root (colon-separated roots). Never through `settings.json`'s `env`, a shell profile or a
 `command:` line. The operator's own top is launched by the operator, through an alias that
 sets `orchestrator`; herdr-crew launches no top but a rotation successor.
 Since 0.2.18, an OMP launcher reads autonomic 0.7.0's live mode file via `AUTONOMIC_MODE_FILE`;
 Claude Code keeps reading `AUTONOMIC_EFFECTIVE_MODE`. Only an exact `autopilot` marks a child; unset, missing or older autonomic is manual.
 
-Since 0.2.17, OMP coordinator and worker seats launch through `omp-seat` (see `references/config.md`); OMP seats fill the lane driver (default-lane spine session), close, doctor or worker seats, and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4) — never a work-PR session or an activated spine session until a live OMP seat-launching run lifts it (#788).
+Since 0.2.17, OMP coordinator and worker seats launch through `omp-seat` (see `references/config.md`); OMP seats fill the lane driver (default-lane spine session), close, doctor or worker seats, and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4); since 0.2.23, also the activated spine session (`omp-seat crew-spine`) and the work-PR session (`omp-seat crew-work-pr`; omp-roles 0.6.0), which run 788 lifted (#788).
 
 **Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
 invalid role and denies every tool call, so herdr-crew 0.2.7 must be installed together
@@ -162,7 +162,7 @@ dispatcher's own run file only when herdr detects its pane and the seat shares i
 the sentinel `none` — and after every atomic report rename the worker sends one literal
 `REPORT READY: <task> <kind> <path>` line to the pane read then, single-quoted as one argument and skipped
 when the run file is `none`, its read fails or its machine differs from `NOTIFY_MACHINE`: one send, no `--wait`, no retry, and a failed send leaves the report
-intact. A parent herdr cannot target keeps the report-file wait and this heartbeat, no push
+intact. A skipped or failed send is never an answer: after a plan or a question the worker waits at that gate (#810). A parent herdr cannot target keeps the report-file wait and this heartbeat, no push
 promised. The parent consumes a given hash/identity generation once and retires that
 dispatch's wait when it does; a ping naming a path other than the briefed report path is
 surfaced, never read.
@@ -236,7 +236,7 @@ has one fixed path.
   unavailable.
 - The agents named in `~/.claude/herdr-crew/agents.md` resolvable where their pane
   runs; one that is not shows `command not found` and stops that dispatch.
-- The `/code-review` skill available to the reviewer session. If it is unavailable, the
+- The review command (`/code-review` by default, or the agent's `review:`) available to the reviewer session. If it is unavailable, the
   reviewer reports that in its report file and the operator decides.
 - The target repository's ruleset requires conversation resolution before merge, so
   GitHub itself refuses a merge while any review thread is open.

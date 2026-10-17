@@ -190,7 +190,10 @@ test_printed_skill_routes_point_to_ossify() {
   # AGENTS.md work is committed before the route, or A3 refuses on the dirt that
   # step itself created.
   assert_contains 'only for a project previously onboarded with the legacy scaffold stack' "$dual_sec" || return 1
-  assert_contains 'author and commit before' "$dual_sec" || return 1
+  # #768: step 3 now routes the leftover CLAUDE.md to /ossify:doctor, which authors
+  # the repair — so the block says the user *reviews and commits* the result, rather
+  # than authoring the file themselves. Same commitment before the route (A3).
+  assert_contains 'review and commit before' "$dual_sec" || return 1
 
   local sec
   for sec in "$init_sec" "$pair_sec" "$dual_sec"; do
@@ -258,7 +261,6 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   # plugin entries in the shared catalogs are accurate hosted-but-deprecated
   # documentation and are deliberately out of scope.
   local files=(
-    "$WI_PLUGIN_ROOT/templates/CLAUDE.md.stub.tmpl"
     "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl"
     "$WI_PLUGIN_ROOT/templates/README.md.tmpl"
     "$WI_PLUGIN_ROOT/templates/gitignore.tmpl"
@@ -426,6 +428,260 @@ test_skills_resolve_wi_bin_before_first_use() {
   return "$rc"
 }
 
+# --- #768: workspace-init writes AGENTS.md only ---
+
+# The detector both the scan and its adjacent control run, so the control
+# cannot pass by exercising a different predicate than the one that scans.
+names_claude_md_stub() { # $1=file -> 0 when the file names a CLAUDE.md stub
+  grep -Fq 'stub_claude_md' "$1" || grep -Fq 'CLAUDE.md stub' "$1" || grep -Fq 'Write CLAUDE.md' "$1"
+}
+
+# scan_claude_md_stub_mentions <plugin-root>
+# Prints one path per offending file; rc 1 (with a message) when the globs match
+# nothing at all, so an empty tree cannot report a clean scan having read none.
+scan_claude_md_stub_mentions() { # $1=plugin root
+  local root="$1" f hits="" scanned=0
+  for f in "$root"/skills/*/SKILL.md "$root"/skills/*/examples/*.md \
+           "$root"/templates/*.tmpl "$root/README.md"; do
+    [[ -f "$f" ]] || continue
+    scanned=$((scanned + 1))
+    if names_claude_md_stub "$f"; then hits="$hits $f"; fi
+  done
+  if [[ "$scanned" -eq 0 ]]; then
+    echo "    the surface globs matched no files under $root"; return 1
+  fi
+  [[ -z "$hits" ]] || printf '%s\n' "${hits# }"
+  return 0
+}
+
+test_no_claude_md_stub_on_any_surface() {
+  # #768: workspace-init writes AGENTS.md only. No skill, example or template
+  # may still tell a model to write or expect a CLAUDE.md stub.
+  local hits
+  hits="$(scan_claude_md_stub_mentions "$WI_PLUGIN_ROOT")" || return 1
+  [[ -z "$hits" ]] || { echo "    still names a CLAUDE.md stub:$hits"; return 1; }
+  # Positive control: the skills still name the one stub they do write.
+  grep -Fq 'stub_agents_md' "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" || { echo "    fresh skill lost stub_agents_md"; return 1; }
+  grep -Fq 'stub_agents_md' "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md" || { echo "    pair skill lost stub_agents_md"; return 1; }
+  # Adjacent control: the same predicate still fires on a file that names one.
+  # Written outside the tree — this suite must not leave files in the plugin.
+  local probe
+  probe="$(mktemp "${TMPDIR:-/tmp}/wi-probe.XXXXXX")"
+  printf 'Write CLAUDE.md for the workspace\n' > "$probe"
+  if names_claude_md_stub "$probe"; then :; else
+    rm -f "$probe"
+    echo "    the detector no longer fires on a CLAUDE.md stub mention"; return 1
+  fi
+  rm -f "$probe"
+}
+
+test_claude_md_stub_scan_fails_on_an_empty_surface() {
+  # D13: the guard's own path. A root with no matching files must report RED,
+  # never a green scan of nothing — and the real root must still come back clean,
+  # which is the adjacent control above.
+  local empty
+  empty="$(mktemp -d "${TMPDIR:-/tmp}/wi-empty-surface.XXXXXX")"
+  if scan_claude_md_stub_mentions "$empty" >/dev/null 2>&1; then
+    rmdir "$empty" 2>/dev/null
+    echo "    an empty surface reported a clean scan"; return 1
+  fi
+  rmdir "$empty" 2>/dev/null
+}
+
+test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c() {
+  # D1/D2: the stub replaces itself and the Scenario C route relies on doctor's
+  # repair; both ship in ossify 1.24.0, and a shipped 1.23.0 does neither. Each
+  # surface must say so, and must keep the by-hand route the PR removed.
+  local tmpl dual
+  tmpl="$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")"
+  dual="$(cat "$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md")"
+  assert_contains 'ossify 1.24.0 or later replaces a file that starts with the marker' "$tmpl" || return 1
+  assert_not_contains '`/ossify:start` replaces the whole file' "$tmpl" || return 1
+  local s
+  for s in "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
+           "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"; do
+    assert_contains 'ossify 1.24.0 or later replaces a file that starts with it' "$(cat "$s")" || return 1
+  done
+  assert_contains 'ossify 1.24.0 or later' "$dual" || return 1
+  # D4: the blanket "Specs … belong here" contradicted the manifest's routing,
+  # which sends prd/srs/product_adrs to the canonical. The old stub had the
+  # distinction; the fold dropped it. D25 adds MASTER-SPEC, which routing sends
+  # to the AI workspace (`pairing.json.tmpl:76`).
+  assert_contains 'Sprint specs, `MASTER-SPEC.md`, the memory bank and process records belong here.' "$tmpl" || return 1
+  assert_contains 'PRDs and SRSs also go to the' "$tmpl" || return 1
+  assert_not_contains 'Specs, the memory bank and process records belong here.' "$tmpl" || return 1
+  # D5: the §4 scan must name the `.claude/` copy too, which step 3 covers.
+  assert_contains '- `${ai_root}/.claude/CLAUDE.md`' "$dual" || return 1
+  # D19/D21/D27-29 (round 4, narrowing): workspace-init 0.10.0 no longer describes
+  # or routes an ossify older than 1.24.0 at all. Every site that used to carry a
+  # version-conditioned older-ossify route now carries the one narrowing sentence
+  # instead, and none may tell the user to delete or merge `CLAUDE.md` outside the
+  # 1.24.0 doctor repair or a 1.24.0 adopt.
+  local narrow='on an older ossify, stop after pairing'
+  local sites=(
+    "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl"
+    "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md"
+    "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/examples/fresh-bootstrap.md"
+    "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"
+    "$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md"
+  )
+  local s n=0
+  for s in "${sites[@]}"; do
+    n=$((n + 1))
+    assert_contains "$narrow" "$(cat "$s")" || return 1
+  done
+  # Adjacent control: the list is the one intended, and it is not empty.
+  [[ "$n" -eq 5 ]] || { echo "    the narrowing-site list changed size: $n"; return 1; }
+  # The route itself: no `/ossify:start` or `/ossify:adopt` before 1.24.0.
+  assert_contains 'do not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed' \
+    "$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")" || return 1
+  # The dual skill wraps the sentence across lines, so flatten whitespace first —
+  # a literal substring test cannot see across the wrap (and this is exactly the
+  # trap that made three earlier assertions fail on a rewrap).
+  local dual_flat
+  dual_flat="$(printf '%s' "$dual" | tr '\n' ' ' | tr -s ' ')"
+  assert_contains 'do not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed' \
+    "$dual_flat" || return 1
+  # Scenario C: on an older ossify the leftover `CLAUDE.md` stays put. A mutation
+  # back to "merge `CLAUDE.md` into `AGENTS.md`" would satisfy the interop check by
+  # deleting a file shipped adopt 1.23.0 then refuses to start without, so this is
+  # the pin that keeps the removal out.
+  assert_contains 'leave the leftover `CLAUDE.md` exactly where it is' "$dual_flat" || return 1
+  # What 1.24.0 or later does is kept, on every surface that names it.
+  assert_contains 'On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`' \
+    "$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")" || return 1
+  assert_contains 'adopt merges its loop section into' "$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")" || return 1
+  assert_contains 'It moves or merges `CLAUDE.md` into `AGENTS.md`' "$dual_flat" || return 1
+  # The Claude Code 2.1.277 sentence is not ossify and stays on every surface.
+  assert_contains 'Claude Code 2.1.277 or later' "$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")" || return 1
+  assert_contains 'an older Claude Code reads only `CLAUDE.md`' \
+    "$(printf '%s' "$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")" | tr '\n' ' ' | tr -s ' ')" || return 1
+  # Adjacent control: the older-ossify descriptions and the by-hand route are gone
+  # from every shipped surface. Each of these strings was asserted present by the
+  # previous round and must now be absent. Case-insensitive: the first version was
+  # case-sensitive and a sentence-initial "On an older ossify it" SURVIVED it.
+  local gone='an older ossify does|on an older ossify it|merge by hand|1\.23\.0'
+  local f hit
+  for f in "$WI_PLUGIN_ROOT"/templates/*.tmpl "$WI_PLUGIN_ROOT"/skills/*/SKILL.md \
+           "$WI_PLUGIN_ROOT"/skills/*/examples/*.md "$WI_PLUGIN_ROOT/README.md"; do
+    [[ -f "$f" ]] || continue
+    if hit="$(grep -Eni "$gone" "$f")"; then
+      echo "    older-ossify route survives in $f"; printf '%s\n' "$hit"; return 1
+    fi
+  done
+  # …and the control's own teeth: the same predicate must still fire on the text
+  # it exists to reject. Locally written, never in the tree.
+  local probe
+  probe="$(mktemp "${TMPDIR:-/tmp}/wi-gone.XXXXXX")"
+  printf 'On an older ossify it merges that section into CLAUDE.md.\n' > "$probe"
+  if grep -Eni "$gone" "$probe" >/dev/null; then :; else
+    rm -f "$probe"
+    echo "    the older-ossify detector no longer fires"; return 1
+  fi
+  rm -f "$probe"
+}
+
+test_marker_string_matches_across_surfaces() {
+  # D14: the marker is a contract between workspace-init and ossify's /start.
+  # The skills quote it in prose; the template mints it. A typo in either would
+  # ship a stub ossify never recognises.
+  local marker='<!-- workspace-init stub: ossify:start replaces this file -->'
+  local tmpl_first
+  tmpl_first="$(head -n 1 "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")"
+  assert_eq "$marker" "$tmpl_first" || return 1
+  local s
+  for s in "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md" \
+           "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md"; do
+    grep -Fq "$marker" "$s" || { echo "    $s does not quote the template marker verbatim"; return 1; }
+  done
+}
+
+test_claude_code_fallback_is_version_gated() {
+  # D20: the `AGENTS.md` fallback shipped in Claude Code 2.1.277 (release
+  # v2.1.277, 2026-09-18). This release stops writing CLAUDE.md, so on an older
+  # or enterprise-pinned client a fresh workspace loads no project instructions
+  # at all — every surface that states the fallback must name the floor.
+  local tmpl init_s pair_s chg
+  tmpl="$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")"
+  init_s="$(cat "$WI_PLUGIN_ROOT/skills/initializing-dual-repo-workspace/SKILL.md")"
+  pair_s="$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")"
+  chg="$(cat "$WI_PLUGIN_ROOT/CHANGELOG.md")"
+
+  assert_contains 'Claude Code 2.1.277 or later loads it when the' "$tmpl" || return 1
+  assert_contains 'an older Claude Code reads only `CLAUDE.md`' "$tmpl" || return 1
+  assert_contains 'Claude Code 2.1.277 or later' "$init_s" || return 1
+  assert_contains 'Claude Code 2.1.277 or later' "$pair_s" || return 1
+  assert_contains 'Claude Code **2.1.277 or later** loads it as project instructions' "$chg" || return 1
+  # Adjacent control: the unqualified claim, and the "measured on" wording the
+  # design used for its probe, must be gone from the shipped surfaces.
+  assert_not_contains 'Claude Code, Codex, OMP and other agents read it' "$tmpl" || return 1
+  assert_not_contains 'measured on Claude Code 2.1.300' "$chg" || return 1
+  assert_not_contains 'Claude Code loads it when the' "$tmpl" || return 1
+}
+
+test_release_record_matches_the_shipped_files() {
+  # D23/D24: the release record and a test header carry claims about files that
+  # can drift from them. Three of these were wrong in round 1 (R2 found them) and
+  # each mutation SURVIVED until this test existed.
+  local chg hdr
+  chg="$(cat "$WI_PLUGIN_ROOT/CHANGELOG.md")"
+  hdr="$(sed -n '1,10p' "$WI_PLUGIN_ROOT/tests/test-stubs.sh")"
+  # The "grown organically" pointer lives in `pairing-canonical-repo` §1, not in
+  # `pairing-existing-dual` — verify the fact before pinning the claim.
+  local dual_s
+  dual_s="$(cat "$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md")"
+  grep -Fq 'grown organically' "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md" \
+    || { echo "    the pointer no longer lives in pairing-canonical-repo"; return 1; }
+  case "$dual_s" in
+    *'grown organically'*) echo "    pairing-existing-dual now holds the pointer too — update the claim"; return 1 ;;
+  esac
+  assert_contains 'pointer paragraph in `pairing-canonical-repo` §1 names' "$chg" || return 1
+  assert_contains 'section plus the canonical-and-ossify continuation sections from the old `CLAUDE.md` stub' "$chg" || return 1
+  # The header's count must equal the runners that file actually declares.
+  local runners
+  runners="$(grep -c 'wi_test_run' "$WI_PLUGIN_ROOT/tests/test-stubs.sh")"
+  assert_contains "Covers ($runners tests)" "$hdr" || return 1
+  assert_not_contains 'SPEC §8.5' "$hdr" || return 1
+}
+
+test_layout_tree_versions_match_manifests() {
+  # D7: the root README's Layout tree carries a hand-maintained `(vX.Y.Z)` per
+  # plugin, and workspace-init's had drifted to v0.8.0 two releases behind. The
+  # catalog row above is read from the manifest; this tree was not. Pin every
+  # label to its own manifest so the next bump cannot leave a stale one.
+  local layout n=0 d v m
+  # Fence-aware: `sed -n '/^## Layout$/,/^```$/p'` closes on the OPENING fence
+  # and returns three lines. Enter on the heading, then skip one fence, then
+  # collect until the fence that closes the block.
+  layout="$(awk '
+    /^## Layout$/ { inblock=1; next }
+    inblock && /^```/ { if (fence++) exit; next }
+    inblock { print }
+  ' "$ROOT_README")"
+  [[ -n "$layout" ]] || { echo "    Layout block not found in the root README"; return 1; }
+  while IFS= read -r line; do
+    case "$line" in
+      *'plugin (v'*|*'lifecycle (v'*|*'roles'*'orchestrator (v'*) ;;
+      *) continue ;;
+    esac
+    d="$(printf '%s' "$line" | sed -E 's/^[^ ]+ ([a-z-]+)\/.*/\1/')"
+    [[ -d "$REPO_ROOT/$d" ]] || { echo "    Layout names a missing dir: $d"; return 1; }
+    v="$(printf '%s' "$line" | grep -oE '\(v[0-9.]+' | sed 's/(v//')"
+    m="$(jq -r .version "$REPO_ROOT/$d/.claude-plugin/plugin.json" 2>/dev/null)"
+    [[ -n "$m" && "$m" != null ]] || m="$(jq -r .version "$REPO_ROOT/$d/package.json" 2>/dev/null)"
+    [[ "$v" == "$m" ]] || { echo "    $d: Layout says v$v, manifest says $m"; return 1; }
+    n=$((n + 1))
+  done <<<"$layout"
+  # Adjacent control: the scan must have found the rows, not passed vacuously.
+  [[ "$n" -ge 10 ]] || { echo "    only $n version labels found in the Layout tree"; return 1; }
+}
+
+test_existing_dual_scans_both_instruction_files() {
+  local s="$WI_PLUGIN_ROOT/skills/pairing-existing-dual/SKILL.md"
+  grep -Fq '`${ai_root}/AGENTS.md`' "$s" && grep -Fq '`${ai_root}/CLAUDE.md`' "$s" || { echo "    scan list must name both files"; return 1; }
+  grep -Fq '/ossify:doctor' "$s" || { echo "    next steps must route a CLAUDE.md to the doctor repair"; return 1; }
+}
+
 # --- run all ---
 wi_test_run test_init_skill_file_exists
 wi_test_run test_pair_skill_file_exists
@@ -451,5 +707,13 @@ wi_test_run test_launcher_steps_name_both_surfaces
 wi_test_run test_ai_dir_name_flag_reaches_skills_and_commands
 wi_test_run test_readme_links_stay_inside_the_plugin
 wi_test_run test_skills_resolve_wi_bin_before_first_use
+wi_test_run test_no_claude_md_stub_on_any_surface
+wi_test_run test_claude_md_stub_scan_fails_on_an_empty_surface
+wi_test_run test_marker_string_matches_across_surfaces
+wi_test_run test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c
+wi_test_run test_claude_code_fallback_is_version_gated
+wi_test_run test_release_record_matches_the_shipped_files
+wi_test_run test_layout_tree_versions_match_manifests
+wi_test_run test_existing_dual_scans_both_instruction_files
 
 wi_test_summary

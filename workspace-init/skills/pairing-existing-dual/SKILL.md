@@ -9,7 +9,7 @@ description: Use when the user says "pair my existing workspace", "wire up an ex
 
 This skill handles **Scenario C** (per **SPEC §9** — the third pairing scenario, alongside Scenario A `pairing-canonical-repo` and the deferred Scenario B): **both repos already exist and are populated.** A project that pre-dates the plugins often grew a memory-bank, specs, and handoffs in a sibling AI-workspace directory before the user installed workspace-init and ossify. The canonical holds production code. Neither was created by workspace-init, and there is no pairing manifest tying them together yet.
 
-This skill does the minimum to wire them up: it **writes the `.workspace/pairing.json` manifest** into the existing AI workspace and **installs the trace-filter `commit-msg` hook** (always in canonical; also in the AI workspace when it is itself a git repo). It does NOT create the AI workspace, seed its subdirectories, write CLAUDE.md / AGENTS.md / README.md stubs, or seed a memory bank — that content already exists and is the user's. **Nothing under the existing AI workspace is overwritten.**
+This skill does the minimum to wire them up: it **writes the `.workspace/pairing.json` manifest** into the existing AI workspace and **installs the trace-filter `commit-msg` hook** (always in canonical; also in the AI workspace when it is itself a git repo). It does NOT create the AI workspace, seed its subdirectories, write AGENTS.md / README.md stubs, or seed a memory bank — that content already exists and is the user's. **Nothing under the existing AI workspace is overwritten.**
 
 Auto-invokes on phrases like "pair my existing AI workspace", "both repos already exist, wire them up", "add a manifest to my existing dual-repo setup". Also runs via `/pair-existing-dual <ai-workspace-abs-path> <canonical-abs-path>`.
 
@@ -54,7 +54,9 @@ Then **detect and surface** the existing AI-workspace scaffolding so the user ca
 
 - `${ai_root}/.claude/memory-bank/` (and a count of files under it)
 - `${ai_root}/docs/MASTER-SPEC.md` or `${ai_root}/MASTER-SPEC.md`
+- `${ai_root}/AGENTS.md`
 - `${ai_root}/CLAUDE.md`
+- `${ai_root}/.claude/CLAUDE.md`
 - `${ai_root}/docs/specs/` (and a count of spec files under it)
 
 Unlike Scenario A's §4 marker check, this is **NOT an abort** — finding these markers is exactly what Scenario C expects. Log them as *"existing state to preserve"* and proceed.
@@ -125,7 +127,7 @@ If either repo already has a `commit-msg` hook, the trace-filter install refuses
 
 - **No `mkdir` of the AI workspace or canonical** — both already exist.
 - **No `skeleton_seed_subdirs`** — the AI workspace already has its layout.
-- **No `stub_claude_md` / `stub_agents_md` / `stub_readme`** — those files already exist and are the user's; overwriting them is the cardinal Scenario-C sin.
+- **No `stub_agents_md` / `stub_readme`** — those files already exist and are the user's; overwriting them is the cardinal Scenario-C sin.
 - **No memory-bank seed** — already populated.
 - **No `git init` of either repo, no staging, no commit.**
 
@@ -167,14 +169,26 @@ Next steps:
      `ai_workspace.git_tracked` value and the AI-side trace filter is installed (§6.2), then
      commit.
   2. Open the workspace in Claude/Codex; ossify resolves pairing.json as topology.
-  3. Make the workspace legible to Codex before you continue: ossify's interop check fails while
-     `AGENTS.md` is missing or never names ossify, and it reports rather than repairs. Author that
-     file, or merge an ossify section into the one you already have — keep whatever is already in
-     it. This skill writes no project guidance, so the file is yours to author and commit before
-     step 4.
+  3. Make `AGENTS.md` the workspace's one instruction file before you continue. ossify's interop
+     check fails while `AGENTS.md` is missing or never names ossify — that is its `agents_md` check,
+     and it is real. Claude Code loads `CLAUDE.md` and ignores `AGENTS.md` whenever both exist, so a
+     leftover `CLAUDE.md` (root or `.claude/`) shadows this file until it is gone.
+     - **ossify 1.24.0 or later:** run `/ossify:doctor` (on Codex or OMP, the `doctor` skill) and
+       accept its interop repair. It moves or merges `CLAUDE.md` into `AGENTS.md` and shows you the
+       result first; review and commit before step 4.
+     - **An older ossify:** leave the leftover `CLAUDE.md` exactly where it is. Continue into
+       ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`,
+       `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.
+     This skill writes no project guidance.
   4. Run `/ossify:adopt` only for a project previously onboarded with the legacy scaffold stack —
      without that stack there is no supported ossify continuation yet (or `/ossify:start` if the
      canonical is empty); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     - **`/ossify:start` (empty canonical):** on ossify 1.24.0 or later it replaces the marked
+       `AGENTS.md`; it is the route that writes the one instruction file.
+     - **`/ossify:adopt` (legacy scaffold stack only):** on ossify 1.24.0 or later, adopt merges
+       its loop section into `AGENTS.md`. Continue into ossify 1.24.0 or later: on an older ossify,
+       stop after pairing — do not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair
+       until 1.24.0 is installed.
   5. Adoption refuses while any tree it will edit is dirty: the AI workspace, the canonical, and
      every repo the topology declares must all be clean — tracked and untracked — with each
      declared repo on the default branch the manifest declares (otherwise adoption names the
@@ -183,7 +197,7 @@ Next steps:
 
 ## 10. Discipline rules
 
-- **NEVER overwrite existing AI-workspace files** (CLAUDE.md, AGENTS.md, README.md, memory-bank, specs). The only file this skill authors inside the AI workspace is `.workspace/pairing.json` (+ init-log).
+- **NEVER overwrite existing AI-workspace files** (AGENTS.md, CLAUDE.md, README.md, memory-bank, specs). The only file this skill authors inside the AI workspace is `.workspace/pairing.json` (+ init-log).
 - **NEVER touch the canonical working tree.** The ONLY canonical-side change is `<canonical>/.git/hooks/commit-msg`.
 - **NEVER `git init` the user's existing AI workspace** — if it is not a git repo, skip its hook and note it; the user decides whether to make it one.
 - **NEVER auto-commit, push, pull, or fetch** in either repo.

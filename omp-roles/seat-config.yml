@@ -1,0 +1,4 @@
+# omp-seat passes this overlay to every seat (--config). omp's todo reminders restart a stopped turn while todos
+# are open, so a seat cannot go idle for molt's handoff (#843). The todo tool itself stays on.
+todo:
+  reminders: false

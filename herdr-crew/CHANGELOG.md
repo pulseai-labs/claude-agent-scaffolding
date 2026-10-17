@@ -9,6 +9,30 @@ All notable changes to the `herdr-crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.2.28
+
+**A top that molts in place on OMP re-arms its waits** (#855). omp cancels every background job a session owns when it clears that session, so on OMP the armed waits and the heartbeat do not survive a molt; molt 0.3.3's seed says so. The molt-in-place paragraph now scopes "every armed wait survives the clear" and "it arms no wait the handoff lists" to Claude Code. On OMP, after its generation check, the resumed top re-arms the wait of each dispatch still live and one fresh heartbeat.
+
+## 0.2.27
+
+**The reviewer's command is configurable** (operator, 2026-10-16). A machine entry may declare `review:`, the command a reviewer seat on that agent runs, with `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP). An entry with no `review:` keeps `/code-review <PR> <LEVEL>`. Both reviewer briefs carry the filled command as `REVIEW_INVOCATION`, which replaces the work-PR brief's `REVIEW_LEVEL`. The `can:` table's reviewer row needs `slash-commands` when the command the reviewer runs is a slash command. Lifecycle step 8, roles.md, SKILL.md and the README name the review command instead of `/code-review`.
+
+## 0.2.26
+
+**A run resumes after its top dies with no handoff** (#810; operator rulings 2026-10-16). Every bind now records `run.orchestrator.session`, herdr's `agent_session` for the top's pane — the top's own bind, a spine or work-PR session's, and a top that molts in place (molt's `/clear` starts a new session in the same pane). On the operator's word that the old top died, a new top told to bind the run runs three steps before the resume: it reads `run.orchestrator` before any write, stands the old top down (the operator confirms and closes a pane that still exists: never two tops on one run), and reads the dead top's transcript, found by that session id, for the step in hand, decisions in flight and the last action started. Then the rotation's resume runs with the transcript in the handoff's place: `run.json` wins on facts, a dispatch whose attempt the run records is never sent again (the resume's generation check settles it), and any other started but unconfirmed send, merge, tag or branch delete is checked for its effect before it is redone. Every brief's PING line now says a skipped or failed send is never an answer: a worker with a plan or a question waits at that gate (run B's implementer started without approval).
+
+## 0.2.25
+
+**A standing merge word merges with no ask** (#837). With `run.merge_word: standing`, lifecycle step 12 no longer asks anyone: the operator's standing word is the merge word, and a clean gate set on the head SHA (every check green, every finding fixed or logged as debt through merge-bar) is the agreed condition, so the top merges, pinned to that SHA. With `operator`, it still asks the operator. Live OMP tops in runs A3 and B already merged this way; the text now matches. SKILL.md's work-PR paragraph and `ossify-nested-run.md` answer a work-PR session's merge ask by the same rule.
+
+## 0.2.24
+
+**Seat-driving fixes from the OMP friction review** (part of #845). Every launch-record line in a brief (`SEAT_COMMAND`, `SPINE_COMMAND`, `CLOSE_COMMAND`, `WORKPR_COMMAND`, `WRITER_COMMAND`) says it records the seat's own launch and is never run: an OMP implementer ran one and started a nested console. The OMP host notes now tell the top, and an OMP coordinator for the seats it drives, to pass `timeout: 0` on every bash async job (omp's default deadline is 300 s) and never `name:`, which puts omp's bash in service mode and refuses async and timeout. The readiness text says that before detection (about a second after `pane run`) `agent list` omits the pane and `agent get`/`agent wait` answer `agent_not_found`: ask again for up to five seconds, then take the not-detected path.
+
+## 0.2.23
+
+**OMP may fill the activated spine session and the work-PR session** (#788, #839). Run 788 ran both on OMP (GLM-5.3) and passed. config.md's placement sentence and README's copy now allow them, through omp-roles 0.6.0's `crew-spine` and `crew-work-pr` roles. Those roles take the brief as the procedure and launch every seat as a herdr pane, so they no longer contradict it, as the default-lane `spine-driver` and `work-pr` roles did. The `can:` table's OMP doctor row now also covers the activated spine session, the ossify item implementer (`omp-seat worker`) and the work-PR session: each reaches its skill by `skill://` and needs no `slash-commands`. Both new OMP coordinators get each hosting repo's `.worktrees` root in `SEAT_MODS_ALLOW`, as the lane driver, close and doctor sessions already do.
+
 ## 0.2.22
 
 **A rotation resumes from run state** (#819, part of #810). The rotation's resume is one procedure from `run.json`: rebind; re-ask an open `run.question`; run the generation check against `locator.seen` and re-arm each live attempt's waits; arm one heartbeat; continue at the handoff's next step, never re-running a done one. A resume after a hard stop (the top died with no handoff) is not claimed: the new top tells the operator (#810). The rotation handoff shrinks to the run path, the next step and the context the run file cannot hold, and restates no operator gate: for the merge it points at step 12 and `run.merge_word`, which step 12 now reads. Legacy run files resume with stated defaults. A molted top reads `locator.seen`. A brief sent to a seat already running now opens its attempt with phase and locator like a launch.

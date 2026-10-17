@@ -20,8 +20,10 @@ export type RuleId =
 
 export type Place = 'worktree' | 'allow' | 'outside'
 
-export type Removal = { place: Place; protected: boolean }
-export type Facts = { kind: 'bash'; rules: readonly RuleId[]; removals?: readonly Removal[] } | { kind: 'write'; place: Place }
+// `unresolved`: the guard could not read the operand's shell word ($VAR, `…`, {…}, a relative path after cd): UNREAD.
+export type Removal = { place: Place; protected: boolean; unresolved?: boolean }
+// `allow`: the SEAT_MODS_ALLOW folders, named in an outside write's deny text as the place for scratch files.
+export type Facts = { kind: 'bash'; rules: readonly RuleId[]; removals?: readonly Removal[] } | { kind: 'write'; place: Place; allow?: readonly string[] }
 
 // Rules every herdr-crew brief of every role shares (spec §4).
 const COMMON: readonly RuleId[] = ['merge', 'force-push', 'branch-delete', 'no-verify', 'ai-trailer']
@@ -417,16 +419,23 @@ export function decide(role: Role, facts: Facts): string | undefined {
   if (facts.kind === 'bash') {
     const hit = facts.rules.find(rule => profile.deny.includes(rule))
     if (hit !== undefined) return denyText(role, RULE_TEXT[hit], 'run this command')
+    // #844: an operand the guard cannot read gets its own text, which says how to make it readable.
+    if (facts.removals?.some(target => target.unresolved))
+      return `${denyText(role, 'no rm with an operand the guard cannot resolve', 'run this command')} ${RM_LITERAL}`
     if (facts.removals?.some(target => target.protected || !profile.writeIn.includes(target.place)))
-      return denyText(role, 'no rm outside writable places, of their roots or ancestors, or with unresolvable operands', 'run this command')
+      return denyText(role, 'no rm outside writable places, or of their roots or ancestors', 'run this command')
     return undefined
   }
   if (profile.writeIn.includes(facts.place)) return undefined
-  const rule = facts.place === 'worktree'
-    ? 'no edits in the worktree'
-    : 'no writes outside the worktree and the SEAT_MODS_ALLOW directories'
-  return denyText(role, rule, 'write here')
+  if (facts.place === 'worktree') return denyText(role, 'no edits in the worktree', 'write here')
+  const deny = denyText(role, 'no writes outside the worktree and the SEAT_MODS_ALLOW directories', 'write here')
+  return facts.allow?.length ? `${deny} Scratch files, such as a commit message, go in ${facts.allow.join(', ')}.` : deny
 }
+
+// An rm operand rmTargets could not read (its path is undefined): a removal the glues report without placing it.
+export const UNREAD: Readonly<Removal> = Object.freeze({ place: 'outside', protected: false, unresolved: true })
+
+const RM_LITERAL = 'To remove a file, spell its path out literally: the guard does not read $VAR, `…` or {…}, or a relative path after cd.'
 
 export function uncheckedRmText(role: Role): string {
   return denyText(role, 'Bash command could not be checked', 'run this command')

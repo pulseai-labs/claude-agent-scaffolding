@@ -11,8 +11,8 @@ export const MODS = ['seat-mods', 'molt', 'autonomic'] as const
 const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0', autonomic: '0.6.0' }
 export const ROLES: Record<string, string | undefined> = {
   worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
-  orchestrator: 'orchestrator.md',
-}   // role → roles/<file>.md
+  orchestrator: 'orchestrator.md', 'crew-spine': 'crew-spine.md', 'crew-work-pr': 'crew-work-pr.md',
+}   // role → roles/<file>.md; the crew-* roles follow a herdr-crew activated brief (#839)
 // A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798) and
 // autonomic's live mode file, so the herdr seats it launches inherit autopilot.
 const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4', autonomic: '0.7.0' } }
@@ -42,7 +42,7 @@ export function versionWarning(v: { error?: Error; status: number | null; stdout
   return pinWarning(v.stdout ?? '', tested)
 }
 
-export function planLaunch(o: { role: string; via: string; args: string[]; ompRecord: string; claudeRecord: string; rolesDir?: string; roleEnv?: string }):
+export function planLaunch(o: { role: string; via: string; args: string[]; ompRecord: string; claudeRecord: string; rolesDir?: string; roleEnv?: string; seatConfig?: string }):
   { argv: string[]; warnings: string[]; extensions: string[] } | { error: string } {
   if (!Object.hasOwn(ROLES, o.role)) return { error: `omp-seat: unknown role "${o.role}" (known: ${Object.keys(ROLES).join(', ')})` }
   // seat-mods' no-subagent rail (#798) keys on the session's SEAT_MODS_ROLE, which the launcher sets: refuse a top
@@ -77,6 +77,12 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     }
     argv.push('-e', ext)
     extensions.push(ext)
+  }
+  // The seat overlay keeps omp's todo reminders from restarting a turn molt needs to end (#843); without it the
+  // seat would launch but stall at every handoff, so a missing file stops the launch like a missing role file.
+  if (o.seatConfig !== undefined) {
+    if (!existsSync(o.seatConfig)) return { error: `omp-seat: seat config ${o.seatConfig} is missing` }
+    argv.push(`--config=${o.seatConfig}`)
   }
   const file = ROLES[o.role]
   if (file !== undefined) {

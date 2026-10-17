@@ -1651,8 +1651,11 @@ pin "$PRBRIEFS_MD" 'REPO_ROOT=' \
   "the work-PR brief injects the repo root exactly once"
 pin "$PRBRIEFS_MD" '/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT' \
   "the work-PR brief names its invocation exactly once"
-pin "$PRBRIEFS_MD" 'REVIEW_LEVEL=' \
-  "the work-PR brief injects the decided review level"
+pin "$PRBRIEFS_MD" 'REVIEW_INVOCATION=<the reviewer'"'"'s agent'"'"'s `review:`, else `/code-review <PR> <LEVEL>`, with PR_NUMBER, the PR URL and the level the top decided filled in>' \
+  "the work-PR brief injects the reviewer's filled review command"
+pin "$PRBRIEFS_MD" 'brief it to run REVIEW_INVOCATION.' \
+  "the work-PR session briefs the reviewer with the filled review command"
+absent "$PRBRIEFS_MD" '/code-review PR_NUMBER' "the work-PR brief hardcodes no reviewer command"
 pin "$PRBRIEFS_MD" 'merge bound to the named SHA' \
   "the work-PR session merges bound to the SHA the top relayed"
 pin "$PRBRIEFS_MD" 'never a squash or rebase' \
@@ -1819,20 +1822,50 @@ pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
 pin "$MECHANICS_MD" '`{hash, identity}`' \
   "the consumed generation records the exact object keys" flat
 
-section "a rotation resumes from run state (#819; hard stop deferred to #810)"
+section "a rotation and a hard stop resume from run state (#819, #810)"
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 pin "$LIFECYCLE_MD" 'From the handoff on, this session writes nothing to the run file and takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.' \
   "the outgoing top stops writing and dispatching at handoff and relays every intervening wake" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 pin "$LIFECYCLE_MD" 'write nothing more to the run file and take no dispatch action' \
   "stand-down keeps the outgoing top from writing or dispatching" flat
-pin "$LIFECYCLE_MD" 'It writes `run.orchestrator.machine` beside the pane.' \
+pin "$LIFECYCLE_MD" 'It writes `run.orchestrator.machine` and `.session` beside the pane (step 1).' \
   "resume step 2 writes the successor's machine beside its pane" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 pin "$LIFECYCLE_MD" 'Binding a run another top drove through a rotation runs **The resume** (Rotation past the context ceiling) first; its step 2 is this rebind.' \
   "Orient routes a rotation's takeover through the resume before rebinding" flat
-pin "$LIFECYCLE_MD" 'A hard stop — the top died with no handoff — has no resume procedure yet (#810): the new top tells the operator and continues only as the operator directs.' \
-  "a hard stop is not claimed: the new top defers to the operator (#810)" flat
+pin "$LIFECYCLE_MD" 'is resumed only on the operator'"'"'s word that it died' \
+  "a hard stop resumes only on the operator's word (#810)" flat
+pin "$LIFECYCLE_MD" 'and `run.orchestrator.session`, herdr'"'"'s `agent_session` for' \
+  "every bind records the top's session for a later transcript read (#810)" flat
+pin "$LIFECYCLE_MD" 'Read `run.orchestrator` — pane, machine, session — before any write' \
+  "a hard stop reads the old top before the rebind overwrites it (#810)" flat
+pin "$LIFECYCLE_MD" 'Never two tops on one run.' \
+  "a hard stop stands the old top down first (#810)" flat
+pin "$LIFECYCLE_MD" 'OMP `~/.omp/agent/sessions/*/*_<id>.jsonl`' \
+  "the transcript is found by session id on both hosts (#810)" flat
+pin "$LIFECYCLE_MD" 'where it and `run.json` disagree on a fact, `run.json` wins' \
+  "the transcript is context; run.json wins on facts (#810)" flat
+pin "$LIFECYCLE_MD" 'is checked for its effect first' \
+  "a started-but-unconfirmed action is checked before it is redone (#810)" flat
+pin "$LIFECYCLE_MD" 'A dispatch whose attempt the run records is never sent again: step 4 settles it' \
+  "a hard stop never re-sends a recorded dispatch; resume step 4 settles it (#810)" flat
+pin "$LIFECYCLE_MD" 'Binding one whose top died with no handoff runs **A hard stop**'"'"'s three steps before it.' \
+  "Orient routes a hard-stop takeover through its three steps before the rebind (#810)" flat
+pin "$LIFECYCLE_MD" 'Claude `~/.claude/projects/*/<id>.jsonl`' \
+  "the transcript is found by session id on Claude Code too (#810)" flat
+pin "$LIFECYCLE_MD" 'With no session recorded, no file found, or the old top on another machine, ask the operator once for the transcript path or the next step.' \
+  "a hard stop with no transcript asks the operator once (#810)" flat
+pin "$LIFECYCLE_MD" 'it always rewrites `run.orchestrator.session` (step 1), since molt'"'"'s `/clear` starts a new session in this pane' \
+  "a top that molts in place records its new session (#810)" flat
+for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
+  pin "$f" 'and `run.orchestrator.session`, herdr'"'"'s `agent_session` for the pane as `{agent, id}`' \
+    "${f##*/} records its session on creation and continuation (#810)" flat
+done
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md` — and `run.orchestrator.session`' \
+  "the nested spine successor records its session on rebind (#810)" flat
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `herdr-mechanics.md` — and `run.orchestrator.session`' \
+  "the nested work-PR dispatch records its session (#810)" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 # Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.
 # Ruling 12: relaunch cause retired with the automatic relaunch path.
@@ -1871,6 +1904,10 @@ pin "$LIFECYCLE_MD" 'step 12 and `run.merge_word`' \
   "the handoff points at the merge rule instead of restating it" flat
 pin "$LIFECYCLE_MD" 'With `operator`, the ask says that this run'"'"'s brief or the operator set an operator merge gate, so autonomic routes it to the operator' \
   "step 12 states an operator gate explicitly so autonomic routes it" flat
+pin "$LIFECYCLE_MD" 'a clean gate set on that SHA is the agreed condition, so merge with no ask (#837)' \
+  "under a standing merge word the top merges a clean gate with no ask (#837)" flat
+pin "$LIFECYCLE_MD" 'merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator' \
+  "an operator merge executor is reached under a standing word too (#837 round 1)" flat
 pin "$LIFECYCLE_MD" 'A run file older than 0.2.21' \
   "the resume names the legacy run-file rules" flat
 pin "$LIFECYCLE_MD" 'no `phase` counts as `delivered`' \
@@ -2347,7 +2384,10 @@ pin "$LIFECYCLE_MD" 'add to it the id of every background task you have running'
 pin "$LIFECYCLE_MD" 'a wake or message that reaches you after it is added to it verbatim, never acted on' \
   "lifecycle: a wake after the top's handoff is handed over (Review Focus 5)" flat
 pin "$LIFECYCLE_MD" 'There is no stand-down and no successor launch' "lifecycle: the molt path launches nothing (#669)" flat
-pin "$LIFECYCLE_MD" 'It arms no wait and no heartbeat the handoff lists' "lifecycle: the resumed top re-arms nothing listed (#669)" flat
+pin "$LIFECYCLE_MD" 'On Claude Code it arms no wait and no heartbeat the handoff lists' "lifecycle: the resumed top re-arms nothing listed on Claude Code (#669, #855)" flat
+pin "$LIFECYCLE_MD" 'and, on Claude Code, every armed wait survive the clear' "lifecycle: waits survive a molt on Claude Code only (#855)" flat
+pin "$LIFECYCLE_MD" 'On OMP the clear cancels every background job the old session ran' "lifecycle: an OMP molt cancels the old session's jobs (#855)" flat
+pin "$LIFECYCLE_MD" 'the resumed top re-arms the wait of each dispatch still live and one fresh heartbeat' "lifecycle: a top resumed on OMP re-arms its live waits and a heartbeat (#855)" flat
 pin "$LIFECYCLE_MD" 'A heartbeat tick the handoff carries means that heartbeat has ended' \
   "lifecycle: a carried tick re-arms the heartbeat (#669)" flat
 # Retired the handoff hash/identity pin: run.json now holds locator.seen (ruling 12).

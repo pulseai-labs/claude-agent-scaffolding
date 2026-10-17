@@ -7,7 +7,7 @@ The operator typed `/start` in a new AI workspace,
 `/home/dev/projects/ledgerline-ai`. The workspace holds only
 `.ossify/topology.json`, authored a moment ago at §3's topology probe. It has
 no ossify state, no `MASTER-SPEC.md`, no `EXECUTIVE-SUMMARY.md`, no
-`CLAUDE.md` and no `.claude/` directory. The topology declares one repo,
+`AGENTS.md`, no `CLAUDE.md` and no `.claude/` directory. The topology declares one repo,
 `canonical`, at `/home/dev/projects/ledgerline`; it holds only a `.git` with no
 commits and no `PUBLIC_BOUNDARY.md`, so the canonical-content gate passes.
 

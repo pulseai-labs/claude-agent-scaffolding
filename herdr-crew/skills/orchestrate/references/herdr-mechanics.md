@@ -37,7 +37,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
    report directory and its scratch directory in its `SEAT_MODS_ALLOW`. A coordinator seat —
    the spine, close or work-PR session, the doctor session, the lane driver — exports
    `SEAT_MODS_ROLE=coordinator` with the molt marking below; the top's rotation successor exports
-   `SEAT_MODS_ROLE=orchestrator`; neither free role gets `SEAT_MODS_ALLOW` except for an OMP lane driver, close or doctor coordinator (config.md), which adds each hosting repo's `.worktrees` root (colon-separated roots). The operator's
+   `SEAT_MODS_ROLE=orchestrator`; neither free role gets `SEAT_MODS_ALLOW` except for an OMP coordinator (config.md), which adds each hosting repo's `.worktrees` root (colon-separated roots). The operator's
    own first top is not launched here — the operator starts it through a `claude-orch` alias
    that sets `orchestrator`. The scratch directory, created first, is
    `<run dir>/scratch/<role>-<n>` — `<run dir>` the directory holding the run's `run.json`,
@@ -104,7 +104,7 @@ No single herdr call creates a seat, starts its command and delivers its brief; 
 herdr answers, live, which path a seat takes: whether `herdr agent list` returns a record for
 the pane. That answer, never a config field, is the discriminator — a detection manifest
 landing later moves a seat to the typed path with no edit anywhere. Detection after `pane
-run`: a record at about a second (0.6 s, still `agent_status: unknown`, no session identity)
+run`: a record at about a second (0.6 s, still `agent_status: unknown`, no session identity; before it, `agent list` omits the pane and `agent get`/`agent wait` answer `agent_not_found`: ask again for up to five seconds, then take the not-detected path)
 and a settled state (`idle`) at about four seconds (3.8–4.0 s). The first ask, once the record
 is there, chooses only the **readiness wait** below; made once step 5's model read has shown
 `expected_model:` on the pane, a second ask of that list decides the **send's route** and with
@@ -152,9 +152,13 @@ question written to the report file is not a dialog; it rings that doorbell (Com
 
 ## Host: OMP
 
-An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these substitutions. Background call: omp's bash async job (`async.enabled`, on by default); the async job passes `timeout: 0`, which disables omp's command deadline (a nonzero value is clamped), so herdr's `--timeout` bounds the wait; its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one.
-A send's slash command is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. herdr-crew's `hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension.
-No `Agent` tool means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
+An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these
+substitutions; so does an OMP coordinator for the seats it drives. Background call: omp's bash async job (`async.enabled`, on by default); pass `timeout: 0` on every one
+(omp's default deadline is 300 s and a nonzero value is clamped; 0 disables it), so herdr's `--timeout` bounds the wait; never pass `name:`, which puts omp's bash in service mode and refuses async and timeout.
+Its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
+is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. herdr-crew's
+`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent` tool
+means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
 **New enrolled OMP path only:** before the seat command, the operator/trusted delegated dispatcher independently selects outside-allowance input/event/source paths and invokes `bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root <trusted-root> --worker-root <assignment-worktree> --worker-root <each-extra-root>` (repeat roots). Its JSON binding maps path/sha256/assignmentId/generation/launchId to `AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`, `AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` in the trusted startup export; never take them from a worker/report/model.
 Check the whole allowance, including every `SEAT_MODS_ALLOW` entry, coordinator `.worktrees`, report/scratch/handoff and output roots: authority, parent, input and evidence/policy sources must not overlap in either ancestry direction. omp-seat resolves the installed Autonomic CLI and validates before the via version probe/worker; partial/invalid bindings refuse. Preserve all existing role/path/molt/autonomic markings and extension order seat-mods → Molt → Autonomic. A role or autopilot marks a seat, not a grant; empty grants authorize nothing. No live issuance is supplied by these instructions.
 Every materially new enrolled assignment ends the old agent process and needs fresh issuance/launch, retained pane included. Same-assignment corrections/rechecks use unchanged approvals/grants/lifetime; revocation/completion/replacement invalidates, never rebinds. A parent-handback child ends its unit. Public host evidence cannot distinguish private Molt ownership from generic `/new` plus lineage, so enrolled in-place clears remain suspended and require fresh trusted launch; finish/handoff existing tops/workers before rollout, never hot-enroll via env/report edits. Retain phase/locator.seen/generation/resume ownership and never auto-relaunch a live attempt.

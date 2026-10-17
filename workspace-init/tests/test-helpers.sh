@@ -161,6 +161,36 @@ test_render_template_missing_template_returns_error() {
   [[ ! -f "$out" ]] || { echo "    output file should not exist"; return 1; }
 }
 
+# D3/#768: the replacement must be spliced literally. Under bash 5.2+
+# `patsub_replacement` (on by default), `&` in a ${var//pat/repl} replacement
+# expands to the matched text — so a value carrying `&` used to leave the
+# placeholder in the output and corrupt it. `\` is the other patsub
+# metacharacter. Both are values, never patterns.
+test_render_template_replacement_is_literal() {
+  local tmpl="$_WI_TMP/tmpl3.txt"
+  local out="$_WI_TMP/out3.txt"
+  printf 'root=${CANONICAL_ROOT}\n' > "$tmpl"
+  local val='/tmp/a&b\c$d`e'
+  wi_render_template "$tmpl" "$out" "CANONICAL_ROOT=$val" || return 1
+  local content; content="$(cat "$out")"
+  assert_eq "root=$val" "$content" || return 1
+  # Adjacent control: the placeholder must be gone, and the literal text must
+  # not have been re-expanded into a fresh placeholder.
+  assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+}
+
+# A value that itself contains the placeholder text must terminate, not
+# re-substitute the value into itself (the failure mode of re-scanning the
+# accumulator instead of splicing left-to-right).
+test_render_template_value_containing_placeholder_terminates() {
+  local tmpl="$_WI_TMP/tmpl4.txt"
+  local out="$_WI_TMP/out4.txt"
+  printf 'x=${A}\n' > "$tmpl"
+  wi_render_template "$tmpl" "$out" 'A=lit-${A}-lit' || return 1
+  local content; content="$(cat "$out")"
+  assert_eq 'x=lit-${A}-lit' "$content" || return 1
+}
+
 # --- run all ---
 test_write_new_refuses_any_existing_entry() {
   # wi_write_new (#582): the file is created with O_EXCL
@@ -229,6 +259,8 @@ wi_test_run test_log_op_creates_parent_dir_if_missing
 wi_test_run test_render_template_substitutes_single_var
 wi_test_run test_render_template_substitutes_multiple_vars
 wi_test_run test_render_template_missing_template_returns_error
+wi_test_run test_render_template_replacement_is_literal
+wi_test_run test_render_template_value_containing_placeholder_terminates
 wi_test_run test_write_new_refuses_any_existing_entry
 wi_test_run test_write_new_sets_the_mode_at_creation
 wi_test_run test_file_mode_reads_permission_bits

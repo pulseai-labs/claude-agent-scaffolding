@@ -30,9 +30,9 @@ PLACEMENT: <abs path of the worktree the spine's lane ran from>.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 SPINE_ID=<spine id>
-CLOSE_COMMAND=<the command this seat was launched with, from its machine entry>
+CLOSE_COMMAND=<the command this seat was launched with, from its machine entry> — a record of your own launch: you are already that seat, never run it
 CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
 CLOSE_EFFORT=<the effort this seat was launched at>
 CLOSE_REVIEW_LEDGER=<every close review's ledger for this spine, oldest first,
@@ -43,7 +43,7 @@ TASK: run `/ossify:close SPINE_ID` and let it complete or halt. Whatever it hand
 off, you do not drive: if it opens PRs and halts, that halt is your result. The
 ceremony's own steps are yours to perform, including
 the close review the ceremony itself runs over the accumulated diff before any PR
-opens — `/ossify:close` doing its job, not a `/code-review` you dispatch. Its
+opens — `/ossify:close` doing its job, not a review you dispatch. Its
 findings are yours to report, never to fix: ossify keeps that review advisory —
 it halts no ceremony gate — but this dispatch is stricter, and a `fix now`
 disposition ends this dispatch as `halted: close-review — <ledger>`,
@@ -103,17 +103,17 @@ PLACEMENT: REPO_ROOT — the worktree holding this PR's branch.
 
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when herdr detects the dispatcher's pane and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is.
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `herdr agent prompt <that pane> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/herdr-mechanics.md
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>
-WORKPR_COMMAND=<the command this seat was launched with, from its machine entry>
+WORKPR_COMMAND=<the command this seat was launched with, from its machine entry> — a record of your own launch: you are already that seat, never run it
 WORKPR_EXPECTED_MODEL=<the model the banner or screen must show>
 WORKPR_EFFORT=<the effort this seat was launched at>
 REVIEWER=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
-REVIEW_LEVEL=<the /code-review level the top decided>
+REVIEW_INVOCATION=<the reviewer's agent's `review:`, else `/code-review <PR> <LEVEL>`, with PR_NUMBER, the PR URL and the level the top decided filled in>
 PRFIX=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
@@ -130,7 +130,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID`
      — dagr's stable-agent fallback otherwise — in the same producer loop every other
      write takes. On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane
-     — this server's machine, per MECHANICS. Stay its single writer, as dagr's producer contract (`dagr --skill`)
+     — this server's machine, per MECHANICS — and `run.orchestrator.session`, herdr's `agent_session` for the pane as `{agent, id}`, as step 1 of `lifecycle.md` beside MECHANICS says. Stay its single writer, as dagr's producer contract (`dagr --skill`)
      says, linting every write with `dagr check --strict` before it replaces the file.
      Nothing of yours goes in the top's run.json.
   2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must read
@@ -152,7 +152,7 @@ TASK: drive PR_NUMBER to a merge on the top's word.
   3. Initial runs only: create the reviewer FIRST from its REVIEWER row — every launch or
      re-creation of it carries the guard before its command (role `reviewer`, `MECHANICS`
      step 2) — confirm the model as its row's `model_shows` says and from the first reply,
-     and brief it to run `/code-review PR_NUMBER REVIEW_LEVEL`. Read the findings from its
+     and brief it to run REVIEW_INVOCATION. Read the findings from its
      report file — it posts nothing; that file is the only copy. Validate it against the
      reviewer brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or
      finding lines plus both — before passing anything on; on a malformed body send

@@ -2,6 +2,27 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.4 — 2026-10-17
+
+- **OMP: the status meter follows the window** (#842). After a clear-and-seed, molt's status line kept the old
+  session's percent (`molt 40%/65%` beside OMP's own 17%). The meter was redrawn with a fresh reading only at
+  `session_stop` and `agent_end`, and omp defers or skips `session_stop` while a background job or a todo continuation is pending. Now
+  every reading redraws the meter, and a new window (a clear-and-seed, a session switch, a compaction) shows `molt`
+  until its first reading.
+
+## 0.3.3 — 2026-10-17
+
+- **OMP: a top with background jobs pending can molt** (#855). omp defers `session_stop` while a background job is
+  pending, and skips it for a todo or compaction continuation. It reports both as `agent_end` with `willContinue`.
+  molt now also reads the `MOLT-HANDOFF` marker there. From the first warning on, a readable marker molts at once,
+  since an omp clear cancels the session's jobs anyway. A terminal settle still goes to `session_stop`, which keeps
+  the block reflex and the fallback brief.
+- **OMP: the seed says the jobs are gone.** omp's `newSession()` cancels every background job the old session owned.
+  The seed now ends with one line telling the resumed session to re-arm each wait and heartbeat its handoff lists.
+- **OMP: `/molt now` starts a turn.** The instruction goes out as an `aside`, which starts a turn on an idle session.
+  Before, a `steer` sat in the queue until something else started a turn. Below the handoff threshold, its first
+  line says the operator asked for a handoff, not that the fill is "past" the threshold.
+
 ## 0.3.2 — 2026-10-14
 
 - **Internal: one copy of each shared rule** (#783). `MAX_STOP_BLOCKS` and the shared notice texts live in the pure

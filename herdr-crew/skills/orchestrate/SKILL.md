@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One /code-review per PR, findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says the herdr orchestrator session, a herdr worker seat, the herdr crew, dispatch to a herdr session, execution assignments for a spine in herdr, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/herdr-crew/agents.md, .herdr-crew/roles.md). One review per PR (/code-review by default), findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says the herdr orchestrator session, a herdr worker seat, the herdr crew, dispatch to a herdr session, execution assignments for a spine in herdr, or runs /herdr-crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -183,16 +183,17 @@ These cases are named because they look like clashes and are not:
   not this file's, and that template does not adjudicate it.
 - **`work-pr`.** Its brief carries the child templates it will construct, verbatim:
   `references/briefs.md`'s reviewer template for the
-  review, and that file's fix-round and correction bodies for what follows — a work-PR session
+  review, its REVIEW_INVOCATION filled by you (the worker cannot read the machine file), and that file's fix-round and correction bodies for what follows — a work-PR session
   builds those child briefs, and a dispatched brief is the whole contract its worker ever sees.
   After the single reviewer dispatch and your disposition, the fix dispatch
   to the retained implementer is `/ossify:work-pr <PR> --repo-root <worktree holding the
   PR branch>` with the disposition list embedded as a third finding signal — work-pr
   targets the invoking repository unless told otherwise, and the retained implementer
   often sits elsewhere. `work-pr`'s "re-review on the new head" means re-fetching
-  GitHub signals after a push, so no second `/code-review` occurs. The worker stops at
-  `work-pr`'s merge ask and returns its ledger in its report file; you relay the ask to the
-  operator and merge on the word with one `gh` command.
+  GitHub signals after a push, so no second review occurs. The worker stops at
+  `work-pr`'s merge ask and returns its ledger in its report file; you answer it as
+  step 12's `run.merge_word` says (with `standing`, a clean gate set is the word; with `operator`,
+  ask the operator), and the assigned merge executor lands it — one `gh` command where that is you.
 
 ## 7. Refusals
 
@@ -210,6 +211,6 @@ These cases are named because they look like clashes and are not:
   `claude --model`.
 - **A worker refuses on policy:** report the refusal verbatim. Do not retry it around, and
   do not rephrase the brief to slip past it.
-- **`/code-review` is unavailable in the reviewer session:** the reviewer reports that in
+- **The review command is unavailable in the reviewer session:** the reviewer reports that in
   its report file and the operator decides what reviews the PR. Do not run the review
   inline.

@@ -49,16 +49,15 @@ Each field exists because a measured case needs it:
   status-bar agent returns nothing on the default read.
 - `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
   a file and sends one line pointing at it, for an agent whose composer fragments injects.
-- `can:` — what the agent is able to run, comma-separated: `slash-commands`,
-  `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role
-  requirement, and where it is checked, are stated below.
+- `can:` — what the agent is able to run, comma-separated: `slash-commands`, `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement, and where it is checked, are stated below.
+- `review:` — optional: the command a reviewer seat on this agent runs, `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP); absent, `/code-review <PR> <LEVEL>`.
 - `note:` — free prose the coordinator reads when it uses that agent.
 
 A seat's readiness path is never a field here: it follows from herdr's own answer
 to whether the pane is detected (`herdr-mechanics.md`) — so a detection manifest
 landing later moves a seat onto the typed path with no edit anywhere.
 
-**OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat fills the lane driver (default-lane spine session), close, doctor or worker seats (`omp-seat worker --via <wrapper>`), and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4) — never a work-PR session or an activated spine session until a live OMP seat-launching run lifts it (#788). New enrolled OMP authority is separate from these profiles: role/effort/model/command/autopilot never mint grants. The operator/trusted dispatcher selects outside-allowance issuance/source paths and a trusted root; the complete startup envelope must include coordinator `.worktrees`, report/scratch/handoff/output roots, exported through `SEAT_MODS_ALLOW` also for free roles. Preserve the startup binding and complete brief envelope. New material assignment needs fresh process; existing tops/workers finish/handoff before enrollment. A restored wrapper or edited env/report cannot enroll. Public Molt evidence is insufficient for autonomous reactivation: remain suspended until fresh trusted launch. No actual roster/config/grant is written here; CC/legacy profile behavior stays unchanged.
+**OMP coordinator seats.** Put `omp-seat` on PATH with the symlink in [omp-roles' Install step](../../../../omp-roles/README.md#install); an OMP seat fills the lane driver (default-lane spine session), close, doctor or worker seats (`omp-seat worker --via <wrapper>`), and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4); since 0.2.23, also the activated spine session (`omp-seat crew-spine`) and the work-PR session (`omp-seat crew-work-pr`; omp-roles 0.6.0), which run 788 lifted (#788). Every OMP coordinator seat adds each hosting repo's `.worktrees` root (colon-separated roots) to its `SEAT_MODS_ALLOW`: its procedure and the omp task children that inherit its env write item worktrees. New enrolled OMP authority is separate from these profiles: role/effort/model/command/autopilot never mint grants. The operator/trusted dispatcher selects outside-allowance issuance/source paths and a trusted root; the complete startup envelope must include coordinator `.worktrees`, report/scratch/handoff/output roots, exported through `SEAT_MODS_ALLOW` also for free roles. Preserve the startup binding and complete brief envelope. New material assignment needs fresh process; existing tops/workers finish/handoff before enrollment. A restored wrapper or edited env/report cannot enroll. Public Molt evidence is insufficient for autonomous reactivation: remain suspended until fresh trusted launch. No actual roster/config/grant is written here; CC/legacy profile behavior stays unchanged.
 ```markdown
 ### omp-spine-deepseek
 command: omp-seat spine-driver --via omp-deepseek-go
@@ -97,7 +96,7 @@ a session launches nothing with its own profile.
 
 | role | its brief invokes | needs |
 |---|---|---|
-| reviewer | `/code-review` | `slash-commands` |
+| reviewer | its agent's `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |
 | implementer, verifier | no command | — |
 | fix-round implementer | `/ossify:work-pr` when ossify is installed | `slash-commands` then |
 | ossify item implementer | `/ossify:work-item` | `slash-commands` |
@@ -109,7 +108,7 @@ a session launches nothing with its own profile.
 | OMP seat (omp-roles close), close session | the role file carries the procedure by `skill://close`; the brief's `/ossify:close` reaches it as text | — |
 | work-PR session | `/ossify:work-pr` | `slash-commands` |
 | doctor session | `/ossify:doctor` | `slash-commands` |
-| OMP seat (omp-seat worker), doctor session | the brief's `/ossify:doctor` reaches it as text; the seat follows ossify's `doctor` skill by name | — |
+| OMP seat: doctor session or ossify item implementer (omp-seat worker), activated spine session (omp-roles crew-spine), work-PR session (crew-work-pr) | the brief's `/ossify:<skill>` reaches it as text; the seat follows `skill://<skill>` | — |
 | PR-fix seat inside work-PR | none — the clause is removed | — |
 | close-review writer | no command | — |
 | an operator-defined role | whatever its `brief:` invokes | as declared |

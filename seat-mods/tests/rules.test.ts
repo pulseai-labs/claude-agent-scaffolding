@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, placeOf, decide, invalidText, statusText } from '../hooks/rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText } from '../hooks/rules'
 
 describe('parseRole', () => {
   test('unset and empty default to the guarded implementer', () => {
@@ -229,6 +229,25 @@ describe('decide', () => {
       expect(decide(role, { kind: 'write', place: 'allow' })).toBeUndefined()
       expect(decide(role, { kind: 'write', place: 'outside' })).toContain('SEAT_MODS_ALLOW')
     }
+  })
+  // #844: each deny says where a seat can go instead, so a scratch write or cleanup costs one turn, not several.
+  test('an outside write names the SEAT_MODS_ALLOW folders when it has them', () => {
+    const deny = decide('implementer', { kind: 'write', place: 'outside', allow: ['/s/a', '/s/b'] })
+    expect(deny).toContain('no writes outside')
+    expect(deny).toContain('go in /s/a, /s/b.')
+    expect(decide('implementer', { kind: 'write', place: 'outside' })).not.toContain('go in')
+    expect(decide('implementer', { kind: 'write', place: 'allow', allow: ['/s/a'] })).toBeUndefined()
+  })
+  test('an rm operand the guard cannot read says to spell it out; a placed one outside keeps its text', () => {
+    const unread = decide('verifier', { kind: 'bash', rules: [], removals: [UNREAD] })
+    expect(unread).toContain('no rm with an operand the guard cannot resolve')
+    expect(unread).toContain('spell its path out literally')
+    const outside = decide('verifier', { kind: 'bash', rules: [], removals: [removalOf('/etc/x', '/w', ['/s'], false)] })
+    expect(outside).toContain('no rm outside writable places')
+    expect(outside).not.toContain('literally')
+    expect(decide('verifier', { kind: 'bash', rules: [], removals: [removalOf('/s/x', '/w', ['/s'], false)] })).toBeUndefined()
+    // a target the glue could not place (a link's `..`, an omp URL cwd) is outside, not unread
+    expect(removalOf(undefined, '/w', ['/s'], false).unresolved).toBeUndefined()
   })
   test('the deny text has the spec shape', () => {
     expect(decide('verifier', { kind: 'bash', rules: ['push'] }))

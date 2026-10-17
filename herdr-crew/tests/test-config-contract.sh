@@ -35,13 +35,15 @@ pin "$CONFIG_MD" '~/.claude/herdr-crew/agents.md' "the machine file's path is st
 pin "$CONFIG_MD" '`.herdr-crew/roles.md`' "the project file's path is stated once"
 
 section "the agent entry"
-for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'note:'; do
+for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'review:' 'note:'; do
   present "$CONFIG_MD" "$field" "agent field $field is documented"
 done
 present "$CONFIG_MD" 'model_shows: banner' "banner is a documented value"
 present "$CONFIG_MD" 'model_shows: screen' "screen is a documented value"
 present "$CONFIG_MD" 'brief_delivery: inject' "inject is a documented value"
 present "$CONFIG_MD" 'brief_delivery: file' "file delivery is a documented value"
+present "$CONFIG_MD" 'absent, `/code-review <PR> <LEVEL>`.' "a reviewer with no review: field runs /code-review"
+present "$CONFIG_MD" '| reviewer | its agent'"'"'s `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |' "the reviewer's can: need follows its review command"
 
 section "the project file"
 for heading in '## Seats' '## My roles' '## Conditions'; do
@@ -89,12 +91,37 @@ brief_pin() {
 # doctor dispatch, direct work-item, non-spine close. The correction-request
 # template is a send, not a launch, so it carries no seat.
 brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
+brief_pin 'you are already that seat, never run it' "every SEAT_COMMAND says it is a record, never run (#845)" 9
+# The class, not the instance (#845 round 1): every launch-record line in any reference — SEAT_, SPINE_,
+# CLOSE_, WORKPR_, WRITER_COMMAND — carries the never-run clause, so a new *_COMMAND line without it fails here.
+# Every PING line carries the hold-at-gate rule (#810): a worker whose ping finds no top waits, never proceeds.
+ping_total=0; ping_bare=""
+for f in "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
+  n="$(awk '/^PING: / { t++ } END { print t+0 }' "$f")"
+  b="$(awk '/^PING: / && index($0, "A skipped or failed send is never an answer") == 0 { print FILENAME ":" FNR }' "$f")"
+  ping_total=$((ping_total + n)); [ -z "$b" ] || ping_bare="$ping_bare $b"
+done
+if [ "$ping_total" -ge 15 ] && [ -z "$ping_bare" ]; then pass "every PING line holds a worker at its gate ($ping_total)"
+else fail "every PING line holds a worker at its gate" "total $ping_total (want >= 15), bare:$ping_bare"; fi
+cmd_total=0; cmd_bare=""
+for f in "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
+  n="$(awk '/^[A-Z]+_COMMAND=</ { t++ } END { print t+0 }' "$f")"
+  b="$(awk '/^[A-Z]+_COMMAND=</ && index($0, "you are already that seat, never run it") == 0 { print FILENAME ":" FNR }' "$f")"
+  cmd_total=$((cmd_total + n)); [ -z "$b" ] || cmd_bare="$cmd_bare $b"
+done
+if [ "$cmd_total" -ge 13 ] && [ -z "$cmd_bare" ]; then pass "every *_COMMAND launch record says never run ($cmd_total)"
+else fail "every *_COMMAND launch record says never run" "total $cmd_total (want >= 13), bare:$cmd_bare"; fi
 brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 9
 brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 9
 brief_pin 'NOTIFY_RUN=' "every dispatched template names the run file its ping reads" 9
 brief_pin 'NOTIFY_MACHINE=' "every dispatched template names the worker's machine" 9
 brief_pin 'NOTIFY_PANE' "no template keeps the fixed ping target" 0
 brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
+brief_pin 'REVIEW_INVOCATION=<this seat'"'"'s agent'"'"'s `review:` from agents.md, else `/code-review <PR> <LEVEL>`' "the reviewer brief carries its filled review command" 1
+brief_pin 'TASK: run REVIEW_INVOCATION as given' "the reviewer runs the filled review command, not a fixed one" 1
+brief_pin 'run `/code-review <number> <level>`' "the reviewer TASK does not hardcode /code-review" 0
+brief_pin 'If `/code-review` refuses' "the reviewer's failure rule names REVIEW_INVOCATION, not /code-review" 0
+brief_pin 'If REVIEW_INVOCATION refuses or errors, report its output' "the reviewer reports its own command's refusal" 1
 
 section "the named points exist in the run"
 LIFECYCLE_MD="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"

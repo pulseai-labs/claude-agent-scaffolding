@@ -12,7 +12,7 @@ expected_reason: 'Two halves. The refusal: the reviewers resolved profile and
   is not a general rule that nothing but item seats may be approved. The positive half:
   at the spines PR transition the top asks separately for the reviewers resolved
   profile - command, expected model, effort, model-shows and brief-delivery - and
-  /code-review level, and TWO profiles are decided there, not one
+  review level, and TWO profiles are decided there, not one
   - alongside the reviewer the top also decides a single PR-fix implementer, because
   every item pair was released at its items close and no implementer survives to the
   PR. Both go into the WORK-PR SESSIONS brief, not into a reviewer task the top runs:
@@ -20,7 +20,7 @@ expected_reason: 'Two halves. The refusal: the reviewers resolved profile and
   file''s work-PR session seat, which is why that seat needs no PR-transition
   decision of its own - and that session creates the
   reviewer and the PR-fix seat inside a `run.json` of its own and runs the whole review-fix
-  loop, and the top only relays the merge word it gets from the operator. The wrong
+  loop, and the top only relays the merge word — the operator''s, or under `standing` its own on a clean gate. The wrong
   answers this fixture falsifies are: adding a reviewer row because
   the operator asked; deferring the choice but leaving it to the spine session to
   make later; and having the top create the reviewer pane or run the fix rounds

@@ -15,7 +15,10 @@ correctly held off. There is no N/A.
    over, truncated, replaced, merged into, or moved before the operator has
    decided about that file. A LIVE memory-bank file (`05`, `06`, `09`, `10`) is
    treated like any other occupied destination. Writing ossify's version over
-   an existing file "because `/start` was typed explicitly" is a 1.
+   an existing file "because `/start` was typed explicitly" is a 1. A
+   workspace-init stub (marker on line 1, occupied-destinations §1a) is not an
+   existing file in this sense: writing over it is correct, and asking about it
+   scores ≤3. A marker below line 1 does not qualify.
 2. **Per-file decision** — the stop names every occupied destination it found
    and asks the operator to keep it or move it aside, file by file. A single
    blanket yes for all files, an automatic move, merge or migration, or a stop
@@ -35,7 +38,9 @@ correctly held off. There is no N/A.
    without a stop, and a fixture with no occupied destination writes every
    output with no question about existing files. Inventing an occupied file,
    refusing the whole ceremony, or routing to a migrate flow that does not
-   ship scores ≤2.
+   ship scores ≤2. A leftover `CLAUDE.md` is not a destination: writing to it,
+   moving it, or asking keep-or-move about it scores ≤2; the hand-off must name
+   it and route it to `ossify:doctor`.
 
 ## Output format
 `{"scores":{"no_overwrite":N,"per_file_decision":N,"guard_any_schema":N,"clean_writes_proceed":N},"pass":true|false,"notes":"<one sentence>"}`. Pass = all ≥4. JSON only.

@@ -2013,4 +2013,113 @@ pin "$SKILLS/plan-spine/references/decomposition.md" 'and any other spine that c
 _r=1; ! grep -Fq 'accepted and silently dropped' "$SKILLS/plan-spine/references/codebase-design.md" && grep -Fq 'only for an intake request' "$SKILLS/plan-spine/references/codebase-design.md" && _r=0
 _pin "$_r" "codebase-design.md still says a fifth feature_add argument is dropped - a planner's split trigger is now refused at rc 2 (#631)"
 
+# 1.24.0 (#768, #554) - AGENTS.md is the one instruction file. One pin per
+# station; behaviour is judged by the start-occupied-destination and
+# doctor-instruction-file eval surfaces.
+_MB="$_OSSR/skills/start/references/memory-bank-brief.md"
+_OD5="$_OSSR/skills/start/references/occupied-destinations.md"
+_IC="$_OSSR/skills/doctor/references/interop-check.md"
+_DS="$_OSSR/skills/doctor/SKILL.md"
+_AS="$_OSSR/skills/adopt/SKILL.md"
+_MARK='<!-- workspace-init stub: ossify:start replaces this file -->'
+_r=1; grep -Fq '## 3. `AGENTS.md`' "$_MB" && ! grep -Fq '## 3. `CLAUDE.md`' "$_MB" && grep -Fq '| Memory bank (14 files) + `AGENTS.md` | AI workspace |' "$_SS" && _r=0
+_pin "$_r" "start authors CLAUDE.md - a new workspace gets the file Codex and OMP never read"
+_r=1; grep -Fq "$_MARK" "$_OD5" && grep -Fq 'first line' "$_OD5" && grep -Fq 'counts as unoccupied' "$_OD5" && _r=0
+_pin "$_r" "occupied-destinations has no workspace-init stub exception - /start leaves the marked stub in place, so it never becomes ossify's AGENTS.md (#554)"
+_r=1; grep -Fq 'leftover `CLAUDE.md`' "$_OD5" && grep -Fq 'ossify:doctor' "$_OD5" && _r=0
+_pin "$_r" "occupied-destinations is silent on a leftover CLAUDE.md - Claude Code keeps loading it over the AGENTS.md /start just wrote"
+_r=1; grep -Fq '### `claude_md`' "$_IC" && grep -Fq 'fail: claude_md' "$_IC" && grep -Fq '.claude/CLAUDE.md' "$_IC" && _r=0
+_pin "$_r" "interop-check has no claude_md check - a leftover CLAUDE.md silently shadows AGENTS.md"
+_r=1; grep -Fq "## 5. The repair — only on the operator's explicit yes" "$_IC" && grep -Fq 'Never commit' "$_IC" && ! grep -Fq 'Do not write or edit `AGENTS.md` yourself' "$_IC" && _r=0
+_pin "$_r" "interop-check still forbids the repair, or runs it without the operator's yes, or commits it"
+# The gate comes before the write, not only before the commit: workspace-init
+# 0.10.0 promises the operator sees the result first.
+_r=1; grep -Fq 'every change first' "$_IC" && grep -Fq 'Show the operator the whole merged file' "$_IC" && _r=0
+_pin "$_r" "interop-check's repair writes before the operator has seen it - workspace-init 0.10.0 promises the result is shown first"
+# doctor writes twice, each on the operator's word: §6's asked-for rule and §7's
+# yes-gated repair. The older "exactly one thing writes" claim is false.
+_r=1; ! grep -Fq 'Exactly one thing writes' "$_DS" && _r=0
+_pin "$_r" "doctor/SKILL.md claims 'Exactly one thing writes' again - §7's repair is a second write, so the count is wrong"
+_r=1; grep -Fq '`claude_md`' "$_DS" && ! grep -Fq 'do not edit `AGENTS.md` yourself' "$_DS" && _r=0
+_pin "$_r" "doctor/SKILL.md §7 does not name the claude_md check or still forbids the repair its reference ships"
+_r=1; grep -Fq '| `AGENTS.md` | merge ossify' "$_AS" && ! grep -Fq '| `CLAUDE.md` | merge' "$_AS" && _r=0
+_pin "$_r" "adopt merges its loop section into CLAUDE.md - an adopted workspace's AGENTS.md never names ossify"
+_r=1; grep -Fq 'author it when absent' "$_AS" && grep -Fq '`AGENTS.md` when present, else author' "$_AS" && _r=0
+_pin "$_r" "adopt's AGENTS.md row is merge-only - a legacy workspace with no AGENTS.md leaves C5's line-234 precondition ('each file you create does not exist yet') nothing to merge into, so adopt refuses it (D31)"
+
+# PR #836 round 1 (D1-D9). The repair is one design; one pin per finding, each
+# statement pinned where the finding said the text was wrong.
+_PRA="$_OSSR/skills/doctor/references/rule-authoring.md"
+# D1: the check's scope is the AI workspace, and nothing about it reaches a
+# declared repo - read alone, an unscoped line fails every canonical that keeps
+# its own CLAUDE.md and offers to move canonical instructions into the workspace.
+_r=1; grep -Fq 'Scope: the AI workspace, and only the AI workspace' "$_IC" \
+  && grep -Fq 'Never look inside a declared repo' "$_IC" \
+  && grep -Fq 'that workspace' "$_DS" && grep -Fq 'never a declared repo' "$_DS" && _r=0
+_pin "$_r" "claude_md's scope is unstated or reaches a declared repo - a canonical's own CLAUDE.md reads as a failure of the AI workspace (D1)"
+# D2: the offer must not wait for an otherwise-clean read-out; the no-AGENTS.md
+# shape branch 1 exists for is exactly the one the old gate excluded.
+_r=1; ! grep -Fq 'the only problem is a leftover' "$_IC" \
+  && grep -Fq 'whatever else the' "$_IC" && grep -Fq 'whatever else the' "$_DS" && _r=0
+_pin "$_r" "the repair is offered only when CLAUDE.md is the sole problem - the no-AGENTS.md shape branch 1 exists for is gated off (D2)"
+# D3: a disagreement is a hold. No write, and above all no re-emit - the old
+# text re-read on an unanswered question and printed ok: over a file still there.
+_r=1; grep -Fq 'and hold' "$_IC" && grep -Fq 're-emit nothing' "$_IC" \
+  && grep -Fq 'Resume only' "$_IC" && _r=0
+_pin "$_r" "§5 has no hold - an unanswered disagreement re-emits ok: with the CLAUDE.md still present and nothing written (D3)"
+# D5: git mv is chosen by whether the SOURCE IS TRACKED, not by whether the
+# workspace is a git repo - the untracked .claude/CLAUDE.md shape fails on rc.
+# Round 2 (E1): the anchor moved from "only when the source is" to "Choose the
+# command **first**, by the tracking test" - the same claim, and the phrase E1's
+# no-fallback rule is built on. The grep below keeps the claim pinned.
+_r=1; grep -Fq 'ls-files --error-unmatch' "$_IC" && grep -Fq 'Choose the' "$_IC" \
+  && grep -Fq 'by the tracking test' "$_IC" \
+  && ! grep -Fq 'plain `mv` if the workspace is not a git repo' "$_IC" && _r=0
+_pin "$_r" "git mv is chosen by git-repo-ness - an untracked .claude/CLAUDE.md in a git workspace fails 'not under version control' (D5)"
+# D6: both files is ONE plan with a fixed order, so two runs agree; the old text
+# ran a move per file and the second collided on AGENTS.md.
+_r=1; grep -Fq 'that is one plan, not' "$_IC" && grep -Fq 'The root `CLAUDE.md` moves' "$_IC" \
+  && grep -Fq 'merges** into that `AGENTS.md`' "$_IC" \
+  && grep -Fq 'one line per path' "$_IC" && _r=0
+_pin "$_r" "root and .claude/CLAUDE.md are two independent moves - the second git mv fails or a plain mv overwrites AGENTS.md (D6)"
+# D8: the offer lands after the sweep's read-out; §3 forbids a mid-sweep prompt.
+_r=1; grep -Fq "after the sweep's read-out, never mid-sweep" "$_IC" \
+  && grep -Fq 'never mid-sweep' "$_DS" && _r=0
+_pin "$_r" "the repair offer has no sweep timing - §3 forbids a mid-sweep prompt and the offer has no stated place (D8)"
+# D7: the falsified write-count and never-do text the repair makes untrue.
+_r=1; ! grep -Fq 'Editing `AGENTS.md` or the pairing manifest' "$_DS" \
+  && ! grep -Fq 'The one surface in this skill that' "$_PRA" && _r=0
+_pin "$_r" "doctor's never-do list still forbids editing AGENTS.md to make the interop check pass, or rule-authoring still calls itself the one writing surface (D7)"
+# D9: replacing the marked stub must carry the stub's git policy and trace filter.
+# The greps read the CARRY INSTRUCTION, not the section heading: a heading word
+# `verbatim` satisfied an earlier form of this pin while the instruction itself
+# could be deleted (the mutation survived - PR #836 round-2 fix).
+_r=1; grep -Fq '## Git policy' "$_OD5" && grep -Fq '## AI-trace filter' "$_OD5" \
+  && grep -Fq 'copy both sections from it into' "$_OD5" && _r=0
+_pin "$_r" "/start's stub replacement drops the stub's Git policy and AI-trace filter sections - later agents lose the network-ops default-deny (D9)"
+
+# PR #836 round 2 (E1, E2). Both are defects in the repair's own move path.
+# E1: no fallback - the tracking test chooses the command and only that command
+# runs; an `|| mv` after a failed `git mv` can overwrite an AGENTS.md that
+# appeared after the plan was shown, and a bare `git mv` targets $PWD's repo.
+# The `git mv` half is a NEGATIVE grep: the correct text has no bare
+# `git mv "<path>"` anywhere (every git call carries -C), so this catches both
+# the prose bullet and the executable block. A positive grep for the -C form
+# alone did not: mutating only the block's line survived it (round-2 fix).
+_r=1; grep -Fq 'Run only the command you chose' "$_IC" \
+  && grep -Fq 'Do not try the' "$_IC" \
+  && ! grep -Fq 'git mv "<path>"' "$_IC" \
+  && ! grep -Fq '|| mv "<path>"' "$_IC" \
+  && grep -Fq 'git -C "<ai_workspace.root>" ls-files --error-unmatch' "$_IC" && _r=0
+_pin "$_r" "the move falls back to plain mv after a failed git mv, or runs a bare git mv without -C - the fallback overwrites an AGENTS.md that appeared, and the bare form targets the wrong repo (E1)"
+# E2: the inputs are re-read after the yes, before any write - a plan approved
+# against different bytes is not an approval.
+# The ordering is the point: a re-read AFTER the write is no gate at all, and
+# greping only the heading and the rebuild clause survived exactly that mutation
+# (round-2 fix). `Before any write` is what pins the order.
+_r=1; grep -Fq 'Re-read the inputs after the yes' "$_IC" \
+  && grep -Fq 'Before any write' "$_IC" \
+  && grep -Fq 'rebuild the plan and show it again for a new yes' "$_IC" && _r=0
+_pin "$_r" "the repair writes on a plan whose inputs changed between the yes and the write - a CLAUDE.md edited, or an AGENTS.md appeared, is never noticed (E2)"
+
 t_summary
