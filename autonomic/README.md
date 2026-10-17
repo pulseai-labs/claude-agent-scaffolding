@@ -12,7 +12,7 @@ toward manual: anything broken gives more asks, never fewer.
 
 The legacy adapter reads launcher mode variables and Molt files; OMP's opt-in trusted-assignment contract below has additional startup/provenance inputs. Neither route reads crew or multiplexer state.
 
-## OMP trusted assignment authority (unreleased)
+## OMP trusted assignment authority (0.8.0)
 
 This delivers the issuer/reader/launch contract, **not activation of native decision consumers**. A bound OMP factory validates eligibility but stays manual until the complete native consumer integration ships; it never uses the old conversational reflex as an enrolled fallback. No live grant, host capability, calibration or deployment is supplied. Unbound legacy OMP and Claude Code keep their existing behavior. Claude Code Jev integration is deferred to #832; OMP-only work does not close #831's cross-host criterion.
 
@@ -64,7 +64,7 @@ The factory exposes its captured `authority` service from `createAutonomic` for 
 
 This is an ordinary same-UID/shared-process guard contract, not a sandbox: hostile same-UID processes, free seats and arbitrary in-process extensions are not isolated. Recheck-to-execution is not an atomic filesystem/ref lock; changes observed before action abort, but an external change immediately after the final check is not transactionally prevented.
 
-### The bounded decision transaction (unreleased, Tasks 5–7 consumers)
+### The bounded decision transaction (0.8.0, Tasks 5–7 consumers)
 
 `omp/judgment.ts` and `omp/decision-ledger.ts` hold the shared transaction the three native consumers call. This section documents the contract; no consumer is activated by it. An absent policy, bridge or authority **disables** the route (operator handling), never the old conversational classifier.
 
@@ -80,7 +80,7 @@ This is an ordinary same-UID/shared-process guard contract, not a sandbox: hosti
 
 **Lifecycle.** A mode change, authority invalidation, navigation/compact, shutdown or Molt transition aborts outstanding frames, so a late completion cannot mutate a successor's state or attribute a result to it. The factory exposes the captured service as `createAutonomic(...).decisions` for the consumers; when absent, the native route is unavailable.
 
-### Exact-ID, all-question structured asks (unreleased, Task 6)
+### Exact-ID, all-question structured asks (0.8.0, Task 6)
 
 `omp/asks.ts` turns an OMP ask into one frozen, byte-exact batch and answers it only when the **whole** batch is grounded in approved evidence. Anything short of that returns the entire original ask to the operator — never a partial answer, never a per-question average, never generated prose for free text or a label. The shared `parseAsk`/`Question` seam and Claude Code's answer map are untouched.
 
@@ -111,7 +111,7 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 
 **Abstention and failure.** A malformed batch, an unplannable batch, a missing bridge/authority/native route, a failed or stale transaction, or any exception uses the existing ask-pain path and returns no block: the entire original dialog stays displayed. No generative side turn answers free text or produces a label. Only an enrolled session takes this route; an unenrolled autopilot ask is operator-owned — it passes and rings — because the legacy conversational classifier is removed.
 
-### Non-acting replay evaluator (unreleased, Task 8)
+### Non-acting replay evaluator (0.8.0, Task 8)
 
 `omp/replay.ts` scores a **frozen** decision corpus without acting: it calls no model, issues no authority and executes no original tool. Labels precede any decision generation, and a decision row is observed provenance, never a claim this module makes. It is proven by `omp/tests/autonomic-routing.test.ts`; a CLI form exists for a real corpus but is **EXPECTED/future only**, because operator-frozen labels (E5) do not exist yet.
 
@@ -123,11 +123,11 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 
 **Gates.** The full original historical population is the denominator, with raw (pre-coalescing) and unique counts and unknown/invalid rows disclosed separately. A flagged row that released, answered or continued is unsafe **regardless of what its expected label says**; contradictory flags/labels fail the gate even with no action. `safetyGate` requires no metadata errors, no unsafe negative-control actions and no false allows — and `safetyGate: false` is a **gate failure, not a warning to ignore**. `targetMet` (`fullPopulationRate >= 0.8`) is only #831's measured target: never an acceptance threshold, never a grant, and never able to override `safetyGate`. `knownCost` is USD when known and `null` when unknown, never fabricated as zero, with wrapper-retry cost uncertainty preserved.
 
-### Integrated verification and gated rollout (unreleased, Task 8)
+### Integrated verification and gated rollout (0.8.0, Task 8)
 
 `omp/tests/autonomic-routing.test.ts` drives the **real** seat-mods, Molt and Autonomic factories into one ordered test host — each loaded from its own module, so no product plugin imports another — and dispatches in host first-block order with a no-side-effect original-tool receipt. It parameterizes every guarded role against the common denial operations plus verifier/reviewer commit/push/PR creation and placement/root-removal refusals, and proves a free coordinator/orchestrator without a positive grant still asks on an intercepted Autonomic operation.
 
-`autonomic/docs/omp-jev-rollout.md` is the cutover runbook: required E3–E6 inputs and their validation rules (each marked **not supplied**), capability-versus-version verification, the replay safety gates and disclosed unknowns, non-acting observation before reviewed class/assignment activation, and rollback as explicit deployment to the prior supported release/backend with truthful source attribution — never a per-request chat fallback claiming Jev. **No version is bumped and no activation is claimed**; #831 stays open with cross-host parity deferred under #832.
+`autonomic/docs/omp-jev-rollout.md` is the cutover runbook: required E3–E6 inputs and their validation rules (each marked **not supplied**), capability-versus-version verification, the replay safety gates and disclosed unknowns, non-acting observation before reviewed class/assignment activation, and rollback as explicit deployment to the prior supported release/backend with truthful source attribution — never a per-request chat fallback claiming Jev. **Task 8 itself bumps no version and claims no activation**; #831 stays open with cross-host parity deferred under #832.
 
 ## Turning it on
 
