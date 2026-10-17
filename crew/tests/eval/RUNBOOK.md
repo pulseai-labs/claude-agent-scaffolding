@@ -108,9 +108,9 @@ text, so the brief is the whole contract. That confound is genuinely gone.
 Three live channels remain, and they are why replacing only the source files
 with a pre-change snapshot still does not isolate the product version:
 
-- **the guide the seat reads.** The spine-session and work-PR briefs each make
-  `herdr --skill` the seat's first herdr command (`ossify-briefs.md`, `ossify-pr-briefs.md`),
-  and that guide belongs to the installed binary, not the snapshot. It states dispatch and
+- **the guide the seat reads.** The spine-session and work-PR briefs each point the seat at the
+  layer's own guide (`ossify-briefs.md`, `ossify-pr-briefs.md`), and that guide belongs to the
+  installed binary, not the snapshot. It states dispatch and
   authority rules of its own, and this plugin deliberately overrides some of them:
   the guide starts an agent as a sibling pane in the current tab, where
   `layers/herdr.md` places each seat in its own tab; the guide says not to

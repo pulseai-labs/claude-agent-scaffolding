@@ -1,7 +1,7 @@
 # The run
 
 One run per objective. The orchestrator drives these thirteen steps and nothing else.
-Every command's syntax comes from `herdr --skill`.
+Every command's syntax comes from the layer's guide.
 
 1. **Orient.** Take every command's syntax from the layer's own guide
    (`references/layers/<layer>.md`). Single-command probes only: branch,
@@ -350,7 +350,7 @@ covers it.
 molt child, and molt's active marker silences this plugin's hook (0.2.6). molt's two warnings
 (40% and 50% of the window by default) mean: take your next fully acknowledged delivery with
 no operator question in flight, or hand off at once when nothing is in flight. Its handoff
-command (65%) means now: past its block threshold (75%) every `herdr` command is refused.
+command (65%) means now: past its block threshold (75%) every other command is refused.
 Write the handoff your own rotation writes, and add to it the id of every background task you
 have running — each live dispatch's wait and companion, and the heartbeat — and, verbatim, any
 operator question you are holding. Start no dispatch after it; a wake or message that reaches

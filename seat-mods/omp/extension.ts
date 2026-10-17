@@ -143,9 +143,9 @@ export function evalCommands(code: string): string[] {
 function spawnDeny(role: Role): string {
   return `seat-mods (${role}): no subagents — this seat may not spawn; report it instead.`
 }
-// #798: GLM 5.3 dispatched "agent":"task" against its role file. herdr-crew's top dispatches herdr seats, never subagents.
+// #798: GLM 5.3 dispatched "agent":"task" against its role file. crew's top dispatches seats through the layer, never subagents.
 function orchestratorSpawnDeny(): string {
-  return 'seat-mods (orchestrator): no subagents — dispatch a herdr seat instead (herdr-crew orchestrate; #798).'
+  return 'seat-mods (orchestrator): no subagents — dispatch a crew seat instead (crew orchestrate; #798).'
 }
 // before_subagent_spawn fires for task, eval agent() and workpool workers alike. Only the main session may spawn,
 // and not when it is the orchestrator (#798).

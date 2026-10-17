@@ -577,7 +577,7 @@ describe('orchestrator: no subagents (#798)', () => {
   const orch = () => deps({ env: { SEAT_MODS_ROLE: 'orchestrator' } })
   test('the task tool is blocked for an orchestrator main session, naming #798', async () => {
     const r = await guard(orch(), 'task', { agent: 'task' }, { kind: 'main' })
-    expect(r).toContain('seat-mods (orchestrator): no subagents')
+    expect(r).toContain('seat-mods (orchestrator): no subagents — dispatch a crew seat instead (crew orchestrate; #798).')
     expect(r).toContain('#798')
   })
   test('every other tool stays free for the orchestrator', async () => {

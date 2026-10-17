@@ -25,7 +25,7 @@ export type Removal = { place: Place; protected: boolean; unresolved?: boolean }
 // `allow`: the SEAT_MODS_ALLOW folders, named in an outside write's deny text as the place for scratch files.
 export type Facts = { kind: 'bash'; rules: readonly RuleId[]; removals?: readonly Removal[] } | { kind: 'write'; place: Place; allow?: readonly string[] }
 
-// Rules every herdr-crew brief of every role shares (spec §4).
+// Rules every crew brief of every role shares (spec §4).
 const COMMON: readonly RuleId[] = ['merge', 'force-push', 'branch-delete', 'no-verify', 'ai-trailer']
 
 const PROFILES: Record<Role, { deny: readonly RuleId[]; writeIn: readonly Place[] }> = {

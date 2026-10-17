@@ -569,7 +569,7 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   manual pause count.
 - With `AUTONOMIC_LEDGER` unset, the ledger is created at `<repo root>/.autonomic/ledger.md`. In a dual-repo
   project's public canonical, set `AUTONOMIC_LEDGER` to the AI workspace, or ignore `.autonomic/` there; a
-  launcher patch (herdr-crew) is to set it per seat.
+  launcher patch (crew) is to set it per seat.
 - The permission fork judges a subagent's call against the main session's transcript.
 - The turn digest adds up to 4,000 characters to each permission and ask judgment. It shows a tool
   result's tail only, never its middle, and it reads a tool result as a fact, though a result can

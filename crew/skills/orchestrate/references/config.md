@@ -47,8 +47,8 @@ Each field exists because a measured case needs it:
   config defect named at approval, never reconciled at launch.
 - `effort:` — the effort the seat runs at, and the only source for a brief's
   `SEAT_EFFORT`: the embedded flag's value, or `(agent default)`.
-- `model_shows:` — where the launched model is verified, both read with `herdr
-  pane read`: `banner` the emitted stream; `screen` the rendered screen — a
+- `model_shows:` — where the launched model is verified, both read by the layer's
+  Read: `banner` the emitted stream; `screen` the rendered screen — a
   status-bar agent returns nothing on the default read.
 - `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
   a file and sends one line pointing at it, for an agent whose composer fragments injects.
@@ -88,7 +88,7 @@ carrying a profile conforms rather than restating a field list.
 
 | field | set by | consumed at | travels |
 |---|---|---|---|
-| `command:` | the machine entry | `pane run` | every resolved profile |
+| `command:` | the machine entry | the layer's Seat launch | every resolved profile |
 | `expected_model:` | the machine entry | the model read, and the worker's own check | every resolved profile |
 | `effort:` | the machine entry | the launch | every resolved profile |
 | `model_shows:` | the machine entry | the model read | every resolved profile — the launching session never opens this file |
