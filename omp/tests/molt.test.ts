@@ -32,6 +32,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     seeds: [] as string[],
     asides: [] as string[],
     bells: [] as string[],
+    statuses: [] as string[],
   }
   const io: MoltIO = {
     usage: () => w.percent,
@@ -47,7 +48,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     steer: t => { w.steers.push(t) },
     aside: t => { w.asides.push(t) },
     warnNext: t => { w.warnNexts.push(t) },
-    status: () => {},
+    status: t => { w.statuses.push(t) },
     notify: t => { w.notes.push(t) },
     bell: async (_c, m) => { w.bells.push(m) },
     ephemeral: async p => { w.ephemerals.push(p); return over.hang ? new Promise<string | undefined>(() => {}) : w.ephemeralReply },
@@ -1106,5 +1107,44 @@ describe('a marker at a deferred settle (agent_end, willContinue)', () => {
     w.branch = marked('/h/handoff.md')
     expect(await m.onSessionStop()).toBeUndefined()
     expect(w.seeds[0]).toContain('omp cancelled every background job this session had running when it cleared')
+  })
+})
+
+// #842: the status line is the operator's view of the ladder. omp defers or skips session_stop (a pending job, a todo
+// continuation), so a meter drawn only there kept the pre-handoff percent after a clear-and-seed.
+describe('the status meter follows the window', () => {
+  const meter = (w: { statuses: string[] }) => w.statuses[w.statuses.length - 1]
+
+  test('a reading between stops redraws the meter', async () => {
+    const { w, m } = world()
+    w.percent = 41
+    await m.onToolResult(result('read'))
+    expect(meter(w)).toBe('molt 41%/65%')
+    w.percent = 44
+    await m.onToolCall({ toolName: 'read' })
+    expect(meter(w)).toBe('molt 44%/65%')
+  })
+
+  test('a clear-and-seed drops the old percent at once, and the first reading shows the seeded ladder', async () => {
+    const { w, m } = world({ files: { '/h/a.md': 'a' } })
+    w.percent = 41
+    w.branch = marked('/h/a.md')
+    w.onClear = async () => { w.id = 'S2'; await m.onSessionSwitch('new') }
+    await m.onSessionStop()
+    expect(w.seeds).toHaveLength(1)
+    expect(meter(w)).toBe('molt')
+    // Start fill 30: the ladder moves up 30 + 15 - 40 = 5 points, so the command sits at 70.
+    w.percent = 30
+    await m.onToolResult(result('read'))
+    expect(meter(w)).toBe('molt 30%/70%')
+  })
+
+  test('a compaction drops the old percent at once', async () => {
+    const { w, m } = world()
+    w.percent = 52
+    await m.onToolResult(result('read'))
+    expect(meter(w)).toBe('molt 52%/65%')
+    await m.onSessionCompact()
+    expect(meter(w)).toBe('molt')
   })
 })

@@ -343,6 +343,8 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     }
     if (forced.has(id) && !atLeast(stage, 'command')) stage = 'command'
     await publishStage(id)
+    // Every reading redraws: omp defers or skips session_stop, so a meter drawn only there goes stale (#842).
+    showStatus(id)
     return percent
   }
 
@@ -488,6 +490,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     lastPercent = undefined
     for (const set of [nudged, commandNoted]) set.delete(id)
     for (const map of [warned, stopBlocks, lastMd, published, staged, gateStages]) map.delete(id)
+    showStatus(id)
   }
 
   async function onSessionStart() {
@@ -655,7 +658,6 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
         return undefined
       }
       await measure(id)
-      showStatus(id)
       // Below the first warning a marker is not a molt: a seeded session keeps its minimum room.
       if (!atLeast(stage, 'warn')) return undefined
       const answer = answerOf(e, io.branch())
@@ -713,7 +715,6 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       const id = io.sessionId()
       if (off.has(id) || inFlight || paused === id || handedOff.has(id)) return
       await measure(id)
-      showStatus(id)
       if (!atLeast(stage, 'warn')) return
       const last = [...(e.messages ?? [])].reverse().find(x => (x as { role?: unknown })?.role === 'assistant')
       const marker = markerPath(answerOf({ last_assistant_message: last }, io.branch()))

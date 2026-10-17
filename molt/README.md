@@ -203,8 +203,8 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
 - **A molt runs under the session's permission mode.** Under a mode that asks first, the handoff
   and the resume stop at the first approval (the handoff or resume skill, a `git` check) until
   someone answers. An unattended session needs a mode or allow rules that let those run.
-- **The status line lags one turn after a molt.** Until the seeded session's first turn ends, it
-  still shows the old session's fill.
+- **On Claude Code, the status line lags one turn after a molt.** Until the seeded session's first turn
+  ends, it still shows the old session's fill. On OMP the clear drops the old fill at once (0.3.4).
 - **On Claude Code, background waits survive the clear** (probe P6; on OMP the clear cancels them, see OMP below). A root that molts keeps every wait it armed;
   its handoff must list them so the resumed session does not arm them again.
 - The Claude Code mod needs Claude Code; on OMP see the OMP section. Codex has no mod runtime.
