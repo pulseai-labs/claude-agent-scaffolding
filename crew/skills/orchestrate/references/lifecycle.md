@@ -109,14 +109,14 @@ Every command's syntax comes from the layer's guide.
    What a wake means — the file the doorbell reads, the generation check, the two dead ends,
    the ping and the heartbeat are `completion.md`'s, stated there once; this step only names
    the wait. A `blocked` wake is a dialog: read it (the layer's Read), put it to the operator,
-   answer it as the layer's Send says, then one fresh bounded wait. A loop of waits, and
+   answer it as the layer's `Wait` states, then one fresh bounded wait. A loop of waits, and
    restarting a wait after an empty timeout, both stay forbidden.
    Before any question to the operator the top writes `run.question` before it asks and removes it on
    the answer — `{text, asked_at, task, message_id?}` (`message_id` only when the question answers or
    relays a dagr operator message) — so a question survives the top.
-   A read only
-   only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, the
-   false wake's own read, or the heartbeat tick's one check per live seat — never to watch progress.
+   A read only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint,
+   the false wake's own read, or the heartbeat tick's one check per live seat — never to
+   watch progress.
    A round's N parallel items are N bounded background waits, one per pane, each waking the
    session when it exits — not the forbidden loop, since each targets a different
    pane rather than re-entering the one that just timed out. What persists is the

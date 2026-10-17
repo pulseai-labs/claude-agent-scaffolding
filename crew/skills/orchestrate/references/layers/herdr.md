@@ -180,10 +180,10 @@ It is herdr's default set, written out rather than inherited; `--until` narrows:
 companion's excepted: it lapses).
 
 **A `blocked` wake** means herdr recognised an approval or question dialog. A blocked
-agent rejects `herdr agent prompt` with `agent_blocked`, sending nothing; the procedure is
-`lifecycle.md` step 5's, and herdr's reads are `herdr pane read <pane>` for the dialog and
-`herdr agent send-keys <pane> <keys>` for the answer, then one fresh bounded wait. A
-question written to the report file is not a dialog; it rings that doorbell (`completion.md`).
+agent rejects `herdr agent prompt` with `agent_blocked`, sending nothing. The dialog is read
+with `herdr pane read <pane>`, the answer sent with `herdr agent send-keys <pane> <keys>`;
+`lifecycle.md` step 5 owns when a `blocked` wake is answered that way. A question written to
+the report file is not a dialog; it rings that doorbell (`completion.md`).
 
 ## Completion signal
 
