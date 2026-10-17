@@ -23,7 +23,7 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=202
+REF_BUDGET=208          # 2026-10-17: +6 for the `layer:` key, its two stops and the `host:` key (crew 0.3.0, spec §4.2/§4.6)
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -31,11 +31,55 @@ REF_BUDGET=202
 printf '%screw configuration contract%s\n\n' "$DIM" "$RST"
 
 section "the two files"
-pin "$CONFIG_MD" '~/.claude/crew/agents.md' "the machine file's path is stated once"
+# The machine file's path is named TWICE by design and needs both: the prose states it, and
+# the `mv` the old-path stop prints names both ends of the move. `pin` demands exactly one, so
+# this is a count of exactly two — which still refuses a second prose statement of the path,
+# because that would be the third site. Its adjacent control is right below.
+machine_path_sites() { # <file> <label>
+  c="$(occurrences "$1" '~/.claude/crew/agents.md')" || { fail "$2" "unreadable file or empty needle: $1"; return 0; }
+  if [ "$c" -eq 2 ]; then pass "$2"
+  else fail "$2" "found $c, expected 2: the prose statement and the old-path move"; fi
+}
+machine_path_sites "$CONFIG_MD" "the machine file's path is stated at two sites: the prose and the move"
 pin "$CONFIG_MD" '`.crew/roles.md`' "the project file's path is stated once"
 
+# Adjacent control: a third statement of the path must be refused by the same predicate.
+ctl_sites="$(mktemp)"; cp "$CONFIG_MD" "$ctl_sites"
+printf '\nThe machine file is `~/.claude/crew/agents.md`.\n' >> "$ctl_sites"
+out="$(machine_path_sites "$ctl_sites" "control: a third statement of the machine file's path")"
+if printf '%s' "$out" | grep -F 'found 3' >/dev/null; then
+  pass "control: a third statement of the machine file's path is refused"
+else
+  fail "control: a third statement of the machine file's path is refused" "$out"
+fi
+rm -f "$ctl_sites"
+
+section "the layer"
+pin "$CONFIG_MD" 'layer: herdr' "the herdr layer is one of the two values stated"
+pin "$CONFIG_MD" 'layer: orca' "the orca layer is the other value stated"
+pin "$CONFIG_MD" 'no default' "a missing or unknown layer stops on one question and no default"
+pin "$CONFIG_MD" 'the Orca layer ships in crew 0.4.0' "0.3.0's stop names the release the Orca layer arrives in"
+
+section "the old paths"
+# The old name is ASSEMBLED, the way tests/test-crew-rename.sh assembles its own pattern: that
+# gate reads every tracked file for it, and this suite has to name the two moves whose absence
+# it pins. Were the name a literal here, the gate would carry a hit no later task could clear.
+OLD_NAME="herdr"'-'"crew"
+MOVE_PROJECT="mv .$OLD_NAME .crew"
+MOVE_MACHINE="mkdir -p ~/.claude/crew && mv ~/.claude/$OLD_NAME/agents.md ~/.claude/crew/agents.md"
+pin "$CONFIG_MD" "$MOVE_PROJECT" "the project file's move is stated once"
+pin "$CONFIG_MD" "$MOVE_MACHINE" "the machine file's move is stated once"
+
+section "the layer in the skill"
+# §1 loads the chosen layer's file; §7's two layer refusals name a step of that file rather
+# than a herdr command, so the skill holds no layer's syntax (Task 3's sweep proves the rest).
+SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
+present "$SKILL_MD" 'references/layers/<layer>.md' "the skill names the chosen layer's file"
+pin "$SKILL_MD" "The layer's health check fails" "§7's first refusal is the layer's health check"
+pin "$SKILL_MD" "The layer's Identity step finds no own address" "§7's second refusal is the layer's Identity step"
+
 section "the agent entry"
-for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'review:' 'note:'; do
+for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'review:' 'note:' 'host:'; do
   present "$CONFIG_MD" "$field" "agent field $field is documented"
 done
 present "$CONFIG_MD" 'model_shows: banner' "banner is a documented value"
@@ -66,13 +110,32 @@ pin "$CONFIG_MD" 'the first delegated dispatch' \
   "the no-config halt lands at the first delegated dispatch"
 
 section "budget"
-if [ -f "$CONFIG_MD" ]; then
-  n="$(wc -l < "$CONFIG_MD" | tr -d ' ')"
-  if [ "$n" -le "$REF_BUDGET" ]; then pass "config.md within the reference budget ($n lines)"
-  else fail "config.md within the reference budget" "$n lines, over by $((n - REF_BUDGET))"; fi
-else
+# One predicate, two callers: the shipped reference and the over-budget control below. The
+# control pads the REAL file to REF_BUDGET+1 rather than using a fixed count, because a fixture
+# with a fixed line count goes valid the moment the constant moves — the bound
+# test-herdr-mechanics.sh states for its own control.
+config_over_budget() { # <file> -> "<lines> <over>", rc 0 when over budget
+  [ -f "$1" ] || return 1
+  _n="$(wc -l < "$1" | tr -d ' ')"
+  [ "$_n" -gt "$REF_BUDGET" ] || return 1
+  printf '%s %s\n' "$_n" "$((_n - REF_BUDGET))"
+}
+if [ ! -f "$CONFIG_MD" ]; then
   fail "config.md exists" "no such file"
+elif _over="$(config_over_budget "$CONFIG_MD")"; then
+  fail "config.md within the reference budget" "${_over% *} lines, over by ${_over#* }"
+else
+  pass "config.md within the reference budget ($(wc -l < "$CONFIG_MD" | tr -d ' ') lines)"
 fi
+ctl_budget="$(mktemp)"; cp "$CONFIG_MD" "$ctl_budget"
+while [ "$(wc -l < "$ctl_budget" | tr -d ' ')" -le "$REF_BUDGET" ]; do printf '\n' >> "$ctl_budget"; done
+if _over="$(config_over_budget "$ctl_budget")"; then
+  pass "control: one line over the reference budget is refused ($_over)"
+else
+  fail "control: one line over the reference budget is refused" \
+    "accepted the reference padded to $(wc -l < "$ctl_budget" | tr -d ' ') lines against $REF_BUDGET"
+fi
+rm -f "$ctl_budget"
 
 section "briefs carry their seat inline"
 BRIEFS_MD="$PLUGIN_ROOT/skills/orchestrate/references/briefs.md"

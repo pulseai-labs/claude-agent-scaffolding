@@ -11,6 +11,10 @@ You are the orchestrator session. Your context is the scarcest resource in the r
 for decisions, briefs, dispositions, and the operator's questions. Every other kind of
 work goes to a herdr worker session launched by seat name.
 
+Which layer drives those seats is the project file's own line — `layer: herdr` or `layer: orca` — and
+that layer's file, `references/layers/<layer>.md`, is where its commands live: load it before your
+first launch, and read no other layer's file.
+
 Your first herdr command is `herdr --skill`; take every command's syntax from that guide,
 not from this skill. `references/herdr-mechanics.md` states once what that guide cannot
 express or sets a default for that crew overrides: the seat launch and placement
@@ -197,14 +201,12 @@ These cases are named because they look like clashes and are not:
 
 ## 7. Refusals
 
-- **herdr is not running** (`herdr status` fails): say so and stop. Do not fall back
-  to the `Agent` tool or to doing the work inline.
-- **This session is not inside a herdr pane** (`HERDR_PANE_ID` is absent, and with it the
-  `HERDR_WORKSPACE_ID` a rotation later needs): say so and stop. The daemon check above is
-  not enough — a healthy daemon with this session started from an ordinary terminal is a run
-  it cannot finish: the context-ceiling hook is gated on `HERDR_PANE_ID` and goes inert, and
-  every seat is placed relative to the pane the operator launched this session in
-  (`README.md`, Requirements).
+- **The layer's health check fails** (`references/layers/<layer>.md`, Health): say so and stop. Do not
+  fall back to the `Agent` tool or to doing the work inline.
+- **The layer's Identity step finds no own address** (`references/layers/<layer>.md`, Identity): say so
+  and stop. A healthy layer is not enough — with no address of its own this session is a run it cannot
+  finish: the context-ceiling hook, gated on that address, goes inert, and every seat is placed relative
+  to the seat the operator launched this session in (`README.md`, Requirements).
 - **A seat is undefined or its agent is missing** (the seat name is in neither file, the
   pane shows `command not found`, or the banner read shows a model other than its
   `expected_model:`): report it to the operator and stop that dispatch. Never substitute

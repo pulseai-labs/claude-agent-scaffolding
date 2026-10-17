@@ -16,6 +16,10 @@ agents by name, never by command, so no machine detail reaches a repo. For a dua
 the project root is the AI workspace, where orchestrators launch; a single-repo project uses
 that repo.
 
+The project file's first non-heading line states the layer — `layer: herdr` or `layer: orca`. The coordinator
+loads `references/layers/<layer>.md` before its first launch and reads no other layer's file; a missing or
+unknown value stops the run with one question, and there is no default. 0.3.0 ships the herdr layer only: asking for Orca stops, and says the Orca layer ships in crew 0.4.0.
+
 Resolution is a walk up from the session's working directory; the first project file found wins. The pairing manifest is not consulted — its absolute roots can belong to another host.
 
 The project file wins for anything it names — a seat, an extra role, a condition; it never
@@ -49,6 +53,7 @@ Each field exists because a measured case needs it:
   status-bar agent returns nothing on the default read.
 - `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
   a file and sends one line pointing at it, for an agent whose composer fragments injects.
+- `host:` — the machine this seat runs on; absent, this machine. The layer's Machines step says how to reach it.
 - `can:` — what the agent is able to run, comma-separated: `slash-commands`, `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement, and where it is checked, are stated below.
 - `review:` — optional: the command a reviewer seat on this agent runs, `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP); absent, `/code-review <PR> <LEVEL>`.
 - `note:` — free prose the coordinator reads when it uses that agent.
@@ -183,6 +188,8 @@ own context — needs no setup in any state: every role falls back to the agent 
   names the project file and the `## Seats` section to add.
 - Project file only — roles name agents nothing resolves; it names the
   machine file and the entry to add.
+- The old path only — a file left at its old name: the run stops, prints the move and reads no old file:
+  `mkdir -p ~/.claude/crew && mv ~/.claude/herdr-crew/agents.md ~/.claude/crew/agents.md` (machine file), `mv .herdr-crew .crew` (project file).
 
 The operator writes the machine file once per machine; this is the shape to copy:
 

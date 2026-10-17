@@ -77,7 +77,9 @@ while IFS= read -r hit; do
   text="${rest#*:}"
   case "$file" in */CHANGELOG.md) continue ;; esac
   if [ "$file" = "$_CONFIG_MD" ]; then
-    # The old-path stop names the move the operator runs (Task 2 adds it).
+    # The one line allowed to name it: the old-path stop, which prints both moves. A move has to
+    # name both ends of itself, so that line — and only that line — carries the old name. Any
+    # other line of config.md that names it still fails this check.
     case "$text" in *"mv"*"$OLD"*) continue ;; esac
   fi
   hits="$hits$hit
