@@ -1,4 +1,4 @@
-# ossify (v1.24.0)
+# ossify (v1.25.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -138,6 +138,17 @@ is no default and no automatic move or merge. Its §2 ask-first guard fires on a
 lean one. doctor's and close's `fail: state` remedy names `/ossify:start` or
 `/ossify:adopt`, which each run `init`, instead of a bare `init`. No `lib/`
 code, no state change.
+
+Since 1.25.0 (#831, #832; autopilot slice 1), the merge and the demo walk take a
+standing order in the autopilot policy when the session has one. work-pr's
+bundled loop, `/ossify:patch` and the spine close merge on the operator's
+explicit ack or on a standing order that grants merge authority — the terminus
+treats a clean verdict as that ack and the ledger names which order gave it —
+and the demo walk hands each `user:` line to the orchestrator: walked itself
+against the merged product, evidence recorded per line, marked `walked by
+orchestrator` in the read-out, the read-out to the operator, and a failing line
+still halts the close. Absent such an order, every site asks exactly as it did
+at 1.24.0. No `lib/` code, no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and
