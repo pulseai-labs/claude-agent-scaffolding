@@ -12,7 +12,7 @@ checks version and frontmatter parity across the two marketplaces. `seat-mods`, 
 `tests/test-codex-dual-publish.sh` before assuming a plugin ships everywhere.
 
 Shipped: `workspace-init`, `ai-mentor`, `architect-critic`, `claude-security-audit`, `ossify`,
-`code-judo`, `herdr-crew`, `merge-bar`, `seat-mods`, `molt`, `autonomic`.
+`code-judo`, `crew`, `merge-bar`, `seat-mods`, `molt`, `autonomic`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
 handoffs, review records and process exhaust live in a private sibling workspace and must

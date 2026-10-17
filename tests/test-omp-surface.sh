@@ -13,7 +13,7 @@ OMP_SIX="ossify merge-bar workspace-init architect-critic code-judo ai-mentor"
 # The three mods (spec C): catalog entries equal their Claude entries; their text is not gated here.
 OMP_MODS="seat-mods molt autonomic"
 # Claude plugins also listed on OMP for an OMP top (spec D): catalog entries equal their Claude entries; text not gated.
-OMP_SHARED="herdr-crew"
+OMP_SHARED="crew"
 # Plugins that exist on OMP only: no Claude-catalog entry, no .claude-plugin/, versioned by package.json.
 OMP_ONLY="omp-roles"
 # Plugins whose text checks 2-4 enforce on the shipped tree. Widened per PR (spec B §4.4).
@@ -197,8 +197,8 @@ out=$(findings "$WORK/clean" "$OMP_SIX"); [ -z "$out" ] && pass "clean fixture h
 
 control catalog-extra   "catalog: lists"            'jq ".plugins += [{name:\"extra\",source:\"./extra\",description:\"d\",category:\"c\"}]" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
 # Adjacent controls: absence is the list finding; a present shared entry must still match Claude.
-control catalog-shared-missing "catalog: lists" 'jq ".plugins |= map(select(.name != \"herdr-crew\"))" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
-control catalog-shared-drift "catalog: herdr-crew entry" 'jq "(.plugins[] | select(.name==\"herdr-crew\") | .description) = \"x\"" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
+control catalog-shared-missing "catalog: lists" 'jq ".plugins |= map(select(.name != \"crew\"))" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
+control catalog-shared-drift "catalog: crew entry" 'jq "(.plugins[] | select(.name==\"crew\") | .description) = \"x\"" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
 control catalog-drift   "catalog: ossify entry"     'jq "(.plugins[] | select(.name==\"ossify\") | .description) = \"x\"" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
 control catalog-version "catalog: ossify version"   'for c in .omp-plugin .claude-plugin; do jq "(.plugins[] | select(.name==\"ossify\")) += {version:\"9.9.9\"}" $c/marketplace.json > t && mv t $c/marketplace.json; done'
 control omp-only-in-claude  "catalog: omp-roles must not be in the Claude catalog" 'jq ".plugins += [{\"name\":\"omp-roles\",\"source\":\"./omp-roles\"}]" .claude-plugin/marketplace.json > t && mv t .claude-plugin/marketplace.json'
