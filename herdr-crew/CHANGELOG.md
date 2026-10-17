@@ -9,6 +9,10 @@ All notable changes to the `herdr-crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.2.29
+
+**Seats, profiles and the briefs follow the autopilot standing orders** (slice 1 of the stop-the-menus plan). `ossify-execution.md` §3's seat set, its depth confirmation and its resumed-top seat ask, §5's reviewer, PR-fix and close-review writer picks, and `ossify-nested-run.md`'s writer ask now carry the condition: under the **Seats and profiles** standing order in the autopilot policy, the top picks from the project file and continues; otherwise every ask stands exactly as it was. The PROHIBITIONS line in all sixteen brief templates moves the merge off the operator-owned list: a worker's implementation plan is the top's to approve and the merge follows `run.merge_word`; design/spec/release gates, product choices, credential values, Molt handoff, the delete/force-push/no-verify rails and the enrolled-OMP acknowledgment clause are unchanged.
+
 ## 0.2.28
 
 **A top that molts in place on OMP re-arms its waits** (#855). omp cancels every background job a session owns when it clears that session, so on OMP the armed waits and the heartbeat do not survive a molt; molt 0.3.3's seed says so. The molt-in-place paragraph now scopes "every armed wait survives the clear" and "it arms no wait the handoff lists" to Claude Code. On OMP, after its generation check, the resumed top re-arms the wait of each dispatch still live and one fresh heartbeat.
