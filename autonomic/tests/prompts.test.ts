@@ -20,6 +20,9 @@ describe('fork prompts', () => {
   test('the turn-end otherwise branch keeps the scope exception (#866)', () => {
     expect(turnEndPrompt('t', 'p')).toContain('unless the scope already decides the choice')
   })
+  test('the turn-end otherwise branch keeps the pain-list exception too (PR #864 round 2)', () => {
+    expect(turnEndPrompt('t', 'p')).toContain('unless the scope already decides the choice and no pain-list reason applies')
+  })
   test('the ask prompt covers a recommended option under a standing order', () => {
     expect(askPrompt([], 'p')).toContain('When a standing order gives the recommendation authority, a question whose options mark one "(Recommended)" is covered by that option')
   })
