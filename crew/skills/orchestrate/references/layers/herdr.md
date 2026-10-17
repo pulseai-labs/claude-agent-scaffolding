@@ -120,7 +120,10 @@ wait on output the launch command cannot produce, or exclude the echoed command.
 
 ## Send
 
-This is the one statement of how the orchestrator sends a seat anything; other files say "send" and mean this.
+PING_SEND=herdr agent prompt <that pane>
+
+This is the one statement of how the orchestrator sends a seat anything; other files say "send" and mean this. The slot `PING_SEND` a brief's `PING:` and `MOLT:` lines carry is this
+file's send, filled by the dispatcher.
 
 - **Detected:** `herdr agent prompt <pane> "<text>"`. herdr prepends nothing: it submits
   the text and Enter as one submission, and what it adds to a seat is environment such as

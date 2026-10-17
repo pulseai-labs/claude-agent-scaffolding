@@ -68,10 +68,8 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=225  # 2026-10-17: crew 0.3.0 Task 3, second fix round — the eight rule residues the
-# re-check named (the run-workspace order, the workspace recreate, the marking policy, the
-# typed-state rule, the workspace order at teardown, the machine reachability) left for their
-# shared owners, leaving bare pointers; the count fell 228 -> 225.
+REF_BUDGET=228  # 2026-10-17: crew 0.3.0 Task 4 — the `## Send` section gained the PING_SEND
+# slot definition and its one-line statement (3 lines), so the count went 225 -> 228.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

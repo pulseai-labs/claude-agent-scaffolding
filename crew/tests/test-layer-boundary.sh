@@ -20,12 +20,11 @@
 #   PERMANENT  SKILL.md's frontmatter `description:` line — the trigger words an operator
 #              actually types ("the herdr orchestrator session"). Not a command, and the
 #              operator's own words are not something a task removes.
-#   T4         the brief envelope: `PING: `, `MOLT: `, and the `NOTIFY_RUN=` clause inside the
-#              `REPORT_PATH=…` lines. Task 4 names the layer's Send there.
 #   T5         the orchestrator's identity reads: `HERDR_PANE_ID`, `HERDR_WORKSPACE_ID`,
 #              `herdr pane get`. Task 5 moves them behind the layer's Identity.
 #
-# Tasks 4 and 5 shrink their entries to nothing; the PERMANENT one stays.
+# Task 5 shrinks its entry to nothing; the PERMANENT one stays. T4's envelope entry is gone:
+# the `PING:`/`MOLT:`/`NOTIFY_RUN=` lines now name the layer's Send (`test-brief-envelope.sh`).
 #
 # Usage:   bash crew/tests/test-layer-boundary.sh
 # Exit:    0 if every mechanical fact holds; 1 otherwise.
@@ -75,10 +74,6 @@ sweep_findings() { # <skills/orchestrate dir>
       # PERMANENT — the frontmatter triggers of SKILL.md, and that line only.
       case "${f##*/}:$line" in
         SKILL.md:description:*) continue ;;
-      esac
-      # T4 — the brief envelope.
-      case "$line" in
-        "PING: "*|"MOLT: "*|*"NOTIFY_RUN="*) continue ;;
       esac
       # T5 — the orchestrator's identity reads.
       case "$line" in

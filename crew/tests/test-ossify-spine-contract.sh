@@ -67,9 +67,10 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=257          # A3: the budget equals the longest budgeted reference (257,
+REF_BUDGET=260          # A3: the budget equals the longest budgeted reference (260,
                         # ossify-briefs.md); 0.2.9 raised it from 214 for the spine brief's 1.14.0
-                        # caller rules and re-entry seat rule.
+                        # caller rules and re-entry seat rule; Task 4 raised it 257 -> 260 for the
+                        # three `PING_SEND=` fill lines its templates gained.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking
                         # clause each launch site gained.
                         # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief
@@ -412,43 +413,32 @@ section "one mechanic, one statement"
 # Every launch, send, wait, read and release is stated in layers/herdr.md
 # and deferred to. Two names are sanctioned as deferrals: `herdr --skill`, the
 # entry point, and `herdr workspace list`, the teardown check — neither of them
-# here. The ping is the one exception with a reason: a brief is the whole
-# contract its worker sees, so the worker's own one-line ping must be stated in
-# the brief it was dispatched with, not deferred. The fence is therefore
-# per-file: the two non-brief references state no herdr command at all, and in a
-# brief file every `herdr agent ` occurrence IS the ping line — counted both
-# ways, so any other agent command breaks the equality. The adjacent control
-# below proves the equality still flags one. 0.2.8: a leaf template's MOLT line states the
-# worker's second own ping, `MOLT WARNING`, read from NOTIFY_RUN, for the same reason —
-# so each count below adds one per MOLT line in that file.
+# here. Task 4 (crew 0.3.0, spec §4.4): the envelope's layer part is the `<PING_SEND>` slot,
+# defined once in the layer's `Send`, so a brief file states NO layer command at all — the
+# quality this block asserted while the ping line named `herdr agent prompt` is now the
+# absence it always wanted. The adjacent control below proves the fence still flags one.
 PING_CMD='herdr agent prompt <that pane>'
-agent_commands_are_pings() { # <file> <expected ping lines>
+no_layer_command() { # <file>
   _a="$(count_of "$1" 'herdr agent ')" || return 1
-  _p="$(count_of "$1" "$PING_CMD")" || return 1
-  [ "$_a" -eq "$2" ] && [ "$_p" -eq "$2" ]
+  [ "$_a" -eq 0 ]
 }
-for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
+for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$GENERIC_BRIEFS_MD"; do
   for g in 'herdr pane ' 'herdr tab ' 'herdr worktree '; do
     absent "$f" "$g" "${f##*/} restates no '$g' command"
   done
 done
-for f in "$EXEC_MD" "$NESTED_MD"; do
-  if agent_commands_are_pings "$f" 0; then pass "${f##*/} states no herdr-agent command"
+for f in "$EXEC_MD" "$NESTED_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$GENERIC_BRIEFS_MD"; do
+  if no_layer_command "$f"; then pass "${f##*/} states no herdr-agent command"
   else fail "${f##*/} states no herdr-agent command" "an agent command is back"; fi
 done
-for pair in "$BRIEFS_MD:6" "$PRBRIEFS_MD:4" "$WRITER_MD:2"; do
-  _f="${pair%:*}"; _want="${pair##*:}"
-  if agent_commands_are_pings "$_f" "$_want"; then pass "${_f##*/}: every herdr-agent command is the ping line ($_want)"
-  else fail "${_f##*/}: every herdr-agent command is the ping line" "expected $_want of each"; fi
-done
-# Adjacent control: the loosened fence admits the ping line and nothing else.
+# Adjacent control: the fence admits the slot and flags the command it replaced.
 ctl_extra="$(mktemp)"; ctl_ping="$(mktemp)"
 printf '%s\n%s\n' "$PING_CMD" 'herdr agent wait w9:p1 --until idle' > "$ctl_extra"
-printf '%s\n' "$PING_CMD" > "$ctl_ping"
-if agent_commands_are_pings "$ctl_extra" 1; then fail "control: a second agent command is still flagged" "accepted it"
-else pass "control: a second agent command is still flagged"; fi
-if agent_commands_are_pings "$ctl_ping" 1; then pass "control: the ping line alone is accepted"
-else fail "control: the ping line alone is accepted" "refused it"; fi
+printf '%s\n' "<PING_SEND> '<REPORT READY: <task id> <kind> <path>>'" > "$ctl_ping"
+if no_layer_command "$ctl_extra"; then fail "control: an agent command is still flagged" "accepted it"
+else pass "control: an agent command is still flagged"; fi
+if no_layer_command "$ctl_ping"; then pass "control: the ping slot alone is accepted"
+else fail "control: the ping slot alone is accepted" "refused it"; fi
 rm -f "$ctl_extra" "$ctl_ping"
 # #574, the generic layer's half: briefs.md is where a brief-writer meets the doorbell, so
 # it must name what the doorbell compares — the hash or the file's identity — while still
@@ -2399,7 +2389,7 @@ pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the sam
 pin "$NESTED_MD" 'one cut mid-round returns none and is respawned the same way' \
   "nested-run §4: a mid-round cut is respawned under ossify 1.14.0 (#674)" flat
 absent "$NESTED_MD" 'returns none and goes to the operator' "nested-run §4: the pre-1.14.0 relay is gone (#674)"
-MOLT_LINE='MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> '"'"'MOLT WARNING <pct> <task id>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+MOLT_LINE='MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'MOLT WARNING <pct> <task id>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
 # both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
 molt_in_template() { # <file> <fence n> <template name>
@@ -2427,7 +2417,7 @@ n_eq "$GENERIC_BRIEFS_MD" "$MOLT_LINE" 9 "briefs.md carries the MOLT line 9 time
 n_eq "$BRIEFS_MD" "$MOLT_LINE" 2 "ossify-briefs.md carries the leaf MOLT line twice (item pair only)"
 pin "$BRIEFS_MD" 'ROTATE instead once the context-ceiling notice or a molt warning has fired' \
   "spine brief: a molt warning triggers the existing ROTATE" flat
-pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `herdr agent prompt <that pane> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), and ROTATE at the next round barrier' \
+pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), and ROTATE at the next round barrier' \
   "spine brief: the MOLT line" flat
 pin "$BRIEFS_MD" 'End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`' \
   "spine brief: the rotate reply names the handoff for molt (D5)" flat
