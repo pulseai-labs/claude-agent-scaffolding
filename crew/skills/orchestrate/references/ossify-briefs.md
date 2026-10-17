@@ -45,10 +45,10 @@ SEATS — the operator-approved seats for this spine. Use them verbatim.
 A seat this block does not list halts the item and asks.
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 Everything you tell the top — plan relay, question, halt, rotation, report — goes in your
-report file at REPORT_PATH; then wait, or stop where this brief says so. Your first herdr
-command is `herdr --skill`. MECHANICS addresses a run's orchestrator, which for your own
-seats is you: every seat you launch, send to, wait on or release follows it, except that
-where it says the operator, you mean the top, through your report file.
+report file at REPORT_PATH; then wait, or stop where this brief says so. Your command's syntax
+comes from the layer's own guide (`MECHANICS`). MECHANICS addresses a run's orchestrator, which
+for your own seats is you: every seat you launch, send to, wait on or release follows it, except
+that where it says the operator, you mean the top, through your report file.
 
 TASK: drive spine SPINE_ID to its final round barrier. With HANDOFF_PATH set, read that
 handoff first; ossify's own state says which round runs next. Step 3's same command
@@ -63,10 +63,10 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      item has exactly one implementer row and one verifier row, and no row names
      an item the plan does not. A failure halts — ask, never substitute.
   2. Create RUN_JSON for your item tasks, or continue it if it exists. A session that
-     binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID`
-     — dagr's stable-agent fallback otherwise — in the same producer loop every other write
+     binds an existing `run.json` rewrites `run.orchestrator` to its own address from
+     the layer's Identity — dagr's stable-agent fallback otherwise — in the same producer loop every other write
      takes. On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane
-     — this server's machine, per MECHANICS — and `run.orchestrator.session`, herdr's `agent_session` for the pane as `{agent, id}`, as step 1 of `lifecycle.md` beside MECHANICS says. Stay its single writer per dagr's producer contract (`dagr --skill`):
+     — this server's machine, per MECHANICS — and `run.orchestrator.session` from the layer's Identity, as step 1 of `lifecycle.md` beside MECHANICS says. Stay its single writer per dagr's producer contract (`dagr --skill`):
      one task per item, and each round's barrier a gate node whose fan-in is that round's items. Lint every write with `dagr check --strict` before it replaces the file.
   3. Invoke `/ossify:run-spine $SPINE_ID --external-executor`. On the round's
      execution requests, launch a fresh IMPLEMENTER seat per item from its SEATS row, verbatim —

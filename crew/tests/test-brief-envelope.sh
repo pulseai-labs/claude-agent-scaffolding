@@ -82,6 +82,28 @@ if [ -z "$findings" ]; then
 else
   fail "the PING/MOLT lines and the NOTIFY_RUN clause name no layer command" "$findings"
 fi
+
+# One envelope per template. A dropped `PING:` line leaves every fact above green — the
+# survivors are still one byte-identical line — so the count is the fact that catches it:
+# in each file, `PING:`, `MOLT:`, `NOTIFY_RUN=` and `PING_SEND=` are as many as the file's
+# `REPORT_PATH=` fill lines (one per template).
+envelope_counts() { # <file> -> "<report_path> <ping> <molt> <notify_run> <ping_send>"
+  printf '%s %s %s %s %s\n' \
+    "$(grep -c '^REPORT_PATH=' "$1")" \
+    "$(grep -c '^PING:' "$1")" \
+    "$(grep -c '^MOLT:' "$1")" \
+    "$(grep -c 'NOTIFY_RUN=' "$1")" \
+    "$(grep -c '^PING_SEND=' "$1")"
+}
+for l in $ENVELOPE_FILES; do
+  set -- $(envelope_counts "$REF/$l")
+  if [ "$1" -ge 1 ] && [ "$1" -eq "$2" ] && [ "$2" -eq "$3" ] && [ "$3" -eq "$4" ] && [ "$4" -eq "$5" ]; then
+    pass "$l: $1 templates, one PING/MOLT/NOTIFY_RUN/PING_SEND line each"
+  else
+    fail "$l: one envelope line per template" \
+      "REPORT_PATH=$1 PING=$2 MOLT=$3 NOTIFY_RUN=$4 PING_SEND=$5 — the counts must be equal"
+  fi
+done
 n_ping="$(grep -h '^PING:' "$REF"/briefs.md "$REF"/ossify-briefs.md "$REF"/ossify-pr-briefs.md "$REF"/ossify-close-writer.md | wc -l | tr -d ' ')"
 n_molt="$(grep -h '^MOLT:' "$REF"/briefs.md "$REF"/ossify-briefs.md "$REF"/ossify-pr-briefs.md "$REF"/ossify-close-writer.md | wc -l | tr -d ' ')"
 pass "the envelope covers $n_ping PING lines and $n_molt MOLT lines"

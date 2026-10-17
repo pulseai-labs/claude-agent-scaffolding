@@ -167,6 +167,32 @@ pin "$COMP" 'An answered dialog re-arms the pair' \
 pin "$COMP" 'the doorbell and its companion again, not one wait' \
   "the fresh wait after an answer is the pair again, not one wait (#575)"
 
+# Task 5 (crew 0.3.0): the identity reads live in the layer's `Identity`; the shared files
+# name the step and hold the rules, so a shared file carries no env var name and the layer
+# file is where a rotation's workspace and the agent session are read from.
+section "orchestrator identity through the layer"
+present "$REF" 'HERDR_PANE_ID' "the layer's Identity names the pane env var"
+present "$REF" 'HERDR_WORKSPACE_ID' "the layer's Identity names the workspace env var"
+pin "$REF" '.result.pane.agent_session.agent' "the layer's Identity names the agent-session read once"
+pin "$LIFE" 'and `run.orchestrator.session` from the layer'"'"'s Identity' \
+  "step 1 takes the session from the layer's Identity" flat
+present "$LIFE" 'names its own address from the layer'"'"'s Identity' \
+  "a molted-in-place top confirms its address from the layer's Identity" flat
+# The rebind rule is stated once and carried to its two lifecycle sites — step 1's bind and
+# The resume's step 2 — so a reword that drops the layer's Identity from either one fails
+# here. Counted flat: the rule may break at any point in either copy.
+rebind_sites="$(count_of "$LIFE" 'A session that binds an existing `run.json` rewrites `run.orchestrator` to its own address from the layer'"'"'s Identity' flat)" \
+  || rebind_sites=failed
+if [ "$rebind_sites" = failed ]; then
+  fail "lifecycle binds through the layer's Identity at step 1 and The resume" \
+    "count failed — unreadable file or empty needle"
+elif [ "$rebind_sites" -eq 2 ]; then
+  pass "lifecycle binds through the layer's Identity at step 1 and The resume (2)"
+else
+  fail "lifecycle binds through the layer's Identity at step 1 and The resume" \
+    "found $rebind_sites, expected 2"
+fi
+
 section "placement"
 present "$REF" '--cwd' "a seat's tree is set with --cwd"
 present "$REF" '--label' "a seat's tab is labelled"

@@ -1735,7 +1735,7 @@ pin "$PRBRIEFS_MD" "context-ceiling notice" "the work-PR brief returns open: pas
 # The sequence's judgment — who writes when, the queued-message interval — is not
 # parsed here and has no rubric criterion; it is checked by the recorded-claims
 # walkthrough in the verification dispatch (no eval result covers it).
-REBIND='A session that binds an existing `run.json` rewrites `run.orchestrator` to its own `$HERDR_PANE_ID` — dagr'"'"'s stable-agent fallback otherwise — in the same producer loop every other write takes.'
+REBIND='A session that binds an existing `run.json` rewrites `run.orchestrator` to its own address from the layer'"'"'s Identity — dagr'"'"'s stable-agent fallback otherwise — in the same producer loop every other write takes.'
 if ! rebind_life="$(count_of "$LIFECYCLE_MD" "$REBIND" flat)"; then
   fail "lifecycle states the rebind rule at step 1 and carries it to the rotation" "count failed — unreadable file or empty needle"
 elif [ "$rebind_life" -eq 2 ]; then pass "lifecycle states the rebind rule at step 1 and carries it to the rotation (2)"
@@ -1827,8 +1827,8 @@ pin "$LIFECYCLE_MD" 'Binding a run another top drove through a rotation runs **T
   "Orient routes a rotation's takeover through the resume before rebinding" flat
 pin "$LIFECYCLE_MD" 'is resumed only on the operator'"'"'s word that it died' \
   "a hard stop resumes only on the operator's word (#810)" flat
-pin "$LIFECYCLE_MD" 'and `run.orchestrator.session`, herdr'"'"'s `agent_session` for' \
-  "every bind records the top's session for a later transcript read (#810)" flat
+pin "$LIFECYCLE_MD" 'and `run.orchestrator.session` from the layer'"'"'s Identity' \
+  "every bind records the top's session from the layer's Identity for a later transcript read (#810)" flat
 pin "$LIFECYCLE_MD" 'Read `run.orchestrator` — pane, machine, session — before any write' \
   "a hard stop reads the old top before the rebind overwrites it (#810)" flat
 pin "$LIFECYCLE_MD" 'Never two tops on one run.' \
@@ -1850,7 +1850,7 @@ pin "$LIFECYCLE_MD" 'With no session recorded, no file found, or the old top on 
 pin "$LIFECYCLE_MD" 'it always rewrites `run.orchestrator.session` (step 1), since molt'"'"'s `/clear` starts a new session in this pane' \
   "a top that molts in place records its new session (#810)" flat
 for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
-  pin "$f" 'and `run.orchestrator.session`, herdr'"'"'s `agent_session` for the pane as `{agent, id}`' \
+  pin "$f" 'and `run.orchestrator.session` from the layer'"'"'s Identity' \
     "${f##*/} records its session on creation and continuation (#810)" flat
 done
 pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md` — and `run.orchestrator.session`' \
