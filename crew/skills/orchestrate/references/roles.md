@@ -39,35 +39,86 @@ of the layer's steps, and only the layer's file holds their commands and flags:
 5. **Read** — the model read that confirms `expected_model:`.
 6. **Send** — the brief, as `brief_delivery` says.
 
-**The launch environment.** `Seat marking` writes these into the seat's pane, before the
-seat's command; every layer sets the same names and meanings, because the mods read them and
-never ask which layer set them:
+**The launch environment.** `Seat marking` writes these into the seat's pane, before the seat's
+command, in one export; every layer sets the same names and meanings, because the mods read
+them and never ask which layer set them. A guarded seat — implementer, verifier or reviewer —
+is marked by its launcher, before its command, with
+
+    SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain
+
+plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. The names mean:
 
 - `SEAT_MODS_ROLE` — the seat's role: `implementer`, `verifier` or `reviewer` for a guarded
   seat, `coordinator` for a coordinator seat, `orchestrator` for the top's rotation successor.
-  A project-file role whose `replaces:` names a guarded role is guarded as that role; one with
-  no `replaces:` is a guarded `implementer`.
+  A project-file role whose `replaces:` names one of those guarded roles is guarded as that role;
+  one with no `replaces:` is a guarded `implementer`, its own report directory and its
+  scratch directory in its `SEAT_MODS_ALLOW`.
 - `SEAT_MODS_ALLOW` — the colon-separated paths a guarded seat may write: its report directory
-  and its scratch directory. A coordinator takes none, except an OMP coordinator (`config.md`),
+  and its scratch directory. A coordinator seat — the spine, close or work-PR session, the
+  doctor session, the lane driver — exports the same list with `SEAT_MODS_ROLE=coordinator` **in
+  place of** `<role>` and no `SEAT_MODS_ALLOW`: every other assignment on it is unchanged. The
+  top's rotation successor's is that variant with `SEAT_MODS_ROLE=orchestrator`. The operator's
+  own first top is not launched here — the operator starts it through a `claude-orch` alias
+  that sets `orchestrator`. A coordinator takes none, except an OMP coordinator (`config.md`),
   which adds each hosting repo's `.worktrees` root.
-- `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` — every child seat,
-  every coordinator seat and every operator-declared role, so molt never clears it and hands
-  off to its parent; the operator's first top and the top's rotation successor are roots and
-  take neither.
+- `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` — every guarded seat, every coordinator seat and every operator-declared role is marked a molt child, so molt never clears it and hands off to its parent (`completion.md`, "A child past molt's warnings"). The operator's first top and the top's rotation successor are roots and take neither.
 - `AUTONOMIC_LEDGER` and `AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` — the run's one
   ledger, an **absolute** path outside every worktree, and the seat's pain file; the top's
   successor takes `AUTONOMIC_LEDGER` and no pain path, since it has no parent.
 - `AUTONOMIC_MODE=autopilot` — only when the launcher is itself in autopilot.
 
-The scratch directory, created first, is `<run dir>/scratch/<role>-<n>` — `<run dir>` the
-directory holding the run's `run.json`, outside every worktree — with no `:` or space in either
-directory, as `:` separates the list. An ossify implementer's list adds its handoff's directory;
-a brief with scratch work names it `SCRATCH_DIR`. The layer file says how its own launch sets
-all of this, and what its model read also checks.
+Never in `settings.json`'s `env`, a shell profile or a `command:` line. The scratch directory,
+created first, is `<run dir>/scratch/<role>-<n>` — `<run dir>` the directory holding the run's
+`run.json`, outside every worktree — with no `:` or space in either directory, as `:` separates
+the list. An ossify implementer's list adds its handoff's directory; a brief with scratch work
+names it `SCRATCH_DIR`. The layer's `Seat launch` says how its own command sets all of this.
+
+**The model read's status line.** The model read of a guarded seat also reads its status line
+for `seat: <role>`; its absence there means no guards — a coordinator records that in its report
+file (to the top), the top records one from its own launches to the operator, and a missing
+status line halts no seat, re-launches none and is never silently dropped. The layer's step says
+which read carries it.
+
+**autonomic marking.** The same export adds `AUTONOMIC_LEDGER=<ledger>
+AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` for every child the molt marking reaches, and
+`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot. `<ledger>` is the
+launcher's own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`: one ledger
+per run, outside every worktree. A relative launcher value is first
+resolved against the launcher's own repo root, as autonomic resolves it, never passed on as
+written: a relative path resolves inside each seat's worktree and dies with it, and with none
+the ledger lands in the worktree and rides the seat's commits. The export quotes nothing, so an
+inherited path is passed on only when every character is a letter, a digit, `.`, `_`, `/` or
+`-`; any other is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead.
+`<run dir>` and `REPORT_PATH` are crew's own choice and keep to the same characters. The
+launcher's mode is autonomic's live mode, read at each launch — on Claude Code, `printf %s
+"$AUTONOMIC_EFFECTIVE_MODE"`, set by autonomic 0.4.0 on every mode change. An OMP launcher (an
+`omp-seat` coordinator) reads `cat "$AUTONOMIC_MODE_FILE"` (autonomic 0.7.0), because omp's bash
+children keep the environment from session start. Exactly `autopilot` marks the child; anything
+else (unset, missing file, older autonomic) does not. It is never `$AUTONOMIC_MODE`, the spawn's
+input: the top may be in autopilot by `/autopilot on` or a molt's lineage, which that never
+shows, or may have been refused it. It is never the record file either: one that failed to
+write can still read `autopilot` after a fall to manual. `autopilot` marks the child; anything
+else, unset included, leaves `AUTONOMIC_MODE` unset. A manual seat writes neither file, so the
+two paths cost nothing. An autopilot seat's scope is its brief; it gets no `/autopilot on`. Its
+first permission ask, and the first after a clear, has nothing to judge and waits for a human,
+so a seat meant to run unattended needs a `command:` whose permission mode does not ask
+first — the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the pain
+file reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
+`AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's
+first top takes none. A respawn reads the launcher's mode again.
+
+**A molt is not a launch.** The top's in-place molt (`lifecycle.md`, "Where molt runs") keeps
+the pane's process and its exports, so its `orchestrator` marking stands across the clear, and
+seat-mods reads the role from the environment on every tool call. The status-line check belongs
+to the launch read; a later read that finds no `seat: <role>` after a molt is not a missing
+marking. A respawned child is a launch: this runs again in full — a fresh export naming its new
+`MOLT_STATUS_PATH`, its `SEAT_MODS_ALLOW` rebuilt, and the status-line read, a missing
+`seat: <role>` recorded as at any launch.
 
 This file states only the role table and retention. Acceptance of input is not the start of a
 turn: the send's own check confirms the turn started in the same call, and the layer's Send
-says what to do when it did not. A wrong model is a failed launch: release the seat and report
+says what to do when it did not. A stalled or timed-out send is never sent again to prove
+delivery — a stall does not prove non-delivery — and the state it left is read instead. A wrong model is a failed launch: release the seat and report
 it. Every brief also asks the worker to state its model in its first reply — the second
 check, and the worker's own: one that finds its model is not `SEAT_EXPECTED_MODEL` reports
 a failed launch in its report file and stops, rather than working around it.
@@ -93,14 +144,13 @@ implementer returns its handoff inputs in its report file; the orchestrator writ
 handoff into the next brief. Rotation happens between work items, never mid-PR: the
 retained implementer finishes the PR's fix rounds unless the harness auto-compacts or molt
 warns it: a warned seat gets no new unit, and its next one goes to a fresh seat
-(`layers/herdr.md`, "A child past molt's warnings").
+(`completion.md`, "A child past molt's warnings").
 The reviewer owns nothing durable and is released the moment its report file is
 processed; the verifier seat is retained across a fail-and-fix cycle on the same item
 — the re-check attaches its task to the same verifier — and is released only when the
-item passes or goes to the operator. A seat is released as `layers/herdr.md`'s
-Teardown says — the same place that states the source repository's workspace a worktree
-seat leaves open, which the run did not create and does not close — and
-the run's own workspace closes last. Read each receipt rather than assuming it succeeded.
+item passes or goes to the operator. A seat is released as the Teardown order below says —
+the same section that states the source repository's workspace a worktree seat leaves open,
+which the run did not create and does not close.
 
 ## The activated-ossify-spine exception
 
@@ -172,3 +222,16 @@ worktree of it.
   get parallel worktrees.
 - **The orchestrator writes briefs, dispositions, and handoffs.** It writes no product
   file.
+
+## Teardown order
+
+Close only what the run created: a seat's pane or worktree, and the run's own workspace
+closes last, after every workspace linked to it. A worktree seat is released once its branch's
+work is safe — the implementer's after `lifecycle.md` step 12's merged-branch check, the
+reviewer's (it edits nothing) once its report file validates (step 8). Read every receipt — a
+failed call reports on stderr and exits nonzero — and confirm against the layer's listing,
+never assume: a last pane's close may take its tab and workspace too, and a target already gone
+is information, not failure. A refused remove goes to the operator, never a forced one. The
+source repository's workspace a worktree seat leaves open was not created by the run and the
+operator closes it, never the run (in the dual-repo case the canonical checkout). The layer's
+`Teardown` step holds the commands.

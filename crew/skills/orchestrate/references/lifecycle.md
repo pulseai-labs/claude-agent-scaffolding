@@ -76,8 +76,8 @@ Every command's syntax comes from `herdr --skill`.
    file) on the route `layers/herdr.md` fixes from its second detection ask after
    that read — is `roles.md`'s "The launch," with the undetected-seat path in
    `layers/herdr.md`. An implementer, verifier or reviewer seat's launch also
-   runs the guarded-seat export the layer's `Seat marking` states, before its
-   command — `roles.md`'s launch block carries the line. The run's workspace can
+   runs the guarded-seat export `roles.md`'s launch block states, before its
+   command. The run's workspace can
    go before the run does — a first seat's release may take it — so a later launch
    whose workspace the layer's Run workspace no longer shows
    creates it again first and binds the id that call returns, the clause the spine
@@ -92,13 +92,12 @@ Every command's syntax comes from `herdr --skill`.
    The full locator records `pane`, `machine` (a local seat's too), `report`, molt's `status` path
    and autonomic's `pain` path, so an attempt whose brief never arrived never looks live.
    Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded`
-   and its full locator before the brief goes, writing an existing `REPORT_PATH` file's current generation
-   `{hash, identity}` as the new attempt's `locator.seen` and leaving `seen` absent only when the file is absent,
-   and sets `phase: delivered` once the send is confirmed.
+   and its full locator before the brief goes, notes the generation the doorbell compares
+   (`completion.md`), and sets `phase: delivered` once the send is confirmed.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your
    plan to your report file, then wait for a reply before implementing. The
    orchestrator reads the plan from that file when its bounded wait wakes or the plan's
-   ping arrives, the same doorbell as completion (`layers/herdr.md`), and approves or
+   ping arrives, the same doorbell as completion (`completion.md`), and approves or
    amends it by sending the seat its next message. The final report later overwrites the
    plan in the same file. Fast briefs skip this.
 5. **Wait.** One bounded wait per dispatch, run in the background as the layer's Wait
@@ -107,26 +106,11 @@ Every command's syntax comes from `herdr --skill`.
    seat, the report-file wait. Either is one call that
    returns once: whatever polling it does happens inside that call, never a rolling poll
    by the orchestrator.
-   On a `done` or `idle` wake, read the report file its brief named, when
-   it is new since dispatch (`layers/herdr.md`) — the wake is only the doorbell, the
-   file is the contract. A `blocked` wake is a dialog, and a blocked seat rejects
-   a send: read it (the layer's Read), answer it as
-   `layers/herdr.md` says, then one fresh bounded wait on the answer.
-   A timeout is that file's checkpoint (a doorbell companion's lapses instead), and a wake with nothing new in the report while the
-   seat still works is its false wake. Each licenses one read (the layer's Read): the timeout's
-   observed state — stopped, at a dialog, or still at work — is reported to the operator,
-   and the false wake follows the doorbell rule that file states for the rest of that
-   dispatch, paging no one. Neither is a failure, and neither is re-entered here. A loop of
-   waits, and restarting a wait after an empty timeout, both stay forbidden. The run's ping
-   and its heartbeat are not that loop. A ping is a wake that arrives as a turn: the
-   generation check precedes it as it does any wake (`layers/herdr.md`), and a ping for a
-   generation already consumed is a no-op — it retires no wait and acts on nothing. The
-   heartbeat is one bounded background timer of about 15 minutes, re-armed per tick, at most
-   one health check per live seat per tick; it is not a completion wait and never re-enters
-   or restarts one. This session arms it with the first live herdr-pane dispatch — a typed-wait
-   seat is in scope, not only a report-file wait — and kills it when its last dispatch settles,
-   at teardown, and at a rotation's stand-down; a host with no background timer keeps the wait/ping fallback, never a rolling foreground
-   loop (`layers/herdr.md`).
+   What a wake means — the file the doorbell reads, the generation check, the two dead ends,
+   the ping and the heartbeat are `completion.md`'s, stated there once; this step only names
+   the wait. A `blocked` wake is a dialog: read it (the layer's Read), answer it as the layer's
+   Send says, then one fresh bounded wait. A loop of waits, and restarting a wait after an
+   empty timeout, both stay forbidden.
    Before any question to the operator the top writes `run.question` before it asks and removes it on
    the answer — `{text, asked_at, task, message_id?}` (`message_id` only when the question answers or
    relays a dagr operator message) — so a question survives the top.
@@ -285,7 +269,7 @@ crew's hook tells a session its own context figure once it reaches the ceiling (
 plugin setting `context_ceiling`, default 500000 tokens). The top, the spine session and the
 work-PR session act on it; a close session and every leaf seat simply finish their unit.
 Where molt runs, its warnings take the notice's place: every seat but the top hands off to
-its parent (`layers/herdr.md`, "A child past molt's warnings"), and the top molts in place
+its parent (`completion.md`, "A child past molt's warnings"), and the top molts in place
 (below).
 Past the ceiling a seat finishes the unit in hand and starts no new one, never stopping
 mid-item. At its next boundary it settles its dispatch with a return that carries its state

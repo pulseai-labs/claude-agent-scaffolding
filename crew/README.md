@@ -12,9 +12,10 @@ threads to zero, and the merge waits for the operator's word.
 Every herdr command's syntax comes from `herdr --skill`, the binary's own
 version-matched guide. This plugin states what a seat is and who does what; it does not
 re-type the guide. `skills/orchestrate/references/layers/herdr.md` is the one file
-that records the mechanics the guide cannot state or defaults differently — the launch,
-the two readiness paths, the send and its turn-start check, the waits, completion,
-placement, teardown, and machines — and it wins where the two differ.
+that records herdr's half — the launch and its marking, the two readiness paths, the send
+and its turn-start check, the waits, the typed completion states, placement, the teardown
+commands, and the machine labels — and it wins where the two differ. What a finished seat
+means is layer-neutral and lives in `references/completion.md`.
 
 ### Trusted OMP assignment enrollment (unreleased)
 
@@ -31,8 +32,9 @@ For enrolled OMP, operator merge acknowledgment and spec/design/plan/release gat
 | Surface | What it carries |
 |---|---|
 | `orchestrate` (the skill) | The orchestrator session's playbook: the delegation floor and its decidable test, the role list, the run by reference, the briefs, the ossify seam, and the refusals. |
-| `references/layers/herdr.md` | The mechanics `herdr --skill` cannot state: the seat launch and its placement, the two readiness paths, the typed wait, the turn-start check on a send, the report-file doorbell, the worker ping and its one-generation consumption rule, the heartbeat backstop, teardown, and machines. It overrides the guide's default placement. |
-| `references/roles.md` | The role table and the seats that fill it, the launch sequence, retention, the session budget, placement for the dual-repo case, and the writers rules. |
+| `references/layers/herdr.md` | herdr's own half, under the thirteen fixed step headings every layer file carries: the run workspace and the seat worktree, the pane and its command, the two readiness paths, the typed wait, the turn-start check on a send, the health read, the teardown commands and the machine labels. The rules every layer obeys stay in the shared files; this file holds herdr's commands, flags and ids. It overrides the guide's default placement. |
+| `references/completion.md` | How a run learns a seat finished, stated once for every layer: the report-file contract and the dispatch-time generation note, the doorbell and its generation check, the two dead ends, the worker's ping and the heartbeat backstop, a child past molt's warnings, and a child's pain. The layer's `Completion signal` step says how its own state is typed. |
+| `references/roles.md` | The role table and the seats that fill it, the launch sequence and the launch environment every layer sets, retention, the session budget, placement for the dual-repo case, the writers rules, and the teardown order. |
 | `references/lifecycle.md` | The thirteen-step run, the operator's own roles and the named points they run at, and rotation past the context ceiling. |
 | `references/config.md` | The operator's two files, the agent entries and their fields, the resolved profile and where each value travels, the project file's three sections, and what happens when a file is missing. |
 | `references/briefs.md` | Nine dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the four dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close) — plus the correction-request message template, which is a send and not a session; the file's header states the whole-contract rule and the dispatch matrix. |

@@ -21,6 +21,10 @@ seat's worktree and tab, the launch and its marking, readiness, the model read, 
 wait, how a seat signals completion, teardown, and machines. Where the two differ, that file
 wins. Everything else here says what to do, and the guide says how to type it.
 
+What a seat's completion means is layer-neutral and is stated once in
+`references/completion.md`: the report-file contract, the doorbell and its generation check,
+the two dead ends, the ping and the heartbeat.
+
 If you were invoked with an objective, bind or create the run's `run.json` for it, then follow
 `references/lifecycle.md` from step 1. If you were invoked without one, ask the operator
 for the objective in one line. Do not start probing first.
@@ -67,8 +71,7 @@ Three consequences:
   run's ping and its heartbeat are neither: the ping is a wake the worker sends, and the
   heartbeat is a session-level timer over every live seat dispatch, typed-wait seats included.
   The two dead ends — a timeout, and a wake with nothing new in the report while the seat still
-  works — are that step's, and it names the next action for each
-  (`references/layers/<layer>.md`). A loop of waits, and restarting a wait after an empty
+  works — are `references/completion.md`'s, which names the next action for each. A loop of waits, and restarting a wait after an empty
   timeout, stays forbidden; the ping and the heartbeat are not that loop, and a ping for a
   generation already consumed retires no wait. Beyond those reads, the only bounded ones are the
   launch-banner read in `roles.md`, the readiness wait of a seat the layer does not detect, and
@@ -77,7 +80,7 @@ Three consequences:
 - **Past the context ceiling, the hook says so.** Finish the unit in hand, start no new one,
   and rotate at your next boundary — `lifecycle.md`, "Rotation past the context ceiling".
   Where molt runs, its warnings replace the notice: a child hands off to its parent
-  (`layers/herdr.md`, "A child past molt's warnings"), and the top molts in place.
+  (`references/completion.md`, "A child past molt's warnings"), and the top molts in place.
 - **Verifying a worker's claim is a verifier dispatch**, not an orchestrator read. "Tests
   pass" in a seat's report is a claim until CI on that head SHA, or a verifier, says so.
   One narrow exception: lifecycle step 6's PR gate — `gh pr view` for identity and
@@ -150,7 +153,7 @@ These cases are named because they look like clashes and are not:
   merges at the barrier. The `Agent`-tool ban in §2 applies
   to this session only. You
   wait on one spine report, through its report file: a lane driver whose subagents run
-  in the background is a coordinator seat (`references/layers/herdr.md`, Completion).
+  in the background is a coordinator seat (`references/completion.md`, Completion).
   Its brief is `references/briefs.md`'s lane-driver template, filled: that template carries
   its own ROLE, PLACEMENT, TASK, completion body and NEVER line, so none of them is
   assembled from another template's. When its barrier lands, the close transition

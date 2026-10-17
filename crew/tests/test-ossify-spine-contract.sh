@@ -58,6 +58,7 @@ CONFIG_MD="$REF/config.md"
 PLUGIN_README_MD="$PLUGIN_ROOT/README.md"
 COMMAND_MD="$PLUGIN_ROOT/commands/orchestrate.md"
 MECHANICS_MD="$REF/layers/herdr.md"
+COMPLETION_MD="$REF/completion.md"
 EVAL_DIR="$PLUGIN_ROOT/tests/eval"
 EVAL_FIXTURE14="$EVAL_DIR/fixtures/ossify-spine-execution/14-close-brief-identities-and-workspace-records.md"
 EVAL_RUBRIC_MD="$EVAL_DIR/rubrics/ossify-spine-execution.md"
@@ -315,7 +316,7 @@ for f in "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$GENERIC_BRIEFS_MD" "$MECHANI
 done
 # #816: the ping goes only to a pane on the worker's own server. The comparison is
 # the rule that keeps a cross-host rotation from pinging a pane id from another server.
-pin "$MECHANICS_MD" 'only when `run.orchestrator.machine` equals `NOTIFY_MACHINE`' \
+pin "$COMPLETION_MD" 'only when `run.orchestrator.machine` equals `NOTIFY_MACHINE`' \
   "the ping compares the top's machine with the worker's" flat
 pin "$GENERIC_BRIEFS_MD" 'a stored brief whose fixed run file or fixed machine differs from the run'"'"'s is surfaced, not overridden; equal values are no conflict, kept as they are.' \
   "a stored brief conflicts on either fixed run file or fixed machine, not equal values" flat
@@ -453,8 +454,8 @@ rm -f "$ctl_extra" "$ctl_ping"
 # it must name what the doorbell compares — the hash or the file's identity — while still
 # deferring to layers/herdr.md for the rule. The mechanics file states it once (its own
 # suite pins that); this pin holds the deferral, not a second statement.
-pin "$GENERIC_BRIEFS_MD" 'doorbell compares that file'"'"'s hash or its identity (`layers/herdr.md`)' \
-  "briefs.md names what the doorbell compares and still defers to layers/herdr.md (#574)"
+pin "$GENERIC_BRIEFS_MD" 'doorbell compares that file'"'"'s hash or its identity (`completion.md`)' \
+  "briefs.md names what the doorbell compares and still defers to completion.md (#574)"
 
 section "the seats block is the freeze, not a file"
 
@@ -555,8 +556,8 @@ pin "$CONFIG_MD" 'spine session, external-executor lane' \
 # file can fill — doctor gets its own seat.
 n_eq "$CONFIG_MD" 'doctor session' 3 \
   "doctor session is a project-file role and in the capability table"
-pin "$ROLES_MD" 'doctor session' \
-  "the seat budget grants a doctor session"
+pin "$ROLES_MD" 'A `doctor session` — one fresh tab and pane' \
+  "the seat budget grants a doctor session" flat
 # Next-instance gate: every command SKILL.md lists as dispatched to a herdr
 # session must name its `/ossify:` invocation in config.md — a dispatched
 # command with no role to fill is the same defect. An anchor that no longer
@@ -1561,7 +1562,7 @@ pin "$PRBRIEFS_MD" 'as MECHANICS'"'"'s Teardown says' \
   "the work-PR session releases its seats as layers/herdr.md's Teardown says"
 pin "$PRBRIEFS_MD" 'the layer'"'"'s Run workspace list' \
   "the work-PR session verifies what it created is gone"
-pin "$MECHANICS_MD" 'with `herdr workspace list`, never assume' \
+pin "$MECHANICS_MD" 'Confirm what closed with `herdr workspace list`' \
   "the confirming list is layers/herdr.md's own"
 # PR #470 row 4 (settles ledger row 9): the list always shows the top's
 # workspaces as well as this session's — the check is none OF THEM, never none
@@ -1811,15 +1812,15 @@ pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brie
   "step 3 records the attempt before the send" flat
 pin "$LIFECYCLE_MD" '`phase: delivered` once the send is confirmed' \
   "step 3 marks delivery after the send" flat
-pin "$LIFECYCLE_MD" 'Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded` and its full locator before the brief goes, writing an existing `REPORT_PATH` file'"'"'s current generation `{hash, identity}` as the new attempt'"'"'s `locator.seen` and leaving `seen` absent only when the file is absent, and sets `phase: delivered` once the send is confirmed.' \
-  "every dispatch records its phase, full locator and existing report baseline before sending" flat
+pin "$COMPLETION_MD" 'writing an existing `REPORT_PATH` file'"'"'s current generation `{hash, identity}` as the new attempt'"'"'s `locator.seen` and leaving `seen` absent only when the file is absent' \
+  "every dispatch records its existing report baseline before sending" flat
 pin "$LIFECYCLE_MD" 'writes `run.question` before it asks and removes it on the answer' \
   "an operator ask is recorded in the run" flat
 pin "$LIFECYCLE_MD" '`{text, asked_at, task, message_id?}`' \
   "an operator question records the exact object keys" flat
-pin "$MECHANICS_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
+pin "$COMPLETION_MD" 'and recorded as the attempt'"'"'s `locator.seen`' \
   "the generation check records the consumed generation in the run" flat
-pin "$MECHANICS_MD" '`{hash, identity}`' \
+pin "$COMPLETION_MD" '`{hash, identity}`' \
   "the consumed generation records the exact object keys" flat
 
 section "a rotation and a hard stop resume from run state (#819, #810)"
@@ -2012,8 +2013,8 @@ pin "$ROLES_MD" 'a seat is sent one only when' \
   "the context probe is conditioned, not sent to every retained seat"
 pin "$ROLES_MD" 'the send route that reaches it' \
   "the probe's second condition is the route, not the profile's can: alone"
-pin "$ROLES_MD" 'A seat is released as `layers/herdr.md`'"'"'s' \
-  "roles.md points teardown at layers/herdr.md instead of restating it"
+pin "$ROLES_MD" 'A seat is released as the Teardown order below says' \
+  "roles.md points teardown at its own Teardown order instead of restating it"
 
 # T8b. The shipped summaries of that conditioning, pinned next door to the rule
 # they summarise. T8 rewrote the two it could reach to carry the condition and the
@@ -2104,38 +2105,38 @@ section "the seat-mods guard reaches every launch site"
 # site that orders one of those launches must order the guard beside it. One pin per
 # site; the label names the site, so a removal reads as that site. 0.2.7's
 # coordinator-marking pins sit beside these, one per site.
-pin "$MECHANICS_MD" 'every launch that places a seat in a herdr pane marks it' \
+pin "$MECHANICS_MD" 'Every launch that places a seat in a herdr pane marks it' \
   "step 2's opening states every herdr-pane launch is marked"
-pin "$MECHANICS_MD" 'in the pane, before the command' \
-  "step 2 binds the marking to the launch, before the command" flat
-pin "$MECHANICS_MD" 'the spine, close or work-PR session, the doctor session, the lane driver' \
-  "step 2's coordinator marking enumerates the coordinator seats" flat
-pin "$MECHANICS_MD" 'A project-file role with no `replaces:` is marked a guarded `implementer`' \
-  "step 2 marks an operator role with no replaces as a guarded implementer" flat
-pin "$MECHANICS_MD" 'is that variant with `SEAT_MODS_ROLE=orchestrator`' \
-  "step 2 marks the top's rotation successor orchestrator" flat
-pin "$MECHANICS_MD" '`SEAT_MODS_ROLE=coordinator`' \
-  "step 2 names the coordinator seat's export once"
+pin "$ROLES_MD" 'into the seat'"'"'s pane, before the seat'"'"'s command' \
+  "the launch block binds the marking to the launch, before the command" flat
+pin "$ROLES_MD" 'the spine, close or work-PR session, the doctor session, the lane driver' \
+  "the launch block enumerates the coordinator seats" flat
+pin "$ROLES_MD" 'one with no `replaces:` is a guarded `implementer`' \
+  "the launch block marks an operator role with no replaces as a guarded implementer" flat
+pin "$ROLES_MD" 'is that variant with `SEAT_MODS_ROLE=orchestrator`' \
+  "the launch block marks the top's rotation successor orchestrator" flat
+pin "$ROLES_MD" '`SEAT_MODS_ROLE=coordinator`' \
+  "the launch block names the coordinator seat's export once"
 # 0.2.19: scope to the launch export; Host: OMP also names the role's rail.
 pin "$MECHANICS_MD" 'blocks them for `SEAT_MODS_ROLE=orchestrator`' \
   "the OMP host names the role's rail once"
-pin "$MECHANICS_MD" 'The operator'"'"'s own first top is not launched here' \
-  "step 2 says the operator launches its own top" flat
-pin "$MECHANICS_MD" 'the directory holding the run'"'"'s `run.json`, outside every worktree' \
-  "step 2 defines <run dir> (#658)" flat
-pin "$MECHANICS_MD" 'from the rendered viewport (`--source visible`) even where a `banner`' \
+pin "$ROLES_MD" 'The operator'"'"'s own first top is not launched here' \
+  "the launch block says the operator launches its own top" flat
+pin "$ROLES_MD" 'the directory holding the run'"'"'s `run.json`, outside every worktree' \
+  "the launch block defines <run dir> (#658)" flat
+pin "$MECHANICS_MD" '`--source visible` on the model read, even where a `banner`' \
   "the status line reads the viewport on a banner seat (#658)" flat
-pin "$MECHANICS_MD" 'the top records one from its own launches to the operator' \
+pin "$ROLES_MD" 'the top records one from its own launches to the operator' \
   "the missing-status-line record routes the top's own launches too (#658)" flat
-pin "$MECHANICS_MD" 'halts no seat, re-launches none' \
+pin "$ROLES_MD" 'halts no seat, re-launches none' \
   "a missing status line halts nothing and re-launches nothing (#658)" flat
-pin "$MECHANICS_MD" 'also reads the status line for `seat: <role>`' \
+pin "$ROLES_MD" 'also reads its status line for `seat: <role>`' \
   "the model read also reads the guarded seat's status line" flat
-pin "$MECHANICS_MD" 'records that in its report file (to the top)' \
+pin "$ROLES_MD" 'records that in its report file (to the top)' \
   "a missing status line is recorded in the coordinator's report file" flat
-pin "$MECHANICS_MD" 'herdr pane run <pane> "export SEAT_MODS_ROLE=<role>' \
-  "step 2 spells the guard as the send into the seat's pane"
-pin "$MECHANICS_MD" 'A project-file role whose `replaces:` names one of those roles is guarded as that role' \
+pin "$MECHANICS_MD" 'one `herdr pane run <pane> "export …"`' \
+  "the layer spells the guard as the send into the seat's pane"
+pin "$ROLES_MD" 'names one of those guarded roles is guarded as that role' \
   "a replacing project-file role is guarded as the role it replaces"
 
 pin "$ROLES_MD" 'The launch environment' \
@@ -2143,8 +2144,8 @@ pin "$ROLES_MD" 'The launch environment' \
 pin "$ROLES_MD" '`SEAT_MODS_ALLOW` — the colon-separated paths a guarded seat may write' \
   "roles.md scopes the allow list to the guarded roles"
 
-pin "$LIFECYCLE_MD" 'runs the guarded-seat export the layer'"'"'s `Seat marking` states' \
-  "lifecycle step 3 requires the guard and points at step 2"
+pin "$LIFECYCLE_MD" 'runs the guarded-seat export `roles.md`'"'"'s launch block states' \
+  "lifecycle step 3 requires the guard and points at roles.md's launch block"
 
 pin "$BRIEFS_MD" 'Guard it before its command as' \
   "the spine brief guards the item implementer launch (step 3)"
@@ -2218,8 +2219,8 @@ pin "$ROLES_MD" '`work-PR session`), marked `coordinator` before its command' \
   "roles.md's budget marks the close and work-PR launches" flat
 pin "$ROLES_MD" 'seat of the same name, marked `coordinator`' \
   "roles.md marks the doctor session's launch" flat
-pin "$MECHANICS_MD" 'the same line with `SEAT_MODS_ROLE=coordinator` **in place of** `<role>`' \
-  "the layer file shows the coordinator export as the guarded line's variant" flat
+pin "$ROLES_MD" 'the same list with `SEAT_MODS_ROLE=coordinator` **in place of** `<role>`' \
+  "the launch block shows the coordinator export as the guarded line's variant" flat
 absent "$MECHANICS_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "the top's successor export carries no molt marking"
 absent "$ROLES_MD" 'SEAT_MODS_ROLE=orchestrator MOLT_HANDOFF' "roles.md carries no marked orchestrator export"
 pin "$COMMAND_MD" 'start one spine session — marked `coordinator`' \

@@ -23,7 +23,10 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=207          # 2026-10-17: +5 for the `layer:` key, its two stops and the `host:` key (crew 0.3.0, spec §4.2/§4.6)
+REF_BUDGET=214          # 2026-10-17: +7 for the machine rules beside `host:` (a seat runs elsewhere only
+                        # when the operator names one, an unknown machine halts, place a seat only where its
+                        # report file is readable, a connection failure proves nothing) — Task 3 fix round moved
+                        # them out of layers/herdr.md into this file (spec §2), the same shared home as the key.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

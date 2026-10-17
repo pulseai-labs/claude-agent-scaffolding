@@ -2,8 +2,8 @@
 
 Dispatched by the top when a close returns `halted: close-review`
 (`ossify-nested-run.md` §4, `ossify-execution.md` §5). The top launches each writer
-as a guarded seat: role `implementer`, with the export `layers/herdr.md`'s
-Seat launch states run before its command. Not the PR-fix seat,
+as a guarded seat: role `implementer`, with the export `roles.md`'s launch block
+states run before its command. Not the PR-fix seat,
 and not a project-file seat: the profile is asked of the operator at the halt, as
 the reviewer is asked at the PR transition, because the seat does not exist
 before the moment that creates it.
@@ -15,7 +15,7 @@ accepted `fix now` findings by their declared `target_repo` — the key
 `ossify-nested-run.md` slices the accepted ledger by — and dispatch one
 writer per repo with findings, each in that repo's own spine worktree, all
 from the one profile the operator named. Each writer is released when its
-report file validates, as `layers/herdr.md`'s Teardown says; no seat survives
+report file validates, as `roles.md`'s Teardown order says; no seat survives
 the halt, and a later halt asks again. Only when every writer has returned does
 the top dispatch the fresh close.
 

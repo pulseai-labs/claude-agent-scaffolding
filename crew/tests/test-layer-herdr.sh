@@ -17,6 +17,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate/references/layers/herdr.md"
+COMP="$PLUGIN_ROOT/skills/orchestrate/references/completion.md"
+ROLES="$PLUGIN_ROOT/skills/orchestrate/references/roles.md"
 LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # 235, raised from 204 during T3 (2026-09-22): the pilot measured eight mechanics the file
 # had wrong or missing — the two detection events, the worktree path's workspace label and
@@ -66,7 +68,10 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=422  # 2026-10-17: crew 0.3.0 Task 3 — the file is the herdr layer now: the same text re-headed into the thirteen steps, plus the five step sections the shared files no longer state (Health, Identity, Run workspace, Seat worktree, Read).
+REF_BUDGET=228  # 2026-10-17: crew 0.3.0 Task 3 fix round — the completion, teardown, machine and
+# marking RULES left this file for completion.md, roles.md and config.md (spec §2: a layer file
+# holds commands only), so the count fell 422 -> 228. What remains is the layer's own half: the
+# thirteen step headings and the herdr commands, flags and ids under them.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -102,10 +107,10 @@ pin "$REF" '`agent get`/`agent wait` answer `agent_not_found`: ask again for up 
 section "the rules that must survive a rewording"
 pin "$REF" 'never `pane split`' "the no-split rule survives"
 pin "$REF" 'invoked by name' "the lane-by-name rule survives"
-pin "$REF" 'the file is the contract' "the report-file contract survives"
-pin "$REF" 'placed outside every seat'"'"'s worktree' \
+pin "$COMP" 'the file is the contract' "the report-file contract survives"
+pin "$COMP" 'placed outside every seat'"'"'s worktree' \
   "every file the run keeps lives outside every seat's worktree (R39)"
-pin "$REF" 'and so is a coordinator'"'"'s' \
+pin "$COMP" 'and so is a coordinator'"'"'s' \
   "a coordinator seat is waited on through its report file (R41)"
 pin "$REF" 'A local slash command (`/context`, `/clear`) settles without a turn' \
   "a local slash command is sent without the turn-start check (R42)"
@@ -113,55 +118,55 @@ pin "$REF" 'A local slash command (`/context`, `/clear`) settles without a turn'
 # #574: the doorbell's predicate. Both halves are pinned — a revert to the hash alone kills
 # the first, and dropping the comparison leaves the identity remedy recorded but unread,
 # which is the half the issue exists for.
-pin "$REF" 'the identity noted beside it differs' \
+pin "$COMP" 'the identity noted beside it differs' \
   "the doorbell's wait compares the noted identity, not the hash alone (#574)"
-pin "$REF" 'Both are compared, not merely recorded' \
+pin "$COMP" 'Both are compared, not merely recorded' \
   "the noted identity is compared, not merely recorded (#574)"
 
 # #575: the detected coordinator's companion wait, made mutually cancelling — each wake
 # disarms the other, so a dispatch leaves at most one armed wait.
-pin "$REF" 'and it ends the doorbell' \
+pin "$COMP" 'and it ends the doorbell' \
   "the companion's blocked wake ends the doorbell (#575)"
-pin "$REF" "The doorbell's return — a new report or its timeout — ends the companion" \
+pin "$COMP" "The doorbell's return — a new report or its timeout — ends the companion" \
   "the doorbell's return ends the companion: one armed wait per dispatch (#575)"
 
 # The fix round's completions. #574's dispatch-time step now notes the identity the
 # doorbell compares — and "note the file's identity" is stated once, so the doorbell
 # paragraph refers back to that note rather than restating it (the `(inode or mtime)`
 # pin below is the one-definition check: a re-added restatement makes it two).
-pin "$REF" "and the file's identity" \
+pin "$COMP" "and the file's identity" \
   "the dispatch-time note records the file's identity beside the hash (#574)"
 # Counted flat, not per line: a restatement of the definition may break at any point, and
 # the measured revert wraps `inode` onto its own line — a per-line count would call that
 # file "defined once" (measured: 3, not 2, before this pin was made wrap-proof). Residual,
 # and accepted: a restatement naming neither word escapes; any realistic one names one.
-pin "$REF" 'inode or mtime' \
+pin "$COMP" 'inode or mtime' \
   "the identity is defined once — inode or mtime, not restated (#574)" flat
-pin "$REF" 'the identity noted at dispatch' \
+pin "$COMP" 'the identity noted at dispatch' \
   "the doorbell paragraph refers back to the dispatch-time note (#574)"
 # #650 R1-1: one generation rule. The typed wake's novelty test must be the same
 # hash-or-identity comparison the ping and the doorbell use; hash alone is the old
 # form, and it read a byte-identical atomic replacement as a false wake.
-pin "$REF" 'a different hash or identity' \
+pin "$COMP" 'a different hash or identity' \
   "the typed wake's novelty is the same hash-or-identity generation (#650 R1-1)" flat
 
 # #575: the pair is re-armed, not restarted, after a dialog the operator answered.
-pin "$REF" "The companion's own timeout, while the doorbell is still armed, is no checkpoint" \
+pin "$COMP" "The companion's own timeout, while the doorbell is still armed, is no checkpoint" \
   "a companion timeout under a live doorbell lapses silently (#651 B)" flat
-pin "$REF" '**A stall** is the one exception to a silent `working`' \
+pin "$COMP" '**A stall** is the one exception to a silent `working`' \
   "the heartbeat names the stall rule (#651 D)" flat
-pin "$REF" 'is a seat failure, not a failed task' "a stall is a seat failure, never a task failure (#651 D)" flat
-pin "$REF" "then launch the fallback the project file's" "a stall launches the declared fallback (#651 D)" flat
-pin "$REF" 'stall with no fallback named, is reported to the operator once' "no declared fallback goes to the operator (#651 D)" flat
-pin "$REF" 'Settle its dispatch first (kill its report-file wait and companion)' "a stalled dispatch is settled before its fallback launches (#651 D, round 1)" flat
-pin "$REF" 'the seat'"'"'s last report when it wrote one' "a stall before any report still has a brief (#651 D, round 1)" flat
-pin "$REF" 'A seat a fresh session cannot resume (the cuts the molt paragraph below lists) gets no fallback' "a non-resumable seat is never auto-replaced (#651 D, round 1)" flat
-pin "$REF" "a timeout is the checkpoint Completion states (a doorbell companion's excepted: it lapses)" "the typed wait carries the companion's exception (#651 B, round 1)" flat
-pin "$REF" "*A timeout is a checkpoint* (but a doorbell companion's, which lapses;" "the dead-end definition carries the companion's exception (#651 B, round 1)" flat
-pin "$LIFE" "A timeout is that file's checkpoint (a doorbell companion's lapses instead)" "lifecycle step 5 carries the companion's exception (#651 B, round 1)" flat
-pin "$REF" 'An answered dialog re-arms the pair' \
+pin "$COMP" 'is a seat failure, not a failed task' "a stall is a seat failure, never a task failure (#651 D)" flat
+pin "$COMP" "then launch the fallback the project file's" "a stall launches the declared fallback (#651 D)" flat
+pin "$COMP" 'stall with no fallback named, is reported to the operator once' "no declared fallback goes to the operator (#651 D)" flat
+pin "$COMP" 'Settle its dispatch first (kill its report-file wait and companion)' "a stalled dispatch is settled before its fallback launches (#651 D, round 1)" flat
+pin "$COMP" 'the seat'"'"'s last report when it wrote one' "a stall before any report still has a brief (#651 D, round 1)" flat
+pin "$COMP" 'A seat a fresh session cannot resume (the cuts the molt paragraph below lists) gets no fallback' "a non-resumable seat is never auto-replaced (#651 D, round 1)" flat
+pin "$REF" "a timeout is the checkpoint \`completion.md\` states (a doorbell companion's excepted: it lapses)" "the typed wait carries the companion's exception (#651 B, round 1)" flat
+pin "$COMP" "*A timeout is a checkpoint* (but a doorbell companion's, which lapses;" "the dead-end definition carries the companion's exception (#651 B, round 1)" flat
+pin "$LIFE" "the two dead ends, the ping and the heartbeat are \`completion.md\`'s, stated there once" "lifecycle step 5 points at completion.md for the wake's meaning (#651 B, round 1)" flat
+pin "$COMP" 'An answered dialog re-arms the pair' \
   "an answered dialog re-arms the pair (#575)"
-pin "$REF" 'the doorbell and its companion again, not one wait' \
+pin "$COMP" 'the doorbell and its companion again, not one wait' \
   "the fresh wait after an answer is the pair again, not one wait (#575)"
 
 section "placement"
@@ -178,93 +183,93 @@ within_budget() { # <file>
 }
 
 section "molt children (0.2.8)"
-pin "$REF" '**molt marking.**' "step 2 has the molt marking clause" flat
-pin "$REF" 'MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
-  "step 2 names the child marking exactly" flat
-pin "$REF" 'every guarded seat, every coordinator seat and every operator-declared role' \
-  "step 2 marks every child kind" flat
-pin "$REF" 'The operator'"'"'s first top and the top'"'"'s rotation successor are roots and take neither' \
-  "step 2 never marks the top" flat
-pin "$REF" '**A molt is not a launch.**' "step 2: a molt keeps the top's marking" flat
-pin "$REF" 'A respawned child is a launch: this step runs again in full' \
-  "step 2: a respawn re-runs the marking, the allow list and the status-line read (Review Focus 6)" flat
-pin "$REF" "**A child past molt's warnings.**" "Completion holds the parent rules once" flat
-pin "$REF" 'MOLT WARNING <pct> <task id>' "the ping text is named" flat
-pin "$REF" 'per tick, per live seat, also reads its recorded status file' \
+pin "$ROLES" '**The launch environment.**' "roles.md holds the marking clause" flat
+pin "$ROLES" 'MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
+  "the launch block names the child marking exactly" flat
+pin "$ROLES" 'every guarded seat, every coordinator seat and every operator-declared role' \
+  "the launch block marks every child kind" flat
+pin "$ROLES" 'The operator'"'"'s first top and the top'"'"'s rotation successor are roots and take neither' \
+  "the launch block never marks the top" flat
+pin "$ROLES" '**A molt is not a launch.**' "a molt keeps the top's marking" flat
+pin "$ROLES" 'A respawned child is a launch: this runs again in full' \
+  "a respawn re-runs the marking, the allow list and the status-line read (Review Focus 6)" flat
+pin "$COMP" '## A child past molt'"'"'s warnings' "completion.md holds the parent rules once" flat
+pin "$COMP" 'MOLT WARNING <pct> <task id>' "the ping text is named" flat
+pin "$COMP" 'per tick, per live seat, also reads its recorded status file' \
   "the heartbeat reads each child's status file (Review Focus 2)" flat
-pin "$REF" 'note it and send that seat no new unit' "a warned child gets no new unit" flat
-pin "$REF" 'launched from the same row, marked the same, with a fresh `REPORT_PATH`' \
+pin "$COMP" 'note it and send that seat no new unit' "a warned child gets no new unit" flat
+pin "$COMP" 'launched from the same row, marked the same, with a fresh `REPORT_PATH`' \
   "a respawn takes a fresh REPORT_PATH, so a fresh status file (Review Focus 1)" flat
-pin "$REF" 'RESUME FROM: <handoff path>' "the respawned brief names the handoff" flat
-pin "$REF" 'it reuses its predecessor'"'"'s scratch directory' \
+pin "$COMP" 'RESUME FROM: <handoff path>' "the respawned brief names the handoff" flat
+pin "$COMP" 'it reuses its predecessor'"'"'s scratch directory' \
   "a respawn keeps the report and scratch directories writable (Review Focus 6)" flat
-pin "$REF" 'run-spine re-enters a started spine, mid-round included, so respawn it as a `rotate:` is' \
+pin "$COMP" 'run-spine re-enters a started spine, mid-round included, so respawn it as a `rotate:` is' \
   "a spine cut mid-round is respawned under ossify 1.14.0, not relayed (#674)" flat
-pin "$REF" 'only that halt goes to the operator' "a re-entry halt still goes to the operator (#674)" flat
-c="$(count_of "$REF" 'relay it to the operator with its handoff path: a spine session' flat)"
+pin "$COMP" 'only that halt goes to the operator' "a re-entry halt still goes to the operator (#674)" flat
+c="$(count_of "$COMP" 'relay it to the operator with its handoff path: a spine session' flat)"
 if [ "$c" -eq 0 ]; then pass "the relayed-cut list no longer names the spine session (#674)"
 else fail "the relayed-cut list no longer names the spine session (#674)" "$c left"; fi
-pin "$REF" 'relay it to the operator with its handoff path' "a skill-run cut is relayed" flat
+pin "$COMP" 'relay it to the operator with its handoff path' "a skill-run cut is relayed" flat
 # Final review (0.2.8) — each pin is one finding.
-pin "$REF" 'not a report ping: it names no path' "the MOLT WARNING ping gets no correction request" flat
-pin "$REF" 'Record that path per seat at launch' "a retained seat's status file is the launch one" flat
-pin "$REF" 'its next unit (a fix round, a re-check, the next item) goes to a fresh seat' \
+pin "$COMP" 'not a report ping: it names no path' "the MOLT WARNING ping gets no correction request" flat
+pin "$COMP" 'Record that path per seat at launch' "a retained seat's status file is the launch one" flat
+pin "$COMP" 'its next unit (a fix round, a re-check, the next item) goes to a fresh seat' \
   "a warned seat's next unit goes to a fresh seat, so the run never stalls" flat
-pin "$REF" 'never a new `worktree create`' "a respawned implementer keeps its predecessor's worktree" flat
-pin "$REF" 'Close the predecessor'"'"'s pane only after the new tab exists' "the old pane outlives the new tab" flat
-pin "$REF" 'every respawn, after `rotate:` and `open:` included' "a rotate/open respawn takes a fresh REPORT_PATH too" flat
-pin "$REF" 'whose seat has returned no `rotate:`, `open:` or `handoff:`' \
+pin "$COMP" 'never a new `worktree create`' "a respawned implementer keeps its predecessor's worktree" flat
+pin "$COMP" 'Close the predecessor'"'"'s pane only after the new tab exists' "the old pane outlives the new tab" flat
+pin "$COMP" 'every respawn, after `rotate:` and `open:` included' "a rotate/open respawn takes a fresh REPORT_PATH too" flat
+pin "$COMP" 'whose seat has returned no `rotate:`, `open:` or `handoff:`' \
   "a handed-off line that is a return's own respawns nothing twice" flat
 # PR #671 round 1.
-pin "$REF" 'Before a retained seat'"'"'s next unit, read its recorded status file' \
+pin "$COMP" 'Before a retained seat'"'"'s next unit, read its recorded status file' \
   "an idle retained seat's status is read before it gets another unit" flat
-pin "$REF" 'a reviewer that hands off before its report validates' \
+pin "$COMP" 'a reviewer that hands off before its report validates' \
   "a reviewer cut mid-review goes to the operator, never a second review" flat
 # PR #671 round 2.
-pin "$REF" 'settle the predecessor'"'"'s dispatch first' "a status-only handoff retires the old wait before the respawn" flat
-pin "$REF" 'a work-PR session that hands off with no `open:`' "a work-PR cut mid-round goes to the operator" flat
-pin "$REF" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
-  "step 2's quoted guarded export carries the molt marking" flat
+pin "$COMP" 'settle the predecessor'"'"'s dispatch first' "a status-only handoff retires the old wait before the respawn" flat
+pin "$COMP" 'a work-PR session that hands off with no `open:`' "a work-PR cut mid-round goes to the operator" flat
+pin "$ROLES" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
+  "the launch block's quoted guarded export carries the molt marking" flat
 
 section "autonomic marking (0.2.9, #676)"
-pin "$REF" '**autonomic marking.**' "step 2 has the autonomic marking clause" flat
-pin "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
-  "step 2's quoted guarded export carries the autonomic variables" flat
-pin "$REF" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
+pin "$ROLES" '**autonomic marking.**' "roles.md has the autonomic marking clause" flat
+pin "$ROLES" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
+  "the launch block's quoted guarded export carries the autonomic variables" flat
+pin "$ROLES" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
   "autopilot is passed down, never set on a manual launcher's child" flat
-pin "$REF" 'printf %s "$AUTONOMIC_EFFECTIVE_MODE"' \
+pin "$ROLES" 'printf %s "$AUTONOMIC_EFFECTIVE_MODE"' \
   "Claude Code reads the live environment mode (0.2.10)" flat
-pin "$REF" 'cat "$AUTONOMIC_MODE_FILE"' \
+pin "$ROLES" 'cat "$AUTONOMIC_MODE_FILE"' \
   "OMP reads the live mode file (autonomic 0.7.0)" flat
-pin "$REF" 'never `$AUTONOMIC_MODE`' "the mode is never read from the spawn's input" flat
-pin "$REF" 'never the record file' "the record file is never the signal (it can be stale)" flat
-pin "$REF" 'unset included' "an unset signal marks no child (D2)" flat
-c="$(count_of "$REF" 'jq -r .mode' flat)"
+pin "$ROLES" 'never `$AUTONOMIC_MODE`' "the mode is never read from the spawn's input" flat
+pin "$ROLES" 'never the record file' "the record file is never the signal (it can be stale)" flat
+pin "$ROLES" 'unset included' "an unset signal marks no child (D2)" flat
+c="$(count_of "$ROLES" 'jq -r .mode' flat)"
 if [ "$c" -eq 0 ]; then pass "the record read is gone (0.2.10)"
 else fail "the record read is gone (0.2.10)" "$c left"; fi
-pin "$REF" 'an **absolute** path outside every worktree' "the ledger is absolute and outside every worktree" flat
-pin "$REF" 'the launcher'"'"'s own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`' \
+pin "$ROLES" 'an **absolute** path outside every worktree' "the ledger is absolute and outside every worktree" flat
+pin "$ROLES" 'the launcher'"'"'s own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`' \
   "one ledger per run, inherited down the tree" flat
-pin "$REF" 'A relative launcher value is first resolved against the launcher'"'"'s own repo root' \
+pin "$ROLES" 'A relative launcher value is first resolved against the launcher'"'"'s own repo root' \
   "an inherited relative ledger is made absolute before it is passed on (PR #679 r1)" flat
-pin "$REF" 'is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead' \
+pin "$ROLES" 'is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead' \
   "an unsafe inherited ledger path falls back to the run ledger, never into the export (PR #679 r3)" flat
-pin "$REF" 'passed on only when every character is a letter, a digit, `.`, `_`, `/` or `-`' \
+pin "$ROLES" 'passed on only when every character is a letter, a digit, `.`, `_`, `/` or `-`' \
   "the inherited ledger is an allowlist, never a denylist (PR #679 r4)" flat
-pin "$REF" '`<run dir>` and `REPORT_PATH` are crew'"'"'s own choice and keep to the same characters' \
+pin "$ROLES" '`<run dir>` and `REPORT_PATH` are crew'"'"'s own choice and keep to the same characters' \
   "the paths crew picks keep the same characters (PR #679 r4)" flat
-c="$(count_of "$REF" 'a backtick or a backslash is not passed on' flat)"
+c="$(count_of "$ROLES" 'a backtick or a backslash is not passed on' flat)"
 if [ "$c" -eq 0 ]; then pass "the r3 denylist is gone (PR #679 r4)"
 else fail "the r3 denylist is gone (PR #679 r4)" "$c left"; fi
-c="$(count_of "$REF" 'single-quoted in the export' flat)"
+c="$(count_of "$ROLES" 'single-quoted in the export' flat)"
 if [ "$c" -eq 0 ]; then pass "no quoting rule for the ledger remains (PR #679 r3)"
 else fail "no quoting rule for the ledger remains (PR #679 r3)" "$c left"; fi
-pin "$REF" '`AUTONOMIC_BELL` is never set' "no per-seat bell" flat
-pin "$REF" 'and `AUTONOMIC_LEDGER` by the same rule and no pain path' "the top's successor keeps autopilot, has no parent" flat
-pin "$REF" '**A child'"'"'s pain.**' "Completion has the child-pain paragraph" flat
-pin "$REF" 'The heartbeat, per tick, per live seat, reads it too' "the heartbeat reads each child's pain file" flat
-pin "$REF" 'it is never a failed task' "a pain line is an ask, not a failure" flat
-pin "$REF" 'seat-mods refuses the call before autonomic sees it' "a seat-mods deny rings no pain of its own (F7)" flat
+pin "$ROLES" '`AUTONOMIC_BELL` is never set' "no per-seat bell" flat
+pin "$ROLES" 'and `AUTONOMIC_LEDGER` by the same rule and no pain path' "the top's successor keeps autopilot, has no parent" flat
+pin "$COMP" '## A child'"'"'s pain' "completion.md has the child-pain paragraph" flat
+pin "$COMP" 'The heartbeat, per tick, per live seat, reads it too' "the heartbeat reads each child's pain file" flat
+pin "$COMP" 'it is never a failed task' "a pain line is an ask, not a failure" flat
+pin "$COMP" 'seat-mods refuses the call before autonomic sees it' "a seat-mods deny rings no pain of its own (F7)" flat
 
 section "OMP top (0.2.19)"
 pin "$REF" '## Host: OMP' "the layer file carries the OMP host mapping"

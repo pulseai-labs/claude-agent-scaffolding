@@ -83,7 +83,7 @@ seat already sits in, never a fixed canonical path. Launched from the `work-PR s
 seat the project file names — marked `coordinator` before its command
 (the layer's `Seat marking`) — with the top's merge-executor assignment and PRIOR_REVIEW, it
 owns both PR seats inside a `run.json` of its own. The top waits on it as a coordinator
-seat (`layers/herdr.md`, Completion).
+seat (`completion.md`, Completion).
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):

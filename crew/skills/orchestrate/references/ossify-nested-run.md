@@ -37,14 +37,14 @@ file, as dagr's producer contract requires.
   report file;
 - its final report goes in its report file like everything else, naming `RUN_JSON`;
 - the spine session is the only waiter on its item seats; you wait on the spine session
-  as on a coordinator seat (`layers/herdr.md`, Completion).
+  as on a coordinator seat (`completion.md`, Completion).
 
 The nested run keeps item plans and item reports away from you: you read a batched
 plan relay, genuine spine-level decisions, and one final report.
 
 **Teardown is the pairs and their workspace, not the `run.json`.** The spine session
 releases every item pair and closes the workspace it created, as
-`layers/herdr.md`'s Teardown says, before its final report. Nothing closes a
+`roles.md`'s Teardown order and the layer's Teardown say, before its final report. Nothing closes a
 `run.json`: dagr never writes one, and the file stays as the spine's record.
 
 ## 3. The round procedure, as the spine session runs it
@@ -136,7 +136,7 @@ rebinding `run.orchestrator` to its own pane (its brief's step 2 says). On that 
 completion at the final barrier. A spine session that rotated on a molt warning returns the same
 `rotate:`; one cut mid-round returns none and is respawned the same way, its handoff as
 `HANDOFF_PATH`: ossify 1.14.0's run-spine re-enters the round from recorded state, and only a
-halt in its reconcile read-out goes to the operator (`layers/herdr.md`, "A child past
+halt in its reconcile read-out goes to the operator (`completion.md`, "A child past
 molt's warnings").
 
 When its final report lands, **you dispatch** `/ossify:close <spine-id>` to a close

@@ -22,7 +22,7 @@ the operator's approved seat, copied into the brief at launch; a worker that fin
 model is not `SEAT_EXPECTED_MODEL` reports a failed launch and stops.
 
 The report file is replaced whole, never appended to in pieces: the orchestrator's
-doorbell compares that file's hash or its identity (`layers/herdr.md`), and it reads a
+doorbell compares that file's hash or its identity (`completion.md`), and it reads a
 change as a finished report. Write the new content to a temp file in the same directory,
 then rename it over the path: the rename is the atomic step, and opening the path is not —
 it truncates the file before the content lands, and the doorbell can fire on that
