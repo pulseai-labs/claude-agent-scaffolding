@@ -132,8 +132,8 @@ Claude Code keeps reading `AUTONOMIC_EFFECTIVE_MODE`. Only an exact `autopilot` 
 Since 0.2.17, OMP coordinator and worker seats launch through `omp-seat` (see `references/config.md`); OMP seats fill the lane driver (default-lane spine session), close, doctor or worker seats, and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4); since 0.2.23, also the activated spine session (`omp-seat crew-spine`) and the work-PR session (`omp-seat crew-work-pr`; omp-roles 0.6.0), which run 788 lifted (#788).
 
 **Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
-invalid role and denies every tool call, so `crew` — the pre-rename 0.2.7 and later — must be
-installed together with `seat-mods` 0.2.0.
+invalid role and denies every tool call, so 0.2.7 and later —
+the pre-rename line and every `crew` release — need `seat-mods` 0.2.0.
 An operator-declared role with no `replaces:` is marked a guarded `implementer` and runs
 under implementer rails.
 
