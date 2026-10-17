@@ -18,6 +18,10 @@ Every materially new enrolled assignment needs a fresh process/launch binding, e
 
 The real authority CLI/reader is usable independently of model/backend; native decision activation and its host release/policy/calibration gates are separate. Task-3 fixture issuance is not a live grant. See Autonomic's trusted-assignment section for exact schema/CLI and same-UID/shared-process/last-check race limits. Operator-owned merge/design/plan gates and all seat-mods denials remain absolute; no new role/profile/exception is supplied. Claude Code launch/backend semantics are unchanged; Jev parity remains deferred to #832.
 
+### Gated rollout of the integrated routing release candidate (unreleased)
+
+The reviewed integrated OMP routing release candidate adds no launcher flag and no new role. Cutover is staged by the operator, not by a worker: start a **fresh approved OMP top** with a trusted bounded assignment binding; retained assignments use new processes; a same-assignment in-place Molt needs the full revalidation transaction or stays suspended. Do **not** edit a running top's env or reports to enroll it — enrollment is a launch, not a mutation of a live process. Existing Claude Code tops/backend/permissions are unchanged under #832, and no new sandbox claim is made. Rollback is explicit deployment to the prior supported release/backend with truthful source attribution and current floor protection, never a per-request chat fallback claiming Jev. The full input/validation/gate list lives in Autonomic's `docs/omp-jev-rollout.md`. **No version is selected here and `ompTested` is unchanged.**
+
 ## Install
 
 Coordinator roles need ossify 1.18.0 for `spine-driver` and `close`, and merge-bar for `work-pr`.

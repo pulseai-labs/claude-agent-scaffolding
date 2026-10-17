@@ -4,6 +4,7 @@ All notable changes to the `herdr-crew` plugin.
 
 **Unreleased (not published)**
 
+- The reviewed integrated OMP routing release candidate ships with a gated-cutover runbook (autonomic `docs/omp-jev-rollout.md`): non-acting replay observation first, then reviewed class/assignment activation; a fresh approved OMP top with a trusted bounded assignment; retained assignments use new processes; same-assignment in-place Molt requires the full revalidation transaction or stays suspended. Existing Claude Code tops/backend/permissions are unchanged under #832; no new sandbox claim. Rollback is explicit deployment to the prior supported release/backend, never a per-request chat fallback claiming Jev.
 - Scope new OMP autonomous enrollment to externally approved, finite assignment snapshots and startup-pinned launch provenance; complete brief identity/prohibition blocks accompany each affected dispatch.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.

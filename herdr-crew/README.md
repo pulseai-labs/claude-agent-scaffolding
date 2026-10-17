@@ -24,6 +24,8 @@ A retained pane may host a new assignment only after the old agent process ends 
 
 For enrolled OMP, operator merge acknowledgment and spec/design/plan/release gates outrank `run.merge_word=standing`, inherited policy prose, role and confidence. Claude Code and legacy/manual retention/backend rules remain unchanged. Herdr 0.2.22's phase/locator.seen, one-generation consumption, resume/rotation ownership and no-auto-relaunch rules still apply: fresh-binding requirements never authorize duplicate workers on a live attempt. This is not a same-UID sandbox or atomic revocation lock. Native decision integration/release remains separately gated; #832 and #831's cross-host criterion are not closed.
 
+**Gated cutover of the reviewed integrated candidate (unreleased).** The reviewed integrated OMP routing candidate changes no roster, no launch flag and no per-seat profile. Activation is staged, not hot: observe with the non-acting replay first, then enable only the reviewed classes/assignments. Do not edit a running top's env or reports to enroll it; start a fresh approved OMP top with a trusted bounded assignment, use new processes for retained assignments, and keep a same-assignment in-place Molt suspended unless the full revalidation transaction runs. Existing CC tops/backend/permissions continue unchanged under #832 and no new sandbox claim is made. Rollback is explicit deployment to the prior supported release/backend with truthful source attribution, never a per-request chat fallback claiming Jev. Autonomic's `docs/omp-jev-rollout.md` holds the complete input/validation/gate list; no version is selected here.
+
 ## What ships
 
 | Surface | What it carries |

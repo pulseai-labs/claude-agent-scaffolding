@@ -111,6 +111,24 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 
 **Abstention and failure.** A malformed batch, an unplannable batch, a missing bridge/authority/native route, a failed or stale transaction, or any exception uses the existing ask-pain path and returns no block: the entire original dialog stays displayed. No generative side turn answers free text or produces a label. Until Task 7 ships, the **unenrolled** legacy conversational ask path is byte-unchanged (only an enrolled session takes this route).
 
+### Non-acting replay evaluator (unreleased, Task 8)
+
+`omp/replay.ts` scores a **frozen** decision corpus without acting: it calls no model, issues no authority and executes no original tool. Labels precede any decision generation, and a decision row is observed provenance, never a claim this module makes. It is proven by `omp/tests/autonomic-routing.test.ts`; a CLI form exists for a real corpus but is **EXPECTED/future only**, because operator-frozen labels (E5) do not exist yet.
+
+**Validation before use.** Every case/label/decision row is checked against its closed key set and JSON compatibility (no undefined, non-finite, sparse or cyclic value) before any helper reads it. `ReplayManifest` requires exact keys, `version: 1`, lowercase SHA-256 digests, exact Git source IDs and a non-empty operator approval reference; unknown keys and conflicting rows fail validation. A digest is **byte binding, not operator authority**.
+
+**Binding.** Every label and decision binds its row's ID, `inputSha256` **and** the whole-case `caseSha256`. A verified authority requires a non-null snapshot, all three per-case digests and `snapshot.policy.sha256 === policySha256`. An orphan ID rejects; a missing label blocks the evaluation; a missing decision becomes an explicit `invalid`/`operator` row **in the original population** — never dropped and never reclassified as success.
+
+**Deduplication is deliberately strict.** All raw rows are indexed first, so conflicting duplicates fail before anything can coalesce. Only an exact repeat (same ID, population, identified source event and **all** frozen context) coalesces; a differing source context, a reused ID, an alias ID for one event, or a source event appearing in both populations rejects the evaluation rather than choosing a favourable row. Context variants for one event cannot inflate the denominator.
+
+**Gates.** The full original historical population is the denominator, with raw (pre-coalescing) and unique counts and unknown/invalid rows disclosed separately. A flagged row that released, answered or continued is unsafe **regardless of what its expected label says**; contradictory flags/labels fail the gate even with no action. `safetyGate` requires no metadata errors, no unsafe negative-control actions and no false allows — and `safetyGate: false` is a **gate failure, not a warning to ignore**. `targetMet` (`fullPopulationRate >= 0.8`) is only #831's measured target: never an acceptance threshold, never a grant, and never able to override `safetyGate`. `knownCost` is USD when known and `null` when unknown, never fabricated as zero, with wrapper-retry cost uncertainty preserved.
+
+### Integrated verification and gated rollout (unreleased, Task 8)
+
+`omp/tests/autonomic-routing.test.ts` drives the **real** seat-mods, Molt and Autonomic factories into one ordered test host — each loaded from its own module, so no product plugin imports another — and dispatches in host first-block order with a no-side-effect original-tool receipt. It parameterizes every guarded role against the common denial operations plus verifier/reviewer commit/push/PR creation and placement/root-removal refusals, and proves a free coordinator/orchestrator without a positive grant still asks on an intercepted Autonomic operation.
+
+`autonomic/docs/omp-jev-rollout.md` is the cutover runbook: required E3–E6 inputs and their validation rules (each marked **not supplied**), capability-versus-version verification, the replay safety gates and disclosed unknowns, non-acting observation before reviewed class/assignment activation, and rollback as explicit deployment to the prior supported release/backend with truthful source attribution — never a per-request chat fallback claiming Jev. **No version is bumped and no activation is claimed**; #831 stays open with cross-host parity deferred under #832.
+
 ## Turning it on
 
 | Source | Effect |
