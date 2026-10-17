@@ -19,6 +19,9 @@
 # autonomic, ossify): Task 1's non-goal, so each hit is listed and the gate stays red until
 # Task 7 lands. Failing with that list is the expected state at the end of Task 1.
 #
+# A checkout is the premise of all three facts, and the guard before them fails loudly on a
+# tree that is not one — see its own comment.
+#
 # Usage: bash tests/test-crew-rename.sh
 # Deps:  bash 3.2+, git, jq, awk, sed.
 set -u
@@ -39,6 +42,18 @@ pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
 
 printf 'crew rename gate\n'
+
+# The premise every fact below rests on: `git ls-files` and `git grep` print NOTHING outside
+# a checkout, with the failure on stderr only — so an exported tarball or a copied directory
+# reads exactly like a clean one and all three checks would pass vacuously. A gate that cannot
+# distinguish "clean" from "unread" is not a gate. tests/test-omp-surface.sh asks the same
+# question to choose between its git and non-git greps; here the answer has to stop the run.
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  fail "run inside a git checkout"
+  printf '        %s is not a git checkout: `git ls-files` and `git grep` would print nothing and every check below would pass vacuously.\n' "$ROOT"
+  printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
+  exit 1
+fi
 
 # 1. The directory itself.
 old_paths="$(git ls-files | awk -v o="$OLD/" 'index($0, o) == 1')"

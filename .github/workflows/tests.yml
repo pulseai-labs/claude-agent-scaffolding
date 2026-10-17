@@ -100,6 +100,13 @@ jobs:
         # sibling tree, so this one is repo-root.
         run: bash tests/test-crew-parity.sh
 
+      - name: crew rename gate (repo-root)
+        # The rename's clean cut (spec §4.6): no tracked path, no catalog entry and no
+        # tree-wide reference to the old plugin name outside CHANGELOG history and
+        # config.md's old-path stop. Repo-root because it scans every plugin's tree,
+        # which crew's own runner cannot see.
+        run: bash tests/test-crew-rename.sh
+
       - name: merge-bar template parity (repo-root)
         # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).
         run: bash tests/test-merge-bar-template-parity.sh
