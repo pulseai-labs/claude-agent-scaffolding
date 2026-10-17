@@ -27,7 +27,9 @@ Under the bundled loop, three rails survive any adaptation:
   evidence-shaped refutation) in the ledger you surface.
 - **The merge is the operator's, or a standing order's in the autopilot policy.**
   Surface the ledger, the reviewer state, and a mergeability verdict, then stop at
-  the ask. Never auto-merge.
+  the ask — or, under a standing order in the autopilot policy that grants merge
+  authority, treat a clean verdict as the ack (as `references/loop.md` §4 says).
+  Never auto-merge.
 
 Whichever loop runs, the merge is the operator's, or a standing order's in the autopilot policy,
 and requirements a caller states in the invocation bind it: spine close states its landing (a merge commit where the repo allows one,

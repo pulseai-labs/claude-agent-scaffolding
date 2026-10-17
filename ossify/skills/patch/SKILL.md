@@ -175,7 +175,9 @@ adopt it.
 - **Switching or stashing a checkout a spine is parked on** to cut the branch (§4).
 - **Reading `touch_check` rc 2 as clean**, or a `risk_gate` hit as advisory (§2).
 - **Bumping one manifest** and leaving the old version on another surface (§4).
-- **Merging on the operator's behalf**, or tagging before the merge (§5, §6).
+- **Merging on the operator's behalf** — a merge with neither the operator's ack
+  nor a granting standing order in the autopilot policy — or tagging before the
+  merge (§5, §6).
 - **Recording the patch in ossify state.** Git is the record (top of this file).
 
 ## 8. Slash-command interaction

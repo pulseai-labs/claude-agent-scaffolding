@@ -2142,4 +2142,16 @@ pin "$_PRW_CD" 'Under a standing order in the autopilot policy that gives you th
 pin "$_PRW_CD" 'You may not perform a `user:` line on the human'"'"'s behalf and mark it passed.' \
   "cumulative-demo.md's otherwise branch - the human's walk - is gone, so the walk reads as the orchestrator's always (#832)"
 
+# PR #869 round 1 (disposition items 1-3, one class): the two sites the first pass
+# left operator-only, conditioned in one commit. The first two pins are red on
+# dceda637's text and green after the fix; the third is the loosening's adjacent
+# control (CLAUDE.md): the rail gains a merge branch, so the prohibition the
+# disposition says to keep - "Never auto-merge" - is pinned against deletion.
+pin "$_PRW_SC" "the human, or yourself under a standing order in the autopilot policy that gives" \
+  "spine-close.md's step-4 reference still gives the demo walk to the human alone (#869 disposition 1)"
+pin "$_PRW_WP" "the ask — or, under a standing order in the autopilot policy that grants merge" \
+  "work-pr/SKILL.md's merge rail still stops at the ask with no standing-order branch (#869 disposition 2)"
+pin "$_PRW_WP" "Never auto-merge." \
+  "work-pr/SKILL.md's merge rail lost 'Never auto-merge' - a merge queue's auto-merge stays forbidden (#869 disposition 2)"
+
 t_summary

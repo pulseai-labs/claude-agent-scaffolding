@@ -769,8 +769,10 @@ An unknown spine id is rc 7 with a message, not a silent no-op.
 
 `oss demo_run` for every active `auto:` line, then walk
 `oss demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
-the human. Full detail, the §6.1-vs-§6.2 scoping, quarantine handling and the
-ledger's wall-clock budget in **`references/cumulative-demo.md`**.
+the human, or yourself under a standing order in the autopilot policy that gives
+you the demo walk (`cumulative-demo.md` §3). Full detail, the §6.1-vs-§6.2
+scoping, quarantine handling and the ledger's wall-clock budget in
+**`references/cumulative-demo.md`**.
 
 **Halt on the first failure, and the halt is terminal**: no touch check, no
 critic, no retro, no harvest, no cleanup, no status write. A demo failure is the

@@ -28,7 +28,7 @@ the spec's, not an optimization:
 |---|---|---|
 | `auto:` lines | all accumulated, every run | all accumulated |
 | `user:` lines | **this spine's own contribution only** | **every** accumulated line, grouped by feature |
-| Who drives the `user:` half | the human, here, now | the human, at the release gate |
+| Who drives the `user:` half | the human, here, now, or yourself under a standing order in the autopilot policy that gives you the demo walk (§3) | the human, at the release gate, or yourself under that order (§3) |
 
 One verb serves both: `oss demo_user_lines` **with** a spine argument filters to
 `source_spine == <spine>`; **without** one it returns every active `user:` line.
@@ -406,7 +406,8 @@ records nothing at all.
   a spine that passes its own lines and breaks an older one has broken the
   product.
 - **Treating a `user:` line's mismatch as advisory** (§3).
-- **Marking a `user:` line passed without the human** (§3).
+- **Marking a `user:` line passed without the human**, absent the standing order
+  in the autopilot policy that gives you the walk (§3).
 - **Editing a demo line, its command, or its expectation to get past a failure**
   (§2).
 - **Quarantining a line this spine broke** (§4).
