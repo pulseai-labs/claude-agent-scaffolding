@@ -217,7 +217,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
       if (op === 'pr_create') rules.push('pr-create')
       else if (op === 'pr_push') rules.push('push')
       // pr_checkout makes a worktree and branch outside this one (default ~/.omp/wt); `force` resets a branch.
-      else if (op === 'pr_checkout') return decide(role, { kind: 'write', place: 'outside' })
+      else if (op === 'pr_checkout') return decide(role, { kind: 'write', place: 'outside', allow: await allowOf(deps) })
       else if (!GITHUB_READS.has(op)) return toolDeny(role, `${label}github ${op}`)
       return rules.length === 0 ? undefined : decide(role, { kind: 'bash', rules })
     }
@@ -273,7 +273,7 @@ async function shellCheck(deps: GuardDeps, role: Role, commands: string[], baseO
 async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: Record<string, unknown>): Promise<string | undefined> {
   const targets = writeTargets(toolName, input) ?? []
   const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
-  if (targets.length === 0) return decide(role, { kind: 'write', place: 'outside' })
+  if (targets.length === 0) return decide(role, { kind: 'write', place: 'outside', allow })
   for (const raw of targets) {
     // `write xd://resolve` / `xd://reject` confirm or discard a preview an earlier, already-checked ast_edit staged.
     const places: Place[] = []

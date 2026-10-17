@@ -615,6 +615,18 @@ describe('scratch sinks (#844)', () => {
       expect(await guard(deps(), 'write', { path, content: 'x' }, child('implementer'))).toBeDefined()
     expect(await guard(deps(), 'edit', { path: 'local://x' }, child('implementer'))).toContain('no writes outside')
     expect(await guard(deps(), 'ast_edit', { path: 'local://x', pattern: 'a', rewrite: 'b' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { input: '*** Add File: local://x\n+z' }, child('implementer'))).toContain('no writes outside')
+    expect(await guard(deps(), 'edit', { paths: ['local://x'] }, child('implementer'))).toContain('no writes outside')
+    // one allowed target never carries another: the second write target is still placed
+    expect(await guard(deps(), 'write', { path: 'local://x', paths: ['/etc/x'], content: 'x' }, child('implementer'))).toContain('no writes outside')
+  })
+  // PR #862 round 1: every outside-write deny on OMP carries the hint, including the two that place no target.
+  test('a write with no target, and a github pr_checkout, also name the scratch folders', async () => {
+    for (const [tool, input] of [['write', { content: 'x' }], ['edit', { input: 'no headers' }], ['github', { op: 'pr_checkout', pr: 1 }]] as const) {
+      const deny = await guard(deps(), tool, input as Record<string, unknown>, child('implementer'))
+      expect(deny).toContain('no writes outside')
+      expect(deny).toContain('go in /tmp/allow.')
+    }
   })
   test('a write denied outside names the SEAT_MODS_ALLOW folders as the place for scratch files', async () => {
     const deny = await guard(deps(), 'write', { path: '/tmp/pr861-commit-message.txt', content: 'x' }, child('implementer'))

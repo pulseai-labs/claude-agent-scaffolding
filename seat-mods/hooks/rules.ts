@@ -433,7 +433,7 @@ export function decide(role: Role, facts: Facts): string | undefined {
 }
 
 // An rm operand rmTargets could not read (its path is undefined): a removal the glues report without placing it.
-export const UNREAD: Removal = { place: 'outside', protected: false, unresolved: true }
+export const UNREAD: Readonly<Removal> = Object.freeze({ place: 'outside', protected: false, unresolved: true })
 
 const RM_LITERAL = 'To remove a file, spell its path out literally: the guard does not read $VAR, `…` or {…}, or a relative path after cd.'
 
