@@ -261,6 +261,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   let paused: string | undefined
   let seeded: { session: string; startPercent?: number } | undefined
   let inFlight = false                      // a molt between newSession() and its seed
+  let claiming = false                      // an agent_end between its first await and molt(): two overlapping calls clear once
   let progress = 0                          // Write, Edit or commit since the last molt
   const nudged = new Set<string>()
   const stopBlocks = new Map<string, number>()
@@ -649,7 +650,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     const id = io.sessionId()
     try {
       await touchActive(id)
-      if (off.has(id) || inFlight || paused === id || handedOff.has(id)) {
+      if (off.has(id) || inFlight || claiming || paused === id || handedOff.has(id)) {
         showStatus(id)
         return undefined
       }
@@ -705,10 +706,11 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   // once, since a clear cancels pending jobs anyway. No block and no fallback here: a terminal settle reaches
   // session_stop, which keeps both.
   async function onAgentEnd(e: { messages?: readonly unknown[]; willContinue?: boolean } = {}): Promise<void> {
-    if (e.willContinue !== true) return
-    await load()
-    const id = io.sessionId()
+    if (e.willContinue !== true || claiming) return
+    claiming = true
     try {
+      await load()
+      const id = io.sessionId()
       if (off.has(id) || inFlight || paused === id || handedOff.has(id)) return
       await measure(id)
       showStatus(id)
@@ -726,6 +728,8 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
       else await molt(id, handoff)
     } catch (err) {
       await log(`agent_end error ${String(err)}`)
+    } finally {
+      claiming = false
     }
   }
 

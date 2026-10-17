@@ -882,6 +882,20 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
+  test('#855 /molt now as the first prompt arms the clear route itself', async () => {
+    const b = boot({ percent: 41 })
+    try {
+      const handoff = join(b.home, 'handoff.md')
+      writeFileSync(handoff, '# h')
+      await b.handlers.get('session_start')!({}, b.ctxFor())
+      await b.commands.get('molt')!.handler('now', b.ctxFor())
+      b.state.branch = marked(handoff)
+      const messages = b.state.branch.map(x => (x as { message: unknown }).message)
+      await b.handlers.get('agent_end')!({ messages, willContinue: true }, b.ctxFor())
+      expect(b.state.newSessions).toBe(1)
+    } finally { b.restore() }
+  })
+
   test('print mode never arms, never clears, and logs the missing route', async () => {
     const b = boot({ percent: 66, mode: 'print' })
     try {
@@ -1030,16 +1044,21 @@ describe('a marker at a deferred settle (agent_end, willContinue)', () => {
   const end = (branch: unknown[], willContinue?: boolean) => ({ messages: messagesOfBranch(branch), willContinue })
   const messagesOfBranch = (branch: unknown[]) => branch.map(x => (x as { message: unknown }).message)
 
-  test('a warned session whose reply ends with a readable marker molts at once, and only once', async () => {
+  test('a warned session whose reply ends with a readable marker molts at once', async () => {
     const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
     w.percent = 41
     w.branch = marked('/h/handoff.md')
-    w.onClear = async () => { w.id = 'S2'; await m.onSessionSwitch('new') }
     await m.onAgentEnd(end(w.branch, true))
     expect(w.seeds).toHaveLength(1)
     expect(w.seeds[0]).toContain('/h/handoff.md')
     expect(w.logs.some(l => l.includes('source=marker'))).toBe(true)
-    await m.onAgentEnd(end(w.branch, true))
+  })
+
+  test('two overlapping agent_end calls, or one overlapping a session_stop, clear once', async () => {
+    const { w, m } = world({ files: { '/h/handoff.md': '# h' } })
+    w.percent = 60
+    w.branch = marked('/h/handoff.md')
+    await Promise.all([m.onAgentEnd(end(w.branch, true)), m.onAgentEnd(end(w.branch, true)), m.onSessionStop()])
     expect(w.seeds).toHaveLength(1)
   })
 

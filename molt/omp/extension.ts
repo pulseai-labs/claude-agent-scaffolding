@@ -72,6 +72,8 @@ export default function (pi: any) {
     description: 'molt: now | off | on | status',
     handler: async (args: string, c: any) => {
       if (!main(c)) return
+      // /molt now may be the session's first prompt, before any /molt-arm: its command ctx is the clear route too.
+      if ((args ?? '').trim() === 'now') saved = c
       c.ui?.notify?.(await molt.onCommand(args ?? ''), 'info')
     },
   })
