@@ -13,21 +13,28 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DEFAULTS, parseConfig } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
-import { toolEntry, pushEntry, renderDigest } from '../hooks/digest'
-import { enforced } from '../hooks/enforce'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from '../hooks/floor'
-import { ledgerLine, ledgerPathFor, oneLine } from '../hooks/ledger'
+import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
 import type { LedgerCase } from '../hooks/ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from '../hooks/mode'
-import { DEFAULT_READERS, namesDanger, neverRules } from '../hooks/never'
-import type { Where } from '../hooks/never'
+import { DEFAULT_READERS, floorFindings, namesDanger } from '../hooks/never'
+import type { Finding, Where } from '../hooks/never'
+import { operationFacts, permissionEligibility } from '../hooks/operations'
 import { DEFAULT_POLICY, expandHome } from '../hooks/policy'
-import { askPrompt, scopeMessage, turnEndPrompt } from '../hooks/prompts'
+import { scopeMessage, shownInput } from '../hooks/prompts'
 import { lineagePath, logPath, modeFilePath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from '../hooks/records'
 import type { SessionRecord } from '../hooks/records'
 import { shape } from '../hooks/shape'
-import { parseAsk, parseTurn } from '../hooks/verdict'
-import type { Question } from '../hooks/verdict'
+import type { TurnCase, TurnVerdict } from '../hooks/verdict'
+import { captureLaunchBinding } from '../hooks/authority'
+import { launchWorkerRoots } from '../bin/authority'
+import { PinnedAuthority, placementFacts } from './authority-store'
+import type { AuthorityLease } from '../hooks/authority'
+import { acceptedChoice, captureFrame, judgeNative, parsePolicyBundle } from './judgment'
+import type { ConsumerHost, DecisionDraft, DecisionFrame, DecisionIO } from './judgment'
+import { commitDecision } from './decision-ledger'
+import { assembleAsk, holdsSecret, planAsk, snapshotAsk } from './asks'
+import { payloadForTurn, stateHoldsSecret, turnEvidence } from './turn-end'
 
 type Live = SessionRecord & { problem?: string; invalid?: string }
 
@@ -40,6 +47,8 @@ export type AutonomicIO = {
   sessionId(): string
   cwd: string
   env: Readonly<Record<string, string | undefined>>
+  launchCwd?: string                                        // immutable trusted process-start cwd
+  sessionFile?(): string | undefined
   setEnv(name: string, value: string | undefined): void
   readText(path: string): Promise<string | undefined>
   exists(path: string): Promise<boolean>
@@ -47,9 +56,12 @@ export type AutonomicIO = {
   appendLine(path: string, line: string): Promise<boolean>      // creates the folder; false when it did not land
   touch(path: string): Promise<boolean>
   run(argv: string[]): Promise<{ exitCode: number; stdout: string }>
-  // One side turn off the session's history. A throw or an empty reply is a failed attempt; undefined means the
-  // host has no ephemeral turn, so there is nothing to judge with.
-  ephemeral(prompt: string, timeoutMs: number): Promise<string | undefined>
+  // The bounded decision services (Task 4). Absent means the native decision route is unavailable:
+  // a consumer must fall back to operator handling, never to the old ephemeral classifier.
+  decisions?: DecisionIO
+  // Read the live entry context ONCE, binding judge/generate to that exact object. Absent on hosts
+  // with no captured context; the decision route is then unavailable.
+  captureHost?: () => ConsumerHost
   usage(): number | undefined                                    // ctx.getContextUsage().percent
   systemPrompt(): string | string[] | undefined
   notify(text: string): void
@@ -59,20 +71,6 @@ export type AutonomicIO = {
 
 const CONFIG_PATH = '.omp/agent/autonomic.json'
 const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status'
-// tool_call and the other dispatched handlers have a 30 s budget in omp 18.8.9, and tool_call fails closed on a
-// timeout. Both attempts of a judgment share one deadline inside it, so a slow model ends in a pain signal and a
-// passed event, never in the host's timeout.
-export const JUDGE_BUDGET_MS = 25_000
-const MIN_ATTEMPT_MS = 1_000
-
-// The deadline must not depend on the host honouring the abort signal: a turn that never settles is a failed attempt.
-function within<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`no reply within ${ms} ms`)), ms)
-    p.then(v => { clearTimeout(timer); resolve(v) }, e => { clearTimeout(timer); reject(e) })
-  })
-}
-
 // omp 18.8.9's built-in tools (the binary's tool registry, the same enumeration molt/omp/core.ts records), each
 // decided once. Read-only, so a turn of these alone is no progress for the loop guard:
 //   read, grep, glob, find, ast_grep, web_search, fetch, ls, ask, todo, wait, think, recall, reflect
@@ -124,25 +122,6 @@ const textOf = (content: unknown): string => {
   return content.filter(b => b?.type === 'text' && typeof b.text === 'string').map(b => b.text as string).join('\n')
 }
 
-// omp's ask input: { questions: [{ id, question, options: [{ label, description? }], recommended?, header?, multi? }] }
-// (probe 13 Q4; the binary also reads a legacy single `question` / `options` form and options given as strings).
-export function questionsOf(input: unknown): Question[] {
-  const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-  const list = Array.isArray(args.questions) ? args.questions : typeof args.question === 'string' ? [args] : []
-  const out: Question[] = []
-  for (const q of list) {
-    const text = str((q as Record<string, unknown> | null)?.question)
-    if (text === undefined) continue
-    const rec = q as Record<string, unknown>
-    const options = (Array.isArray(rec.options) ? rec.options : [])
-      .map(o => ({ label: typeof o === 'string' ? o : str((o as Record<string, unknown> | null)?.label) }))
-      .filter((o): o is { label: string } => o.label !== undefined && o.label !== '')
-    const header = str(rec.header)
-    out.push({ question: text, ...(header === undefined ? {} : { header }), options, ...(rec.multi === true ? { multiSelect: true } : {}) })
-  }
-  return out
-}
-
 // A system prompt as a list of blocks: omp 18.8.9 hands the event and ctx.getSystemPrompt() a string[]; a lone string is one block.
 const blocksOf = (v: unknown): string[] | undefined =>
   typeof v === 'string' ? [v] : Array.isArray(v) && v.every(b => typeof b === 'string') ? (v as string[]) : undefined
@@ -172,7 +151,61 @@ const claimedModeFiles = new Set<string>()
 
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
 
-export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_BUDGET_MS) {
+export function createAutonomic(io: AutonomicIO) {
+  // Capture before worker execution; mode records, later env and briefs never rebind this store.
+  const startup = Object.freeze({ ...io.env })
+  const enrolled = ['AUTONOMIC_AUTHORITY_PATH', 'AUTONOMIC_AUTHORITY_SHA256', 'AUTONOMIC_ASSIGNMENT_ID', 'AUTONOMIC_ASSIGNMENT_GENERATION', 'AUTONOMIC_LAUNCH_ID'].some(name => startup[name] !== undefined)
+  let authority: PinnedAuthority
+  let authorityState = enrolled ? 'unavailable' : 'legacy/manual (no grant)'
+  let authorityLease: AuthorityLease | undefined
+  let predecessorFile: string | undefined
+  try {
+    const binding = captureLaunchBinding(startup)
+    authority = new PinnedAuthority(binding, binding ? launchWorkerRoots(startup, io.launchCwd ?? io.cwd) : [])
+  } catch {
+    authority = new PinnedAuthority(undefined, [])
+    authority.invalidate()
+    authorityState = 'invalid startup binding; fresh trusted launch required'
+  }
+
+  // One per-process cancellation for outstanding decision frames. A mode change, navigation,
+  // shutdown, Molt transition or authority invalidation aborts it and replaces it for the next
+  // frame, so no late completion can act on a session whose authority has moved.
+  let frameAbort = new AbortController()
+  function abortFrames(): void { frameAbort.abort(new Error('frame cancelled')); frameAbort = new AbortController() }
+
+  // Every automatic fall to manual is a mode change. It cancels outstanding decision frames and, for
+  // an enrolled session, suspends the pinned authority — the same invalidation the other points use —
+  // so no frame captured before the fall can still pass its freshness check and release afterward.
+  function fallToManual(rec: Live, problem: string): Live {
+    if (enrolled) suspendAuthority()
+    else abortFrames()
+    return { ...rec, mode: 'manual', problem }
+  }
+
+  // The entry moment of the current handler, captured before any await so a decision frame gets the
+  // real start of its one monotonic 25-second window. Read by the native consumers (Tasks 5–7).
+  let lastEntryMs = 0
+
+  function suspendAuthority(): void {
+    if (!enrolled) return
+    abortFrames()
+    authority.suspend()
+    authorityState = 'suspended; fresh trusted launch required'
+  }
+  function onSessionBeforeSwitch(): void {
+    predecessorFile = io.sessionFile?.()
+    suspendAuthority()
+  }
+  async function onSessionSwitch(): Promise<void> {
+    // reason:new + predecessor file/lineage/stage do not expose Molt's private pending ownership.
+    // Keep the observed predecessor, but never turn a generic new/resume into autonomous eligibility.
+    if (enrolled) {
+      suspendAuthority()
+      io.notify(`autonomic authority: ${authorityState}${predecessorFile ? ' (observed predecessor transition)' : ''}`)
+    }
+    await onSessionStart()
+  }
   let cfg: AutonomicConfig = DEFAULTS
   let ready: Promise<void> | undefined
   const live = new Map<string, Live>()       // each session's resolved record
@@ -180,9 +213,6 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   const changed = new Set<string>()          // sessions that changed something since their last turn end
   const announced = new Set<string>()        // sessions whose carried scope has been announced
   const pendingScope = new Set<string>()     // prepared scope, committed only at agent_start
-  const digests = new Map<string, string[]>()
-  const note = (id: string, entry: string): void => { digests.set(id, pushEntry(digests.get(id) ?? [], entry)) }
-  const digestOf = (id: string): string => renderDigest(digests.get(id) ?? [])
 
   const home = (): string => io.env.HOME ?? ''
   // omp's bash helper captures the environment after extension load. The path stays fixed for this process.
@@ -194,6 +224,8 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   }
 
   function onSessionShutdown(): void {
+    abortFrames()
+    if (enrolled) authority.invalidate()
     try { io.remove(modeFile) } catch {}
   }
 
@@ -233,11 +265,14 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   }
 
   // Autopilot needs its policy and a writable ledger; without either the session is manual (spec §4).
+  // An enrolled session additionally needs the native decision service; the ask and turn-end
+  // consumers stay operator-owned until Tasks 6–7 ship (see askReflex/onSessionStop).
   async function guard(rec: Live): Promise<Live> {
     const clean: Live = { ...rec, problem: undefined }
     if (rec.mode !== 'autopilot') return clean
-    if ((await policyText()) === undefined) return { ...clean, mode: 'manual', problem: 'no policy' }
-    if (!(await io.touch(await ledgerPath()))) return { ...clean, mode: 'manual', problem: 'ledger not writable' }
+    if (enrolled && io.decisions === undefined) return fallToManual(clean, 'enrolled authority requires the native decision service')
+    if ((await policyText()) === undefined) return fallToManual(clean, 'no policy')
+    if (!(await io.touch(await ledgerPath()))) return fallToManual(clean, 'ledger not writable')
     return clean
   }
 
@@ -270,7 +305,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (safeSessionId(id)) {
       try { await io.writeText(sessionPath(home(), id), serializeRecord(rec)) } catch (err) {
         await log(`record write failed session=${id} ${String(err)}`)
-        out = { ...rec, mode: 'manual', problem: 'record not writable' }
+        out = fallToManual(rec, 'record not writable')
         io.notify(`autonomic: the session record could not be saved (${sessionPath(home(), id)}); this session is manual.`)
       }
     }
@@ -288,7 +323,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     // The policy is read again each time: one removed mid-session ends autopilot (spec §4).
     if (known !== undefined && (known.mode !== 'autopilot' || (await policyText()) !== undefined)) return known
     if (known !== undefined) {
-      const off = await save(id, { ...known, mode: 'manual', problem: 'no policy' })
+      const off = await save(id, fallToManual(known, 'no policy'))
       io.notify('autonomic: autopilot refused — no policy')
       return off
     }
@@ -318,22 +353,41 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
   async function recordAll(id: string, lines: readonly string[]): Promise<boolean> {
     if (await io.appendLine(await ledgerPath(), lines.join('\n'))) return true
     const rec = live.get(id)
-    if (rec !== undefined) await save(id, { ...rec, mode: 'manual', problem: 'ledger not writable' })
+    if (rec !== undefined) await save(id, fallToManual(rec, 'ledger not writable'))
     io.notify('autonomic: the ledger is not writable; this session is manual now.')
     await log(`ledger append failed session=${id}`)
     await pain(id, 'ledger not writable', `${await ledgerPath()}: autopilot is off for this session`)
     return false
   }
 
+  // The complete validated option text (Plan Task 7 §9 line 1103): a 40-character one-line label and the
+  // whole instruction a press submits, never cut, recommended first. One renderer, so the notice, the bell,
+  // the pain file and the human row all carry the same content.
+  function optionLines(options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>): string {
+    return (options ?? [])
+      .map(o => ({ label: oneLine(o.label, 40), text: o.text, recommended: o.recommended }))
+      .sort((a, b) => Number(b.recommended) - Number(a.recommended))
+      .map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''} — ${o.text}`)
+      .join(' ')
+  }
+
+  // The pain row a press would submit, and the bound that keeps it whole: `painOptions` allows three
+  // options of 300 characters, and the row carries every one of them complete, exactly as the notice does.
+  function painRow(options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>): { a: string; answerMax: number } {
+    const optionsText = optionLines(options)
+    const a = optionsText === '' ? 'ask the operator' : `ask the operator; options: ${optionsText}`
+    return { a, answerMax: a.length }
+  }
+
   // A pain signal (spec §3.4): notice, bell and the pain file a launcher may name. It never resumes the run by
-  // itself. Options (a turn-end pain) are listed in the notice, the bell and the pain file, numbered; a credential
-  // request is its own plain-text line after them. No band buttons on OMP.
+  // itself. Options (a turn-end pain) are listed in the notice, the bell and the pain file, numbered, recommended
+  // first, each with its complete validated instruction text; a credential request is its own plain-text line
+  // after them. No band buttons on OMP.
   async function pain(id: string, reason: string, detail: string, options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>, credential?: string): Promise<void> {
     const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
-    const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), recommended: o.recommended })).sort((a, b) => Number(b.recommended) - Number(a.recommended))
+    const optionsText = optionLines(options)
     const plain = credential === undefined ? undefined : oneLine(credential, Number.MAX_SAFE_INTEGER)
-    const numbered = shown.length === 0 ? text
-      : `${text} · options: ${shown.map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''}`).join(' ')}`
+    const numbered = optionsText === '' ? text : `${text} · options: ${optionsText}`
     const listed = plain === undefined ? numbered : `${numbered} · in plain text: ${plain}`
     io.notify(listed)
     const bell = live.get(id)?.bell
@@ -347,27 +401,34 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     await log(`pain session=${id} ${listed}`)
   }
 
-  // One side turn, one retry (spec §4), both inside one deadline. No ephemeral turn lets the event pass.
-  async function judge<T>(kind: 'turn-end' | 'ask', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
-    const deadline = Date.now() + judgeBudgetMs
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const left = deadline - Date.now()
-      if (attempt > 0 && left < MIN_ATTEMPT_MS) break
-      let text: string | undefined
-      const ms = Math.max(left, MIN_ATTEMPT_MS)
-      try { text = await within(io.ephemeral(prompt, ms), ms) } catch (err) {
-        await log(`fork failed attempt=${attempt + 1} ${String(err)}`)
-        continue
-      }
-      if (text === undefined) return { skip: true }
-      if (text.trim() === '') { await log(`fork reply empty attempt=${attempt + 1}`); continue }
-      await log(`fork ${kind} session=${io.sessionId()}`)
-      const v = parse(text)
-      if (v !== undefined) return { v }
-      await log(`fork reply did not parse attempt=${attempt + 1}`)
-    }
-    return { fail: 'the fork failed twice, or its reply did not parse' }
-  }
+  // The bounded decision services (Task 4). Built once; absent (undefined) whenever this session is
+  // not an enrolled assignment, so a consumer treats the native route as unavailable. It is exposed
+  // for Tasks 5–7 to call; nothing here activates a consumer or the old classifier.
+  const decisionIO: DecisionIO | undefined = enrolled ? {
+    capture: () => {
+      const host = io.captureHost?.()
+      if (host === undefined) throw new Error('no captured host context')
+      return host
+    },
+    authority,
+    placement: async (input, signal) => {
+      signal.throwIfAborted()
+      const raw = input !== null && typeof input === 'object' && 'cwd' in input ? input.cwd : undefined
+      const dir = typeof raw === 'string' && raw.trim() !== '' ? bashCwd(raw, io.cwd, home()) : io.cwd
+      if (dir === undefined) throw new Error('the input cwd is not a folder the decision route can read')
+      return placementFacts(dir)
+    },
+    policy: lease => parsePolicyBundle(lease.policyText),
+    appendLine: (path, line) => io.appendLine(path, line),
+    ledgerPath,
+    // Manual/failure integration: publish the operator-facing failure state; never authorize action.
+    fail: async (sessionId, reason) => {
+      const rec = live.get(sessionId)
+      if (rec !== undefined) await save(sessionId, fallToManual(rec, 'decision not recorded'))
+      await pain(sessionId, 'decision failure', reason)
+    },
+  } : undefined
+  if (decisionIO !== undefined) io.decisions = decisionIO
 
   async function writeDefaultPolicy(): Promise<void> {
     const path = expandHome(cfg.policyPath, home())
@@ -412,6 +473,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     const stageNow = safeSessionId(id) ? parseStage(await io.readText(stagePath(home(), id))) : undefined
     const lines = [
       `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
+      ...(enrolled ? [`authority: ${authority.signal.aborted ? 'suspended; fresh trusted launch required' : authorityState}`] : []),
       `scope: ${rec.scope.length === 0 ? 'none named (what the session has read)' : rec.scope.join(', ')}`,
       `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
       `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
@@ -429,6 +491,15 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // session_start: the default policy (never overwritten), the live mode for launchers, and any config problem.
   async function onSessionStart(): Promise<void> {
+    if (enrolled) {
+      try {
+        authorityLease = authority.lease(io.sessionId(), placementFacts(io.cwd))
+        authorityState = 'eligible pinned assignment (decision activation separate)'
+      } catch {
+        authorityState = 'suspended; fresh trusted launch required'
+        io.notify(`autonomic authority: ${authorityState}`)
+      }
+    }
     await load()
     await writeDefaultPolicy()
     try { publish((await modeOf()).mode) } catch (err) { await log(`session_start mode error ${String(err)}`) }
@@ -437,8 +508,9 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // In-file navigation/compaction abandons branch facts, never the operator's mode or scope.
   function onContextRebuild(): void {
+    abortFrames()
+    suspendAuthority()
     const id = io.sessionId()
-    digests.delete(id)
     changed.delete(id)
     pendingScope.delete(id)
     announced.delete(id)
@@ -477,76 +549,237 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (pendingScope.delete(id)) announced.add(id)
   }
 
+  // The display text of an operator-owned ask. Never used to judge or answer: `snapshotAsk` names a
+  // well-formed batch, and a malformed or free-text one keeps a generic label (the dialog is on screen).
+  function askLabel(input: unknown): string {
+    try { return snapshotAsk(input).questions[0]!.question } catch {}
+    const args = input !== null && typeof input === 'object' ? (input as { questions?: unknown; question?: unknown }) : {}
+    const first = Array.isArray(args.questions) ? args.questions[0] : undefined
+    if (first !== null && typeof first === 'object' && typeof (first as { question?: unknown }).question === 'string') return (first as { question: string }).question
+    return typeof args.question === 'string' && args.question.trim() !== '' ? args.question : 'a question'
+  }
+
   // An ask that reaches the operator is on the record as well as on the screen (Review Focus 5).
   async function askPain(id: string, question: string, why: string): Promise<void> {
     await record(id, 'pain', question, 'ask the operator', why)
     await pain(id, 'question for you', `${question} (${why})`)
   }
 
-  // The ask reflex (spec §3.2): answer from the policy and scope, or let the operator see the question and ring.
+  // The ask reflex (spec §3.2): an enrolled session answers from a complete grounded native batch;
+  // any other autopilot session leaves the whole ask with the operator (R3 — no conversational
+  // classifier remains, and no ask is answered without a decision service).
   async function askReflex(input: unknown): Promise<{ block: true; reason: string } | undefined> {
-    const questions = questionsOf(input)
-    if ((await modeOf()).mode !== 'autopilot' || questions.length === 0) return undefined
-    const id = io.sessionId()
-    // A question with no options takes free text: only the operator can answer it.
-    if (questions.some(q => !Array.isArray(q.options) || q.options.length === 0)) {
-      await askPain(id, questions[0]?.question ?? 'a question', 'free text')
-      return undefined
-    }
-    const j = await judge('ask', askPrompt(questions, (await policyText()) ?? '', digestOf(id)), t => parseAsk(t, questions))
-    if ('v' in j && j.v.covered) {
-      const { answers, reason } = j.v
-      const time = new Date().toISOString()
-      const lines = questions.map(q => ledgerLine({ time, session: id, kase: 'ask', q: q.question, a: answers[q.question] ?? '', why: reason }))
-      if (!(await recordAll(id, lines))) return undefined
-      const noteText = `autonomic answered in the operator's place, from the autopilot policy and scope: ${reason}`
-      note(id, toolEntry('ask', input, { text: `autonomic answered: ${JSON.stringify(answers)}` }))
-      return { block: true, reason: `autonomic answered: ${JSON.stringify(answers)} — ${noteText}` }
-    }
-    const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
-    await askPain(id, questions[0]?.question ?? 'a question', why)
+    if ((await modeOf()).mode !== 'autopilot') return undefined
+    if (io.decisions !== undefined) return answerAsk(input)
+    // The dialog is already on screen; this records the operator-owned ask and rings.
+    await askPain(io.sessionId(), askLabel(input), 'no decision service is enrolled')
     return undefined
   }
 
+  // The native ask consumer (Plan Task 6 §8 Step 4): snapshot the whole batch, plan the exact-ID
+  // independent questions, judge once, assemble only a complete grounded batch, record every
+  // question's decision, and only then block the original ask with the single exact answer block.
+  // Any exception, missing bridge/authority/route/acceptance, unplannable batch or ledger failure
+  // leaves the entire original ask visible (with the existing ask-pain path) and never injects a
+  // fake or partial answer.
+  async function answerAsk(input: unknown): Promise<{ block: true; reason: string } | undefined> {
+    const decisions = io.decisions
+    if (decisions === undefined) return undefined
+    const id = io.sessionId()
+    let snapshot
+    try { snapshot = snapshotAsk(input) } catch (err) {
+      await log(`ask snapshot rejected ${String(err)}`)
+      await askPain(id, askLabel(input), 'a malformed ask batch')
+      return undefined
+    }
+    // Never judge a batch in part: if redaction would hide any string the frozen batch carries (a
+    // question text, option label, description or header), the whole ask stays with the operator.
+    // The same shape as the permission path; the reason/pain layers apply their own redaction, so
+    // no secret byte is echoed.
+    if (holdsSecret(snapshot)) {
+      await askPain(id, snapshot.questions[0]!.question, 'the batch holds content that redaction would hide')
+      return undefined
+    }
+    // The cancellation generation this frame belongs to, bound where the frame starts:
+    // `abortFrames()` aborts and replaces the controller, so reading it here is what ties the
+    // frame's work to the session it was captured for (shutdown, switch, rebuild, mode fall).
+    const signal = frameAbort.signal
+    try {
+      const frame = await captureFrame(decisions, lastEntryMs, 'ask', input, signal)
+      const plan = planAsk(snapshot, frame)
+      const result = await judgeNative(frame, plan.request)
+      const answer = assembleAsk(plan, result, frame)
+      if (answer === undefined) {
+        await askPain(id, plan.snapshot.questions[0]!.question, 'the batch is not completely covered by approved evidence')
+        return undefined
+      }
+      const draft: DecisionDraft = { outcome: 'answered', grantIds: answer.grantIds, evidenceIds: answer.evidenceIds,
+        answers: result.judgment.answers as DecisionDraft['answers'], route: result.route, response: result.judgment,
+        payloadSource: { kind: 'candidate', id: null }, reason: answer.reason }
+      await commitDecision(decisions, frame, draft,
+        plan.snapshot.questions.map(q => ({ kase: 'ask' as const, q: q.question, a: answer.answers[q.question]! })))
+      frame.budget.check()
+      if (!frame.lease.fresh()) return undefined
+      return { block: true, reason: `autonomic answered: ${JSON.stringify(answer.answers)} — ${answer.reason}` }
+    } catch (err) {
+      await log(`ask decision error ${String(err)}`)
+      // A frame cancelled with its session writes nothing late: the pain row would be attributed
+      // to a dialog the session no longer owns.
+      if (signal.aborted) return undefined
+      await askPain(id, snapshot.questions[0]?.question ?? 'a question', 'the native ask decision is unavailable')
+      return undefined
+    }
+  }
+
+  // The one independent choice question of Step 4: statement and criteria exactly as planned.
+  const PERMISSION_QUESTIONS = { permission: {
+    type: 'choice' as const,
+    instructions: 'Within the supplied positive task grants and bounded effects, is this routine operation covered? Never expand authority.',
+    criteria: { allow: 'All effects are within supplied approved task evidence; no operator gate or red line applies.',
+      ask: 'Task coverage is unclear or operator handling is required.' },
+  } }
+
   // The never-approve floor (planner decision 7): in autopilot a match blocks the bash call and rings. A session that
   // left autopilot through a failure (ledger, record, policy) keeps the floor: under yolo, manual means no asks at all.
-  // `cwd` is the bash call's own folder (omp's bash tool takes one); the command is judged where it will run.
-  async function floor(command: string, from?: { tool?: 'bash' | 'github'; cwd?: unknown }): Promise<{ block: true; reason: string } | undefined> {
+  // `cwd` is the bash call's own folder (omp's bash tool takes one); the command is judged where it will run. Task 5
+  // adds one branch: a matched call whose effects are fully bounded by positive authority is decided (and recorded)
+  // through the native judgment route, and only then does the original tool proceed.
+  async function floor(command: string, from?: { tool?: 'bash' | 'github'; cwd?: unknown; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
     if (!namesDanger(command, cfg.readers)) return undefined
     const tool = from?.tool ?? 'bash'
     // From here every failure keeps the call blocked: an unneeded block costs one operator decision, a missed one a force push.
-    let rules: ReturnType<typeof neverRules>
+    let findings: Finding[]
     try {
       const m = await modeOf()
       if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
       const raw = typeof from?.cwd === 'string' && from.cwd.trim() !== '' ? from.cwd : undefined
       const dir = raw === undefined ? io.cwd : bashCwd(raw, io.cwd, home())
       if (dir === undefined) throw new Error(`cwd ${raw} is not a folder the floor can read`)
-      rules = enforced(neverRules(command, await where(dir), cfg.readers), cfg.neverApprove)
+      findings = floorFindings(command, await where(dir), cfg.readers).findings.filter(f => cfg.neverApprove.includes(f.rule))
     } catch (err) {
       await log(`floor error ${String(err)}`)
       return { block: true, reason: 'autonomic: the never-approve check failed; this call stays with the operator' }
     }
-    if (rules.length === 0) return undefined
+    if (findings.length === 0) return undefined
+    const rules = [...new Set(findings.map(f => f.rule))]
+    // An enrolled session owns a decision service; without one the call keeps the plain operator block.
+    const decisions = io.decisions
+    if (decisions !== undefined) {
+      const signal = frameAbort.signal
+      try {
+        return await decisionFor(decisions, { tool, command, input: from?.input, findings }, signal)
+      } catch (err) {
+        await log(`permission decision error ${String(err)}`)
+        // A frame cancelled with its session neither writes nor releases: the call still stays with
+        // the operator, but no row is attributed to a session that has moved on.
+        if (signal.aborted) return { block: true, reason: 'autonomic: the decision frame was cancelled with the session; this call stays with the operator' }
+        // The decision route failed, so this call stays with the operator — and it is recorded and
+        // rings exactly as the plain never-approve path does, rather than blocking in silence.
+        await ringDecline(tool, command, [...new Set(findings.map(f => f.rule))], 'the decision route failed')
+        return { block: true, reason: 'autonomic: decision unavailable or stale; this call stays with the operator' }
+      }
+    }
+    return signalOperator(tool, command, rules)
+  }
+  // The operator-visible outcome for a call this route will not release: the human ledger row plus
+  // the pain signal a launcher watching AUTONOMIC_PAIN_PATH sees. Every decline goes through here —
+  // the plain never-approve path, the operator block of an incomplete effect bound, the native
+  // judgment's own `ask`, and the decision route's failure — so a stopped force push is never a
+  // silent block. `why` is the deciding reason, omitted where the reason is the rules themselves.
+  async function ringDecline(tool: 'bash' | 'github', command: string, rules: readonly string[], why?: string): Promise<void> {
     try {
       const id = io.sessionId()
-      await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}`)
+      await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}${why === undefined ? '' : ` (${why})`}`)
       await pain(id, 'never-approve', painFocus(rules, command))
-      note(id, toolEntry(tool, { command }, { deny: `never-approve: ${rules.join(', ')}` }))
     } catch (err) {
       await log(`floor signal error ${String(err)}`)
     }
+  }
+  // The plain never-approve operator path, unchanged (Plan Task 5 §7 Step 4).
+  async function signalOperator(tool: 'bash' | 'github', command: string, rules: readonly string[]): Promise<{ block: true; reason: string }> {
+    await ringDecline(tool, command, rules)
     return { block: true, reason: `autonomic: never-approve — ${rules.join(', ')}; the operator decides` }
   }
 
+  /**
+   * The Step 4 intercepted path: capture the whole original input, bound its effects, and either
+   * decide it deterministically/through one native judgment and record it before returning the
+   * host's nonblocking result, or keep it with the operator. Every failure returns an explicit
+   * block; a catch returning undefined here would release a yolo-blocked call.
+   */
+  async function decisionFor(io2: DecisionIO, call: { tool: 'bash' | 'github'; command: string; input: unknown; findings: Finding[] }, signal: AbortSignal): Promise<{ block: true; reason: string } | undefined> {
+    const { tool, command } = call
+    const captured = call.input !== undefined ? call.input : { command }
+    // Never judge an input in part: if redaction would hide material text, this call stays with the operator.
+    const shown = shownInput(captured)
+    if (redact(shown) !== shown) return operatorBlock(tool, command, call.findings, 'the input holds content that redaction would hide')
+    const frame = await captureFrame(io2, lastEntryMs, 'permission', captured, signal)
+    const ctx: OperationContext = { inputSha256: frame.inputSha256, facts: frame.facts, snapshot: frame.lease.snapshot,
+      approved: frame.policy.approved.permissions as ApprovedPermission[], evidence: frame.lease.evidence,
+      commands: frame.policy.approved.commands as ApprovedCommand[] }
+    const facts = operationFacts(tool, captured, ctx, cfg.readers ?? DEFAULT_READERS)
+    const merged: Finding[] = [...new Map([...facts.findings, ...call.findings].map(f => [`${f.rule}|${f.level}|${f.focus}`, f])).values()]
+    const eligibility = permissionEligibility({ ...facts, findings: merged }, ctx)
+    if (eligibility.kind === 'ask') return operatorBlock(tool, command, merged, eligibility.reason)
+    let decision: 'allow' | 'ask'
+    let draft: DecisionDraft
+    if (eligibility.kind === 'covered') {
+      decision = eligibility.decision
+      draft = { outcome: decision, grantIds: eligibility.grantIds, evidenceIds: eligibility.evidenceIds, answers: {},
+        route: null, response: null, payloadSource: { kind: 'deterministic', id: null }, reason: eligibility.reason }
+    } else {
+      const result = await judgeNative(frame, { state: nativeState(frame, facts), questions: PERMISSION_QUESTIONS })
+      const answer = (result.judgment.answers as Record<string, unknown>).permission
+      const choice = acceptedChoice(answer as never, frame.policy.acceptance.permission)
+      decision = choice === 'allow' ? 'allow' : 'ask'
+      draft = { outcome: decision, grantIds: eligibility.grantIds, evidenceIds: eligibility.evidenceIds,
+        answers: { permission: answer as never }, route: result.route, response: result.judgment,
+        payloadSource: { kind: 'candidate', id: null },
+        reason: decision === 'allow'
+          ? `native judgment and the matched grants ${eligibility.grantIds.join(', ')} agree within their evidence`
+          : 'native judgment did not accept the call as covered' }
+    }
+    if (decision !== 'allow') {
+      // A native `ask` is an operator-owned stop like any other: it is recorded and rings, so a
+      // declined force-push attempt is visible to a launcher watching the pain file.
+      await ringDecline(tool, command, [...new Set(merged.map(f => f.rule))], 'the native judgment declined the call')
+      return { block: true, reason: 'autonomic: the operator decides' }
+    }
+    await commitDecision(io2, frame, draft, [{ kase: 'permission', q: `${tool}: ${shape(command)}`, a: 'allow original call' }])
+    frame.budget.check()
+    if (!frame.lease.fresh()) throw new Error('stale permission')
+    return undefined // nonblocking result only; normal host executes the original tool once
+  }
+
+  // The operator-visible outcome for a call the decision route will not release: the same
+  // never-approve record/pain plus the deciding reason.
+  async function operatorBlock(tool: 'bash' | 'github', command: string, findings: readonly Finding[], reason: string): Promise<{ block: true; reason: string }> {
+    const rules = [...new Set(findings.map(f => f.rule))]
+    await ringDecline(tool, command, rules, reason)
+    return { block: true, reason: `autonomic: never-approve — ${rules.join(', ')}; the operator decides` }
+  }
+
+  // The bounded native state: sanitized full input, authority identity and the normalized facts.
+  function nativeState(frame: DecisionFrame, facts: ReturnType<typeof operationFacts>) {
+    return { tool: facts.tool, cwd: facts.cwd, inputSha256: frame.inputSha256, inputShape: frame.inputShape,
+      assignmentId: frame.lease.snapshot.assignmentId, generation: frame.lease.snapshot.generation,
+      authoritySha256: frame.lease.binding.sha256, policySha256: frame.lease.policyDigest,
+      effects: facts.effects.map(e => ({ operation: e.operation, argv: e.argv, cwd: e.cwd,
+        force: e.force, deletion: e.deletion, noVerify: e.noVerify, merge: e.merge, trailer: e.trailer,
+        targets: e.targets, unresolved: e.unresolved })),
+      findings: facts.findings.map(f => ({ rule: f.rule, level: f.level })) }
+  }
+
   async function onToolCall(e: { toolName?: string; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
+    // The one monotonic decision window starts at the first line, before load/mode/authority awaits.
+    lastEntryMs = performance.now()
     await load()
     if (e?.toolName === 'ask') {
       try { return await askReflex(e.input) } catch (err) { await log(`ask reflex error ${String(err)}`); return undefined }
     }
     if (e?.toolName === 'bash') {
       const input = e.input as { command?: unknown; cwd?: unknown } | undefined
-      return typeof input?.command === 'string' ? floor(input.command, { cwd: input.cwd }) : undefined
+      return typeof input?.command === 'string' ? floor(input.command, { cwd: input.cwd, input: e.input }) : undefined
     }
     // omp's own push tool: github pr_push with forceWithLease is a force push of the branch the call names (default: HEAD).
     if (e?.toolName === 'github') {
@@ -554,24 +787,120 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       if (input?.op !== 'pr_push' || (input.forceWithLease !== true && input.forceWithLease !== 'true')) return undefined
       // Never the raw name in a command line: only a plain ref name is passed on.
       const ref = typeof input.branch === 'string' && /^[\w./-]+$/.test(input.branch) ? input.branch : 'HEAD'
-      return floor(`git push --force-with-lease origin ${ref}`, { tool: 'github' })
+      return floor(`git push --force-with-lease origin ${ref}`, { tool: 'github', input: e.input })
     }
     return undefined
   }
 
-  // tool_result: the turn digest, and whether this turn changed anything (the loop guard's progress).
+  // tool_result: whether this turn changed anything (the loop guard's progress).
   async function onToolResult(e: { toolName?: string; input?: unknown; isError?: boolean; content?: unknown }): Promise<void> {
     try {
       const id = io.sessionId()
       const name = String(e?.toolName ?? '')
-      note(id, toolEntry(name, e.input, { text: textOf(e.content), ...(e.isError === true ? { isError: true as const } : {}) }))
       if (e.isError !== true && changedBy(name, e.input)) changed.add(id)
     } catch {}
+  }
+
+  // The one classification question (Plan Task 7 §9 Step 3): exactly five labels, judged once
+  // against the bounded state, with the operator-owned acceptance rule. Never a joint planner.
+  const TURN_QUESTIONS = { turn_end: {
+    type: 'choice' as const,
+    instructions: 'Classify this bounded turn end without granting authority or inventing payloads.',
+    criteria: {
+      covered: 'An already-decided routine choice can continue within supplied task authority.',
+      stalled: 'An approved remaining step exists and work stopped without a valid wait or operator gate.',
+      waiting: 'Real armed work or verified Molt handoff requires no continuation.',
+      done: 'Approved objective completion is evidenced; no acceptance or release approval is implied.',
+      pain: 'Operator decision, missing evidence/authority, credentials, approval gate or other unsafe ambiguity.',
+    },
+  } }
+
+  // The hosted turn-end consumer (Plan Task 7 §9 Steps 3–5): freeze the bounded state, classify once
+  // through the native bridge, render an exact candidate or one isolated generation, validate the
+  // payload against the approved records, record both rows, re-check time and freshness, and only
+  // then move the loop and return the continuation. Any shortfall leaves the operator the stop.
+  async function decideTurnEnd(id: string, answer: string, n: number, turn: { changed: boolean; stage: string | null; handoff: boolean }): Promise<{ decision: 'block'; reason: string } | undefined> {
+    const decisions = io.decisions
+    if (decisions === undefined) return undefined
+    let frame: DecisionFrame | undefined
+    const signal = frameAbort.signal
+    try {
+      frame = await captureFrame(decisions, lastEntryMs, 'turn-end', { lastReply: answer.slice(-cfg.tailChars) }, signal)
+      const state = turnEvidence(frame, answer.slice(-cfg.tailChars),
+        { pushes: n, changed: turn.changed, loopMax: cfg.loopMax }, { stage: turn.stage, handoff: turn.handoff })
+      // Every string the state would send native or generation must survive redaction unchanged.
+      if (stateHoldsSecret(state)) return void (await turnPain(id, 'turn end', 'the turn state holds content that redaction would hide'))
+      const result = await judgeNative(frame, { state: state as unknown as Readonly<Record<string, unknown>>, questions: TURN_QUESTIONS })
+      const accepted = acceptedChoice((result.judgment.answers as Record<string, unknown>).turn_end as never, frame.policy.acceptance['turn-end'])
+      if (accepted === undefined) return void (await turnPain(id, 'turn end', 'the native classification was not accepted'))
+      const rendered = await payloadForTurn(frame, accepted as TurnCase, state)
+      if (rendered === undefined) return void (await turnPain(id, 'turn end', `no grounded ${accepted} payload could be validated`))
+      const verdict = rendered.verdict
+      await commitTurn(frame, rendered, id, verdict)
+      frame.budget.check()
+      if (!frame.lease.fresh()) {
+        pushes.delete(id)
+        await turnPain(id, 'turn end', 'authority changed before the turn could continue')
+        return undefined
+      }
+      return applyTurn(id, n, verdict)
+    } catch (err) {
+      await log(`turn-end decision error ${String(err)}`)
+      if (frame !== undefined) {
+        try { frame.budget.cancel() } catch {}
+      }
+      pushes.delete(id)
+      // A frame cancelled with its session writes nothing late: the turn end belongs to a session
+      // that has ended, switched or rebuilt.
+      if (signal.aborted) return undefined
+      await turnPain(id, 'turn end', 'the native turn-end decision is unavailable')
+      return undefined
+    }
+  }
+
+  // The operator-facing escalation for a turn end that could not be groundedly decided.
+  async function turnPain(id: string, q: string, why: string): Promise<void> {
+    await record(id, 'pain', q, 'ask the operator', why)
+    await pain(id, 'pain', why)
+  }
+
+  // Both records, then the loop/progress move. `waiting` uses the existing `operator` human case with
+  // the exact planned text and the JSONL outcome `waiting`; nothing outside this branch continues.
+  async function commitTurn(frame: DecisionFrame, rendered: { verdict: TurnVerdict; source: DecisionDraft['payloadSource'] }, id: string, verdict: TurnVerdict): Promise<void> {
+    const decisions = io.decisions!
+    const draft: DecisionDraft = { outcome: verdict.case === 'covered' || verdict.case === 'stalled' ? 'continue'
+        : verdict.case === 'waiting' ? 'waiting' : verdict.case === 'done' ? 'done' : 'pain',
+      grantIds: frame.policy.approved.remainingSteps.filter(s => s.text === (verdict.answer ?? verdict.next_step)).flatMap(s => s.grantIds),
+      evidenceIds: frame.lease.evidence.filter(e => verdict.reason.includes(e.ref.id)).map(e => e.ref.id),
+      answers: {}, route: null, response: null, payloadSource: rendered.source, reason: verdict.reason }
+    const rows = verdict.case === 'waiting'
+      ? [{ kase: 'operator' as const, q: 'turn end', a: 'waiting; no continuation' }]
+      : [verdict.case === 'pain'
+        // A pain row carries the complete validated option content, exactly as the notice and pain file
+        // do, so its own row bound is the content's own length rather than the default clamp.
+        ? { kase: 'pain' as const, q: verdict.question ?? 'turn end', ...painRow(verdict.options) }
+        : { kase: verdict.case, q: verdict.question ?? 'turn end', a: verdict.answer ?? verdict.next_step ?? 'stop' }]
+    await commitDecision(decisions, frame, draft, rows)
+    void id
+  }
+
+  // The loop/progress move and the continuation text, only after both records landed.
+  function applyTurn(id: string, n: number, verdict: TurnVerdict): { decision: 'block'; reason: string } | undefined {
+    if (verdict.case === 'covered' || verdict.case === 'stalled') {
+      const a = (verdict.answer ?? verdict.next_step ?? '').replace(/[.!]\s*$/, '')
+      pushes.set(id, n + 1)
+      return { decision: 'block', reason: verdict.case === 'covered' ? `Autopilot: ${a}. Proceed.` : `Autopilot: continue — ${a}.` }
+    }
+    pushes.delete(id)
+    if (verdict.case === 'done') io.notify(`autopilot: done — ${oneLine(verdict.reason, 160)}`)
+    if (verdict.case === 'pain') void pain(id, 'pain', verdict.question ?? verdict.reason, verdict.options, verdict.credential)
+    return undefined
   }
 
   // session_stop: the turn-end reflex (spec §3.1). Yield to molt first, then the loop guard, then classify.
   async function onSessionStop(e: { last_assistant_message?: unknown; session_id?: unknown }): Promise<{ decision: 'block'; reason: string } | undefined> {
     try {
+      lastEntryMs = performance.now()   // the one monotonic window starts here, before any await
       await load()
       const id = io.sessionId()
       // omp runs the handlers in extension order and molt's has already cleared the session when it molted: the event is
@@ -587,20 +916,23 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
       const answer = typeof m === 'string' ? m : m !== null && typeof m === 'object' ? textOf((m as { content?: unknown }).content) : ''
       // The turn end is molt's at its handoff command: molt's stage file when it exists, else the yieldAtPercent
       // fill fallback (molt absent). The live fill is checked against the file's effective command too, so hook
-      // order cannot hide a handoff that is due.
+      // order cannot hide a handoff that is due. Molt outranks the decision route (Plan Task 7 §9 Step 3).
       const stageText = safeSessionId(id) ? await io.readText(stagePath(home(), id)) : undefined
       const stage = parseStage(stageText)
       const at = stage === undefined ? cfg.yieldAtPercent : stage === 'off' ? undefined : parseStageCommand(stageText)
       const fill = at === undefined ? undefined : io.usage()
       const statusPath = (io.env.MOLT_STATUS_PATH ?? '').trim()
       const status = statusPath === '' ? undefined : await io.readText(statusPath)
-      if (hasMoltMarker(answer) || statusYields(status) || stageYields(stage) || (fill !== undefined && at !== undefined && fill >= at)) {
+      const handoff = hasMoltMarker(answer) || statusYields(status) || stageYields(stage) || (fill !== undefined && at !== undefined && fill >= at)
+      if (handoff) {
         pushes.delete(id)
         changed.delete(id)
         await record(id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end')
         return undefined
       }
-      const n = changed.has(id) ? 0 : (pushes.get(id) ?? 0)
+      // The loop guard is deterministic and outranks classification (Plan Task 7 §9 Step 3).
+      const changedNow = changed.has(id)
+      const n = changedNow ? 0 : (pushes.get(id) ?? 0)
       changed.delete(id)
       if (n >= cfg.loopMax) {
         pushes.delete(id)
@@ -608,33 +940,12 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
         await pain(id, 'autopilot loop', `${n} turn ends pushed on with no change made`)
         return undefined
       }
-      const j = await judge('turn-end', turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText()) ?? ''), parseTurn)
-      if ('skip' in j) return undefined
-      if ('fail' in j) {
-        pushes.delete(id)
-        await record(id, 'pain', 'turn end', 'ask the operator', j.fail)
-        await pain(id, 'fork failed', j.fail)
-        return undefined
-      }
-      const v = j.v
-      if (v.case === 'covered' || v.case === 'stalled') {
-        const a = v.case === 'covered' ? (v.answer ?? '') : (v.next_step ?? '')
-        if (!(await record(id, v.case, v.question ?? 'turn end', a, v.reason))) return undefined
-        pushes.set(id, n + 1)
-        const bare = a.replace(/[.!]\s*$/, '')
-        return { decision: 'block', reason: v.case === 'covered' ? `Autopilot: ${bare}. Proceed.` : `Autopilot: continue — ${bare}.` }
-      }
-      pushes.delete(id)
-      if (v.case === 'waiting') return undefined
-      if (v.case === 'done') {
-        await record(id, 'done', 'turn end', 'stop', v.reason)
-        io.notify(`autopilot: done — ${oneLine(v.reason, 160)}`)
-        return undefined
-      }
-      const asked = v.credential === undefined ? v.question ?? 'turn end' : `${v.question ?? 'turn end'} · in plain text: ${v.credential}`
-      await record(id, 'pain', asked, 'ask the operator', v.reason)
-      await pain(id, 'pain', v.question ?? v.reason, v.options, v.credential)
-      return undefined
+      // No decision service means no classification, no generation and no continuation: the turn end
+      // is operator-owned (R3). There is no conversational fallback left.
+      if (io.decisions === undefined) return undefined
+      // The state the classifier judges carries the facts this handler just measured — the change
+      // mark and the live molt stage — never a hardcoded false/no-stage pair.
+      return await decideTurnEnd(id, answer, n, { changed: changedNow, stage: stage ?? null, handoff })
     } catch (err) {
       await log(`session_stop error ${String(err)}`)
       return undefined
@@ -650,6 +961,7 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
     if (c.kind === 'status') return statusReport(id)
     const prev = await modeOf()
     if (c.kind === 'off') {
+      suspendAuthority()
       pendingScope.delete(id)
       const off = await save(id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
       pushes.delete(id)
@@ -678,16 +990,33 @@ export function createAutonomic(io: AutonomicIO, judgeBudgetMs: number = JUDGE_B
 
   // Claude's composer/bridge prompt reset: OMP notices have no persistent pain band to dismiss.
   function onInput(e: { source?: string }): void {
+    if (enrolled && authorityLease && !authorityLease.fresh()) suspendAuthority()
     if (e.source !== 'extension') pushes.delete(io.sessionId())
   }
 
-  return { onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { authority, decisions: decisionIO, abortFrames, entryMs: () => lastEntryMs, onSessionBeforeSwitch, onSessionSwitch, onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
 function ioFor(pi: any, cur: () => any): AutonomicIO {
+  // Bind the live entry context ONCE: judge/generate are captured against that exact object, so a
+  // later mutable cur() cannot attribute a result to a different context (never evaluate after await).
+  const captureHost = (): ConsumerHost => {
+    const c = cur()
+    return {
+      sessionId: c?.sessionManager?.getSessionId?.() ?? '',
+      cwd: typeof c?.cwd === 'string' ? c.cwd : '',
+      sessionFile: c?.sessionManager?.getSessionFile?.(),
+      judge: typeof c?.judge === 'function' ? c.judge.bind(c) : undefined,
+      generate: typeof c?.runEphemeralTurn === 'function' ? c.runEphemeralTurn.bind(c) : undefined,
+      asyncJobs: () => (typeof c?.getAsyncJobSnapshot === 'function' ? c.getAsyncJobSnapshot() : null) as ReturnType<ConsumerHost['asyncJobs']>,
+    }
+  }
   return {
     pid: process.pid,
+    launchCwd: process.cwd(),
+    captureHost,
+    sessionFile: () => cur()?.sessionManager?.getSessionFile?.(),
     remove: path => { rmSync(path, { force: true }) },
     writeMode: (path, mode) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, mode) },
     rename: (from, to) => { renameSync(from, to) },
@@ -708,12 +1037,6 @@ function ioFor(pi: any, cur: () => any): AutonomicIO {
         resolve({ exitCode: err === null ? 0 : typeof code === 'number' ? code : 1, stdout: String(stdout ?? '') })
       })
     }),
-    ephemeral: async (prompt, timeoutMs) => {
-      const run = cur().runEphemeralTurn
-      if (typeof run !== 'function') return undefined
-      const r = await run.call(cur(), { promptText: prompt, tools: false, signal: AbortSignal.timeout(timeoutMs) })
-      return typeof r?.replyText === 'string' ? r.replyText : ''
-    },
     usage: () => { const p = cur().getContextUsage?.()?.percent; return typeof p === 'number' && Number.isFinite(p) ? p : undefined },
     systemPrompt: () => { try { return blocksOf(cur().getSystemPrompt?.()) } catch { return undefined } },
     notify: text => { cur().ui?.notify?.(text, 'warning') },
@@ -746,7 +1069,8 @@ export default function (pi: any) {
   pi.on('session_start', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
   pi.on('session_tree', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
   pi.on('session_compact', (_e: any, c: any) => main(c) ? autonomic.onContextRebuild() : undefined)
-  pi.on('session_switch', (_e: any, c: any) => main(c) ? autonomic.onSessionStart() : undefined)
+  pi.on('session_before_switch', (_e: unknown, c: unknown) => main(c) ? autonomic.onSessionBeforeSwitch() : undefined)
+  pi.on('session_switch', (_e: unknown, c: unknown) => main(c) ? autonomic.onSessionSwitch() : undefined)
   pi.on('input', (e: any, c: any) => main(c) ? autonomic.onInput(e) : undefined)
   pi.on('agent_start', (_e: any, c: any) => main(c) ? autonomic.onAgentStart() : undefined)
   pi.on('before_agent_start', (e: any, c: any) => main(c) ? autonomic.onBeforeAgentStart(e) : undefined)

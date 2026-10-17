@@ -1,5 +1,6 @@
 // omp-seat's logic: where the three extensions are installed, and the omp command line for a role.
 import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { semver } from 'bun'
 import { join } from 'node:path'
 import { installPaths } from './bin-path'
@@ -103,6 +104,25 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     }
   }
   return { argv: [...argv, ...o.args], warnings: [], extensions }
+}
+
+// CLI/file boundary only: plugins never import each other's implementation.
+export function authorityPreflight(o: { env: Readonly<Record<string, string | undefined>>; workerRoots: readonly string[]; autonomicRoot: string }): { ok: true } | { error: string } {
+  const names = ['AUTONOMIC_AUTHORITY_PATH', 'AUTONOMIC_AUTHORITY_SHA256', 'AUTONOMIC_ASSIGNMENT_ID', 'AUTONOMIC_ASSIGNMENT_GENERATION', 'AUTONOMIC_LAUNCH_ID']
+  const present = names.filter(name => o.env[name] !== undefined).length
+  if (present === 0) return { ok: true } // Legacy/manual launch is not positive authority.
+  if (present !== names.length) return { error: 'omp-seat: partial authority binding; fresh trusted launch required' }
+  const cli = join(o.autonomicRoot, 'bin', 'authority.ts')
+  if (!existsSync(cli)) return { error: 'omp-seat: installed Autonomic has no authority validator' }
+  const r = spawnSync('bun', [cli, 'validate-launch', ...o.workerRoots.flatMap(root => ['--worker-root', root])], {
+    env: o.env, encoding: 'utf8', timeout: 10_000, maxBuffer: 64000,
+  })
+  if (r.error || r.status !== 0) return { error: 'omp-seat: invalid or unavailable trusted authority; fresh trusted launch required' }
+  try {
+    const value: unknown = JSON.parse(r.stdout)
+    if (value === null || typeof value !== 'object' || !('valid' in value) || value.valid !== true) throw new Error('invalid validator receipt')
+  } catch { return { error: 'omp-seat: invalid authority validation receipt' } }
+  return { ok: true }
 }
 
 export function testedVersion(pkgJson: string): string {

@@ -10,8 +10,124 @@ session stop only for a reason on a closed **pain list**, and tells the operator
 Every decision it takes in the operator's place is one line in a committed **ledger**. It fails
 toward manual: anything broken gives more asks, never fewer.
 
-autonomic reads no crew or multiplexer state. It reads five environment variables a launcher may
-set, and two files `molt` writes.
+The legacy adapter reads launcher mode variables and Molt files; OMP's opt-in trusted-assignment contract below has additional startup/provenance inputs. Neither route reads crew or multiplexer state.
+
+## OMP trusted assignment authority (unreleased)
+
+This delivers the issuer/reader/launch contract, **not activation of native decision consumers**. A bound OMP factory validates eligibility but stays manual until the complete native consumer integration ships; it never uses the old conversational reflex as an enrolled fallback. No live grant, host capability, calibration or deployment is supplied. Unbound legacy OMP and Claude Code keep their existing behavior. Claude Code Jev integration is deferred to #832; OMP-only work does not close #831's cross-host criterion.
+
+### Dispatcher CLI and independent provenance
+
+Only the operator, or a dispatcher with recorded bounded operator delegation, selects the trusted input/source paths outside every worker allowance. A worker must never invoke issuance or supply a new path/hash as enrollment. Commands use the known installed Autonomic path:
+
+```text
+bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root <trusted-root> --worker-root <assignment-worktree> --worker-root <each-additional-root>
+bun <autonomic-root>/bin/authority.ts validate-launch --worker-root <assignment-worktree> --worker-root <each-additional-root>
+```
+
+Repeat `--worker-root`; unknown flags and duplicate scalar flags fail. `issue` prints one JSON `{path,sha256,assignmentId,generation,launchId}` binding, not shell text. `validate-launch` reads startup variables, checks actual local Git placement and emits a positive validation receipt or exits 2 before the worker runs. Include the entire launch allowance: assignment worktree, all `SEAT_MODS_ALLOW` entries (coordinator `.worktrees` included), report/scratch/handoff roots and writable output locations. The snapshot, its parent, input and provenance/evidence/policy sources must be outside them in either ancestry direction. Free roles do not waive this check or create sandbox isolation.
+
+For a new enrolled launch, export every declared report/scratch/handoff/other writable root in the startup `SEAT_MODS_ALLOW`, **also for free roles**, in addition to any coordinator `.worktrees` roots. Alternatively the corresponding exported report/output path variables contribute their parent directories; `SCRATCH_DIR` contributes its directory. This is the trusted launch envelope captured by both CLI and factory, not a later model-supplied list. Issuer `--worker-root` arguments and the envelope must describe the same complete allowance. A path mentioned only in a mutable brief is not a usable launch-envelope input; reconcile it before issuance. The legacy marking examples are unchanged.
+
+Trusted input is exactly `{snapshot,material,approval,delegation}`. Each material is `{ref:{id,source,sha256,locator},text}`; `source` is the independently selected absolute canonical source file, and the full bounded UTF-8 text must match its coherent bytes and digest. Approval is an external JSON event: `{version:1,kind:'operator-approval',id,operatorId,snapshotSha256,delegationSha256,assignments:[{assignmentId,briefSha256}]}`. Its locator equals its event ID. Direct issuance requires matching operator ID and null delegation; delegated issuance supplies a separately materialized operator parent Snapshot with the event's exact delegation digest, explicit assignment/brief membership and finite resource narrowing. An event/path/hash claimed by a worker is not an operator event.
+
+Construction order is acyclic: **materialize task/brief/policy evidence → serialize Snapshot → record the external operator event hashing those snapshot bytes → create the independently selected issuance input**. Snapshot string approval IDs identify the event but no snapshot EvidenceRef/policy/brief may hash the approval event or reference its source/input. The CLI rejects that circular provenance rather than seeking a hash fixed point. Operator source selection is an external trust prerequisite, not something JSON or file permissions can prove.
+
+Each launch is a fresh exclusive directory under the authority root. The issuer writes/fsyncs complete sibling files, atomically renames the snapshot and returns its binding. It preserves original input path/digest/file identity in `provenance.json`; referenced excerpts live in `evidence/<sha256>` and policy bytes in `policy/<policy-sha256>.json`. Original event/input/source records must remain readable and unchanged. The Markdown policy is never rewritten. Replacement/removal/revocation is invalidation, not an in-process grant update.
+
+### Version-1 snapshot and reader API
+
+`hooks/authority.ts` exports the exact schema/types and `parseSnapshot`, `narrows`, `captureLaunchBinding`; `omp/authority-store.ts` exports `canonicalTarget`, `readCoherent`, `PinnedAuthority`, `MoltTransition` and local `placementFacts`. Snapshot is one object, at most 64,000 UTF-8 bytes, with these required fields:
+
+| Field | Closed shape |
+|---|---|
+| identity | `version:1`, nonempty `assignmentId`, positive safe-integer `generation` |
+| issuer | `{kind:'operator'\|'delegated-dispatcher',id,approvalRef,delegationRef:string\|null}` |
+| seat | `{id,host:'omp',role:'implementer'\|'verifier'\|'reviewer'\|'coordinator'\|'orchestrator',launchId}` |
+| placement | `{repository,worktree,branch}` — canonical absolute paths and exact full ref |
+| task | `{briefSha256,scopeRefs:EvidenceRef[],instructionRefs:EvidenceRef[]}`; brief bytes resolve to pinned task evidence |
+| policy | `{id,sha256,approvalRef}`; materialized companion bytes, not standing-mode authority |
+| grants | `{id,operation,resource,authorityRefs:string[]}[]`; empty authorizes nothing |
+| lifetime | `{issuedAt,expiresAt:string\|null,revoked:false}`; calendar-valid UTC RFC3339, issued no later than now, future expiry |
+
+Unknown/duplicate keys, conflicting/duplicate IDs, malformed hashes, nonfinite/unsafe numbers, wildcards, ambiguous refs/paths, invalid UTF-8 and unresolved approvals fail. Repeated evidence IDs across scope/instruction lists must have identical definitions. Resources are finite `paths {repository,roots}`, `commit {repository,branch,paths}`, `push {repository,remote,sourceRef,destinationRef}`, or `pr {repository,headRef,number}`. Create uses null PR number; update requires a positive safe integer.
+
+Operations are `worktree.read/build/test/lint/edit`, `git.commit`, `git.push-own-branch`, `pr.create-own`, `pr.update-own`, `task-output.write`. Paths/refs/repository must narrow the approved task/delegation. Commit/push/PR operations are excluded for reviewer/verifier roles; reviewers also cannot edit the worktree. Seat-mods still owns all its denials independently. No delete/merge/force/no-verify/trailer grant exists. Operator merge acknowledgment, design/spec/plan/release gates, product choices, credentials and Molt handoff cannot be supplied by a role, standing mode, plan approval, confidence or a model. Actual operation/command facts and protected/default-ref checks remain mandatory at the consumer boundary; a lease is not permission to execute an arbitrary command.
+
+`PinnedAuthority(binding,workerRoots)` captures one launch and role. `lease(sessionId,facts)` returns frozen snapshot/evidence/policy, file identity, session/epoch and `fresh()`. Read before decisions, after asynchronous work, and immediately before action; final `fresh()` must have no subsequent model await. Local Git rechecks are synchronous bounded subprocesses; consumers must check their remaining transaction deadline again after these calls before acting. `signal` aborts outstanding work on invalidation. `invalidate()` permanently rejects; `suspend()` cancels and advances the epoch. File reads use no-follow regular-file descriptors, bounded coherent bytes and full dev/inode/size/nanosecond mtime/ctime comparisons. Same-byte replacement, symlinks, revoked/expired state, missing/changed source/policy/evidence, branch/placement drift and generation mismatch reject; they never select newer authority.
+
+### Startup and assignment lifecycle
+
+Copy the trusted binding into `AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`, `AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` **before** `omp-seat` starts. All five are captured once; partial/invalid bindings refuse launch. Editing env/report/task prose in a running seat cannot enroll it. Every materially new assignment ends the old process and launches fresh, even in a retained pane. Same-assignment corrections stay within unchanged pinned approvals/grants/lifetime; replacing those bytes requires fresh issuance/launch. Completion/revocation invalidates the predecessor.
+
+The factory exposes its captured `authority` service from `createAutonomic` for later DecisionIO integration, never a worker-reconstructed lease. Main-only before-switch, switch/resume, context rebuild/rewind, shutdown and explicit mode-off cancel eligibility. `/autopilot on`, lineage and predecessor mode records cannot restore it. `revalidateMolt(MoltTransition,facts)` keeps the planned before/after interface, but the inspected public host exposes no proof of Molt's private pending ownership. Therefore in-place Molt **remains suspended and requires fresh trusted launch**, even with plausible lineage/stage bytes; parent-handback children end their unit. Already-running tops/workers must finish/handoff then launch fresh, not hot-enroll or assume restart installs a missing host API.
+
+This is an ordinary same-UID/shared-process guard contract, not a sandbox: hostile same-UID processes, free seats and arbitrary in-process extensions are not isolated. Recheck-to-execution is not an atomic filesystem/ref lock; changes observed before action abort, but an external change immediately after the final check is not transactionally prevented.
+
+### The bounded decision transaction (unreleased, Tasks 5–7 consumers)
+
+`omp/judgment.ts` and `omp/decision-ledger.ts` hold the shared transaction the three native consumers call. This section documents the contract; no consumer is activated by it. An absent policy, bridge or authority **disables** the route (operator handling), never the old conversational classifier.
+
+**One monotonic window.** All phases share one deadline **25 seconds from handler entry**, captured at the first line of the handler before any await. Capture is ≤2 s; one native judgment is ≤12 s from entry and at most 10 s; generation is ≤22 s and at most 10 s; the final validation/record/recheck is ≤25 s. Earlier completion can advance work but never extends a cutoff, and no phase creates a fresh 25-second window. A phase whose allowance is exhausted aborts.
+
+**Result validation and units.** `validateAnswers` rejects before any confidence is read: answer/question ID sets must match exactly, the answer type must match the question, choice labels and distribution keys must equal `criteria` exactly, every probability and confidence is finite in [0,1], the distribution sums to 1 within `PROBABILITY_SUM_TOLERANCE = 1e-6`, and the reported choice is a **unique** maximum. `noul` is **P(yes)**, not a boolean. Cache counts are safe integers with `0 ≤ cachedQuestions ≤ questions`, equal to the frozen question count. A selected native API kind must be one of `typesafe`/`openrouter-decisions` (the SDK union), and the selected API/provider/model tuple plus its `calibrationRef` must appear, with matching evidence, in the effective policy. `PROBABILITY_SUM_TOLERANCE` is serialization roundoff only, **never** an action threshold.
+
+**Operator-owned acceptance.** `acceptedChoice` and `acceptedNoul` apply rules the operator supplies in the effective policy. There is no default probability, confidence or rollout cutoff. An overlapping `noul` rule (`minYes + minNo ≤ 1`) is invalid configuration; where the regions overlap, the answer is `undefined` (abstain). Acceptance is a configured decision, never authority.
+
+**The effective policy.** `PolicyBundle` is a version-1 file whose exact bytes are pinned by the snapshot's policy digest. It is an OMP-only companion to the Markdown policy, not a rewrite of it; ordinary repository prose never becomes a bundle. A missing, malformed or unapproved bundle disables the route.
+
+**Two-write attribution.** `commitDecision` writes both `<resolved-ledger>.decisions.jsonl` (a version-1 `DecisionRecord`; audit output, **never** authority) and the human ledger row, each under a `lease.fresh()` check, with `budget.check()` after each write and a final `lease.fresh()` after the last. Every string field is redacted with the existing `redact`, and command/input values use the existing `shape`/`inputShape`. The human row's `why` carries `decisionId=<id>; <reason>`, with room reserved for the full ID before `oneLine` truncation. A partial sidecar or human record is an **intent, never execution proof**. A required-write failure or timeout publishes manual/failure (via the captured `io.fail`) and releases nothing. Native `result.usage` is not billed again; Claude Code's token-only rows are unchanged. The caller must still do `budget.check()` plus a synchronous `lease.fresh()` immediately before its action or return; anything changed while logging means abstain.
+
+**Lifecycle.** A mode change, authority invalidation, navigation/compact, shutdown or Molt transition aborts outstanding frames, so a late completion cannot mutate a successor's state or attribute a result to it. The factory exposes the captured service as `createAutonomic(...).decisions` for the consumers; when absent, the native route is unavailable.
+
+### Exact-ID, all-question structured asks (unreleased, Task 6)
+
+`omp/asks.ts` turns an OMP ask into one frozen, byte-exact batch and answers it only when the **whole** batch is grounded in approved evidence. Anything short of that returns the entire original ask to the operator — never a partial answer, never a per-question average, never generated prose for free text or a label. The shared `parseAsk`/`Question` seam and Claude Code's answer map are untouched.
+
+**Snapshot and identity.** `snapshotAsk(input)` copies the whole input as JSON before any asynchronous work, so later mutation cannot change the frozen batch or its fingerprint. It validates every question (text, ID, option label/description, `header`, `multi`, `recommended`). A **malformed batch is rejected outright** rather than silently shortened to the questions that happened to parse — the old normalizer dropped IDs/descriptions and filtered bad entries; this route does neither. Every label byte is retained; duplicate label bytes, duplicate supplied or derived IDs, duplicate question text (the key of the existing consumer answer map), an empty/missing option list, and a `multi` label carrying a comma or edge whitespace (which the shared `", "`-joined representation could not read back) all keep the ask with the operator.
+
+**The exact question/label mapping.** SDK question IDs, not labels:
+
+| Purpose | SDK question ID | Type |
+|---|---|---|
+| Original identity | actual nonempty host `id`; a legacy no-ID input derives `legacy:<full-input-sha256>:<zero-based-ordinal>` | — |
+| Coverage per question | `cover:${encodeURIComponent(q.id)}` | `noul` — P(yes) that this whole question is already covered by approved evidence without an operator gate |
+| Single-select candidate | `select:${encodeURIComponent(q.id)}` | `choice`, criteria keyed by the internal ordinal option IDs `o0`, `o1`, … |
+| Multi membership per option | `member:${encodeURIComponent(q.id)}:${option.id}` | `noul` — P(yes) that this exact option belongs to the decided complete set; **every** option gets a question |
+
+Option IDs are request-local ordinals, never label text. Labels sent back to the consumer are the **original label bytes**, in stable input order, joined with `", "` for a multi-select (the existing representation; a comma-bearing multi label therefore stays with the operator).
+
+**Independent questions over one frozen state.** Every question is answered against the same frozen state and its own input/evidence; none references another's answer ("if coverage is yes", "use the preceding selection"). Coverage, selection and membership are separate, and all must later validate. `recommended` is read as a position only and creates no grant; descriptions, `header` and `multi` grant nothing.
+
+**Planning is gated by approved evidence, never by inference.** `planAsk` requires, per question, exactly one approved question for the frozen **fingerprint** (the content digest — text, `header`, `multi`, `recommended` and every option's ordinal/label/description — deliberately **not** the identity, so a legacy digest-derived ID stays authorizable), live grant references in the current lease, at least one approved evidence reference that resolves, and a complete `membership` map for a multi question (and none for a single-select). An approved option the ask does not carry, an unknown constraint reference, a missing map or an inline operator gate makes the whole ask unplannable. Missing complete evidence or routine-versus-gate uncertainty returns the whole ask to the operator; the model is never asked to infer that permission probably existed.
+
+**Assembly accepts a whole batch or nothing.** `assembleAsk` validates the SDK result first, then for **each** question: every coverage answer must be an accepted `yes` under `ask.coverage`; every single selection must pass its own `ask.selection` rule **and** be specifically supported by that question's evidence; every multi membership must resolve under its own `ask.membership` rule and equal the pinned complete membership map (an unresolved verdict is a failure, never read as "no"). A mismatch is rejected rather than averaged. Constraints are deterministic over the assembled set: `requires` `(a,b)` means `!selected.has(a) || selected.has(b)`, `excludes` means `!(selected.has(a) && selected.has(b))`. An empty multi set, a member outside the approved supported options, an uncovered option, a missing/extra native ID or a malformed answer fails the whole batch. The reason cites the real approved evidence (`ref.id@ref.locator`) this batch used and no assumed prose; an answer whose approved evidence resolves only in the pinned bundle (not the lease) leaves no citable reason and stands down.
+
+**Records before the answer.** Every question gets one `ask` ledger row and the sidecar records the native IDs/probabilities, matched grants/evidence and route, before the single exact-answer block. A ledger failure leaves the real ask visible with **no partial answer injection**.
+
+**Operator gates are bundle-level.** Policy parsing rejects **any** approved question whose `operatorGate` is not `none`; a bundle carrying one is unavailable, so **both** the ask and the permission consumers treat it as absent — the conservative direction (an unanswered gate is never auto-answered). The gate matrix (spec/design/plan/release approval, merge acknowledgment, unresolved product choice, credential location/value, Molt handoff) stays operator-owned even under favourable probabilities and otherwise valid unrelated grants.
+
+**Secret-like content abstains.** Before any frame capture, state build or native call, if redaction would change **any** string the frozen batch carries (a question text, option label, description or header), the whole ask stays with the operator — the same shape as the permission path's `redact(shown) !== shown` abstain — with the pain reason's own redaction applied, so no secret byte reaches state, the block reason, the ledger, a notice or the pain file.
+
+**Abstention and failure.** A malformed batch, an unplannable batch, a missing bridge/authority/native route, a failed or stale transaction, or any exception uses the existing ask-pain path and returns no block: the entire original dialog stays displayed. No generative side turn answers free text or produces a label. Only an enrolled session takes this route; an unenrolled autopilot ask is operator-owned — it passes and rings — because the legacy conversational classifier is removed.
+
+### Non-acting replay evaluator (unreleased, Task 8)
+
+`omp/replay.ts` scores a **frozen** decision corpus without acting: it calls no model, issues no authority and executes no original tool. Labels precede any decision generation, and a decision row is observed provenance, never a claim this module makes. It is proven by `omp/tests/autonomic-routing.test.ts`; a CLI form exists for a real corpus but is **EXPECTED/future only**, because operator-frozen labels (E5) do not exist yet.
+
+**Validation before use.** Every case/label/decision row is checked against its closed key set and JSON compatibility (no undefined, non-finite, sparse or cyclic value) before any helper reads it. `ReplayManifest` requires exact keys, `version: 1`, lowercase SHA-256 digests, exact Git source IDs and a non-empty operator approval reference; unknown keys and conflicting rows fail validation. A digest is **byte binding, not operator authority**.
+
+**Binding.** Every label and decision binds its row's ID, `inputSha256` **and** the whole-case `caseSha256`. A verified authority requires a non-null snapshot, all three per-case digests and `snapshot.policy.sha256 === policySha256`. An orphan ID rejects; a missing label blocks the evaluation; a missing decision becomes an explicit `invalid`/`operator` row **in the original population** — never dropped and never reclassified as success.
+
+**Deduplication is deliberately strict.** All raw rows are indexed first, so conflicting duplicates fail before anything can coalesce. Only an exact repeat (same ID, population, identified source event and **all** frozen context) coalesces; a differing source context, a reused ID, an alias ID for one event, or a source event appearing in both populations rejects the evaluation rather than choosing a favourable row. Context variants for one event cannot inflate the denominator.
+
+**Gates.** The full original historical population is the denominator, with raw (pre-coalescing) and unique counts and unknown/invalid rows disclosed separately. A flagged row that released, answered or continued is unsafe **regardless of what its expected label says**; contradictory flags/labels fail the gate even with no action. `safetyGate` requires no metadata errors, no unsafe negative-control actions and no false allows — and `safetyGate: false` is a **gate failure, not a warning to ignore**. `targetMet` (`fullPopulationRate >= 0.8`) is only #831's measured target: never an acceptance threshold, never a grant, and never able to override `safetyGate`. `knownCost` is USD when known and `null` when unknown, never fabricated as zero, with wrapper-retry cost uncertainty preserved.
+
+### Integrated verification and gated rollout (unreleased, Task 8)
+
+`omp/tests/autonomic-routing.test.ts` drives the **real** seat-mods, Molt and Autonomic factories into one ordered test host — each loaded from its own module, so no product plugin imports another — and dispatches in host first-block order with a no-side-effect original-tool receipt. It parameterizes every guarded role against the common denial operations plus verifier/reviewer commit/push/PR creation and placement/root-removal refusals, and proves a free coordinator/orchestrator without a positive grant still asks on an intercepted Autonomic operation.
+
+`autonomic/docs/omp-jev-rollout.md` is the cutover runbook: required E3–E6 inputs and their validation rules (each marked **not supplied**), capability-versus-version verification, the replay safety gates and disclosed unknowns, non-acting observation before reviewed class/assignment activation, and rollback as explicit deployment to the prior supported release/backend with truthful source attribution — never a per-request chat fallback claiming Jev. **No version is bumped and no activation is claimed**; #831 stays open with cross-host parity deferred under #832.
 
 ## Turning it on
 
@@ -472,8 +588,39 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
 - OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call, writes
   a `permission` ledger line and raises a pain signal. The floor reads `bash` (the command, judged in the call's own `cwd`) and `github` `pr_push`
   with `forceWithLease`; `eval`, `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
-- There is no band: a turn-end pain lists its options, numbered, in the notice, the bell and the pain file. The ask judge sees what
-  the session has read, so a scope document answers an ask only after the session has read it.
+- **Grant-bounded decisions (0.7.x, unactivated).** An enrolled session with a decision service now has one extra branch in that floor: a matched
+  call whose *complete literal* effects are bounded by live positive grants is decided by `permissionEligibility` (`hooks/operations.ts`) and
+  recorded, then the original tool runs unchanged and exactly once. It is deterministic when a bounded command's evidence and a matching grant
+  already agree, and otherwise one native judgment inside the matched grants, with the semantic route requiring the judge, the accepted choice and
+  the deterministic grant/fact checks to all agree. Nothing widens what autonomy may do: `executionSegments` parses only the bash grammar it can
+  read (literal wrappers, `cd`, `git -C`, explicit ref/config effects) and marks anything it cannot — expansions, substitutions, interpreters,
+  aliases, functions, config writes — opaque, and an opaque segment never gains authority. A grant never mints authority for an operation it does
+  not cover, a command outside its approved evidence is not enough, and a default or protected destination, force, delete, `--no-verify`, an AI
+  trailer, a merge or any unsupported effect always stays with the operator. This is not universal enforcement: the other OMP tools, and any call
+  the floor never matched, are untouched. It is gated until Tasks 6–8 and both releases.
+- The `github` route's bounded facts read the repository's configured remote URLs locally (read-only `git config`) so a PR/API mutation can resolve
+  its exact repository from the pinned facts; no network call is made while deciding.
+- There is no band: a turn-end pain lists its options, numbered, in the notice, the bell, the pain file and the human ledger row,
+  recommended first, each with its 40-character one-line label and its complete validated instruction text — the row's answer bound is the
+  content's own length, so a valid multi-option pain is never cut (every other ledger row keeps the shared 300-character clamp). The ask
+  judge sees what the session has read, so a scope document answers an ask only after the session has read it.
+- **Five-state turn end with grounded payloads (Task 7, unactivated).** An enrolled session's stop is classified once, natively, with one
+  `turn_end` choice question whose labels are exactly `covered`, `stalled`, `waiting`, `done` and `pain`. The classification is never
+  authority: before it, the stale-event check, the Molt handoff and the loop guard decide as they always did, and after it the payload must
+  survive `validateTurnPayload` (`omp/turn-end.ts`). `covered` and `stalled` may only repeat an approved remaining step or an approved
+  candidate — byte for byte, with its grants and evidence still live — so a model can render prose and never extend an action. `waiting`
+  needs a real running host job or the verified Molt fact (prose saying “waiting” is not evidence), `done` needs approved completion
+  evidence, and `pain` grounds its question, options and credential-location request in cited evidence. Every reason is the cited rendering
+  `evidenceId: excerpt[start..end]` joined by `; `, so no invented policy line reaches the ledger. No approved action means no payload —
+  the stop escalates instead.
+- **One isolated generation, never a classifier.** With no prebuilt candidate, one `runEphemeralTurn` at `{tools:false, isolated:true,
+  dedupeReply:false}` renders the required fields inside the frozen, redacted state (Task 2's explicit isolation, not `history:[]`). A
+  provider/native failure never calls it, and it never supplies a step the policy does not approve. Native classification and the render
+  stay separately accounted.
+- **The conversational OMP classifier is gone.** The old `judge('ask'|'turn-end')` two-attempt fork, its `MIN_ATTEMPT_MS`, `io.ephemeral`,
+  `questionsOf` and the OMP turn digest are removed: an autopilot ask or turn end with no decision service is now operator-owned (the ask
+  passes and rings; the stop passes with no continuation and no ledger row) rather than answered by chat. The shared Claude Code prompts,
+  parsers and `$.model.fork` are untouched.
 - A process that dies without `session_shutdown` (SIGKILL, crash, shutdown budget) leaves `mode/<pid>`; nothing sweeps these files; a reused pid clears its own at first load, and only children of the dead process could read it.
 - Main limit: if writing the OMP mode file fails AND removing it fails, a stale file can remain. The notice says
   not to let a launcher trust it in this session. A missing file reads manual.

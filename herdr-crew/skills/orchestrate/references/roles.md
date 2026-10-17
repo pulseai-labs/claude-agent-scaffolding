@@ -60,6 +60,8 @@ a failed launch in its report file and stops, rather than working around it.
 
 ## Retention follows artifacts
 
+**Enrolled OMP override:** retention preserves a pane/artifact lineage, not permission to hot-enroll its running agent. A materially new task ends the process and takes fresh trusted issuance/launch. A correction or re-check may reuse only the same assignment and unchanged approval/grants/lifetime. All role profiles remain ceilings, never grants; operator-owned merge/design/plan gates and seat-mods denials win. Completion/revocation invalidates old authority. Generic switch or an in-place Molt without independently distinguishable public ownership evidence remains suspended and needs fresh trusted launch; parent-handback children end their unit. The legacy/Claude Code retention paragraphs below are unchanged.
+
 The session that built the PR fixes the PR, and an implementer is retained across
 consecutive work items. herdr has no ownership transfer: retain a seat by keeping its
 pane and sending it the next task's brief (`herdr-mechanics.md` says how). At each task

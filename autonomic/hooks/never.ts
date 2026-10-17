@@ -832,6 +832,24 @@ function verbOpaque(ws: readonly string[]): boolean {
 }
 const isGit = (ws: readonly string[]) => ws.some(w => isVerb(w, 'git') || /^git-/.test(base(w)))
 const READ_CONFIG = /^(?:--(?:get|get-all|get-regexp|get-urlmatch|get-color|get-colorbool|list|show-origin|show-scope|name-only|null|includes|type=\w+|global|local|system|worktree)|-[lz]+)$/
+// A git global `-c NAME=VALUE` or `--config-env=NAME=ENVVAR` runs the command with configuration
+// the model chose: core.hooksPath, core.pager, aliases and every other key. That configuration is
+// a fact this segment cannot establish — a released push then executes bytes a pinned fact never
+// named — so the segment is opaque, the same rule a config write already gets. Only the
+// global-option position counts: past the subcommand word a `-c` belongs to the subcommand
+// (`git commit -c <commit>` reuses a message) and injects nothing.
+function injectsConfig(words: readonly string[]): boolean {
+  const at = words.findIndex(w => isVerb(w, 'git'))
+  if (at < 0) return false
+  for (let i = at + 1; i < words.length; i++) {
+    const w = words[i]!
+    if (w === '-C' || w === '--git-dir' || w === '--work-tree' || w === '--namespace' || w === '--exec-path') { i++; continue }
+    if (w === '-c' || /^-c./.test(w) || w === '--config-env' || w.startsWith('--config-env=')) return true
+    if (w.startsWith('-')) continue
+    return false
+  }
+  return false
+}
 // Section 1: any git config that is not a plain read (one key, or a --get/--list form) is a write.
 function writesConfig(ws: readonly string[]): boolean {
   const at = ws.findIndex(w => isVerb(w, 'config'))
@@ -848,6 +866,190 @@ function writesConfig(ws: readonly string[]): boolean {
 // command read over all words), and the fork judges with the finding in its prompt.
 export type Finding = { rule: NeverRule; level: 'ask' | 'fork'; focus: string }
 export type Floor = { findings: Finding[] }
+
+// One executable command segment of a call, in order (Plan Task 5 §7 Step 3). `text` is the
+// segment as written; `argv` is the literal argv the shell would pass after quote decoding;
+// `cwd` is where it runs, after any literal cd/git -C; `opaque` marks a segment whose effects
+// cannot be established (never granted authority) — including one whose resolved cwd is not the
+// pinned worktree (root) or a directory within it; `redirects` are its redirection targets.
+export type ExecutionSegment = { text: string; argv: string[]; cwd: string; opaque: boolean; redirects: string[] }
+
+// The mask never.ts uses for hidden characters; a literal one in the raw text is a user byte we
+// must reject, never confound with a decoded quote character.
+const MASKED = /[\uE000-\uF8FF]/
+const unmask = (w: string) => w.replace(/[\uE000-\uF8FF]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xE000))
+// A wrapper's own words, never the wrapped program: the value flags each wrapper's options take.
+// The accepted wrappers are exactly the plan's five (env, nice, ionice, timeout, command): each
+// runs its argument in the same place for the same user, so nothing else is parsed through.
+const WRAP_VALUES: Record<string, ReadonlySet<string>> = {
+  env: new Set(['-u', '--unset', '-C', '--chdir']),
+  nice: new Set(['-n', '--adjustment']),
+  ionice: new Set(['-c', '--class', '-n', '--classdata', '-p', '--pid', '-P', '--pgid', '-u', '--uid']),
+  timeout: new Set(['-s', '--signal', '-k', '--kill-after']),
+}
+const WRAPPERS = new Set([...Object.keys(WRAP_VALUES), 'command'])
+// Every program whose effects this vocabulary can name. An unknown program may run its arguments,
+// so it is opaque rather than silently treated as inert.
+const KNOWN_PROGRAMS = new Set(['git', 'gh', 'rm', 'unlink', 'chmod', 'chown', 'mv', 'cp', 'ln', 'mkdir', 'touch', 'sed', 'tee',
+  'diff', 'cmp', 'sha1sum', 'sha256sum', 'sha512sum', 'md5sum', 'b2sum', 'file', 'du', 'readlink', 'realpath', 'basename', 'dirname',
+  'bun', 'npm', 'npx', 'pnpm', 'yarn', 'cargo', 'go', 'make', 'pytest', 'uv', 'pip', 'tsc', 'eslint', 'prettier', 'ruff', 'vitest', 'jest',
+  ...[...INERT]])
+// The wrapped program's index, after a wrapper's own options and assignments (undefined: no wrapper).
+function wrapNext(name: string, ws: readonly string[], i: number): number | undefined {
+  if (!WRAPPERS.has(name)) return undefined
+  const values = WRAP_VALUES[name] ?? new Set<string>()
+  let k = i + 1
+  while (k < ws.length) {
+    const w = ws[k]!
+    if (w === '--') { k++; break }
+    if (values.has(w)) { k += 2; continue }
+    if (/^[A-Za-z_]\w*=/.test(w)) { k++; continue }
+    if (w.startsWith('-')) { k++; continue }
+    break
+  }
+  // timeout's own operand is the duration, before the program.
+  if (name === 'timeout' && k < ws.length && /^\d+(?:\.\d+)?[smhd]?$/.test(ws[k]!)) k++
+  return k
+}
+// Pure string dot-segment collapsing (`.` and `..`), used for both the relative and the absolute
+// branch. No filesystem access: the comparison path must stay lexical.
+const collapseDots = (parts: readonly string[]): string => {
+  const out: string[] = []
+  for (const p of parts) { if (p === '' && out.length > 0) continue; if (p === '.') continue; if (p === '..') { out.pop(); continue } out.push(p) }
+  return out.join('/') || '/'
+}
+const joinPath = (cwd: string, target: string): string | undefined => {
+  const t = target.replace(/\/+$/, '') || '/'
+  if (t.startsWith('~')) return undefined
+  // The absolute branch collapses dots too, so `/tree/../other` is `/other` and cannot pass a
+  // `startsWith(root + '/')` prefix test while pointing outside the pinned worktree.
+  if (t.startsWith('/')) return collapseDots(t.split('/'))
+  return collapseDots(`${cwd}/${t}`.split('/'))
+}
+// A literal cd target for later segments: undefined means no change, null means unknown.
+function literalCd(bare: string): string | undefined | null {
+  const ws = split(bare)
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0 || (ws[i] !== 'cd' && ws[i] !== 'pushd')) return undefined
+  const t = ws.slice(i + 1).find(w => !w.startsWith('-'))
+  if (t === undefined || t === '-' || hasExpansion(t)) return null
+  return t
+}
+const hasExpansion = (w: string) => /[$*?[{`]/.test(w)
+// A literal `git -C <dir>` value for this command: undefined when absent, null when not literal.
+function gitDir(bare: string): string | undefined | null {
+  const ws = split(bare)
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0 || base(ws[i]!) !== 'git') return undefined
+  for (let k = i + 1; k < ws.length; k++) {
+    if (ws[k] === '-C') return ws[k + 1] === undefined || hasExpansion(ws[k + 1]!) ? null : ws[k + 1]!
+    if (ws[k] === '--') return undefined
+    if (ws[k]!.startsWith('-')) continue
+    return undefined
+  }
+  return undefined
+}
+// A literal `env -C/--chdir <dir>` relocation: undefined when absent, null when not literal.
+function envDir(bare: string): string | undefined | null {
+  const ws = split(bare)
+  const i = ws.findIndex(x => !KEYWORD.has(x))
+  if (i < 0 || base(ws[i]!) !== 'env') return undefined
+  const values = WRAP_VALUES.env ?? new Set<string>()
+  for (let k = i + 1; k < ws.length; k++) {
+    const w = ws[k]!
+    if (w === '--') return undefined
+    if (w === '-C' || w === '--chdir') { const v = ws[k + 1]; return v === undefined || hasExpansion(v) ? null : v }
+    if (w.startsWith('--chdir=')) { const v = w.slice(8); return v === '' || hasExpansion(v) ? null : v }
+    if (/^-C./.test(w)) { const v = w.slice(2); return hasExpansion(v) ? null : v }
+    if (w.startsWith('-') || /^[A-Za-z_]\w*=/.test(w)) { if (values.has(w)) k++; continue }
+    return undefined
+  }
+  return undefined
+}
+// One segment: its literal argv, its cwd, and whether its effects can be established at all.
+function segmentOf(c: Command, cwd: string, unknownCwd: boolean, root: string): ExecutionSegment {
+  const raw = c.text
+  const redirects = targets(c.bare)
+  const hidden = MASKED.test(raw)
+  const masked = maskQuoted(raw.replace(REDIRS, ' '))
+  const words = argv(masked)
+  // A program, flag or redirect position holding an expansion, substitution or glob may be any
+  // word, so the segment's effects cannot be established (never granted authority).
+  const expandable = hidden || /[$`*?[\]{}]/.test(masked)
+  let progAt = -1
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]!
+    if (KEYWORD.has(w) || /^[A-Za-z_]\w*=/.test(w)) continue
+    const next = wrapNext(base(w), words, i)
+    if (next !== undefined) { i = next - 1; continue }
+    progAt = i
+    break
+  }
+  const prog = progAt < 0 ? undefined : words[progAt]!
+  const name = prog === undefined ? undefined : base(prog)
+  const known = name !== undefined && KNOWN_PROGRAMS.has(name)
+  const runner = name !== undefined && (RUNNER.test(name) || name === 'xargs')
+  const defines = /\([ \t]*\)/.test(unquoted(masked)) || /(?:^|[\s;&|(])(?:function|alias)[ \t]/.test(masked)
+  const unsafeSed = name === 'sed' && !safeSed(raw)
+  // The words ahead of the program: a wrapper's own options and any prefix environment assignment.
+  const before = words.slice(0, progAt < 0 ? words.length : progAt)
+  // `env -S`/`--split-string` splits its value into words and runs THEM as the command, so the
+  // words after it are not the argv this segment names and the payload is dropped from argv and
+  // from the native state. Read from `before`, in every form (`-S`, `-S…`, `--split-string[=]`),
+  // because the split program runs code no pinned fact names (the `=` form still leaves a known
+  // program after it, so this check — not the unknown-name rule — is what marks it).
+  const splitString = before.some(w => w === '-S' || /^-S./.test(w) || w === '--split-string' || w.startsWith('--split-string='))
+  // Any environment assignment ahead of the program — a shell prefix or one after `env` — changes
+  // how the program runs in a way no pinned fact names (GIT_SSH_COMMAND, GIT_EXEC_PATH, LD_PRELOAD,
+  // PATH, GH_REPO …), and argv drops it: a bounded effect would be established from a command that
+  // is not the one that runs.
+  const assigns = before.some(w => /^[A-Za-z_]\w*=/.test(w))
+  // A git config write, a global `-c`/`--config-env` injection, or an explicit git dir/work-tree —
+  // and `--exec-path`, which moves the very `git-<subcommand>` git runs — moves the facts out of
+  // the pinned ones.
+  const git = isGit(words)
+  const movesFacts = assigns || (git && (injectsConfig(words) || writesConfig(words) || words.some(w => /^--(?:git-dir|work-tree|exec-path)/.test(w) || /^GIT_(?:DIR|WORK_TREE|CONFIG)/.test(w))))
+  const dirs = gitDir(c.bare)
+  const envC = envDir(c.bare)
+  // A resolved cwd outside the pinned worktree relocates the real command, so the segment's
+  // effects cannot be established against the task's own resources (Plan §7 Step 3): the
+  // resolution to the pinned facts is what decides, not merely that a path resolved.
+  const moves = dirs !== undefined ? dirs : envC
+  const resolved = moves === undefined ? cwd : (moves === null ? null : joinPath(cwd, moves))
+  // A relocation target the module cannot resolve (a literal `~`, whose expansion needs HOME) is
+  // as unknown as a non-literal one: `joinPath` answers undefined for it, so the segment's cwd is
+  // not established and its effects are not either. Reading undefined as a path here threw a
+  // TypeError inside classification, which the floor's catch turned into the generic
+  // "decision unavailable" block instead of this segment's own unresolved fact.
+  const elsewhere = resolved !== null && resolved !== undefined && resolved !== root && !resolved.startsWith(root + '/')
+  const opaque = expandable || unknownCwd || defines || runner || unsafeSed || !known || splitString
+  const cwdFor = resolved ?? cwd
+  return { text: raw.trim(), argv: words.slice(progAt < 0 ? words.length : progAt).map(unmask), cwd: cwdFor,
+    opaque: opaque || resolved === null || resolved === undefined || movesFacts || elsewhere, redirects }
+}
+/**
+ * Every executable command of `command`, in order, with the literal argv each is given, where it
+ * runs and what could not be established. Reuses the floor's own grammar (`commands`, the quote
+ * mask, `targets`, `split`), so a word the floor reads the same way reaches the same segment.
+ * An unknown program, expansion, substitution, interpreter, definition or config write is
+ * `opaque`, and an opaque segment never gains authority.
+ */
+export function executionSegments(command: string, cwd: string, root = cwd): ExecutionSegment[] {
+  const cmds = commands(command)
+  if (cmds === undefined) return [{ text: command.trim(), argv: [], cwd, opaque: true, redirects: [] }]
+  const out: ExecutionSegment[] = []
+  let current = cwd
+  let unknownCwd = false
+  for (const c of cmds) {
+    out.push(segmentOf(c, current, unknownCwd, root))
+    const cd = literalCd(c.bare)
+    if (cd !== undefined) {
+      if (cd === null) unknownCwd = true
+      else { const next = joinPath(current, cd); if (next === undefined) unknownCwd = true; else current = next }
+    }
+  }
+  return out
+}
 
 export function neverRules(command: string, where: Where, readers: Readers = DEFAULT_READERS): NeverRule[] {
   return [...new Set(floorFindings(command, where, readers).findings.map(f => f.rule))]

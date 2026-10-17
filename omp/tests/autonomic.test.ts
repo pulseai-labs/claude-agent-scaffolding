@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from 'bun:test'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import ompExtension, { createAutonomic, questionsOf } from '../../autonomic/omp/extension'
+import ompExtension, { createAutonomic } from '../../autonomic/omp/extension'
 import type { AutonomicIO } from '../../autonomic/omp/extension'
 import { DEFAULT_POLICY } from '../../autonomic/hooks/policy'
 import { modeFilePath, sessionPath, stagePath } from '../../autonomic/hooks/records'
@@ -27,7 +27,6 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     id: 'S1',
     percent: undefined as number | undefined,
     system: undefined as string | string[] | undefined,
-    replies: [...(over.replies ?? [])],
     prompts: [] as string[],
     budgets: [] as number[],
     notes: [] as string[],
@@ -67,13 +66,6 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
       if (a.endsWith('rev-parse --abbrev-ref HEAD')) return { exitCode: 0, stdout: `${g.branch}\n` }
       if (a.endsWith('symbolic-ref --short refs/remotes/origin/HEAD')) return { exitCode: 0, stdout: `${g.originHead}\n` }
       return { exitCode: 1, stdout: '' }
-    },
-    ephemeral: async (prompt, ms) => {
-      w.prompts.push(prompt)
-      w.budgets.push(ms)
-      const r = w.replies.shift()
-      if (r instanceof Error) throw r
-      return r
     },
     usage: () => w.percent,
     systemPrompt: () => w.system,
@@ -130,6 +122,9 @@ describe('OMP live mode file', () => {
       if (reason === 'ledger not writable') io.appendLine = async () => false
       if (reason === 'record not writable') io.writeText = async () => { throw new Error('read-only') }
       if (reason === 'record not writable') await a.onCommand('on')
+      // `ledger not writable` is a real ledger write: the unenrolled floor still records a
+      // permission row, so it exercises the same fall the conversational classifier used to.
+      else if (reason === 'ledger not writable') await a.onToolCall({ toolName: 'bash', input: { command: 'git push --force origin main' } })
       else await a.onSessionStop({ last_assistant_message: 'x' })
       expect(files.get(MODE_FILE)).toBe('manual')
     })
@@ -211,173 +206,44 @@ describe('manual mode', () => {
 })
 
 describe('the ask reflex', () => {
-  test('autopilot: a covered ask is blocked with the answer, and one ledger line is written', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [answered({ 'Which plan?': 'Plan A' })] })
-    const r = await a.onToolCall(ask(Q))
-    expect(r).toEqual({ block: true, reason: expect.stringMatching(/^autonomic answered: \{"Which plan\?":"Plan A"\} — autonomic answered in the operator's place/) })
-    const lines = ledger(w)
-    expect(lines).toHaveLength(1)
-    expect(lines[0]).toContain(' · ask · Q: Which plan? · A: Plan A · why: the plan names Plan A')
-    expect(w.notes).toEqual([])
-    expect(w.prompts[0]).toContain('autonomic question check')
-    expect(w.prompts[0]).toContain('TEST POLICY')
-  })
-
-  test('autopilot: a fork that fails twice (a throw, then an empty reply) passes the ask, raises pain and writes a pain ledger line', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [new Error('boom'), ''] })
+  test('autopilot with no decision service: the whole ask stays with the operator and is on the record', async () => {
+    const { w, a, files } = world({ files: autopilot() })
     expect(await a.onToolCall(ask(Q))).toBeUndefined()
-    expect(w.prompts).toHaveLength(2)
-    expect(w.notes).toHaveLength(1)
-    expect(w.notes[0]).toContain('autopilot: question for you')
-    expect(w.notes[0]).toContain('Which plan?')
-    expect(w.notes[0]).toContain('the fork failed twice')
-    // Review Focus 5: the pass is on the record, not only on the screen.
-    expect(ledger(w).join('\n')).toContain(' · pain · ')
+    expect(w.prompts).toEqual([])
+    expect(w.notes[0]).toContain('question for you')
+    expect(w.notes[0]).toContain('no decision service is enrolled')
+    expect(ledger({ files })[0]).toContain(' · pain · Q: Which plan? · A: ask the operator')
   })
 
-  test('a reply that does not parse twice is the same failure', async () => {
-    const { w, a } = world({ files: autopilot(), replies: ['not json', '{"covered": maybe}'] })
-    expect(await a.onToolCall(ask(Q))).toBeUndefined()
-    expect(w.notes[0]).toContain('the fork failed twice, or its reply did not parse')
-  })
-
-  test('a not-covered verdict passes with pain naming its reason', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [turn({ covered: false, reason: 'tradeoff the scope does not settle' })] })
-    expect(await a.onToolCall(ask(Q))).toBeUndefined()
-    expect(w.notes[0]).toContain('tradeoff the scope does not settle')
-  })
-
-  test('a question with no options is free text: pain, no fork', async () => {
+  test('a question with no options is free text: the operator owns it and it is on the record', async () => {
     const { w, a } = world({ files: autopilot() })
     expect(await a.onToolCall(ask([{ id: 'q', question: 'Which token?' }]))).toBeUndefined()
     expect(w.prompts).toEqual([])
-    expect(w.notes[0]).toContain('(free text)')
-    expect(ledger(w)[0]).toContain(' · pain · Q: Which token? · A: ask the operator · why: free text')
+    expect(w.notes[0]).toContain('Which token?')
+    expect(w.notes[0]).toContain('no decision service is enrolled')
   })
 
-  test('a ledger that cannot be written passes the ask: the decision is not taken', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [answered({ 'Which plan?': 'Plan A' })], failAppend: /ledger/ })
+  test('manual mode passes without a ledger line or a generation', async () => {
+    const { w, a, files } = world()
     expect(await a.onToolCall(ask(Q))).toBeUndefined()
-    expect(w.notes.join('\n')).toContain('ledger is not writable')
-  })
-
-  test('both attempts share one deadline inside the 30 s handler budget', async () => {
-    const { w, a } = world({ files: autopilot(), replies: ['x', 'y'] })
-    await a.onToolCall(ask(Q))
-    expect(w.budgets).toHaveLength(2)
-    expect(w.budgets[0]!).toBeLessThanOrEqual(25_000)
-    expect(w.budgets[1]!).toBeLessThanOrEqual(w.budgets[0]!)
-  })
-
-  test('a hung ephemeral turn (a host that ignores the abort signal) is a failed attempt: the ask passes with pain and a pain ledger line', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [HANG], budgetMs: 1_000 })
-    const t0 = Date.now()
-    expect(await a.onToolCall(ask(Q))).toBeUndefined()
-    expect(Date.now() - t0).toBeLessThan(5_000)  // the deadline, not omp's 30 s
-    expect(w.prompts).toHaveLength(1)
-    expect(w.notes).toHaveLength(1)
-    expect(w.notes[0]).toContain('question for you')
-    expect(w.notes[0]).toContain('the fork failed twice')
-    expect(ledger(w).join('\n')).toContain(' · pain · ')
-  })
-
-  test('a reply inside the deadline is still taken (control for the hung-turn race)', async () => {
-    const { a } = world({ files: autopilot(), replies: [answered({ 'Which plan?': 'Plan A' })], budgetMs: 60 })
-    expect((await a.onToolCall(ask(Q)))?.reason).toContain('autonomic answered')
-  })
-
-  test('a hung turn at the turn end is the same failed attempt: the stop passes with pain', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [HANG], budgetMs: 1_000 })
-    expect(await a.onSessionStop({ last_assistant_message: 'Shall I proceed?' })).toBeUndefined()
-    expect(w.notes.join('\n')).toContain('autopilot:')
-  })
-
-  test('a host with no ephemeral turn has nothing to judge with: the ask passes with pain', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [undefined] })
-    expect(await a.onToolCall(ask(Q))).toBeUndefined()
-    expect(w.notes[0]).toContain('nothing to judge yet')
-  })
-
-  test('questionsOf maps omp\'s ask input: id/question/options/multi, string options, the legacy single form', () => {
-    expect(questionsOf({ questions: [{ id: 'a', question: 'Q1?', header: 'H', options: [{ label: 'x', description: 'd' }, 'y'], multi: true, recommended: 0 }] }))
-      .toEqual([{ question: 'Q1?', header: 'H', options: [{ label: 'x' }, { label: 'y' }], multiSelect: true }])
-    expect(questionsOf({ question: 'Solo?', options: [{ label: 'x' }] })).toEqual([{ question: 'Solo?', options: [{ label: 'x' }] }])
-    expect(questionsOf({ questions: [{ id: 'a' }, null, 'junk'] })).toEqual([])
-    expect(questionsOf(undefined)).toEqual([])
-  })
-
-  test('a multi-select answer is read back as joined labels', async () => {
-    const { a } = world({ files: autopilot(), replies: [answered({ 'Which?': 'Plan A, Plan B' })] })
-    const r = await a.onToolCall(ask([{ id: 'q', question: 'Which?', options: OPTS, multi: true }]))
-    expect(r?.reason).toContain('"Which?":"Plan A, Plan B"')
+    expect(w.notes).toEqual([])
+    expect(files.has(LEDGER)).toBe(false)
   })
 })
 
 describe('the turn-end reflex', () => {
-  test('autopilot: stalled with next step "run the tests" blocks with Autopilot: continue — run the tests.', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [STALLED] })
-    expect(await a.onSessionStop({ last_assistant_message: 'Step 2 is done.' })).toEqual({ decision: 'block', reason: 'Autopilot: continue — run the tests.' })
-    expect(ledger(w)[0]).toContain(' · stalled · ')
-    expect(w.prompts[0]).toContain('autonomic turn-end check')
-    expect(w.prompts[0]).toContain('Step 2 is done.')
+  test('autopilot with no decision service: the stop passes, no continuation, no ledger row', async () => {
+    const { w, a, files } = world({ files: autopilot() })
+    expect(await a.onSessionStop({ last_assistant_message: 'Step complete.' })).toBeUndefined()
+    expect(w.notes).toEqual([])
+    // The ledger path is touched when the session turns autopilot, but no row is written.
+    expect(ledger(w)).toEqual([])
   })
 
-  test('covered blocks with the answer', async () => {
-    const { a } = world({ files: autopilot(), replies: [COVERED] })
-    expect(await a.onSessionStop({ last_assistant_message: 'Shall I proceed?' })).toEqual({ decision: 'block', reason: 'Autopilot: Proceed with the plan. Proceed.' })
-  })
-
-  test('autopilot: pain passes the stop and raises the pain signal with the question and its options', async () => {
-    const reply = turn({ case: 'pain', question: 'Merge to main?', reason: 'one-way door', options: [{ label: 'Merge', text: 'Merge it.', recommended: false }, { label: 'Hold', text: 'Do not merge.', recommended: true }] })
-    const { w, a, files } = world({ files: autopilot(), replies: [reply], env: { AUTONOMIC_PAIN_PATH: '/pain.txt' } })
-    expect(await a.onSessionStop({ last_assistant_message: 'Merge to main?' })).toBeUndefined()
-    expect(w.notes).toHaveLength(1)
-    expect(w.notes[0]).toContain('autopilot: pain — Merge to main?')
-    // The recommended option leads, and the options are listed in the notice and the pain file (no band buttons on OMP).
-    expect(w.notes[0]).toContain('options: 1) Hold (Recommended) 2) Merge')
-    expect(files.get('/pain.txt')).toContain('pain autopilot: pain — Merge to main?')
-    expect(ledger({ files })[0]).toContain(' · pain · Q: Merge to main?')
-  })
-
-  test('a credential request is its own plain-text line', async () => {
-    const reply = turn({ case: 'pain', question: 'Need the key', reason: 'credential', credential: 'paste the deploy key in plain text' })
-    const { w, a } = world({ files: autopilot(), replies: [reply] })
-    await a.onSessionStop({ last_assistant_message: 'Need the key' })
-    expect(w.notes[0]).toContain('in plain text: paste the deploy key in plain text')
-  })
-
-  test('the bell rings with the pain text when the record carries one', async () => {
-    const reply = turn({ case: 'pain', question: 'Merge to main?', reason: 'one-way door' })
-    const { w, a } = world({ files: { [REC()]: JSON.stringify({ mode: 'autopilot', scope: [], source: 'command', bell: 'say hi' }) }, replies: [reply] })
-    await a.onSessionStop({ last_assistant_message: 'Merge to main?' })
-    expect(w.bells).toHaveLength(1)
-    expect(w.bells[0]![0]).toBe('say hi')
-    expect(w.bells[0]![1]).toContain('autopilot: pain')
-  })
-
-  test('waiting and done pass; done writes a ledger line and tells the operator', async () => {
-    const waiting = world({ files: autopilot(), replies: [turn({ case: 'waiting', reason: 'a build is running' })] })
-    expect(await waiting.a.onSessionStop({ last_assistant_message: 'Waiting for CI.' })).toBeUndefined()
-    expect(waiting.w.notes).toEqual([])
-    const done = world({ files: autopilot(), replies: [turn({ case: 'done', reason: 'the plan is complete' })] })
-    expect(await done.a.onSessionStop({ last_assistant_message: 'All done.' })).toBeUndefined()
-    expect(ledger(done.w)[0]).toContain(' · done · ')
-    expect(done.w.notes[0]).toContain('autopilot: done — the plan is complete')
-  })
-
-  test('a fork that fails twice passes the stop with a fork-failed pain and a pain ledger line', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [new Error('x'), new Error('y')] })
-    expect(await a.onSessionStop({ last_assistant_message: 'ok' })).toBeUndefined()
-    expect(w.notes[0]).toContain('autopilot: fork failed')
-    expect(ledger(w)[0]).toContain(' · pain · ')
-  })
-
-  test('the answer comes from a message object too; a missing one is an empty tail', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [turn({ case: 'waiting', reason: 'r' }), turn({ case: 'waiting', reason: 'r' })] })
-    await a.onSessionStop({ last_assistant_message: { content: [{ type: 'text', text: 'FROM-BLOCKS' }] } })
-    await a.onSessionStop({})
-    expect(w.prompts[0]).toContain('FROM-BLOCKS')
-    expect(w.prompts).toHaveLength(2)
+  test('the bounded reply is read from a message object too', async () => {
+    const { w, a } = world({ files: autopilot() })
+    expect(await a.onSessionStop({ last_assistant_message: { content: [{ type: 'text', text: 'FROM-BLOCKS' }] } })).toBeUndefined()
+    expect(ledger(w)).toEqual([])
   })
 })
 
@@ -385,174 +251,50 @@ describe('yielding to molt', () => {
   test('a stage file at command passes without a fork, with a molt ledger line', async () => {
     const { w, a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'command', command: 65 }) }, replies: [STALLED] })
     expect(await a.onSessionStop({ last_assistant_message: 'working' })).toBeUndefined()
-    expect(w.prompts).toEqual([])
     expect(ledger(w)[0]).toContain(' · molt · ')
   })
 
   test('the fallback stage and the block stage yield too', async () => {
     for (const stage of ['block', 'fallback']) {
-      const { w, a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage }) }, replies: [STALLED] })
+      const { w, a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage }) } })
       expect(await a.onSessionStop({ last_assistant_message: 'working' })).toBeUndefined()
-      expect(w.prompts).toEqual([])
+      expect(ledger(w)[0]).toContain(' · molt · ')
     }
   })
 
   test('a below stage does not yield, but a live fill past the file\'s command does', async () => {
     const files = { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'below', command: 50 }) }
-    const low = world({ files, replies: [STALLED] })
+    // Below the file's command the turn end is not molt's: without a decision service it is still
+    // operator-owned, but molt writes no row.
+    const low = world({ files })
     low.w.percent = 49
-    expect((await low.a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
-    const high = world({ files, replies: [STALLED] })
+    expect(await low.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
+    expect(ledger(low.w)).toEqual([])
+    const high = world({ files })
     high.w.percent = 50
     expect(await high.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(high.w.prompts).toEqual([])
+    expect(ledger(high.w)[0]).toContain(' · molt · ')
   })
 
   test('with no stage file, yieldAtPercent (65) is the fallback; a stage of off never yields on fill', async () => {
-    const none = world({ files: autopilot(), replies: [STALLED] })
+    const none = world({ files: autopilot() })
     none.w.percent = 66
     expect(await none.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    const off = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'off' }) }, replies: [STALLED] })
+    expect(ledger(none.w)[0]).toContain(' · molt · ')
+    // A stage of off never yields on fill: no molt row is written.
+    const off = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'off' }) } })
     off.w.percent = 99
-    expect((await off.a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
+    expect(await off.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
+    expect(ledger(off.w)).toEqual([])
   })
 
   test('the handoff marker in the reply and a child\'s handoff status line yield', async () => {
-    const marker = world({ files: autopilot(), replies: [STALLED] })
+    const marker = world({ files: autopilot() })
     expect(await marker.a.onSessionStop({ last_assistant_message: 'done\nMOLT-HANDOFF: /tmp/h.md' })).toBeUndefined()
-    expect(marker.w.prompts).toEqual([])
-    const status = world({ files: { ...autopilot(), '/st.log': '2026-10-13T00:00:00Z handoff required\n' }, env: { MOLT_STATUS_PATH: '/st.log' }, replies: [STALLED] })
+    expect(ledger(marker.w)[0]).toContain(' · molt · ')
+    const status = world({ files: { ...autopilot(), '/st.log': '2026-10-13T00:00:00Z handoff required\n' }, env: { MOLT_STATUS_PATH: '/st.log' } })
     expect(await status.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(status.w.prompts).toEqual([])
-  })
-})
-
-describe('the loop guard', () => {
-  test('a context rebuild restarts the no-change loop count before a covered turn end', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [COVERED, COVERED, COVERED, COVERED] })
-    for (let i = 0; i < 2; i++) expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
-    a.onContextRebuild()
-    expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
-    expect(w.prompts).toHaveLength(3)
-    expect(ledger(w).at(-1)).toContain('covered')
-    expect(w.notes).toEqual([])
-    expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
-    expect(w.notes).toEqual([])
-    expect(await a.onCommand('status')).toContain('pushes in a row with no change: 2 of 3')
-  })
-
-  test('loopMax pushes with no change: the next turn end passes with an autopilot loop pain', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [STALLED, STALLED, STALLED, STALLED] })
-    for (let i = 0; i < 3; i++) expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
-    expect(await a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(w.prompts).toHaveLength(3)
-    expect(w.notes).toHaveLength(1)
-    expect(w.notes[0]).toContain('autopilot: autopilot loop — 3 turn ends pushed on with no change made')
-    expect(ledger(w).at(-1)).toContain('autopilot loop: 3 pushes with no change')
-  })
-
-  test('a change between turn ends resets the count; a read-only turn does not', async () => {
-    const { w, a } = world({ files: autopilot(), replies: Array(8).fill(STALLED) })
-    for (let i = 0; i < 2; i++) await a.onSessionStop({ last_assistant_message: 'x' })
-    await a.onToolResult({ toolName: 'read', input: { path: 'a' }, isError: false })
-    await a.onToolResult({ toolName: 'grep', input: {}, isError: false })
-    await a.onSessionStop({ last_assistant_message: 'x' })
-    expect(await a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(w.notes[0]).toContain('autopilot loop')
-    await a.onToolResult({ toolName: 'edit', input: { path: 'a' }, isError: false })
-    expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
-    expect(w.notes).toHaveLength(1)
-  })
-})
-
-describe('changed tracking', () => {
-  // A stop after one tool result: changed resets the loop count, so three stops in a row stay blocking.
-  async function changes(tool: string, isError = false): Promise<boolean> {
-    const { a } = world({ files: autopilot(), replies: Array(8).fill(STALLED) })
-    for (let i = 0; i < 3; i++) await a.onSessionStop({ last_assistant_message: 'x' })
-    await a.onToolResult({ toolName: tool, input: {}, isError })
-    return (await a.onSessionStop({ last_assistant_message: 'x' }))?.decision === 'block'
-  }
-
-  test('the read-only set does not count as a change', async () => {
-    for (const t of ['read', 'grep', 'glob', 'find', 'ast_grep', 'lsp', 'web_search', 'fetch', 'ls', 'ask', 'todo', 'wait', 'think', 'recall', 'reflect'])
-      expect([t, await changes(t)]).toEqual([t, false])
-  })
-
-  test('every other tool, and an unknown one, counts as a change', async () => {
-    for (const t of ['bash', 'write', 'edit', 'eval', 'task', 'github', 'notebook', 'memory_edit', 'some_new_tool', 'mcp__x__y'])
-      expect([t, await changes(t)]).toEqual([t, true])
-  })
-
-  test('a failed call is not a change', async () => {
-    expect(await changes('bash', true)).toBe(false)
-  })
-
-  // After three pushes with no change, one more stop blocks only if the call in between counted as a change.
-  async function changesBy(...results: Array<{ toolName: string; input: unknown; isError?: boolean }>): Promise<boolean> {
-    const { a } = world({ files: autopilot(), replies: Array(8).fill(STALLED) })
-    for (let i = 0; i < 3; i++) await a.onSessionStop({ last_assistant_message: 'x' })
-    for (const r of results) await a.onToolResult({ isError: false, ...r })
-    return (await a.onSessionStop({ last_assistant_message: 'x' }))?.decision === 'block'
-  }
-  const AST = { toolName: 'ast_edit', input: { ops: [{ pat: 'a', out: 'b' }], paths: ['src/a.ts'] } }
-  const RESOLVE = { toolName: 'write', input: { path: 'xd://resolve', content: 'the preview is right' } }
-  const REJECT = { toolName: 'write', input: { path: 'xd://reject', content: 'wrong files' } }
-
-  test('an ast_edit result is a preview: a change only once it is resolved', async () => {
-    expect(await changesBy(AST)).toBe(false)
-    expect(await changesBy(AST, REJECT)).toBe(false)
-    expect(await changesBy(AST, RESOLVE)).toBe(true)
-    expect(await changesBy(AST, { ...RESOLVE, isError: true })).toBe(false)
-    expect(await changesBy(AST, { toolName: 'resolve', input: { action: 'apply', reason: 'ok' } })).toBe(true)
-    expect(await changesBy(AST, { toolName: 'resolve', input: { action: 'discard', reason: 'no' } })).toBe(false)
-    expect(await changesBy(AST, { toolName: 'reject', input: { reason: 'no' } })).toBe(false)
-    expect(await changesBy({ toolName: 'write', input: { path: 'xd://propose', content: 'my-plan' } })).toBe(false)
-  })
-
-  test('lsp: a rename or rename_file applies by default and is a change; apply:false is a preview; code_actions apply only on apply:true', async () => {
-    const lsp = (input: Record<string, unknown>) => ({ toolName: 'lsp', input })
-    expect(await changesBy(lsp({ action: 'rename', file: 'a.ts', new_name: 'b' }))).toBe(true)
-    expect(await changesBy(lsp({ action: 'rename_file', file: 'a.ts', new_name: 'b.ts' }))).toBe(true)
-    expect(await changesBy(lsp({ action: 'rename', file: 'a.ts', new_name: 'b', apply: false }))).toBe(false)
-    expect(await changesBy(lsp({ action: 'code_actions', file: 'a.ts', query: 'fix', apply: true }))).toBe(true)
-    expect(await changesBy(lsp({ action: 'code_actions', file: 'a.ts' }))).toBe(false)
-    for (const action of ['diagnostics', 'definition', 'references', 'hover', 'symbols', 'reload', 'status'])
-      expect([action, await changesBy(lsp({ action, file: 'a.ts' }))]).toEqual([action, false])
-  })
-})
-
-describe('a session_stop whose session a molt already replaced', () => {
-  // omp runs session_stop handlers in extension order (seat-mods, molt, autonomic); molt's newSession() has already
-  // made the live id the successor's when this handler runs. The event carries its own session_id.
-  test('the event names another session than the live one: no ledger line, no fork, no state change, no block', async () => {
-    const { w, a, files } = world({ files: autopilot('S2'), replies: [STALLED, STALLED] })
-    w.id = 'S2'                       // the successor, as io.sessionId() reads it after molt's newSession()
-    expect(await a.onSessionStop({ session_id: 'S1', last_assistant_message: 'working' } as any)).toBeUndefined()
-    expect(w.prompts).toEqual([])
-    expect(files.has(LEDGER)).toBe(false)
-    expect(w.notes).toEqual([])
-    // no loop-count change: the successor's count is still zero, so its first real stop is judged and blocked
-    expect((await a.onSessionStop({ session_id: 'S2', last_assistant_message: 'working' } as any))?.decision).toBe('block')
-    expect(w.prompts).toHaveLength(1)
-  })
-
-  test('a stale stop leaves the successor\'s change mark and its judge budget alone', async () => {
-    const { w, a } = world({ files: autopilot('S2'), replies: Array(8).fill(STALLED) })
-    w.id = 'S2'
-    for (let i = 0; i < 3; i++) await a.onSessionStop({ session_id: 'S2', last_assistant_message: 'x' })
-    await a.onToolResult({ toolName: 'write', input: { path: 'a' }, isError: false })
-    expect(await a.onSessionStop({ session_id: 'S1', last_assistant_message: 'x' } as any)).toBeUndefined()
-    expect(w.prompts).toHaveLength(3)
-    // the successor's `changed` mark is still there: this stop resets its count to zero, not to three
-    expect((await a.onSessionStop({ session_id: 'S2', last_assistant_message: 'x' }))?.decision).toBe('block')
-    expect(w.notes).toEqual([])
-  })
-
-  test('the event\'s own session: handled as before', async () => {
-    const { w, a } = world({ files: autopilot(), replies: [STALLED] })
-    expect((await a.onSessionStop({ session_id: 'S1', last_assistant_message: 'x' }))?.decision).toBe('block')
-    expect(w.prompts).toHaveLength(1)
+    expect(ledger(status.w)[0]).toContain(' · molt · ')
   })
 })
 
@@ -758,8 +500,8 @@ describe('before_agent_start', () => {
 
 describe('mode, record and command', () => {
   test('AUTONOMIC_MODE=autopilot starts the session in autopilot and publishes the live mode', async () => {
-    const { w, a, files } = world({ env: { AUTONOMIC_MODE: 'autopilot' }, replies: [STALLED] })
-    expect((await a.onSessionStop({ last_assistant_message: 'x' }))?.decision).toBe('block')
+    const { w, a, files } = world({ env: { AUTONOMIC_MODE: 'autopilot' } })
+    expect(await a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
     expect(w.envSets.at(-1)).toEqual(['AUTONOMIC_EFFECTIVE_MODE', 'autopilot'])
     expect(JSON.parse(files.get(REC())!)).toMatchObject({ mode: 'autopilot', source: 'env' })
     expect(w.statuses.at(-1)).toBe('autopilot')
@@ -837,7 +579,7 @@ describe('the omp wiring', () => {
   const tmp = mkdtempSync(join(tmpdir(), 'autonomic-omp-'))
   afterAll(() => rmSync(tmp, { recursive: true, force: true }))
 
-  function boot(opts: { env?: Record<string, string | undefined>; reply?: string | Error; mode?: 'autopilot'; staleMode?: boolean } = {}) {
+  function boot(opts: { env?: Record<string, string | undefined>; mode?: 'autopilot'; staleMode?: boolean } = {}) {
     const home = mkdtempSync(join(tmp, 'h-'))
     const ledgerFile = join(home, 'ledger.md')
     const saved: Record<string, string | undefined> = {}
@@ -864,11 +606,6 @@ describe('the omp wiring', () => {
       getSystemPrompt: () => 'CTX-BASE',
       sessionManager: { getSessionId: () => state.id },
       ui: { notify: (t: string, tone: string) => state.notices.push([t, tone]), setStatus: (_k: string, t: string) => state.statuses.push(t) },
-      runEphemeralTurn: async (o: any) => {
-        state.ephemerals.push(o)
-        if (opts.reply instanceof Error) throw opts.reply
-        return { replyText: opts.reply ?? STALLED }
-      },
     })
     const modeFile = join(home, '.claude/state/autonomic/mode', String(process.pid))
     if (opts.staleMode) { mkdirSync(join(modeFile, '..'), { recursive: true }); writeFileSync(modeFile, 'autopilot') }
@@ -920,79 +657,22 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
-  test('input wiring resets only the current main session on operator input', async () => {
-    const b = boot({ mode: 'autopilot' })
-    try {
-      const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, b.ctxFor())
-      for (let i = 0; i < 3; i++) await stop()
-      await b.handlers.get('input')?.({ source: 'extension' }, b.ctxFor())
-      await b.handlers.get('input')?.({ source: 'user' }, b.ctxFor('task'))
-      expect(await stop()).toBeUndefined()
-      for (let i = 0; i < 3; i++) await stop()
-      await b.handlers.get('input')?.({ source: 'user' }, b.ctxFor())
-      expect((await stop())?.decision).toBe('block')
-    } finally { b.restore() }
-  })
-
   for (const event of ['session_tree', 'session_compact', 'rewind']) {
-    test(`round 3 ${event} clears branch A digest and changed flag, preserves mode and scope`, async () => {
+    test(`round 3 ${event} preserves the operator's mode and scope`, async () => {
       const b = boot({ mode: 'autopilot' })
       try {
         const c = b.ctxFor()
         const scope = join(b.home, 'scope.md')
         writeFileSync(scope, 'scope')
         await b.commands.get('autopilot')!.handler(`on ${scope}`, c)
-        const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, c)
-        for (let i = 0; i < 3; i++) await stop()
-        await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/branch-a.txt' }, content: [{ type: 'text', text: 'SECRET-A' }], isError: false }, c)
-        if (event === 'rewind') await b.handlers.get('tool_result')!({ toolName: 'rewind', input: { report: 'kept findings' }, content: [{ type: 'text', text: 'Rewind requested.' }], details: { report: 'kept findings', rewound: true }, isError: false }, c)
+        if (event === 'rewind') await b.handlers.get('tool_result')!({ toolName: 'rewind', input: { report: 'findings' }, content: [{ type: 'text', text: 'Rewind requested.' }], details: { report: 'findings', rewound: true }, isError: false }, c)
         else await b.handlers.get(event)?.({}, c)
-        for (let i = 0; i < 3; i++) expect((await stop())?.decision).toBe('block')
-        expect(await stop()).toBeUndefined() // no branch A change may reset the new loop
         const rec = JSON.parse(readFileSync(sessionPath(b.home, 'W1'), 'utf8'))
         expect(rec.mode).toBe('autopilot')
         expect(rec.scope).toEqual([scope])
-        await b.handlers.get('tool_result')!({ toolName: 'read', input: { path: '/branch-b.txt' }, content: [{ type: 'text', text: 'FACT-B' }], isError: false }, c)
-        await b.handlers.get('tool_call')!(ask(Q), c)
-        const prompt = b.state.ephemerals.at(-1).promptText
-        expect(prompt).toContain('FACT-B')
-        expect(prompt).not.toContain('SECRET-A')
-        expect(prompt).not.toContain('/branch-a.txt')
       } finally { b.restore() }
     })
   }
-
-  test('checkpoint, failed rewind, child rewind and another session rewind preserve digest and changed', async () => {
-    const b = boot({ mode: 'autopilot' })
-    try {
-      const c = b.ctxFor()
-      const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, c)
-      for (let i = 0; i < 3; i++) await stop()
-      await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/kept.txt' }, content: [{ type: 'text', text: 'KEPT-FACT' }], isError: false }, c)
-      const tool = (name: string, isError = false, ctx = c) => b.handlers.get('tool_result')!({ toolName: name, input: { report: 'findings' }, content: [{ type: 'text', text: 'checkpoint result' }], isError }, ctx)
-      await tool('checkpoint')
-      await tool('rewind', true)
-      await tool('rewind', false, b.ctxFor('task'))
-      b.state.id = 'W2'
-      await tool('rewind')
-      b.state.id = 'W1'
-      await b.handlers.get('tool_call')!(ask(Q), c)
-      expect(b.state.ephemerals.at(-1).promptText).toContain('KEPT-FACT')
-      expect((await stop())?.decision).toBe('block') // retained change resets the exhausted loop
-    } finally { b.restore() }
-  })
-
-  test('successful rewind keeps subsequent retained changes for the stop loop guard', async () => {
-    const b = boot({ mode: 'autopilot' })
-    try {
-      const c = b.ctxFor()
-      const stop = () => b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, c)
-      for (let i = 0; i < 3; i++) await stop()
-      await b.handlers.get('tool_result')!({ toolName: 'rewind', input: { report: 'findings' }, content: [{ type: 'text', text: 'Rewind requested.' }], isError: false }, c)
-      await b.handlers.get('tool_result')!({ toolName: 'write', input: { path: '/kept.txt' }, content: [{ type: 'text', text: 'KEPT-CHANGE' }], isError: false }, c)
-      expect((await stop())?.decision).toBe('block')
-    } finally { b.restore() }
-  })
 
   test('round 3 discarded prompt repeats scope until main agent_start accepts it', async () => {
     const b = boot({ mode: 'autopilot' })
@@ -1016,30 +696,6 @@ describe('the omp wiring', () => {
     expect((await a.onBeforeAgentStart({ systemPrompt: ['BASE'] }))?.systemPrompt.join('\n')).toContain('- /spec.md')
   })
 
-  test('the default export is a function and imports under plain bun', () => {
-    expect(typeof ompExtension).toBe('function')
-    const path = join(import.meta.dir, '../../autonomic/omp/extension.ts')
-    const r = Bun.spawnSync(['bun', '-e', `const m = await import(${JSON.stringify(path)}); process.exit(typeof m.default === 'function' ? 0 : 3)`], { stdout: 'pipe', stderr: 'pipe' })
-    expect(r.stderr.toString()).toBe('')
-    expect(r.exitCode).toBe(0)
-  })
-
-  test('the extension imports only autonomic\'s hooks, node: builtins and relative modules (Ruling 10)', () => {
-    const src = readFileSync(join(import.meta.dir, '../../autonomic/omp/extension.ts'), 'utf8')
-    const specs = [...src.matchAll(/^import(?: type)?[^'"]*from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]!)
-    expect(specs.length).toBeGreaterThan(10)
-    for (const s of specs) expect(s.startsWith('node:') || /^\.\.\/hooks\/(?!register|io)[a-z]+$/.test(s)).toBe(true)
-    expect(src).not.toMatch(/@oh-my-pi|@sinclair|claude-code/)
-  })
-
-  test('registers /autopilot and the event handlers', () => {
-    const b = boot()
-    try {
-      expect([...b.commands.keys()]).toEqual(['autopilot'])
-      expect([...b.handlers.keys()].sort()).toEqual(['agent_start', 'before_agent_start', 'input', 'session_compact', 'session_shutdown', 'session_start', 'session_stop', 'session_switch', 'session_tree', 'tool_call', 'tool_result'])
-    } finally { b.restore() }
-  })
-
   test('a child agent (task, advisor, /tan clone): no handler does anything', async () => {
     const b = boot({ mode: 'autopilot' })
     try {
@@ -1051,14 +707,13 @@ describe('the omp wiring', () => {
       await b.handlers.get('tool_result')!({ toolName: 'bash', input: {}, isError: false }, sub)
       await b.handlers.get('session_start')!({}, sub)
       await b.commands.get('autopilot')!.handler('status', sub)
-      expect(b.state.ephemerals).toEqual([])
       expect(b.state.notices).toEqual([])
       expect(existsSync(b.ledgerFile)).toBe(false)
       expect(existsSync(sessionPath(b.home, 'W1'))).toBe(false)
     } finally { b.restore() }
   })
 
-  test('the main session in autopilot: the floor blocks, session_stop blocks, the ephemeral turn is tools:false with a timeout signal', async () => {
+  test('the main session in autopilot: the floor blocks and the turn end is operator-owned', async () => {
     const b = boot({ mode: 'autopilot' })
     try {
       await b.handlers.get('session_start')!({}, b.ctxFor())
@@ -1067,30 +722,29 @@ describe('the omp wiring', () => {
       expect(blocked?.block).toBe(true)
       expect(b.state.notices.at(-1)?.[1]).toBe('warning')
       expect(readFileSync(b.ledgerFile, 'utf8')).toContain(' · permission · ')
-      const stop = await b.handlers.get('session_stop')!({ last_assistant_message: 'Step 2 done.' }, b.ctxFor())
-      expect(stop).toEqual({ decision: 'block', reason: 'Autopilot: continue — run the tests.' })
-      expect(b.state.ephemerals[0]).toMatchObject({ tools: false })
-      expect(b.state.ephemerals[0].promptText).toContain('autonomic turn-end check')
-      expect(b.state.ephemerals[0].signal).toBeInstanceOf(AbortSignal)
+      // No decision service is enrolled here, so the turn end is operator-owned: the stop passes
+      // with no continuation and nothing is written for it.
+      expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'Step 2 done.' }, b.ctxFor())).toBeUndefined()
       expect(await b.handlers.get('before_agent_start')!({ systemPrompt: 'BASE' }, b.ctxFor())).toEqual({ systemPrompt: ['BASE', 'WIRING POLICY'] })
     } finally { b.restore() }
   })
 
-  test('the ask reflex through the wiring, and a stage file written by molt\'s glue yields the stop', async () => {
-    const b = boot({ mode: 'autopilot', reply: answered({ 'Which plan?': 'Plan A' }) })
+  test('the ask reflex through the wiring leaves the ask with the operator; a molt stage yields the stop', async () => {
+    const b = boot({ mode: 'autopilot' })
     try {
-      const r = await b.handlers.get('tool_call')!(ask(Q), b.ctxFor())
-      expect(r?.reason).toContain('autonomic answered: {"Which plan?":"Plan A"}')
+      // No decision service: the whole ask stays with the operator and rings.
+      expect(await b.handlers.get('tool_call')!(ask(Q), b.ctxFor())).toBeUndefined()
+      expect(b.state.notices.join('\n')).toContain('question for you')
+      // A stage file written by molt's glue yields the stop: molt owns the turn end.
       mkdirSync(join(b.home, '.claude/state/molt/stage'), { recursive: true })
       writeFileSync(stagePath(b.home, 'W1'), JSON.stringify({ stage: 'command', command: 65 }))
-      const before = b.state.ephemerals.length
       expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, b.ctxFor())).toBeUndefined()
-      expect(b.state.ephemerals.length).toBe(before)
+      expect(readFileSync(b.ledgerFile, 'utf8')).toContain(' · molt · ')
     } finally { b.restore() }
   })
 
   test('a pain with a bell runs sh -c through pi.exec with the message as $1 and a 30 s timeout', async () => {
-    const b = boot({ mode: 'autopilot', reply: new Error('down'), env: { AUTONOMIC_BELL: 'echo ring' } })
+    const b = boot({ mode: 'autopilot', env: { AUTONOMIC_BELL: 'echo ring' } })
     try {
       await b.handlers.get('tool_call')!(ask(Q), b.ctxFor())
       expect(b.execs).toHaveLength(1)
@@ -1102,30 +756,17 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
-  test('/autopilot reports through ctx.ui.notify; a context with no runEphemeralTurn passes the stop', async () => {
+  test('/autopilot reports through ctx.ui.notify; a turn end is operator-owned', async () => {
     const b = boot({ mode: 'autopilot' })
     try {
       await b.commands.get('autopilot')!.handler('status', b.ctxFor())
       expect(b.state.notices.at(-1)![0]).toContain('autopilot (source: env)')
-      const bare = { ...b.ctxFor(), runEphemeralTurn: undefined }
-      expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, bare)).toBeUndefined()
+      expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, b.ctxFor())).toBeUndefined()
     } finally { b.restore() }
   })
 })
 
 describe('round 2 autonomic parity', () => {
-  test('operator input resets exhausted continuations; extension input does not', async () => {
-    const { w, a } = world({ files: autopilot(), replies: Array(7).fill(STALLED) })
-    for (let i = 0; i < 3; i++) await a.onSessionStop({ last_assistant_message: 'x' })
-    await a.onInput({ source: 'extension' })
-    expect(await a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(w.notes.at(-1)).toContain('autopilot loop')
-    for (let i = 0; i < 3; i++) await a.onSessionStop({ last_assistant_message: 'x' })
-    await a.onInput({ source: 'user' })
-    expect((await a.onSessionStop({ last_assistant_message: 'new request' }))?.decision).toBe('block')
-    expect(w.prompts).toHaveLength(7)
-  })
-
   test('repeated off preserves the unwritable record warning and stale disk mode', async () => {
     const { w, a } = world({ files: autopilot(), failWrite: /sessions/ })
     await a.onSessionStart()

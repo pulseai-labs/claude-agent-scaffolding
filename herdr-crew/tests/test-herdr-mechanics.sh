@@ -66,7 +66,7 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=385  # 0.2.20: +15 lines for #651 B (a companion timeout lapses silently, and every timeout-is-a-checkpoint site says so) and D (the heartbeat's stall rule: settle first, no fallback for a seat a fresh session cannot resume); 0.2.19: +10 lines for "Host: OMP" (spec D); 2026-10-15: 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
+REF_BUDGET=389  # 2026-10-17: +4 lines for PR #860's enrolled-OMP authority paragraphs (trusted issuance CLI, allowance non-overlap, fresh-process lifecycle, operator precedence); 0.2.20: +15 lines for #651 B (a companion timeout lapses silently, and every timeout-is-a-checkpoint site says so) and D (the heartbeat's stall rule: settle first, no fallback for a seat a fresh session cannot resume); 0.2.19: +10 lines for "Host: OMP" (spec D); 2026-10-15: 0.2.18: +3 lines for the OMP mode-file read; adjacent over-budget control retained. 0.2.13: lowered from 360 when the dsh carve-out left step 2 and the heartbeat. 0.2.9: raised from 322 for step 2's autonomic marking and Completion's child-pain paragraph (0.2.8: from 275).
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"

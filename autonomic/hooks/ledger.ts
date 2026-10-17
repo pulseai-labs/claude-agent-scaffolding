@@ -39,8 +39,10 @@ export function oneLine(s: string, max = 300): string {
   return t.length > max ? `${t.slice(0, max - 1)}…` : t
 }
 
-export function ledgerLine(e: { time: string; session: string; kase: LedgerCase; q: string; a: string; why: string; usage?: Usage }): string {
-  const base = `- ${e.time} · ${e.session} · ${e.kase} · Q: ${oneLine(e.q)} · A: ${oneLine(e.a)} · why: ${oneLine(e.why)}`
+// `answerMax` lets one row type carry content longer than the default 300-character bound (the pain
+// row holds up to three complete validated option texts); every other row keeps the default clamp.
+export function ledgerLine(e: { time: string; session: string; kase: LedgerCase; q: string; a: string; why: string; usage?: Usage; answerMax?: number }): string {
+  const base = `- ${e.time} · ${e.session} · ${e.kase} · Q: ${oneLine(e.q)} · A: ${oneLine(e.a, e.answerMax ?? 300)} · why: ${oneLine(e.why)}`
   const u = e.usage
   if (u === undefined) return base
   const input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)

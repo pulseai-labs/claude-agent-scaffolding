@@ -232,6 +232,7 @@ Every command's syntax comes from `herdr --skill`.
     autonomic routes it to the operator: ask for the merge word naming that SHA. Under either word, a dispatch whose
     merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator: tell them the word and the
     SHA, and they land it.
+    **Enrolled OMP precedence:** only actual operator acknowledgment of that head can satisfy this gate. `standing`, a missing legacy merge_word, a role, plan approval, shared standing-policy merge prose or confidence is not that acknowledgment. Spec/design/plan/release gates likewise stay operator-owned. This scoped rule does not rewrite Claude Code or legacy routing below.
     Merge only on that word, as a merge commit, never a squash, bound to that
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
