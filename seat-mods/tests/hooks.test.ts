@@ -727,13 +727,14 @@ describe('deny texts point at the way through (#844)', () => {
 // prompt.submit, classic.Stop or turn.complete in the kit, so each test answers
 // them beneath (as world() answers fs and process). `stop` stands in for
 // autonomic's push: it answers as the handler beneath the mod, called once per
-// stop, and a returned block must pass through unchanged.
-function statusWorld(on: On, env: Record<string, string>, stop?: (e: { last_assistant_message?: string }, call: number) => unknown) {
+// stop, and a returned block must pass through unchanged. `complete` replaces
+// the beneath turn.complete result (the turn's own text by default).
+function statusWorld(on: On, env: Record<string, string>, stop?: (e: { last_assistant_message?: string }, call: number) => unknown, complete?: (e: { answer?: string }) => unknown) {
   world(on, env)
   let calls = 0
   on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
   on('classic.Stop', (_$, e) => (stop === undefined ? {} : stop(e, ++calls)) as never)
-  on('turn.complete', (_$, e) => ({ text: e.answer }) as never)
+  on('turn.complete', (_$, e) => (complete === undefined ? { text: e.answer } : complete(e)) as never)
 }
 
 const STATUS_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
@@ -762,7 +763,8 @@ describe('orchestrator status block (#867)', () => {
     const second = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
     expect(second.block).toBeUndefined()
     const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
-    expect(done.text).toBe(STATUS_WARNING)
+    // The beneath completion's text survives; the warning is its own last line.
+    expect(done.text).toBe('Done.\n' + STATUS_WARNING)
   })
 
   test('4. a good block passes and adds no warning', async ($, on) => {
@@ -846,8 +848,17 @@ describe('orchestrator status block (#867)', () => {
     const sub = await $.turn.complete({ answer: 'sub', durationMs: 1, isAborted: false, turnId: 't2', agentId: 'a1', reason: 'answer' })
     expect(sub.text).toBe('sub')
     const main = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
-    expect(main.text).toBe(STATUS_WARNING)
+    expect(main.text).toBe('Done.\n' + STATUS_WARNING)
     const after = await $.turn.complete({ answer: 'sub2', durationMs: 1, isAborted: false, turnId: 't3', agentId: 'a1', reason: 'answer' })
     expect(after.text).toBe('sub2')
+  })
+
+  test('11. an empty beneath completion keeps only the warning line', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' }, undefined, () => ({ text: '' }))
+    await $.prompt.submit(notify())
+    await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(STATUS_WARNING)
   })
 })

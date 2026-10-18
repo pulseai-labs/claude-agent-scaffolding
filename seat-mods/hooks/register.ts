@@ -173,6 +173,8 @@ export const register: Register = on => {
     const warn = turn?.failedAfterRewrite === true
     // The main turn is over.
     turn = undefined
-    return warn ? { ...r, text: STATUS_WARNING } : r
+    // The warning is its own last line: a `text` beneath (core's or a hook's)
+    // is output the turn produced and is kept (CodeRabbit, PR #874).
+    return warn ? { ...r, text: r.text === '' ? STATUS_WARNING : `${r.text}\n${STATUS_WARNING}` } : r
   })
 }
