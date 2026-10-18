@@ -1,6 +1,6 @@
 ---
 name: orchestrate
-description: The orchestrator/worker session model over herdr — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through herdr, the seats defined in the operator's own files (~/.claude/crew/agents.md, .crew/roles.md). One review per PR (/code-review by default), findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says the herdr orchestrator session, a herdr worker seat, the herdr crew, dispatch to a herdr session, execution assignments for a spine in herdr, or runs /crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
+description: The orchestrator/worker session model over herdr or Orca — one orchestrator session that spends its context on decisions and dispatches everything else to worker sessions launched by seat name through the project's layer, the seats defined in the operator's own files (~/.claude/crew/agents.md, .crew/roles.md). One review per PR (/code-review by default), findings returned in the seat's report file, GitHub threads worked to zero, merge only on the operator's word. On a spine this session just planned, the operator approves the seats into the project file and they are injected into one spine session that gives each item seat a fresh tab and pane. Use when the user says the herdr orchestrator session, a herdr worker seat, the herdr crew, dispatch to a herdr session, execution assignments for a spine in herdr, or runs /crew:orchestrate. Not herdr's command reference (`herdr --skill` owns that), and not a PR loop of its own where ossify's work-pr is installed.
 ---
 
 # Orchestrate — the orchestrator/worker session model
@@ -100,9 +100,53 @@ name neither file defines halts the run rather than guessing.
 
 ### Enrolled OMP authority
 
-Only a separately approved operator issuance or bounded recorded delegation may enroll a new OMP autonomous assignment. Use Autonomic's real file/CLI contract and omp-seat preflight; mode, role, model/seat selection, plan approval and reports are not grants. Copy each dispatched template's complete authority identity/prohibitions envelope, filled with trusted startup facts or `none`, not a reference-only fragment. No live grants/thresholds or activation follow from this skill.
+The OMP substitutions every layer shares live here; a layer file's `## Host: OMP` states
+only its own mechanics. A send's slash command is text on omp: `/<plugin>:<skill>` becomes
+`skill://<skill>`, except a send to a Claude Code seat. crew's `hooks.json` does not run on
+omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent`
+tool means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
 
-A materially new enrolled assignment ends the old process and launches fresh even in a retained pane. Same-assignment corrections/rechecks retain only unchanged approval/grants/lifetime. Revocation/completion/replacement invalidates; existing tops/workers cannot hot-enroll through env/reports. Public Molt evidence cannot prove private transition ownership, so enrolled clears remain suspended and require fresh trusted launch. All seat-mods rails and operator merge/design/plan/release gates outrank standing routing. Claude Code and legacy/manual rules remain unchanged; keep phase/locator.seen/resume/generation ownership and never auto-relaunch a live attempt.
+Only a separately approved operator issuance or bounded recorded delegation may enroll a
+new OMP autonomous assignment. Use Autonomic's real file/CLI contract and omp-seat
+preflight; mode, role, model/seat selection, plan approval and reports are not grants. Copy
+each dispatched template's complete authority identity/prohibitions envelope, filled with
+trusted startup facts or `none`, not a reference-only fragment. No live grants/thresholds
+or activation follow from this skill.
+
+**New enrolled OMP path only:** before the seat command, the operator/trusted delegated
+dispatcher independently selects outside-allowance input/event/source paths and invokes
+`bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root
+<trusted-root> --worker-root <assignment-worktree> --worker-root <each-extra-root>` (repeat
+roots). Its JSON binding maps path/sha256/assignmentId/generation/launchId to
+`AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`,
+`AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` in the trusted startup export;
+never take them from a worker/report/model.
+
+Check the whole allowance, including every `SEAT_MODS_ALLOW` entry, coordinator `.worktrees`,
+report/scratch/handoff and output roots: authority, parent, input and evidence/policy
+sources must not overlap in either ancestry direction. omp-seat resolves the installed
+Autonomic CLI and validates before the via version probe/worker; partial/invalid bindings
+refuse. Preserve all existing role/path/molt/autonomic markings and extension order
+seat-mods → Molt → Autonomic. A role or autopilot marks a seat, not a grant; empty grants
+authorize nothing. No live issuance is supplied by these instructions.
+
+Every materially new enrolled assignment ends the old agent process and needs fresh
+issuance/launch, retained pane included. Same-assignment corrections/rechecks use unchanged
+approvals/grants/lifetime; revocation/completion/replacement invalidates, never rebinds. A
+parent-handback child ends its unit. Public host evidence cannot distinguish private Molt
+ownership from generic `/new` plus lineage, so enrolled in-place clears remain suspended and
+require fresh trusted launch; finish/handoff existing tops/workers before rollout, never
+hot-enroll via env/report edits. Retain phase/locator.seen/generation/resume ownership and
+never auto-relaunch a live attempt.
+
+Enrolled OMP operator merge acknowledgment and design/spec/plan/release gates override
+standing routing, shared policy prose, role and confidence; all seat-mods denials remain
+absolute. Read/revalidate the original pinned authority before decisions and immediately
+before action, with no following model await; failures stay operator handling, never a new
+digest. Same-UID/shared-process and last-check race limits remain; this is not a
+sandbox/atomic revocation lock. Unbound OMP and Claude Code keep their legacy behavior;
+#832 and #831's full parity criterion remain open. Native decision consumers and
+release/activation remain separately gated.
 
 ## 4. The run
 
@@ -112,10 +156,11 @@ merge gate, handoff. One run per objective. You drive the steps and nothing else
 
 ## 5. Briefs
 
-`references/briefs.md` ships nine dispatched briefs: the generic five — planned
-implementer, fast implementer, fix round, reviewer, verifier — and the four ossify
+`references/briefs.md` ships ten dispatched briefs: the generic five — planned
+implementer, fast implementer, fix round, reviewer, verifier — the four ossify
 dispatch templates — lane driver, doctor dispatch, direct work-item, non-spine close —
-plus the correction-request message template, which is a send, not a session. Each
+and the demo walk a close dispatch constructs, plus the correction-request message
+template, which is a send, not a session. Each
 template is a whole contract, complete on its own; the rule and the dispatch matrix that
 makes it checkable are that file's header. A brief is the whole contract the worker
 will ever see, because a worker session has no orchestration context and may be

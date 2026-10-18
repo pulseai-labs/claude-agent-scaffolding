@@ -39,6 +39,11 @@ of the layer's steps, and only the layer's file holds their commands and flags:
 5. **Read** — the model read that confirms `expected_model:`.
 6. **Send** — the brief, as `brief_delivery` says.
 
+**A seat on another machine.** A machine entry that names a `host:` (`config.md`) runs
+every step above on that machine, through the layer's Machines step: its workspace, its
+worktree, its pane and its report file all live there, and its report is read where it was
+written. A seat with no `host:` runs here.
+
 **The launch environment.** `Seat marking` writes these into the seat's pane, before the seat's
 command, in one export; every layer sets the same names and meanings, because the mods read
 them and never ask which layer set them. A guarded seat — implementer, verifier or reviewer —
@@ -129,15 +134,16 @@ a failed launch in its report file and stops, rather than working around it.
 
 The session that built the PR fixes the PR, and an implementer is retained across
 consecutive work items. No ownership transfer exists: retain a seat by keeping its
-pane and sending it the next task's brief (`layers/herdr.md` says how). At each task
+pane and sending it the next task's brief (the layer file says how). At each task
 boundary the context probe is `/context`, for a seat whose profile can run a local slash
 command (`can: slash-commands`, `config.md`): send it and read the one reply with
 the model read (the layer's Read) — the orchestrator's one context source: past half its window, as
 `/context` reports, or an auto-compact, the next item goes to a fresh implementer. That
 probe is the mechanism for the seats that can answer it, and a seat is sent one only when
 both hold: its profile can run a local slash command, and the send route that reaches it —
-the second detection ask's answer (`layers/herdr.md`) — carries one. A seat failing
-either condition — a profile without the capability, or a pane that ask finds undetected —
+the layer file's send route (`layers/<layer>.md`; its second detection ask's answer where it
+has one) — carries one. A seat failing either condition — a profile without the capability,
+or a route that cannot carry the command —
 is never sent the probe, and rotates at its item boundary instead, on the run's own record:
 the item it has just finished, not a probe it cannot answer. The
 implementer returns its handoff inputs in its report file; the orchestrator writes the
