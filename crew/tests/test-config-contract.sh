@@ -64,7 +64,7 @@ section "the layer"
 pin "$CONFIG_MD" 'layer: herdr' "the herdr layer is one of the two values stated"
 pin "$CONFIG_MD" 'layer: orca' "the orca layer is the other value stated"
 pin "$CONFIG_MD" 'no default' "a missing or unknown layer stops on one question and no default"
-pin "$CONFIG_MD" 'the Orca layer ships in crew 0.4.0' "0.3.0's stop names the release the Orca layer arrives in"
+pin "$CONFIG_MD" 'references/layers/<layer>.md' "the value names the layer file the run loads"
 
 section "the old paths"
 # The old name is ASSEMBLED, the way tests/test-crew-rename.sh assembles its own pattern: that

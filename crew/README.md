@@ -216,8 +216,8 @@ launch, one block each, with the field table in `skills/orchestrate/references/c
 saying what each means and where it travels. `<project root>/.crew/roles.md` is the
 project file: which agent fills each role, the operator's own roles, and the conditions
 that choose between seats — it wins for anything it names. Its first non-heading line is the
-mandatory layer line — `layer: herdr` in 0.3.0, and a missing or unknown value stops the run
-with one question; the Orca layer ships in crew 0.4.0. With neither file the
+mandatory layer line — `layer: herdr` or `layer: orca`, and a missing or unknown value stops the run
+with one question. With neither file the
 session's own work needs no setup, and the first delegated dispatch halts naming the file
 to add; a seat name neither defines halts the run.
 

@@ -2107,9 +2107,10 @@ pin "$ROLES_MD" 'is that variant with `SEAT_MODS_ROLE=orchestrator`' \
   "the launch block marks the top's rotation successor orchestrator" flat
 pin "$ROLES_MD" '`SEAT_MODS_ROLE=coordinator`' \
   "the launch block names the coordinator seat's export once"
-# 0.2.19: scope to the launch export; Host: OMP also names the role's rail.
-pin "$MECHANICS_MD" 'blocks them for `SEAT_MODS_ROLE=orchestrator`' \
-  "the OMP host names the role's rail once"
+# 0.2.19: scope to the launch export; T11 (ruling A) moved the Host rules shared with
+# every layer to SKILL.md, so the rail is named there.
+pin "$SKILL_MD" 'blocks them for `SEAT_MODS_ROLE=orchestrator`' \
+  "the OMP host names the role's rail once (SKILL.md)"
 pin "$ROLES_MD" 'The operator'"'"'s own first top is not launched here' \
   "the launch block says the operator launches its own top" flat
 pin "$ROLES_MD" 'the directory holding the run'"'"'s `run.json`, outside every worktree' \

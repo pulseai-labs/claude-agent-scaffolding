@@ -17,7 +17,7 @@ the project root is the AI workspace, where orchestrators launch; a single-repo 
 that repo.
 
 The project file's first non-heading line states the layer — `layer: herdr` or `layer: orca`. A missing or
-unknown value stops the run with one question, and there is no default. 0.3.0 ships one layer only: asking for Orca stops, and says the Orca layer ships in crew 0.4.0.
+unknown value stops the run with one question, and there is no default. The value names the layer file the run loads, `references/layers/<layer>.md`.
 
 Resolution is a walk up from the session's working directory; the first project file found wins. The pairing manifest is not consulted — its absolute roots can belong to another host.
 

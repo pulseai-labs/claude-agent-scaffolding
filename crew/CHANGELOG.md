@@ -9,6 +9,21 @@ All notable changes to the `crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.4.0
+
+**The Orca layer ships** (spec §4.1, plan Part C). `layer: orca` now loads
+`skills/orchestrate/references/layers/orca.md`, written from the 2026-10-18 Orca 1.4.229
+probes; the 0.3.0 stop that refused the value is gone, and either value names the layer
+file the run loads, `references/layers/<layer>.md`. The file carries what the probes
+measured: the seat launch as one `--command` line over `roles.md`'s launch export — a lane
+is a shell function, so `exec <lane>` leaves a shell — the `tui-idle` wait run as a
+background job (a turn's end, not the work's), the same-host `PING_SEND` form with the
+turn-start proof and the never-resend rule, the rendered read, the teardown that catches
+the default shell terminal `worktree create` opens, and the `--environment` flow for a
+seat on another machine. The layer-neutral OMP host rules move to `SKILL.md` §3, stated
+once with the skill. Manifests and catalogs are 0.4.0; the Codex manifest's keywords add
+`orca`.
+
 ## 0.3.0
 
 **`herdr-crew` becomes `crew`** (spec §4.6, clean cut). The directory, the plugin name, the skill (`/crew:orchestrate`) and all three marketplace catalogs move together in this release; no alias plugin ships, and no in-tree reference to the old name is left outside this file's history. The paths move with them: the machine file is `~/.claude/crew/agents.md` and the project file is `.crew/roles.md`. An operator still holding the old files is told the exact move.
@@ -667,10 +682,10 @@ nothing here reads the old ones.
 | `orca terminal close` | a tab seat: `herdr pane close <pane>`; a worktree seat: `herdr worktree remove --workspace <id>`, never a pane close; the run's own workspace closes last with `herdr workspace close <id>` |
 | `orca terminal list` | `herdr pane list` / `herdr agent list`, which is also the readiness discriminator |
 | `orca status --json` | `herdr status` |
-| `orca orchestration dispatch --inject` | detected: `herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --timeout <ms>`, that `--wait` being the turn-start check; undetected: the brief as a file, then a one-line pointer via `herdr pane run`; `brief_delivery: file` writes the brief and prompts one line pointing at it |
-| `orca orchestration ask` / `reply` | a worker writes its question into its report file and waits; the orchestrator answers with the seat's next message — herdr has no worker-to-orchestrator channel |
-| `orca orchestration task-list` | the run's dagr `run.json`; `dagr check --strict` lints it |
-| `orca orchestration run-use` | naming the run's `run.json` path |
+| `orchestration dispatch --inject` | detected: `herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --timeout <ms>`, that `--wait` being the turn-start check; undetected: the brief as a file, then a one-line pointer via `herdr pane run`; `brief_delivery: file` writes the brief and prompts one line pointing at it |
+| `orchestration ask` / `reply` | a worker writes its question into its report file and waits; the orchestrator answers with the seat's next message — herdr has no worker-to-orchestrator channel |
+| `orchestration task-list` | the run's dagr `run.json`; `dagr check --strict` lints it |
+| `orchestration run-use` | naming the run's `run.json` path |
 | `worker-start` | the seat launch (row 1) |
 | `worker-done` | the seat's **report file**; the doorbell is the typed wait for a detected seat that is not a coordinator, and the report-file wait for an undetected or coordinator seat |
 | `worker-read` | `herdr pane read`, only on a `blocked` wake, a missing or malformed report, a timeout's checkpoint, or the false wake's own read |

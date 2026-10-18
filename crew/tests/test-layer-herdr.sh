@@ -20,6 +20,7 @@ REF="$PLUGIN_ROOT/skills/orchestrate/references/layers/herdr.md"
 COMP="$PLUGIN_ROOT/skills/orchestrate/references/completion.md"
 ROLES="$PLUGIN_ROOT/skills/orchestrate/references/roles.md"
 LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
+SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 # 235, raised from 204 during T3 (2026-09-22): the pilot measured eight mechanics the file
 # had wrong or missing — the two detection events, the worktree path's workspace label and
 # `result.root_pane.pane_id` and its source-repo `--cwd`, the source-repo workspace that
@@ -68,8 +69,8 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=227  # 2026-10-18 (round 3): the machine-file key left 0.3.0 for 0.4.0 and took the
-# `## Machines` pointer to it with it (one line), so the count went 228 -> 227.
+REF_BUDGET=220  # 2026-10-18 (T11 ruling A): the layer-neutral OMP-host rules moved to SKILL.md
+# §3, where they are stated once with the skill, so the count went 227 -> 220.
 # 2026-10-17: crew 0.3.0 Task 4 — the `## Send` section gained the PING_SEND
 # slot definition and its one-line statement (3 lines), so the count went 225 -> 228.
 
@@ -299,7 +300,16 @@ pin "$COMP" 'seat-mods refuses the call before autonomic sees it' "a seat-mods d
 
 section "OMP top (0.2.19)"
 pin "$REF" '## Host: OMP' "the layer file carries the OMP host mapping"
-pin "$REF" 'crew'"'"'s `hooks.json` does not run on omp' "the ceiling notice on omp comes from molt" flat
+# T11 ruling A: the host substitutions shared with every layer moved to SKILL.md.
+# Their pins read the shared file, and the layer file must not restate them.
+pin "$SKILL_MD" 'crew'"'"'s `hooks.json` does not run on omp' "the ceiling notice on omp comes from molt (SKILL.md)" flat
+present "$SKILL_MD" 'A send'"'"'s slash command is text on omp' "the send-as-text mapping lives with the skill" flat
+present "$SKILL_MD" 'New enrolled OMP path only' "the enrolled-OMP authority rules live with the skill" flat
+for moved in 'text on omp' 'New enrolled OMP path only' 'live issuance is supplied by these instructions'; do
+  c="$(count_of "$REF" "$moved" flat)" || c=failed
+  if [ "$c" = "0" ]; then pass "the layer file does not restate: $moved"
+  else fail "the layer file does not restate: $moved" "$c left"; fi
+done
 pin "$LIFE" 'a launch command for each host' "the rotation handoff records both hosts' launch commands"
 pin "$LIFE" 'a resolved profile beside a launch command for each host' "the rotation handoff records each host's resolved profile"
 pin "$LIFE" 'using the destination host'"'"'s recorded profile for the readiness path and model read' "the successor uses its destination host's profile" flat
