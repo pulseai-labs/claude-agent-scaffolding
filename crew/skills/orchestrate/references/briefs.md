@@ -543,15 +543,17 @@ outcome: <what the user should observe>
 
 TASK: walk that entry against the product on this machine: perform its text, observe its
 outcome, and record the evidence the walk requires — the commands you ran and their output,
-and a screenshot path where a screen is involved. You edit no product file.
+and a screenshot path where a screen is involved, with the screenshot written into your
+report file's own directory. You edit no product file.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
 DONE: write your report file with the entry's id, its text and its outcome, one result —
 `pass`, or `fail: <what did not match>` — and the evidence above; then stop. Never a commit,
 push or PR line.
-NEVER: write outside the walk — your report file at REPORT_PATH is the only file you write;
-no repository edit, no commit, no push, no seat of your own, no subagent; a question or a
-refusal goes in that report file.
+NEVER: write outside the walk — your report file at REPORT_PATH and the screenshots in that
+file's own directory are the only files you write; no repository edit, no product file, no
+commit, no push, no seat of your own, no subagent; a question or a refusal goes in that
+report file.
 ```
 
 ## Correction request (one send, no new session)
