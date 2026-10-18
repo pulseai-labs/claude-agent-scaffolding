@@ -165,9 +165,10 @@ item's report file is in hand.
 **A worker also pings.** Every brief names `NOTIFY_RUN` (the run file whose `run.orchestrator` the worker pings) — the
 dispatcher's own run file only when herdr detects its pane and the seat shares its machine, otherwise
 the sentinel `none` — and after every atomic report rename the worker sends one literal
-`REPORT READY: <task> <kind> <path>` line to the pane read then, single-quoted as one argument and skipped
+`[crew report <role>] <task> <kind> <path>` line to the pane read then, single-quoted as one argument and skipped
 when the run file is `none`, its read fails or its machine differs from `NOTIFY_MACHINE`: one send, no `--wait`, no retry, and a failed send leaves the report
-intact. A skipped or failed send is never an answer: after a plan or a question the worker waits at that gate (#810). A parent herdr cannot target keeps the report-file wait and this heartbeat, no push
+intact. A brief older than 0.3.1 still sends the legacy `REPORT READY: <task> <kind> <path>` line,
+and the reader accepts either form. A skipped or failed send is never an answer: after a plan or a question the worker waits at that gate (#810). A parent herdr cannot target keeps the report-file wait and this heartbeat, no push
 promised. The parent consumes a given hash/identity generation once and retires that
 dispatch's wait when it does; a ping naming a path other than the briefed report path is
 surfaced, never read.

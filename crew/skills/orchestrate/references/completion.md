@@ -74,7 +74,9 @@ that file at that moment and sends through the layer's Send only when `run.orche
 equals `NOTIFY_MACHINE`: pane ids are server-scoped. One single-quoted literal argument (a
 single quote in it is written `'\''`), `<path>` the file actually renamed over. Every other
 dispatch keeps the report-file wait and this session's heartbeat as the whole of its push
-bound. A failed read or send changes nothing.
+bound. A failed read or send changes nothing. A brief older than 0.3.1 still sends the
+legacy `REPORT READY: <task id> <kind> <path>` form; read either it or the tagged
+`[crew report <role>] <task id> <kind> <path>` as this ping.
 
 A ping is one way a report announces itself, beside a completion wake and a heartbeat tick,
 and the generation check governs all three: a new generation is read, noted — the pair the
@@ -110,17 +112,18 @@ at teardown and at stand-down, where the successor arms a fresh one.
 
 A seat marked a molt child (`Seat marking`, the layer's launch step; `roles.md` holds the marking)
 is never cleared by molt.
-At each of molt's two warnings it sends one ping, `MOLT WARNING <pct> <task id>`, to the pane
-read from `NOTIFY_RUN` as the brief's PING line says — not a report ping: it names no path,
-opens no report and gets no correction request. molt appends `warned <n>`, `handoff required`
+At each of molt's two warnings it sends one ping, its brief's tagged `[crew molt <role>] <pct> <task id>`,
+to the pane read from `NOTIFY_RUN` as the brief's PING line says — not a report ping: it
+names no path, opens no report and gets no correction request. A brief older than 0.3.1
+still sends the legacy `MOLT WARNING` form; read either as this ping. molt appends `warned <n>`, `handoff required`
 and `handed-off <path>` to the status file the seat was launched with — molt's own writes,
 never the seat's. Record that path per seat at launch: molt reads `MOLT_STATUS_PATH` once, so
 no later brief of a retained seat moves it, whatever `REPORT_PATH` that brief names. The
 heartbeat, per tick, per live seat, also reads its recorded status file, so a skipped ping
 costs at most one tick while a dispatch is live. Before a retained seat's next unit, read its
 recorded status file: the heartbeat ends when the last dispatch settles, so an idle seat's
-warning may be noted only there. On a `MOLT WARNING` ping, or a status line not yet noted:
-note it and send that seat no new unit. It finishes the unit in hand; its next unit (a fix
+warning may be noted only there. On a `[crew molt <role>]` ping, or the legacy `MOLT WARNING <pct> <task id>` ping from a
+brief older than 0.3.1, or a status line not yet noted: note it and send that seat no new unit. It finishes the unit in hand; its next unit (a fix
 round, a re-check, the next item) goes to a fresh seat, and the warned seat is released once
 that unit's report is read. A `rotate:` or `open:` return is respawned as `lifecycle.md` says,
 and the `handed-off` line beside it is that return, not a second one. On a report `handoff:

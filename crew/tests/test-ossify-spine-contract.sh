@@ -438,7 +438,7 @@ done
 # Adjacent control: the fence admits the slot and flags the command it replaced.
 ctl_extra="$(mktemp)"; ctl_ping="$(mktemp)"
 printf '%s\n%s\n' "$PING_CMD" 'herdr agent wait w9:p1 --until idle' > "$ctl_extra"
-printf '%s\n' "<PING_SEND> '<REPORT READY: <task id> <kind> <path>>'" > "$ctl_ping"
+printf '%s\n' "<PING_SEND> '[crew report implementer] <task id> <kind> <path>'" > "$ctl_ping"
 if no_layer_command "$ctl_extra"; then fail "control: an agent command is still flagged" "accepted it"
 else pass "control: an agent command is still flagged"; fi
 if no_layer_command "$ctl_ping"; then pass "control: the ping slot alone is accepted"
@@ -1811,7 +1811,7 @@ section "rotation past the context ceiling"
 pin "$LIFECYCLE_MD" "## Rotation past the context ceiling" "lifecycle.md carries the rotation section"
 pin "$LIFECYCLE_MD" 'resumes by naming the parent'"'"'s `run.json` path' \
   "a new top binds the parent run by naming its run.json path"
-pin "$LIFECYCLE_MD" 'so after the rebind a worker on the successor'"'"'s machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.' \
+pin "$LIFECYCLE_MD" 'so after the rebind a worker on the successor'"'"'s machine pings the successor. A stale ping — tagged `[crew report <role>]`, or the legacy `REPORT READY: <task id> <kind> <path>` from a brief older than 0.3.1 — that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.' \
   "same-machine pings follow the rebind and stale pings are handed to the successor" flat
 pin "$BRIEFS_MD" "HANDOFF_PATH=<" "the spine brief takes HANDOFF_PATH"
 pin "$BRIEFS_MD" "rotate: <handoff path>" "the spine brief returns rotate: past the ceiling"
@@ -2483,35 +2483,42 @@ pin "$NESTED_MD" 'A spine session that rotated on a molt warning returns the sam
 pin "$NESTED_MD" 'one cut mid-round returns none and is respawned the same way' \
   "nested-run §4: a mid-round cut is respawned under ossify 1.14.0 (#674)" flat
 absent "$NESTED_MD" 'returns none and goes to the operator' "nested-run §4: the pre-1.14.0 relay is gone (#674)"
-MOLT_LINE='MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'MOLT WARNING <pct> <task id>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+molt_line() { # <role>
+  printf '%s\n' 'MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'[crew molt '"$1"'] <pct> <task id>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt'"'"'s handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.'
+}
 # One pin per template, labelled by name, so a miss names its site (0.2.5 and 0.2.7 were
-# both caught on unnamed launch sites). The span is the Nth ```text fence of the file.
-molt_in_template() { # <file> <fence n> <template name>
+# both caught on unnamed launch sites). The span is the Nth ```text fence of the file; the
+# role is the template's own seat role (crew 0.3.1).
+molt_in_template() { # <file> <fence n> <template name> <role>
   span="$(mktemp)"
   awk -v n="$2" '/^```text/{t++; if (t == n) { on = 1; next } } on && /^```$/{exit} on' "$1" >"$span"
-  pin "$span" "$MOLT_LINE" "${1##*/} — $3 carries the MOLT line" flat
+  pin "$span" "$(molt_line "$4")" "${1##*/} — $3 carries the MOLT line" flat
   rm -f "$span"
 }
-molt_in_template "$GENERIC_BRIEFS_MD" 1 "Planned implementer"
-molt_in_template "$GENERIC_BRIEFS_MD" 2 "Fast implementer"
-molt_in_template "$GENERIC_BRIEFS_MD" 3 "Reviewer"
-molt_in_template "$GENERIC_BRIEFS_MD" 4 "Verifier"
-molt_in_template "$GENERIC_BRIEFS_MD" 5 "Fix round"
-molt_in_template "$GENERIC_BRIEFS_MD" 6 "Lane driver"
-molt_in_template "$GENERIC_BRIEFS_MD" 7 "Doctor dispatch"
-molt_in_template "$GENERIC_BRIEFS_MD" 8 "Direct work-item"
-molt_in_template "$GENERIC_BRIEFS_MD" 9 "Non-spine close"
-molt_in_template "$BRIEFS_MD" 2 "Item implementer"
-molt_in_template "$BRIEFS_MD" 3 "Item verifier"
-molt_in_template "$PRBRIEFS_MD" 1 "Close session"
-molt_in_template "$WRITER_MD" 1 "Close-review writer"
+molt_in_template "$GENERIC_BRIEFS_MD" 1 "Planned implementer" implementer
+molt_in_template "$GENERIC_BRIEFS_MD" 2 "Fast implementer" implementer
+molt_in_template "$GENERIC_BRIEFS_MD" 3 "Reviewer" reviewer
+molt_in_template "$GENERIC_BRIEFS_MD" 4 "Verifier" verifier
+molt_in_template "$GENERIC_BRIEFS_MD" 5 "Fix round" implementer
+molt_in_template "$GENERIC_BRIEFS_MD" 6 "Lane driver" coordinator
+molt_in_template "$GENERIC_BRIEFS_MD" 7 "Doctor dispatch" coordinator
+molt_in_template "$GENERIC_BRIEFS_MD" 8 "Direct work-item" implementer
+molt_in_template "$GENERIC_BRIEFS_MD" 9 "Non-spine close" coordinator
+molt_in_template "$BRIEFS_MD" 2 "Item implementer" implementer
+molt_in_template "$BRIEFS_MD" 3 "Item verifier" verifier
+molt_in_template "$PRBRIEFS_MD" 1 "Close session" coordinator
+molt_in_template "$WRITER_MD" 1 "Close-review writer" implementer
 # Adjacent controls: exactly one line per leaf template — the Correction request (a send,
 # not a session) takes none — and no template carries it twice.
-n_eq "$GENERIC_BRIEFS_MD" "$MOLT_LINE" 9 "briefs.md carries the MOLT line 9 times, none in the Correction request"
-n_eq "$BRIEFS_MD" "$MOLT_LINE" 2 "ossify-briefs.md carries the leaf MOLT line twice (item pair only)"
+n_eq "$GENERIC_BRIEFS_MD" "$(molt_line implementer)" 4 "briefs.md carries the implementer MOLT line 4 times (9 total, none in the Correction request)"
+n_eq "$GENERIC_BRIEFS_MD" "$(molt_line coordinator)" 3 "briefs.md carries the coordinator MOLT line 3 times"
+n_eq "$GENERIC_BRIEFS_MD" "$(molt_line reviewer)" 1 "briefs.md carries the reviewer MOLT line once"
+n_eq "$GENERIC_BRIEFS_MD" "$(molt_line verifier)" 1 "briefs.md carries the verifier MOLT line once"
+n_eq "$BRIEFS_MD" "$(molt_line implementer)" 1 "ossify-briefs.md carries the implementer leaf MOLT line once (item pair only)"
+n_eq "$BRIEFS_MD" "$(molt_line verifier)" 1 "ossify-briefs.md carries the verifier leaf MOLT line once"
 pin "$BRIEFS_MD" 'ROTATE instead once the context-ceiling notice or a molt warning has fired' \
   "spine brief: a molt warning triggers the existing ROTATE" flat
-pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'MOLT WARNING <pct> <SPINE_ID>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), and ROTATE at the next round barrier' \
+pin "$BRIEFS_MD" 'MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'[crew molt coordinator] <pct> <SPINE_ID>'"'"'` (read as PING says; never when NOTIFY_RUN is `none`), and ROTATE at the next round barrier' \
   "spine brief: the MOLT line" flat
 pin "$BRIEFS_MD" 'End the reply that writes `rotate:` with `MOLT-HANDOFF: <handoff path>`' \
   "spine brief: the rotate reply names the handoff for molt (D5)" flat

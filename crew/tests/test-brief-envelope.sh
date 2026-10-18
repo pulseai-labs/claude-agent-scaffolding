@@ -9,9 +9,10 @@
 # layer part becomes the `<PING_SEND>` slot, defined once in the layer's `Send`.
 #
 # Facts:
-#   1. every `PING:` line across the four brief files is byte-identical, carries the
-#      `<PING_SEND>` slot, and names no layer command;
-#   2. every `MOLT:` line carries the slot and the `MOLT WARNING` clause; only the line's
+#   1. every `PING:` line across the four brief files is one line once the tag's role word is
+#      set aside, carries the `<PING_SEND>` slot and the `[crew report <role>]` tag, and
+#      names no layer command;
+#   2. every `MOLT:` line carries the slot and the `[crew molt <role>]` clause; only the line's
 #      own tail differs by design (the spine session's warning returns `rotate:`, the
 #      work-PR's returns `open:`), so the identity check is over the send clause;
 #   3. every `NOTIFY_RUN=` clause names the layer as the one that can address the
@@ -35,7 +36,7 @@ ENVELOPE_FILES='briefs.md ossify-briefs.md ossify-pr-briefs.md ossify-close-writ
 
 # The MOLT send clause. `grep -E` for the per-line test, and the same text as the identity
 # check's subject: everything from `MOLT:` through the `(read as PING says; ...)` clause.
-MOLT_CLAUSE_RE='^MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'MOLT WARNING <pct> <(task id|SPINE_ID)>'"'"'` \(read as PING says; never when NOTIFY_RUN is `none`\)'
+MOLT_CLAUSE_RE='^MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'\[crew molt [a-z-]+\] <pct> <(task id|SPINE_ID)>'"'"'` \(read as PING says; never when NOTIFY_RUN is `none`\)'
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -48,21 +49,24 @@ envelope_findings() { # <dir holding the four brief files>
   files=""
   for l in $ENVELOPE_FILES; do files="$files $dir/$l"; done
 
-  # 1. The PING: lines: one byte-identical line, with the slot, naming no layer command.
+  # 1. The PING: lines: one line once the tag's role word is set aside — each template
+  # carries its own seat's role there (crew 0.3.1, #867) — with the slot and the tag,
+  # naming no layer command.
   ping="$(grep -h '^PING:' $files)"
   if [ -z "$ping" ]; then
     printf 'no PING: line in the four brief files\n'
   else
-    n="$(printf '%s\n' "$ping" | sort -u | wc -l | tr -d ' ')"
-    [ "$n" -eq 1 ] || printf 'the PING: lines are %s distinct lines, not one\n' "$n"
+    n="$(printf '%s\n' "$ping" | sed -E 's/\[crew report [a-z-]+\]/[crew report <ROLE>]/' | sort -u | wc -l | tr -d ' ')"
+    [ "$n" -eq 1 ] || printf 'the PING: lines are %s distinct lines once the tag role is set aside, not one\n' "$n"
     printf '%s\n' "$ping" | grep -F '<PING_SEND>' >/dev/null || printf 'a PING: line carries no <PING_SEND> slot\n'
+    printf '%s\n' "$ping" | grep -E '\[crew report [a-z-]+\]' >/dev/null || printf 'a PING: line carries no [crew report <role>] tag\n'
     printf '%s\n' "$ping" | grep -F 'herdr' >/dev/null && printf 'a PING: line names a layer command\n'
   fi
 
   # 2. The MOLT: lines: every one carries the same send clause.
   molts="$(grep -hc '^MOLT:' $files | awk '{s += $1} END {print s + 0}')"
   n="$(grep -hE "$MOLT_CLAUSE_RE" $files | wc -l | tr -d ' ')"
-  [ "$n" -eq "$molts" ] || printf '%s of %s MOLT: lines carry the MOLT WARNING clause through <PING_SEND>\n' "$n" "$molts"
+  [ "$n" -eq "$molts" ] || printf '%s of %s MOLT: lines carry the tagged molt clause through <PING_SEND>\n' "$n" "$molts"
   grep -h '^MOLT:' $files | grep -F 'herdr' >/dev/null && printf 'a MOLT: line names a layer command\n'
 
   # 3. The NOTIFY_RUN= clause: the layer addresses the dispatcher's seat.

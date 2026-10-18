@@ -69,13 +69,19 @@ SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=223  # 2026-10-18 (V13 fix): -1 — the Machines step dropped the halt it restated
+REF_BUDGET=239  # 2026-10-18 (merge of origin/main, crew 0.3.1): +16 — `## Send` gains the
+# #867 tag paragraphs (the tag rule, what stays untagged, the role words): 223 -> 239.
+# 2026-10-18 (V13 fix): -1 — the Machines step dropped the halt it restated
 # for an unknown `host:` value (`config.md` owns it); the label mapping stays. 224 -> 223.
 # 2026-10-18 (Task 13): +4 — the machine file's `host:` key now maps to this
 # layer's labels in `## Machines`, and that Machines names the cross-machine report read a
 # known limit (the route is measured on the Orca layer only).
 # 2026-10-18 (T11 ruling A): the layer-neutral OMP-host rules moved to SKILL.md
 # §3, where they are stated once with the skill, so the count went 227 -> 220.
+# 2026-10-18 (crew 0.3.1, #867 fix round, main's own count): `## Send`'s tag scope, its
+# untagged list and the `orchestrator` role word were four lines there, 239 -> 243.
+# 2026-10-18 (round 3): the machine-file key left 0.3.0 for 0.4.0 and took the
+# `## Machines` pointer to it with it (one line), so the count went 228 -> 227.
 # 2026-10-17: crew 0.3.0 Task 4 — the `## Send` section gained the PING_SEND
 # slot definition and its one-line statement (3 lines), so the count went 225 -> 228.
 
@@ -226,7 +232,10 @@ pin "$ROLES" '**A molt is not a launch.**' "a molt keeps the top's marking" flat
 pin "$ROLES" 'A respawned child is a launch: this runs again in full' \
   "a respawn re-runs the marking, the allow list and the status-line read (Review Focus 6)" flat
 pin "$COMP" '## A child past molt'"'"'s warnings' "completion.md holds the parent rules once" flat
-pin "$COMP" 'MOLT WARNING <pct> <task id>' "the ping text is named" flat
+# crew 0.3.1 (#867): the send is tagged; completion.md names the tag and keeps the legacy
+# form accepted for briefs older than 0.3.1.
+pin "$COMP" '[crew molt <role>] <pct> <task id>' "the tagged ping text is named" flat
+pin "$COMP" 'MOLT WARNING <pct> <task id>' "the legacy ping text stays accepted" flat
 pin "$COMP" 'per tick, per live seat, also reads its recorded status file' \
   "the heartbeat reads each child's status file (Review Focus 2)" flat
 pin "$COMP" 'note it and send that seat no new unit' "a warned child gets no new unit" flat
@@ -243,7 +252,7 @@ if [ "$c" -eq 0 ]; then pass "the relayed-cut list no longer names the spine ses
 else fail "the relayed-cut list no longer names the spine session (#674)" "$c left"; fi
 pin "$COMP" 'relay it to the operator with its handoff path' "a skill-run cut is relayed" flat
 # Final review (0.2.8) — each pin is one finding.
-pin "$COMP" 'not a report ping: it names no path' "the MOLT WARNING ping gets no correction request" flat
+pin "$COMP" 'not a report ping: it names no path' "the tagged molt ping gets no correction request" flat
 pin "$COMP" 'Record that path per seat at launch' "a retained seat's status file is the launch one" flat
 pin "$COMP" 'its next unit (a fix round, a re-check, the next item) goes to a fresh seat' \
   "a warned seat's next unit goes to a fresh seat, so the run never stalls" flat

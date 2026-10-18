@@ -125,6 +125,22 @@ PING_SEND=herdr agent prompt <that pane>
 This is the one statement of how the orchestrator sends a seat anything; other files say "send" and mean this. The slot `PING_SEND` a brief's `PING:` and `MOLT:` lines carry is this
 file's send, filled by the dispatcher.
 
+**The tag.** Every message crew sends up to a parent or top session — a `PING:` line's
+send, a `MOLT:` line's send, a note between tops or from a rotation successor — starts
+with its tag as the first text: `[crew <kind> <role>]`. `<kind>` is `report`, `molt` or
+`message`; `<role>` is the sending seat's role word — `implementer`, `verifier`,
+`reviewer`, `coordinator`, `orchestrator` — lowercase, letters and hyphens only. Each
+brief template's `PING:` and `MOLT:` lines carry their own role word inside the tag; the
+tag is what tells a receiving session a seat's message apart from the operator's typing.
+
+**Sends that stay untagged.** What crew sends down to a worker — a brief, a plan-gate
+reply, a correction request, a `/context` — is delivered verbatim, no preamble, and
+carries no tag (`briefs.md`); the worker's re-ping after a correction is sent up, and
+carries the tag. A local slash command is untagged too — the rotation resume
+(`/ossify:handoff-resume <path>` to a Claude Code top, `skill://handoff-resume <path>`
+to an OMP top; `lifecycle.md`, "The resume"), and `/context` or `/clear` — because the
+tag is a prefix, and a prefix would break any slash command.
+
 - **Detected:** `herdr agent prompt <pane> "<text>"`. herdr prepends nothing: it submits
   the text and Enter as one submission, and what it adds to a seat is environment such as
   `HERDR_PANE_ID`, never prompt text. A message that starts work takes the turn-start

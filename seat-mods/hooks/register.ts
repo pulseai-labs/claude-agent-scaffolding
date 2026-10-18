@@ -1,6 +1,12 @@
 import type { Register } from 'claude-code'
 import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
+import { classifyPrompt, checkBlock, hasMoltHandoff, rewriteReason, STATUS_CONTEXT, STATUS_WARNING } from './status'
+
+// The live turn's status state, one session per process: set at prompt.submit,
+// read at classic.Stop, cleared at the main loop's turn.complete. It is defined
+// only inside an orchestrator's turn, so every check below skips otherwise.
+let turn: { status: boolean; blocked: boolean; failedAfterRewrite: boolean } | undefined
 
 async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
@@ -117,5 +123,68 @@ export const register: Register = on => {
     }
 
     return next(e)
+  })
+
+  on('prompt.submit', async ($, e, next) => {
+    const state = await roleOf($)
+    if (state.kind !== 'free' || state.role !== 'orchestrator') return next(e)
+    const kind = classifyPrompt(e.origin, e.text)
+    // The context rides only a status prompt that will run as (or inside) a
+    // status turn: a new turn whose kind is status, or a mid-turn status prompt
+    // while the running turn is status. Never an operator prompt, queued or not
+    // (Codex and CodeRabbit, PR #874 round 4).
+    const withContext = kind === 'status' && (e.turnId === undefined || turn?.status === true)
+    const r = await next(withContext ? { ...e, context: [...(e.context ?? []), STATUS_CONTEXT] } : e)
+    // A refused prompt never entered: its result stands and the turn is untouched
+    // (Codex, PR #874 round 4).
+    if (r.drop !== undefined) return r
+    // With the prompt confirmed in: a new turn sets the record from its kind; a
+    // non-waiting operator prompt typed into the running turn frees it.
+    if (e.turnId === undefined) {
+      turn = { status: kind === 'status', blocked: false, failedAfterRewrite: false }
+    } else if (kind === 'operator' && e.wait !== true && turn !== undefined) {
+      turn.status = false
+    }
+    return r
+  })
+
+  on('classic.Stop', async ($, e, next) => {
+    const r = await next(e)
+    // autonomic's block (or any beneath one) passes unchanged and is not seat-mods' rewrite.
+    if (r.block !== undefined) return r
+    const state = await roleOf($)
+    if (state.kind !== 'free' || state.role !== 'orchestrator' || turn?.status !== true) return r
+    if (hasMoltHandoff(e.last_assistant_message ?? '')) {
+      turn.failedAfterRewrite = false
+      return r
+    }
+    const check = checkBlock(e.last_assistant_message ?? '')
+    if (check.ok) {
+      turn.failedAfterRewrite = false
+      return r
+    }
+    if (turn.blocked) {
+      // The one rewrite stands: let this stop through, and mark it for turn.complete.
+      turn.failedAfterRewrite = true
+      return r
+    }
+    turn.blocked = true
+    return { ...r, block: rewriteReason(check.failed) }
+  })
+
+  on('turn.complete', async ($, e, next) => {
+    const r = await next(e)
+    // A subagent's turn end: not the main loop's, so neither warns nor clears turn.
+    if (e.agentId !== undefined) return r
+    const state = await roleOf($)
+    if (state.kind !== 'free' || state.role !== 'orchestrator') return r
+    const warn = turn?.failedAfterRewrite === true
+    // The main turn is over.
+    turn = undefined
+    // Core's result text repeats `e.answer`; only a text a mod beneath set is
+    // output of its own. The warning replaces core's text (the reply would
+    // otherwise show twice) and appends after any other, its own last line
+    // (review round 2, PR #874).
+    return warn ? { ...r, text: r.text === '' || r.text === e.answer ? STATUS_WARNING : `${r.text}\n${STATUS_WARNING}` } : r
   })
 }
