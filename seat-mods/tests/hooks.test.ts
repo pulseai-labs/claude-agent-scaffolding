@@ -728,11 +728,13 @@ describe('deny texts point at the way through (#844)', () => {
 // them beneath (as world() answers fs and process). `stop` stands in for
 // autonomic's push: it answers as the handler beneath the mod, called once per
 // stop, and a returned block must pass through unchanged. `complete` replaces
-// the beneath turn.complete result (the turn's own text by default).
-function statusWorld(on: On, env: Record<string, string>, stop?: (e: { last_assistant_message?: string }, call: number) => unknown, complete?: (e: { answer?: string }) => unknown) {
+// the beneath turn.complete result (the turn's own text by default). `submit`
+// replaces the beneath prompt.submit answer (its text and context by default).
+function statusWorld(on: On, env: Record<string, string>, stop?: (e: { last_assistant_message?: string }, call: number) => unknown, complete?: (e: { answer?: string }) => unknown, submit?: (e: { text: string; context?: readonly string[] }, call: number) => unknown) {
   world(on, env)
   let calls = 0
-  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  let submits = 0
+  on('prompt.submit', (_$, e) => (submit === undefined ? { text: e.text, context: e.context } : submit(e, ++submits)) as never)
   on('classic.Stop', (_$, e) => (stop === undefined ? {} : stop(e, ++calls)) as never)
   on('turn.complete', (_$, e) => (complete === undefined ? { text: e.answer } : complete(e)) as never)
 }
@@ -871,10 +873,20 @@ describe('orchestrator status block (#867)', () => {
     expect(done.text).toBe('Beneath says so.\n' + STATUS_WARNING)
   })
 
-  test('13. a queued mid-turn prompt (wait: true) does not free the status turn', async ($, on) => {
+  test('13. a queued mid-turn prompt (wait: true) takes no context and does not free the status turn', async ($, on) => {
     statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
     await $.prompt.submit(notify())
-    await $.prompt.submit({ text: 'queued for later', origin: { kind: 'composer' }, turnId: 't1', wait: true })
+    const queued = await $.prompt.submit({ text: 'queued for later', origin: { kind: 'composer' }, turnId: 't1', wait: true })
+    expect(queued.context ?? []).not.toContain(STATUS_CONTEXT)
+    const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(s.block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+  })
+
+  test('14. a dropped takeover prompt leaves the status turn checked', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' }, undefined, undefined, (e, call) => (call === 2 ? { drop: 'refused' } : { text: e.text, context: e.context }))
+    await $.prompt.submit(notify())
+    const dropped = await $.prompt.submit({ text: 'take it over', origin: { kind: 'composer' }, turnId: 't1', wait: false })
+    expect(dropped.drop).toBe('refused')
     const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
     expect(s.block).toBe(rewriteReason('Text comes before **What I ruled:**'))
   })

@@ -129,17 +129,23 @@ export const register: Register = on => {
     const state = await roleOf($)
     if (state.kind !== 'free' || state.role !== 'orchestrator') return next(e)
     const kind = classifyPrompt(e.origin, e.text)
+    // The context rides only a status prompt that will run as (or inside) a
+    // status turn: a new turn whose kind is status, or a mid-turn status prompt
+    // while the running turn is status. Never an operator prompt, queued or not
+    // (Codex and CodeRabbit, PR #874 round 4).
+    const withContext = kind === 'status' && (e.turnId === undefined || turn?.status === true)
+    const r = await next(withContext ? { ...e, context: [...(e.context ?? []), STATUS_CONTEXT] } : e)
+    // A refused prompt never entered: its result stands and the turn is untouched
+    // (Codex, PR #874 round 4).
+    if (r.drop !== undefined) return r
+    // With the prompt confirmed in: a new turn sets the record from its kind; a
+    // non-waiting operator prompt typed into the running turn frees it.
     if (e.turnId === undefined) {
       turn = { status: kind === 'status', blocked: false, failedAfterRewrite: false }
     } else if (kind === 'operator' && e.wait !== true && turn !== undefined) {
-      // Typed into a running status turn: the reply now answers the operator (design).
-      // A queued prompt (`wait: true`, ctrl+x enter) waits for a later turn and
-      // leaves this one alone (Codex, PR #874 round 3).
       turn.status = false
     }
-    return turn?.status === true
-      ? next({ ...e, context: [...(e.context ?? []), STATUS_CONTEXT] })
-      : next(e)
+    return r
   })
 
   on('classic.Stop', async ($, e, next) => {
