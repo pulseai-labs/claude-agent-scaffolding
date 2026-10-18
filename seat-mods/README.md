@@ -142,12 +142,13 @@ operator did not start by typing — must end with only the five-field status bl
 **What the PR(s) will carry:** …
 **Next steps:** …
 **Waiting on (seats live):** …
-**Operator decision pending:** …
+**Waiting on operator:** …
 ```
 
 One field per line, in that order; each label bold or plain, followed on the same line by its
-content ("none" is content), nothing before the first label or after the fifth. Three hooks carry
-it:
+content ("none" is content), nothing before the first label or after the fifth; a blank
+(whitespace-only) line between fields is skipped. Waiting on operator takes `none`,
+`decision: <question>` or `action: <what the operator must do>`. Three hooks carry it:
 
 - `prompt.submit` classifies the turn and, on a status turn, adds one line of model-only context
   (tool calls only, then the block). A prompt the operator types into a running status turn makes
@@ -162,10 +163,11 @@ it:
   neither the answer nor the transcript, and a subagent's turn end is ignored.
 
 On the same block, an **idle check** (#876) reads three fields. When both wait fields — Waiting
-on (seats live) and Operator decision pending — read `none` while Next steps names work, the
+on (seats live) and Waiting on operator — read `none` while Next steps names work, the
 block contradicts itself and does not end the turn: the first stop is blocked with
 `seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the
-next step now, or name the seat, wake or decision you wait on.`, and the second adds
+next step now, or name the seat, wake, or operator decision or action you wait on.`, and the
+second adds
 `⚠ seat-mods: status block says nothing waits, but Next steps names work.` under the reply, the
 way the shape warning sits. A field reads `none` when its content starts with the word `none`,
 any case: `none. No seats are live.` counts, `nonetheless` does not. The one block per turn is

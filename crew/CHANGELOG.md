@@ -9,6 +9,15 @@ All notable changes to the `crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.3.3
+
+**The status block's second wait field is `Waiting on operator:`** (#879). §8's block names
+`Waiting on operator:` in field 5 (was `Operator decision pending:`), taking `none`,
+`decision: <question>` or `action: <what the operator must do>`, and states five fields, one per
+line, with a blank line between fields allowed — not "exactly five lines". seat-mods 0.7.0
+enforces the label, the forms and the blank-line rule on a Claude Code top's status turn; the
+same text reaches an OMP top through omp-roles 0.7.5's `orchestrator` role.
+
 ## 0.3.2
 
 **A block that waits on nothing ends no turn** (#876). `orchestrate` §8 now says, after the status block's field list: "A block that waits on no seat and no operator decision while its Next steps names work is not a turn end: do the next step first, and write the block when something outside you holds the turn." seat-mods 0.6.0 enforces it on a Claude Code top's status turn — one nudge, then a warning line, sharing the turn's one block with the shape check — and the same sentence reaches an OMP top as text in omp-roles 0.7.4's `orchestrator` role.

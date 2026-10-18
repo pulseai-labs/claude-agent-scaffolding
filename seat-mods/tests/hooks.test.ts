@@ -741,7 +741,7 @@ function statusWorld(on: On, env: Record<string, string>, stop?: (e: { last_assi
 
 // The good block of the #867 describe: a stop that names what it waits on, so
 // the #876 idle check leaves it alone (its contradiction shape is IDLE_BLOCK).
-const STATUS_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** reviewer wED:p1 is reviewing\n**Operator decision pending:** none'
+const STATUS_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** reviewer wED:p1 is reviewing\n**Waiting on operator:** none'
 const notify = () => ({ text: 'T2 final /r.md', origin: { kind: 'task-notification' as const }, wait: false })
 
 describe('orchestrator status block (#867)', () => {
@@ -896,7 +896,7 @@ describe('orchestrator status block (#867)', () => {
 
 // A valid block whose Next steps names work while both wait fields read none:
 // the idle-stop contradiction (#876).
-const IDLE_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** open the record PR\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
+const IDLE_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** open the record PR\n**Waiting on (seats live):** none\n**Waiting on operator:** none'
 
 describe('idle stop (#876)', () => {
   test('1. an idle block is nudged once, then the idle warning stands', async ($, on) => {
@@ -914,7 +914,7 @@ describe('idle stop (#876)', () => {
     statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
     await $.prompt.submit(notify())
     await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })
-    const good = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** open the PR\n**Waiting on (seats live):** reviewer wED:p1 is reviewing\n**Operator decision pending:** none'
+    const good = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** open the PR\n**Waiting on (seats live):** reviewer wED:p1 is reviewing\n**Waiting on operator:** none'
     expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: good })).block).toBeUndefined()
     const done = await $.turn.complete({ answer: good, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
     expect(done.text).toBe(good)
@@ -968,9 +968,19 @@ describe('idle stop (#876)', () => {
   test('8. a finished-run block (all none) ends the turn with no nudge or warning', async ($, on) => {
     statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
     await $.prompt.submit(notify())
-    const finished = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** none\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
+    const finished = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** none\n**Waiting on (seats live):** none\n**Waiting on operator:** none'
     expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: finished })).block).toBeUndefined()
     const done = await $.turn.complete({ answer: finished, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
     expect(done.text).toBe(finished)
+  })
+
+  test('9. a field-5 action: wait is not an idle stop (#879)', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    // Field 5 names an action only the operator can take, so the block waits.
+    const action = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** open the record PR\n**Waiting on (seats live):** none\n**Waiting on operator:** action: start a fresh session'
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: action })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: action, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(action)
   })
 })

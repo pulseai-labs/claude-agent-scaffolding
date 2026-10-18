@@ -216,12 +216,12 @@ section "the status block is stated"
 pin "$SKILL_MD" 'your reply is only the status block' "SKILL.md states the rule once"
 pin "$SKILL_MD" 'is not a turn end: do the next step first' "SKILL.md states the idle-stop rule"
 pin "$SKILL_MD" 'ends with that line instead of the block' "SKILL.md states the molt-handoff exception" flat
-for label in '**What I ruled:**' '**What the PR(s) will carry:**' '**Next steps:**' '**Waiting on (seats live):**' '**Operator decision pending:**'; do
+for label in '**What I ruled:**' '**What the PR(s) will carry:**' '**Next steps:**' '**Waiting on (seats live):**' '**Waiting on operator:**'; do
   pin "$SKILL_MD" "$label" "SKILL.md carries $label once"
 done
 order_findings() { # <file> — the five labels, once each, in this order
   awk '
-    BEGIN { L[1]="**What I ruled:**"; L[2]="**What the PR(s) will carry:**"; L[3]="**Next steps:**"; L[4]="**Waiting on (seats live):**"; L[5]="**Operator decision pending:**"; e=1 }
+    BEGIN { L[1]="**What I ruled:**"; L[2]="**What the PR(s) will carry:**"; L[3]="**Next steps:**"; L[4]="**Waiting on (seats live):**"; L[5]="**Waiting on operator:**"; e=1 }
     { for (i=1;i<=5;i++) if (i == e && index($0, L[i])) { e++ } else if (i != e && index($0, L[i])) { print "line " NR ": label " i " out of order or repeated"; exit } }
     END { if (e != 6) print "only " e-1 " of the five labels are on a line" }
   ' "$1"
