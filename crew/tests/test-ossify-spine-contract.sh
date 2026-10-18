@@ -1885,9 +1885,9 @@ for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
   pin "$f" 'On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per MECHANICS' \
     "${f##*/} writes its machine on creation and continuation" flat
 done
-pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md`' \
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file' \
   "the nested spine successor writes its machine on rebind" flat
-pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md`' \
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file' \
   "the nested work-PR dispatch writes its machine on creation and continuation" flat
 pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brief goes' \
   "step 3 records the attempt before the send" flat
@@ -1944,9 +1944,9 @@ for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
   pin "$f" 'and `run.orchestrator.session` from the layer'"'"'s Identity' \
     "${f##*/} records its session on creation and continuation (#810)" flat
 done
-pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md` — and `run.orchestrator.session`' \
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file — and `run.orchestrator.session`' \
   "the nested spine successor records its session on rebind (#810)" flat
-pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md` — and `run.orchestrator.session`' \
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file — and `run.orchestrator.session`' \
   "the nested work-PR dispatch records its session (#810)" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 # Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.

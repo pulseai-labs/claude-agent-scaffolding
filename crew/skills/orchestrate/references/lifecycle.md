@@ -73,9 +73,9 @@ Every command's syntax comes from the layer's guide.
    within a round may run in parallel; their merges are serial.
 3. **Launch.** The seat launch — pane creation, the readiness wait, the banner read that
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
-   file) on the route `layers/herdr.md` fixes from its second detection ask after
+   file) on the route the layer file fixes from its second detection ask after
    that read — is `roles.md`'s "The launch," with the undetected-seat path in
-   `layers/herdr.md`. An implementer, verifier or reviewer seat's launch also
+   the layer file. An implementer, verifier or reviewer seat's launch also
    runs the guarded-seat export `roles.md`'s launch block states, before its
    command. The run's workspace can
    go before the run does — a first seat's release may take it — so a later launch
@@ -148,7 +148,7 @@ Every command's syntax comes from the layer's guide.
    entry names — the claims include judgment, and `cannot determine` counts as fail.
    On a fail, attach a fix task to the retained implementer by sending it the
    fast-implementer brief with the verifier's claims for a TASK (`briefs.md`;
-   `layers/herdr.md` says how), wait for its report file
+   the layer file says how), wait for its report file
    naming the new head SHA, read that SHA's check-runs, then re-check on the retained
    verifier; a second fail on the same item goes to the operator. The verifier is
    released only at pass or escalation.
@@ -292,7 +292,7 @@ a line copied from this skill becomes an instruction to the successor, which out
 it points at step 12 and `run.merge_word`. `/ossify:handoff` with ossify installed (`skill://handoff` on OMP), the same
 file by hand without it. Open a new tab and pane with the launch command the handoff recorded — ask the operator once
 when none did; an alias carries provider settings `ps` does not show — in the workspace
-the layer's Identity names, the top's own, never the run's. **Launch it as the seat launch `layers/herdr.md` states** — marked `orchestrator`
+the layer's Identity names, the top's own, never the run's. **Launch it as the seat launch the layer file states** — marked `orchestrator`
 before its command (the layer's `Seat marking`) — using the destination host's recorded profile for the readiness
 path and model read, then the second detection ask, and send its resume on the route that ask fixes: with ossify,
 `skill://handoff-resume <path>` to an OMP top and `/ossify:handoff-resume <path>` to a Claude Code top; without it,
@@ -335,7 +335,7 @@ when the effect is absent.
    workers on one attempt.
    Re-arm step 5’s waits only for an attempt still live after its generation check; a final report consumed on resume
    settles that dispatch, so it gets no wait. The waits are on the pane (a detected coordinator's companion included)
-   through `locator.machine`; every later operation on that pane carries `locator.machine` (`layers/herdr.md`, Machines).
+   through `locator.machine`; every later operation on that pane carries `locator.machine` (the layer file, Machines).
 5. It arms one fresh heartbeat only if at least one dispatch is still live.
 6. It continues at the fresh handoff's next step. A `done` task is never re-run.
 

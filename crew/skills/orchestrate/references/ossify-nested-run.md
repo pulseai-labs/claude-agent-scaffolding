@@ -29,7 +29,7 @@ file, as dagr's producer contract requires.
 
 - every item task, and each round's barrier, is recorded in `RUN_JSON`, never in your `run.json`;
 - the spine session is the orchestrator of its own run, so it launches, sends to, waits
-  on and releases its item seats as `layers/herdr.md` says — each a tab in its run's
+  on and releases its item seats as the layer file says — each a tab in its run's
   workspace, with its own `--cwd`, the worktree ossify prepared for the item;
 - plan, gap, depth and other spine-level questions come up in its report file, and
   you answer by sending it its next message;
@@ -132,7 +132,7 @@ then dispatch a fresh spine session on the same spine-session seat — marked `c
 before its command as the layer's `Seat marking` says — the same approved SEATS
 block injected again — with `HANDOFF_PATH` set and the same `RUN_JSON`, which it continues,
 rebinding `run.orchestrator` to its own pane (its brief's step 2 says). On that rebind it writes
-`run.orchestrator.machine` beside the pane — this server's machine, per `layers/herdr.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). The close waits for a
+`run.orchestrator.machine` beside the pane — this server's machine, per the layer file — and `run.orchestrator.session` (`lifecycle.md` step 1). The close waits for a
 completion at the final barrier. A spine session that rotated on a molt warning returns the same
 `rotate:`; one cut mid-round returns none and is respawned the same way, its handoff as
 `HANDOFF_PATH`: ossify 1.14.0's run-spine re-enters the round from recorded state, and only a
@@ -170,7 +170,7 @@ A multi-repo close can also open a PR in one repo and then halt on a later one, 
 returns `halted:` naming what it opened so far. **Dispatch nothing downstream — no
 work-PR session, no record pass — until a close returns a complete PR list or `closed`.**
 A halt settles that dispatch only: remediate the blocker it names, then dispatch a
-**fresh** close session — marked `coordinator` before its command (`layers/herdr.md`
+**fresh** close session — marked `coordinator` before its command (the layer file,
 Seat launch) — as many times as that takes.
 
 **A close that halts on its own review returns `halted: close-review` with the
@@ -195,7 +195,7 @@ has covered, `covered` when one has and left durable evidence its review ran but
 record, otherwise the durable record that PR's last `open:` result persisted — and the
 `RUN_JSON` path that return named: a resumed successor continues and rebinds that file,
 a first dispatch names a fresh one. On creation and on continue/rebind it writes `run.orchestrator.machine`
-beside the pane — this server's machine, per `layers/herdr.md` — and `run.orchestrator.session` (`lifecycle.md` step 1). It owns both PR seats in a `run.json` of its own,
+beside the pane — this server's machine, per the layer file — and `run.orchestrator.session` (`lifecycle.md` step 1). It owns both PR seats in a `run.json` of its own,
 relays one summary per round, and asks you for the merge word; you answer as `lifecycle.md` step 12's `run.merge_word` says (with
 `standing`, a clean gate set is the word; with `operator`, you ask the operator), and the merge lands under the reply's executor — a merge commit on the named SHA, session or
 operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.

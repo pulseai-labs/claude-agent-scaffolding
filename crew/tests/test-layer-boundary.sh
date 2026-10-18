@@ -126,6 +126,69 @@ else
   fail "control: the sweep controls leave no fixture behind" "$ctl survived its cleanup"
 fi
 
+section "no shared file points at one layer's own file"
+
+# B2 (#877): a shared file naming `layers/herdr.md` sends an `layer: orca` run to herdr's
+# mechanics — the spine and work-PR briefs' `MECHANICS=` slot and every prose pointer were
+# the sites. The pointer belongs to the run's layer, and `layers/<layer>.md` is the only
+# path-shaped form a shared file may carry; `references/layers/*` is exempt, like the
+# command sweep above.
+layer_pointer_findings() { # <skills/orchestrate dir>
+  local dir="$1" f n line
+  find "$dir" -name '*.md' | sort | while IFS= read -r f; do
+    case "$f" in */references/layers/*) continue ;; esac
+    n=0
+    while IFS= read -r line; do
+      n=$((n + 1))
+      case "$line" in
+        *"layers/herdr.md"*|*"layers/orca.md"*) printf '%s:%s:%s\n' "$f" "$n" "$line" ;;
+      esac
+    done < "$f"
+  done
+}
+
+findings="$(layer_pointer_findings "$REF")"
+if [ -z "$findings" ]; then
+  pass "no shared file names one layer's own file"
+else
+  fail "no shared file names one layer's own file ($(printf '%s\n' "$findings" | wc -l | tr -d ' ') line(s)):"
+  printf '%s\n' "$findings" | sed 's/^/        /'
+fi
+
+# Controls: the check reads a tree, so plant one — the clean fixture is the adjacent
+# control, and the planted pointer is caught with its file and line.
+ctl="$(mktemp -d)"
+mkdir -p "$ctl/references"
+printf '# Roles\n\nThe layer file says how a seat is sent a brief.\n' > "$ctl/references/roles.md"
+out="$(layer_pointer_findings "$ctl")"
+if [ -z "$out" ]; then
+  pass "control: the check passes a shared file that names no layer file"
+else
+  fail "control: the check passes a shared file that names no layer file" "$out"
+fi
+printf 'See `layers/herdr.md` for the send.\n' >> "$ctl/references/roles.md"
+out="$(layer_pointer_findings "$ctl")"
+if [ "$(printf '%s\n' "$out" | grep -c .)" -eq 1 ] && printf '%s' "$out" | grep -F 'layers/herdr.md' >/dev/null; then
+  pass "control: a planted pointer is caught, by name and line"
+else
+  fail "control: a planted pointer is caught, by name and line" "got: ${out:-<none>}"
+fi
+# The layer files themselves are exempt: the same line there is not a finding.
+mkdir -p "$ctl/references/layers"
+mv "$ctl/references/roles.md" "$ctl/references/layers/herdr.md"
+out="$(layer_pointer_findings "$ctl")"
+if [ -z "$out" ]; then
+  pass "control: the same pointer inside references/layers/ is exempt"
+else
+  fail "control: the same pointer inside references/layers/ is exempt" "$out"
+fi
+rm -rf "$ctl"
+if [ ! -e "$ctl" ]; then
+  pass "control: the pointer controls leave no fixture behind"
+else
+  fail "control: the pointer controls leave no fixture behind" "$ctl survived its cleanup"
+fi
+
 section "the layer files carry the thirteen steps, in order"
 headings_of() { sed -n 's/^## //p' "$1"; }
 if [ ! -f "$LAYER_MD" ]; then

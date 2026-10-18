@@ -2,7 +2,7 @@
 
 A brief is the whole contract the worker will ever see. The worker has no orchestration
 context, may be launched where the project's rules do not load, and the layer delivers this
-text verbatim (`layers/herdr.md`) — no preamble, nothing prepended, nothing else.
+text verbatim (`layers/<layer>.md`) — no preamble, nothing prepended, nothing else.
 Every brief carries, in this order:
 
 1. Role, and "state your model in your first reply".
@@ -266,7 +266,7 @@ commit it — and run in a disposable worktree. Any other write: stop, and write
 
 ## Fix round (retained implementer, after disposition)
 
-Attach it to the same pane by sending it this brief (`layers/herdr.md` says how) —
+Attach it to the same pane by sending it this brief (the layer file says how) —
 there is no attach or ownership-transfer call; the same session simply receives its
 next brief. It carries its own seat lines, TASK, completion body and NEVER line, and no
 part of it is rebuilt from another template's.

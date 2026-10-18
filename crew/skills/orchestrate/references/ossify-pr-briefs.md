@@ -124,7 +124,7 @@ REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole �
 PING_SEND=<the layer's Send, filled by the dispatcher: how one line reaches a pane on your layer>
 PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '[crew report coordinator] <task id> <kind> <path>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
-MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/layers/herdr.md
+MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/layers/<layer>.md
 PR_REPO=<owner/repo>
 PR_NUMBER=<number>
 REPO_ROOT=<abs path of this seat's worktree>

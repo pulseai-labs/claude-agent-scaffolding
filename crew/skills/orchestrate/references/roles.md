@@ -134,14 +134,14 @@ a failed launch in its report file and stops, rather than working around it.
 
 The session that built the PR fixes the PR, and an implementer is retained across
 consecutive work items. No ownership transfer exists: retain a seat by keeping its
-pane and sending it the next task's brief (`layers/herdr.md` says how). At each task
+pane and sending it the next task's brief (the layer file says how). At each task
 boundary the context probe is `/context`, for a seat whose profile can run a local slash
 command (`can: slash-commands`, `config.md`): send it and read the one reply with
 the model read (the layer's Read) — the orchestrator's one context source: past half its window, as
 `/context` reports, or an auto-compact, the next item goes to a fresh implementer. That
 probe is the mechanism for the seats that can answer it, and a seat is sent one only when
 both hold: its profile can run a local slash command, and the send route that reaches it —
-the second detection ask's answer (`layers/herdr.md`) — carries one. A seat failing
+the second detection ask's answer (`layers/<layer>.md`) — carries one. A seat failing
 either condition — a profile without the capability, or a pane that ask finds undetected —
 is never sent the probe, and rotates at its item boundary instead, on the run's own record:
 the item it has just finished, not a probe it cannot answer. The

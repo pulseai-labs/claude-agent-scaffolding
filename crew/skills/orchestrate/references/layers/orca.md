@@ -51,7 +51,8 @@ close.
 
 The sequence, not one call: `orca terminal create --worktree <sel> --title "seat: <role>
 (<agent>)" --command '<export …>; <lane>' --json`, then read the handle from the receipt
-(`Identity`). The export is `roles.md`'s launch environment, typed before the lane:
+(`Identity`). **Seat marking** is that export — the launch environment `roles.md`'s launch
+block states — typed before the lane:
 `export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain; <lane>`
 The lane is a shell **function**, and Orca types `--command` into the terminal's interactive
 shell, so it resolves; `exec <lane>` fails and leaves a shell. The model read: the rendered
