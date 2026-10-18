@@ -335,3 +335,28 @@ describe('expandRole', () => {
     expect(expandRole('worker', 'omp-glm', 'implementer')).toEqual({ role: 'worker', via: 'omp-glm', roleEnv: 'implementer' })
   })
 })
+
+describe('the orchestrator role states the status block (#867)', () => {
+  // The role file is prose, wrapped: read as one logical line so a phrase broken
+  // by a wrap still counts.
+  const role = readFileSync(join(import.meta.dir, '..', '..', 'omp-roles', 'roles', 'orchestrator.md'), 'utf8').replace(/\s+/g, ' ')
+  const labels = ['**What I ruled:**', '**What the PR(s) will carry:**', '**Next steps:**', '**Waiting on (seats live):**', '**Operator decision pending:**']
+
+  test('carries the five labels, once each, in order', () => {
+    let prev = -1
+    for (const label of labels) {
+      const first = role.indexOf(label)
+      expect(first).toBeGreaterThan(prev)
+      expect(role.indexOf(label, first + 1)).toBe(-1)
+      prev = first
+    }
+  })
+  test('states the rule with crew SKILL.md wording', () => {
+    expect(role).toContain('your reply is only the status block')
+    expect(role).toContain('exactly five lines, one field per line')
+    expect(role).toContain('(`none` is content)')
+    expect(role).toContain('A turn the operator typed is free and takes any shape.')
+    // crew SKILL.md §8's molt-handoff exception, same wording (#867 fix round).
+    expect(role).toContain('ends with that line instead of the block')
+  })
+})
