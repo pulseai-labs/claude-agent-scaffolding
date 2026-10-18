@@ -3,9 +3,10 @@
 # crew — the send tag (#867), mechanical facts only.
 #
 # Every message crew sends up to a parent or top session starts with its tag,
-# `[crew <kind> <role>]` (`layers/herdr.md`, Send), and the brief templates carry their
-# own seat's role word inside it; messages sent down to a worker — briefs, plan-gate
-# replies, correction requests — stay verbatim and untagged. The legacy `REPORT READY:`
+# `[crew <kind> <role>]` (`completion.md`, where the ping contract is stated once), and
+# the brief templates carry their own seat's role word inside it; messages sent down to a
+# worker — briefs, plan-gate replies, correction requests — stay verbatim and untagged. The
+# legacy `REPORT READY:`
 # and `MOLT WARNING` forms stay *accepted* — a top still receives pings from workers a
 # brief older than 0.3.1 dispatched — so this file pins the acceptance clause in place
 # instead of forbidding the words.
@@ -20,8 +21,9 @@
 #   5. the correction request's re-ping is tagged;
 #   6. the legacy forms stay accepted: completion.md states the acceptance clause for the
 #      report ping and for the MOLT ping;
-#   7. `layers/herdr.md`'s `Send` scopes the tag to sends up, names what stays untagged
-#      (down-sends, then local slash commands), and lists the orchestrator role word;
+#   7. `completion.md`, where the ping contract is stated once, scopes the tag to sends up,
+#      names what stays untagged (down-sends, then local slash commands), and lists the
+#      orchestrator role word — layer-neutral since D1: an Orca seat's ping is the same text;
 #   8. `SKILL.md` states the status block — its five labels, once each, in order — and
 #      the molt-handoff exception.
 #
@@ -37,7 +39,6 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate/references"
-LAYER_MD="$REF/layers/herdr.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 COMPLETION_MD="$REF/completion.md"
 
@@ -189,27 +190,19 @@ pin "$COMPLETION_MD" 'A brief older than 0.3.1 still sends the legacy `MOLT WARN
 pin "$COMPLETION_MD" 'A brief older than 0.3.1 still sends the legacy `REPORT READY: <task id> <kind> <path>` form; read either it or the tagged `[crew report <role>] <task id> <kind> <path>` as this ping.' \
   "completion.md takes the tagged or the legacy report ping" flat
 
-section "the layer's Send states the rule"
+section "completion.md states the rule"
 
-send_section() { # <file>
-  awk '/^## Send$/{on=1;next} on && /^## /{exit} on' "$1"
-}
-span="$(mktemp)"
-send_section "$LAYER_MD" > "$span"
-n="$(grep -c . "$span" | tr -d ' ')"
-if [ "$n" -ge 5 ]; then
-  pin "$span" '[crew <kind> <role>]' "the tag grammar is stated"
-  pin "$span" 'sends up to a parent or top session' "the tag rule is scoped to sends up"
-  pin "$span" 'sends down to a worker' "down-sends are named untagged"
-  pin "$span" '`coordinator`, `orchestrator`' "the orchestrator role word is in the grammar"
-  pin "$span" '`/context` or `/clear`' "local slash commands are named with the resume"
-  pin "$span" '/ossify:handoff-resume <path>' "the Claude resume form is named"
-  pin "$span" 'skill://handoff-resume <path>' "the OMP resume form is named"
-  pin "$span" 'prefix would break any slash command' "the exceptions give their reason" flat
-else
-  fail "the Send section spans enough lines to carry the rule" "got $n line(s) — an unreadable extraction fails closed"
-fi
-rm -f "$span"
+# D1: the rule is layer-neutral — an Orca seat's ping reaches the top as the same text — so
+# it lives in the shared file that owns the ping contract (`completion.md`, "The ping and
+# the heartbeat"), and in no layer file, where each layer would need its own copy.
+pin "$COMPLETION_MD" '[crew <kind> <role>]' "the tag grammar is stated"
+pin "$COMPLETION_MD" 'sends up to a parent or top session' "the tag rule is scoped to sends up"
+pin "$COMPLETION_MD" 'sends down to a worker' "down-sends are named untagged"
+pin "$COMPLETION_MD" '`coordinator`, `orchestrator`' "the orchestrator role word is in the grammar"
+pin "$COMPLETION_MD" '`/context` or `/clear`' "local slash commands are named with the resume"
+pin "$COMPLETION_MD" '/ossify:handoff-resume <path>' "the Claude resume form is named"
+pin "$COMPLETION_MD" 'skill://handoff-resume <path>' "the OMP resume form is named"
+pin "$COMPLETION_MD" 'prefix would break any slash command' "the exceptions give their reason" flat
 
 section "the status block is stated"
 

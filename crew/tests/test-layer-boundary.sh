@@ -172,12 +172,18 @@ section "rules stay out of the layer file"
 # anchor below is such a rule phrase; the pair is the check — the phrase must be ABSENT from
 # every `layers/*.md` AND present EXACTLY ONCE in the shared file that owns it, so a phrase
 # that leaves the layer file and never lands in its home fails too.
+#
+# D1 (2026-10-18): the #867 send-tag rule is layer-neutral — an Orca seat's ping reaches the
+# top as the same text — so the rule left `layers/herdr.md` for `completion.md`; the two
+# send-tag anchors below pin it there and out of every layer file.
 ANCHORS="$(printf '%s\n' \
   "the generation check governs all three	completion.md" \
   "A child's pain	completion.md" \
   "One bounded background timer of about 15 minutes	completion.md" \
   "MOLT WARNING <pct> <task id>	completion.md" \
   "doorbell is the report file	completion.md" \
+  "sends up to a parent or top session	completion.md" \
+  "Sends that stay untagged	completion.md" \
   "SEAT_MODS_ROLE=coordinator	roles.md" \
   "closes last	roles.md")"
 

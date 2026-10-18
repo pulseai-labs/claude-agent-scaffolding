@@ -69,7 +69,11 @@ SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=239  # 2026-10-18 (merge of origin/main, crew 0.3.1): +16 — `## Send` gains the
+REF_BUDGET=223  # 2026-10-18 (D1): -16 — the #867 tag paragraphs (the tag rule, what stays
+# untagged, the role words) moved to completion.md, where the ping contract is stated once
+# for every layer — an Orca seat's ping reaches the top as the same text. The layer's `Send`
+# keeps the send itself, its bullets and the turn-start check. 239 -> 223.
+# 2026-10-18 (merge of origin/main, crew 0.3.1): +16 — `## Send` gains the
 # #867 tag paragraphs (the tag rule, what stays untagged, the role words): 223 -> 239.
 # 2026-10-18 (V13 fix): -1 — the Machines step dropped the halt it restated
 # for an unknown `host:` value (`config.md` owns it); the label mapping stays. 224 -> 223.
