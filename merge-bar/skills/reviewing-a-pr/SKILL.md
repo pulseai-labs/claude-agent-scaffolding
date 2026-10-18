@@ -102,8 +102,10 @@ The diff under review is `<previous report's Head>..HEAD` — the fix diff. Then
 - **New mechanism.** A fix that adds behaviour rather than closing a class — a retry, a
   fallback, a new flag — is marked `New mechanism: yes — <what>`, so the work-PR session can
   cut it or split it out.
-- **Nothing else.** Code the fix diff did not touch is not re-read; a defect there is not this
-  round's.
+- **Nothing else.** Every site of every class in the report is a line of the fix diff or a
+  site of a prior class. A gap the fix leaves — new behaviour with no test — is pinned to the
+  fix-diff lines that lack it, never to an untouched file; a point about code the fix diff did
+  not touch is not this round's, true or not.
 
 No previous report to read → run round 1 on the whole PR and say why in the header. Never
 review a fix diff with no class list.

@@ -1,0 +1,1 @@
+{"scores":{"class_complete":5,"bar_sorted":5,"coverage_stated":5,"round_scope":5,"inputs_resolved":5},"pass":true,"notes":"Falls back to round 1 over the whole PR with the reason in the header, lists all three files with read gaps stated, and finds the blocking drain break (condition 1, also 2) with direction named and no invented prior classes."}
