@@ -173,8 +173,10 @@ export const register: Register = on => {
     const warn = turn?.failedAfterRewrite === true
     // The main turn is over.
     turn = undefined
-    // The warning is its own last line: a `text` beneath (core's or a hook's)
-    // is output the turn produced and is kept (CodeRabbit, PR #874).
-    return warn ? { ...r, text: r.text === '' ? STATUS_WARNING : `${r.text}\n${STATUS_WARNING}` } : r
+    // Core's result text repeats `e.answer`; only a text a mod beneath set is
+    // output of its own. The warning replaces core's text (the reply would
+    // otherwise show twice) and appends after any other, its own last line
+    // (review round 2, PR #874).
+    return warn ? { ...r, text: r.text === '' || r.text === e.answer ? STATUS_WARNING : `${r.text}\n${STATUS_WARNING}` } : r
   })
 }

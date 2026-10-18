@@ -763,8 +763,8 @@ describe('orchestrator status block (#867)', () => {
     const second = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
     expect(second.block).toBeUndefined()
     const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
-    // The beneath completion's text survives; the warning is its own last line.
-    expect(done.text).toBe('Done.\n' + STATUS_WARNING)
+    // The beneath text is core's own (it repeats e.answer): the warning replaces it.
+    expect(done.text).toBe(STATUS_WARNING)
   })
 
   test('4. a good block passes and adds no warning', async ($, on) => {
@@ -848,7 +848,7 @@ describe('orchestrator status block (#867)', () => {
     const sub = await $.turn.complete({ answer: 'sub', durationMs: 1, isAborted: false, turnId: 't2', agentId: 'a1', reason: 'answer' })
     expect(sub.text).toBe('sub')
     const main = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
-    expect(main.text).toBe('Done.\n' + STATUS_WARNING)
+    expect(main.text).toBe(STATUS_WARNING)
     const after = await $.turn.complete({ answer: 'sub2', durationMs: 1, isAborted: false, turnId: 't3', agentId: 'a1', reason: 'answer' })
     expect(after.text).toBe('sub2')
   })
@@ -860,5 +860,14 @@ describe('orchestrator status block (#867)', () => {
     await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
     const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
     expect(done.text).toBe(STATUS_WARNING)
+  })
+
+  test("12. a beneath text of its own survives, warning last", async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' }, undefined, () => ({ text: 'Beneath says so.' }))
+    await $.prompt.submit(notify())
+    await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe('Beneath says so.\n' + STATUS_WARNING)
   })
 })
