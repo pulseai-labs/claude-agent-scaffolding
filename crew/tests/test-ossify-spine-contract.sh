@@ -550,10 +550,10 @@ pin "$PRBRIEFS_MD" 'release the seat' \
   "the walk seat is released once its report is read"
 pin "$PRBRIEFS_MD" 'One seat per entry, from that row only' \
   "the exception is narrow: one seat per entry, from that row only"
-pin "$EXEC_MD" 'creating any seat but the one demo-walk seat' \
-  "the close's own row states the seat-creation exception"
-pin "$PRBRIEFS_MD" 'the one demo-walk seat a `user:` entry its `DEMO_WALK` names' \
-  "the close's NEVER states the same exception"
+pin "$EXEC_MD" 'creating any seat but the demo-walk seat a `user:` entry its `DEMO_WALK` names needs — one per entry' \
+  "the close's own row states the seat-creation exception, one demo-walk seat per entry"
+pin "$PRBRIEFS_MD" 'one demo-walk seat per `user:` entry its `DEMO_WALK` names' \
+  "the close's NEVER states the same exception, one demo-walk seat per entry"
 
 section "the demo walk is a whole contract (Task 13)"
 
@@ -2132,17 +2132,17 @@ pin "$LIFECYCLE_MD" 'for a retained implementer whose profile can run a local sl
   "lifecycle step 5's probe sentence names both conditions the rule turns on" flat
 
 # The whole-branch review's finding 1: README's What-ships row for `briefs.md` counted
-# five dispatched templates where the file ships nine — the four ossify dispatch
+# five dispatched templates where the file ships ten — the dedicated dispatch
 # templates absent from the listing surface a reader opens first. Measured on a scratch
 # copy before this pin existed: with the row reverted to "Five dispatched brief
 # templates …", the whole suite stayed green (528/0 — 55 in config, the one assertion a
 # standalone clone skips being the repo-root marketplace sweep), so the row was
 # revertible in silence, exactly as the reviewer reported. The needle is the clause and
-# not the count alone: it names the four templates, because their absence was half the
+# not the count alone: it names the five templates, because their absence was half the
 # finding. Per-line, and it sits whole on the row's one line; a later reword of the row
 # fails it loudly rather than silently, which is the direction this suite accepts.
-pin "$PLUGIN_README_MD" 'Nine dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the four dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close)' \
-  "README's What-ships row counts the nine dispatched templates and names the four dedicated ones"
+pin "$PLUGIN_README_MD" 'Ten dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the five dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close, demo walk)' \
+  "README's What-ships row counts the ten dispatched templates and names the five dedicated ones, the demo walk included"
 
 # T4 G2. Deleting these from lifecycle.md left the suite green. The last is
 # `flat` because the file breaks its line inside the clause today.

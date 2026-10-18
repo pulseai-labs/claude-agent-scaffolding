@@ -71,7 +71,7 @@ no seat.
 
 **An activated ossify spine has four briefs of its own** — spine session, item
 implementer, item verifier, and the correction message — in
-`references/ossify-briefs.md`. They do not replace the nine here, which still govern
+`references/ossify-briefs.md`. They do not replace the ten here, which still govern
 every other dispatch; the item verifier's CLAIMS is this file's verifier CLAIMS body,
 filled into its brief by the coordinator, and `ossify-briefs.md` does not restate it.
 

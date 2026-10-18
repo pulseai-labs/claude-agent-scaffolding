@@ -156,10 +156,11 @@ merge gate, handoff. One run per objective. You drive the steps and nothing else
 
 ## 5. Briefs
 
-`references/briefs.md` ships nine dispatched briefs: the generic five — planned
-implementer, fast implementer, fix round, reviewer, verifier — and the four ossify
+`references/briefs.md` ships ten dispatched briefs: the generic five — planned
+implementer, fast implementer, fix round, reviewer, verifier — the four ossify
 dispatch templates — lane driver, doctor dispatch, direct work-item, non-spine close —
-plus the correction-request message template, which is a send, not a session. Each
+and the demo walk a close dispatch constructs, plus the correction-request message
+template, which is a send, not a session. Each
 template is a whole contract, complete on its own; the rule and the dispatch matrix that
 makes it checkable are that file's header. A brief is the whole contract the worker
 will ever see, because a worker session has no orchestration context and may be

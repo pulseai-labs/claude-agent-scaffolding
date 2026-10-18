@@ -11,8 +11,8 @@ whole contract its reader will ever see — fill every slot, delete nothing else
 ## Close session (one fresh seat per dispatch, created by the top)
 
 The top marks it `coordinator` before its command (the layer's `Seat marking`).
-It creates nothing but the one demo-walk seat `DEMO_WALK` names, and returns a list; only the
-successful record pass is single and conditional.
+It creates nothing but one demo-walk seat per `user:` entry `DEMO_WALK` names, and returns a
+list; only the successful record pass is single and conditional.
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
@@ -83,7 +83,7 @@ naming each finding, its `target_repo`, its decision and the reason: the record 
 cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 MOLT: if molt warns you, send one ping, `<PING_SEND> '[crew molt coordinator] <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
-NEVER: create a seat — the one demo-walk seat a `user:` entry its `DEMO_WALK` names is the
+NEVER: create a seat — one demo-walk seat per `user:` entry its `DEMO_WALK` names is the
 only exception, launched from that row, waited on and released as the TASK says — merge on
 your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
