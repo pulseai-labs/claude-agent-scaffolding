@@ -1,0 +1,1 @@
+{"scores":{"class_complete":4,"bar_sorted":5,"coverage_stated":5,"round_scope":5,"inputs_resolved":5},"pass":true,"notes":"README class sorted condition 2 (direction n/a) and listed first, race sorted non-blocking on the derived-data reasoning ignoring the P1/nit labels; minor blemish is C1 listing an overlapping second README site and an extra non-blocking C3."}
