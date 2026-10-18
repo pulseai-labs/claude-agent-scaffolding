@@ -10,6 +10,8 @@ them, hold the rules and never carry a command, and this is the file
 
 ## Health
 
+The executable is `orca` on macOS and `orca-ide` on Linux — a bare `orca` there can be the
+GNOME screen reader — and this file writes `orca` for whichever the host has.
 `orca status --json` answers whether the app and its runtime are up; its runtime id is the
 incarnation `Identity` records. Failing, it is a refused run (`SKILL.md` §7). The heartbeat's
 per-tick read is `orca terminal show --terminal <h> --json`; an errored read is unreadable,
