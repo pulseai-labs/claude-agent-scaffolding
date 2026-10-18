@@ -120,16 +120,16 @@ the operator (`roles.md`).
 
 ## Machines
 
-`orca host list` names what this host can target and what to pass; every call for a seat on
-another machine carries `--environment <name>` — its handles belong to it. That list names
-this machine too, under its own `machineName`: a seat's `host:` value is one of those names,
-this machine's included. `--host` means
-`ssh:<id>` or `runtime:<env-id>`: a different kind of target, and the common way to get an
-empty answer is passing one where the other belongs. On a host crew does not control: create
-the terminal with no `--command`, read until the shell prompt shows, clear any start-up
-prompt (`n` + Enter on the Mac's zsh update question), then send the seat command and verify
-the agent and its environment — Orca injects `--command` at create, so no post-create wait
-protects it.
+`orca host list` names what this host can target and what to pass: each row carries its own
+selector — `--host ssh:<target-id>` for an SSH target, `--environment <server-name>` for a
+paired server — and every call for a seat on another machine carries that row's selector,
+because its handles belong to it; the other kind's flag is refused with a message naming the
+right one. That list names this machine too, under its own `machineName`:
+a seat's `host:` value is one of those names, this machine's included. On a host crew does
+not control: create the terminal with no `--command`, read until the shell prompt shows,
+clear any start-up prompt (`n` + Enter on the Mac's zsh update question), then send the seat
+command and verify the agent and its environment — Orca injects `--command` at create, so no
+post-create wait protects it.
 
 A seat's report file is read where it is written: its one-line `REPORT:` receipt arrives
 through `Read`, carrying the selector above when the seat is on another machine, and the full
