@@ -29,8 +29,8 @@ file, as dagr's producer contract requires.
 
 - every item task, and each round's barrier, is recorded in `RUN_JSON`, never in your `run.json`;
 - the spine session is the orchestrator of its own run, so it launches, sends to, waits
-  on and releases its item seats as the layer file says — each a tab in its run's
-  workspace, with its own `--cwd`, the worktree ossify prepared for the item;
+  on and releases its item seats as the layer file says, each in the worktree ossify
+  prepared for the item;
 - plan, gap, depth and other spine-level questions come up in its report file, and
   you answer by sending it its next message;
 - an item seat's question reaches the spine session the same way, in that seat's

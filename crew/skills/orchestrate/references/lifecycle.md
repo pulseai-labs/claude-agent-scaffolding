@@ -73,9 +73,9 @@ Every command's syntax comes from the layer's guide.
    within a round may run in parallel; their merges are serial.
 3. **Launch.** The seat launch — pane creation, the readiness wait, the banner read that
    confirms the model, then the brief delivered as `brief_delivery` says (inject or
-   file) on the route the layer file fixes from its second detection ask after
-   that read — is `roles.md`'s "The launch," with the undetected-seat path in
-   the layer file. An implementer, verifier or reviewer seat's launch also
+   file) on the send route the layer file fixes after that read — from its second
+   detection ask where the layer has one — is `roles.md`'s "The launch," with any
+   undetected-seat path in the layer file. An implementer, verifier or reviewer seat's launch also
    runs the guarded-seat export `roles.md`'s launch block states, before its
    command. The run's workspace can
    go before the run does — a first seat's release may take it — so a later launch
@@ -294,7 +294,7 @@ file by hand without it. Open a new tab and pane with the launch command the han
 when none did; an alias carries provider settings `ps` does not show — in the workspace
 the layer's Identity names, the top's own, never the run's. **Launch it as the seat launch the layer file states** — marked `orchestrator`
 before its command (the layer's `Seat marking`) — using the destination host's recorded profile for the readiness
-path and model read, then the second detection ask, and send its resume on the route that ask fixes: with ossify,
+path and model read, then the layer file's send route (its second detection ask where it has one), and send its resume on that route: with ossify,
 `skill://handoff-resume <path>` to an OMP top and `/ossify:handoff-resume <path>` to a Claude Code top; without it,
 the path as its first instruction on either. From the handoff on, this session writes nothing to the run file and
 takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.

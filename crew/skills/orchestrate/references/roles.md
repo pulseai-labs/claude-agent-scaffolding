@@ -141,8 +141,9 @@ the model read (the layer's Read) — the orchestrator's one context source: pas
 `/context` reports, or an auto-compact, the next item goes to a fresh implementer. That
 probe is the mechanism for the seats that can answer it, and a seat is sent one only when
 both hold: its profile can run a local slash command, and the send route that reaches it —
-the second detection ask's answer (`layers/<layer>.md`) — carries one. A seat failing
-either condition — a profile without the capability, or a pane that ask finds undetected —
+the layer file's send route (`layers/<layer>.md`; its second detection ask's answer where it
+has one) — carries one. A seat failing either condition — a profile without the capability,
+or a route that cannot carry the command —
 is never sent the probe, and rotates at its item boundary instead, on the run's own record:
 the item it has just finished, not a probe it cannot answer. The
 implementer returns its handoff inputs in its report file; the orchestrator writes the
