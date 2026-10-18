@@ -4,7 +4,7 @@
 # "At least once" (`grep -Fq`) cannot see the loss it guards when the same words
 # occur elsewhere in the file: delete the guarded sentence and the other copy
 # keeps the check green (pulse360 `verify-step-halt-swallowed-false-pass`).
-# herdr-crew/tests/_helpers.sh has the same contract. Source after harness.sh.
+# crew/tests/_helpers.sh has the same contract. Source after harness.sh.
 pin() {
   local c
   if [ ! -r "$1" ] || [ -z "$2" ]; then

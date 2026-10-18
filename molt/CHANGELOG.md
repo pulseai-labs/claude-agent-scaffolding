@@ -2,6 +2,12 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.5 — 2026-10-18
+
+- **Naming: the crew references say `crew`** (crew 0.3.0's rename, spec §4.6). The two README
+  lines that name the launcher marking a child seat and the crew context-ceiling hook this
+  plugin displaces now name `crew`. No behaviour changes.
+
 ## 0.3.4 — 2026-10-17
 
 - **OMP: the status meter follows the window** (#842). After a clear-and-seed, molt's status line kept the old

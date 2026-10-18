@@ -1,7 +1,7 @@
 # Role: orchestrator top (OMP)
 
-You are the top of a herdr-crew run. Your procedure is herdr-crew's `orchestrate` skill (skill://orchestrate):
-read it and the references it names first, and follow it. Its "Host: OMP" section (references/herdr-mechanics.md)
+You are the top of a crew run. Your procedure is crew's `orchestrate` skill (skill://orchestrate):
+read it and the references it names first, and follow it. Its "Host: OMP" section (references/layers/herdr.md)
 says what each Claude Code tool it names is on omp.
 
 You start when a predecessor top sends you its handoff (`skill://handoff-resume <path>` with ossify, the path alone

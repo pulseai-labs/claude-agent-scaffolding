@@ -12,14 +12,14 @@ const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1
 export const ROLES: Record<string, string | undefined> = {
   worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
   orchestrator: 'orchestrator.md', 'crew-spine': 'crew-spine.md', 'crew-work-pr': 'crew-work-pr.md',
-}   // role → roles/<file>.md; the crew-* roles follow a herdr-crew activated brief (#839)
+}   // role → roles/<file>.md; the crew-* roles follow a crew activated brief (#839)
 // A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798) and
 // autonomic's live mode file, so the herdr seats it launches inherit autopilot.
 const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4', autonomic: '0.7.0' } }
-// A role whose procedure is another plugin's skill: the orchestrator follows herdr-crew's orchestrate skill, whose
-// "Host: OMP" section ships in 0.2.19. Only omp's own record counts: omp does not discover a Claude Code user-scope
+// A role whose procedure is another plugin's skill: the orchestrator follows crew's orchestrate skill, whose
+// "Host: OMP" section ships in 0.3.0. Only omp's own record counts: omp does not discover a Claude Code user-scope
 // plugin unless its claude-plugins provider is enabled.
-const ROLE_SKILL: Record<string, { plugin: string; min: string }> = { orchestrator: { plugin: 'herdr-crew', min: '0.2.19' } }
+const ROLE_SKILL: Record<string, { plugin: string; min: string }> = { orchestrator: { plugin: 'crew', min: '0.3.0' } }
 
 // `orc`: the operator's one-word OMP top. It names the orchestrator role, marks the session for the #798 rail when
 // nothing else did (another role is kept, so planLaunch refuses it), and runs GLM 5.3 unless --via names a wrapper.

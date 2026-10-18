@@ -14,7 +14,7 @@ orchestrator (or any session you start to drive work) and `SEAT_MODS_ROLE=coordi
 close, work-PR and doctor sessions and lane drivers; both are unguarded.
 
 **Rollout: do not install 0.2.0 until every launcher you use — and your own interactive sessions —
-marks its free sessions.** `herdr-crew` 0.2.7 does; for any other
+marks its free sessions.** `crew` does — so did the pre-rename line from 0.2.7; for any other
 launcher, set `SEAT_MODS_ROLE=orchestrator` yourself, e.g. in your launch alias. Until then a coordinator or a bare `claude` session starts guarded as an implementer
 and cannot merge.
 
@@ -30,9 +30,9 @@ Two environment variables, both set **per spawn**:
 | | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
 | `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable — and a reviewer, whose profile may write only in these directories, then writes nothing. |
 
-`herdr-crew` 0.2.2 through 0.2.6 exports both in the pane of each implementer, verifier
-and reviewer seat before its command and leaves every other pane unset; with this release an unset
-pane is a guarded implementer. `herdr-crew` 0.2.7 sets `SEAT_MODS_ROLE=orchestrator` on the
+The pre-rename line's 0.2.2 through 0.2.6 export both in the pane of each implementer, verifier
+and reviewer seat before its command and leave every other pane unset; with this release an unset
+pane is a guarded implementer. 0.2.7 and every `crew` release set `SEAT_MODS_ROLE=orchestrator` on the
 top's rotation successor and `coordinator` on its coordinator seats (the spine, close and work-PR
 sessions, the doctor session, the lane driver). Neither directory may contain `:`, the
 list separator.
@@ -165,7 +165,7 @@ A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report 
 - `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.
 - Quoted command names such as `"cd"` are not recognised as directory changes.
 - `POSIXLY_CORRECT` operand ordering and a backslash-newline inside double quotes are not modelled.
-- **The guarded launch needs a POSIX shell in the seat's pane.** herdr-crew sets the variables
+- **The guarded launch needs a POSIX shell in the seat's pane.** crew sets the variables
   with `export`; a pane whose shell is Nushell leaves them unset, and the session runs under the
   default implementer rails — the status line reads `seat: implementer (default: SEAT_MODS_ROLE
   unset or empty)`.
