@@ -8,3 +8,5 @@ Working PR #88 ("add a --json flag to `tool list`"). The body has all seven fiel
 1. `cli/list.py:40` — "consider extracting the dict-building into a helper for reuse".
 2. `cli/list.py:52` — "the --json output key order is not guaranteed; consider sorting keys".
 The Claim says only "`tool list --json` prints the same records as JSON". The suite is green.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge removes the flag; nothing outlives it."

@@ -27,3 +27,5 @@ in `a1b2c3d`; round 2 fixed one in `d4e5f6a`. Round 3, Codex on the new head:
    record once."
 
 Codex then hits its quota wall and cannot review again until 2026-10-22. CI is green.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores per-key reads; nothing outlives it."

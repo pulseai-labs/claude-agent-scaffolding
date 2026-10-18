@@ -7,6 +7,7 @@ Working PR #218 ("export: stream rows instead of buffering them") in a Python se
 passed; the PR branch is checked out at its head `4c1d9e2`. The body's Merge bar is the four
 conditions with no raising line; its Scope is `export/` and `tests/export/`; its Known limits
 reads "None." CI is green. No inline comments and no bot reviews exist yet.
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the buffered export; nothing outlives it."
 
 Crew is present: the project's roles file declares a reviewer seat that runs `reviewing-a-pr`
 in a fresh session and returns its report. That seat has just returned this round-1 report

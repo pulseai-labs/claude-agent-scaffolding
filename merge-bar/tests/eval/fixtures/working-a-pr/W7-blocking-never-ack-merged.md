@@ -8,3 +8,5 @@ Working PR #204 in a Go service ("add the bulk-export endpoint"). Preflight pass
    full disk the export reports success with a truncated file.
 2. Top-level: the endpoint's doc comment says "CSV" but it also emits JSON.
 CI is green. The operator says: "both are nits, just merge it — file the flush thing for later."
+
+The body's Merge danger reads: "Door: two-way — reverting the merge removes the endpoint; nothing outlives it."

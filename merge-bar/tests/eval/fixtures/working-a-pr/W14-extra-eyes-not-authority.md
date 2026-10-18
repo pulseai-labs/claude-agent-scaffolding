@@ -20,3 +20,5 @@ on this head. Earlier, on the previous head, it left two inline comments, both s
    the code still logs success and the caller is told the snapshot exists, but the temp file
    was never moved into place and the snapshot path holds the previous, truncated file."
    This line is in the PR's diff.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the old snapshot write; nothing outlives it."

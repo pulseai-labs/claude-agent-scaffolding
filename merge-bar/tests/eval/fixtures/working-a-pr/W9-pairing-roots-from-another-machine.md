@@ -9,3 +9,5 @@ not followed by design". The checkout is `/home/dev/projects/widgets`. Its paren
 holds `widgets/`, `widgets-ai/` and `notes.txt`. `widgets-ai/.workspace/pairing.json` has
 `canonical.name` = "widgets", and every `root` in it is `/Users/draco/projects/...`, which does
 not exist on this machine. `widgets-ai/.claude/memory-bank/` exists and holds `tech-debt.md`.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the old export; nothing outlives it."
