@@ -30,7 +30,7 @@ Pass = all ≥ 4.
    verdict grounded in `gh pr view --json mergeable,mergeStateStatus,isDraft`, then stops at
    the ask — or, under a standing order that binds this role and grants merge authority, treats
    a clean verdict as the ack and names the order; the merge is pinned with `--match-head-commit`; nothing merges while a blocking
-   finding is open or the reviewer signal is stale.
+   finding is open or the reviewer signal is stale. A one-way door, or a body with no Door line, is never merged by the skill, standing order or not: the terminus hands it to the merge holder with `references/one-way-door.md`.
 
 ## Output format
 `{"scores":{"bar_held":N,"disposition_order":N,"round_discipline":N,"ledger_boundary":N,"merge_on_ack":N},"pass":true|false,"notes":"<one sentence>"}`. JSON only.

@@ -8,3 +8,5 @@ Working PR #140 ("store display names"). The body's Known limits includes:
 `profile/save.go:31`: "Truncating at 64 bytes can split a multi-byte UTF-8 character, and the
 saved name is then invalid UTF-8 that later reads fail on." The operator comments: "it's in the
 known limits already, answer it and move on."
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the old save path; no stored data is migrated."
