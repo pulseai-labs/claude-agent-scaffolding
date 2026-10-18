@@ -43,8 +43,9 @@ A new tree: `orca worktree create --repo id:<repo-id> --name <name> --base-branc
 under `~/orca/workspaces/<repo>/<name>` (not the repo's `.worktrees/`), branch
 `refs/heads/<github-user>/<name>`. Selectors `id:<…>` / `path:<dir>` / `name:<…>`; `path:`
 is what avoids `terminal_worktree_mismatch` when a call addresses a tree other than the
-caller's — the refusal creates nothing. `worktree create` also opens a default shell
-terminal no probe made; `Teardown` closes it with the worktree-wide close.
+caller's — the name comes from the design spec and was not probed. `worktree create` also
+opens a default shell terminal no probe made; `Teardown` closes it with the worktree-wide
+close.
 
 ## Seat launch
 

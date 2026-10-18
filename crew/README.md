@@ -1,9 +1,9 @@
 # crew
 
-The orchestrator/worker session model over herdr. One prose skill, no runtime library.
+The orchestrator/worker session model over herdr or Orca. One prose skill, no runtime library.
 
 One orchestrator session keeps its context for decisions and dispatches everything else
-to worker sessions launched by seat name through herdr — the seats defined in the
+to worker sessions launched by seat name through the project's layer — the seats defined in the
 operator's own files, not in this plugin. A planned-work seat and a bounded-work seat
 implement by complexity class, one reviewer seat runs its review command (`/code-review` by default) once per PR and
 returns its findings through its report file, the retained implementer works GitHub
