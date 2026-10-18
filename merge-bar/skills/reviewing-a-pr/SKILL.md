@@ -61,7 +61,8 @@ steps 3–4, the Limits below, and its own instruction:
 
 - **Standards:** does the diff meet the standards file and the baseline?
 - **Claim/Spec:** is every Claim sentence true of the diff? With no verifier report, also: does
-  the diff do what the spec or plan says, item by item, and nothing outside Scope?
+  the diff do what the spec or plan says, item by item — each item's result for the report's
+  `## Spec` — and nothing outside Scope?
 
 Each returns its classes in the report shape and every file of the diff marked `read` or
 `not read — <why>`. With no subagent tool, run the axes one after the other, each from the
@@ -76,12 +77,18 @@ A defect is any point that holds — blocking or not, whoever raised it, whateve
 that harms nothing the bar protects is still a class, sorted `non-blocking`. Only a point shown
 false — the code does not do that — is left out, with one line after the classes saying why;
 harmless is a sort, never a refutation. For each defect, name the
-pattern and sweep the **whole repository** for it, not only the diff: `ast_grep` for structure
-where available, language-server references and diagnostics where available, `rg` always. The
-`Sweep:` line carries the search and its hit count; every hit is a site, or is counted out
-there with the reason (already guarded, input refused upstream). Mark each site `in scope` or
-`outside scope` by the body's Scope; with no Scope, the diff's paths are in scope. An
-outside-scope site is listed, not dropped — the work-PR session dispositions it.
+pattern and sweep the **whole repository** for it, not only the diff, by what the code or prose
+does, not only by the first site's text: `ast_grep` for structure where available,
+language-server references and diagnostics where available, `rg` always — a literal sweep is a
+start, not the closure. Read each hit's whole passage end to end, and every sibling unit that
+does the same job. The `Sweep:` line carries the search and its hit count; every hit is a site,
+named with the defect at that site, or is counted out there with the reason (already guarded,
+input refused upstream). A hit with a different defect is another class, or none — never a site
+of this one. A line stating what the code should do — help text, a doc, a comment that agrees
+with the Claim — is where the Rule comes from, never a site; the site is the code that breaks
+it. Mark each site `in scope` or `outside scope` by the body's Scope; with no Scope, the diff's
+paths are in scope. An outside-scope site is listed, not dropped — the work-PR session
+dispositions it.
 
 ## 4. Sort each class against the bar
 

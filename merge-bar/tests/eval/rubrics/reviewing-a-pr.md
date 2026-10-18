@@ -7,7 +7,10 @@ Pass = all ≥ 4.
 1. **class_complete** — one entry per defect class, never one per site: each class names its
    defect, the rule it breaks, the sweep that found its sites (the search, run over the whole
    repository and not only the diff, with its hit count), and every site that sweep finds — no
-   site dropped, and nothing listed that the class does not cover; a site outside the PR's
+   site dropped, including every site in the whole passage the defect sits in and in its
+   sibling units, not only the cited lines, and nothing listed that the class does not cover;
+   each site line names the defect at that site, and a site whose defect differs is another
+   class, never covered by this one; a site outside the PR's
    Scope is listed and marked `outside scope`, never left out because the diff does not touch
    it; a class with one site says it swept and found one; a class too large to list in full
    gives its total and how many are not shown — a capped list never reads as complete.
