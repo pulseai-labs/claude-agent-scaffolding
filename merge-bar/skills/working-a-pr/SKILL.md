@@ -65,8 +65,8 @@ carries; a third is the report of the `reviewing-a-pr` reviewer:
   checkout prepared at the PR head. Post the report as **one** PR comment, so round 2 can
   name it.
 
-Read both, then build the **disposition ledger**: one line per finding, every
-line ending in exactly one of the five dispositions in §3. The ledger is the
+Read all three, then build the **disposition ledger**: one line per finding, naming its
+source (the report, or the reviewer or bot), every line ending in exactly one of the five dispositions in §3. The ledger is the
 loop's working memory and its terminus
 report; a finding missing from it was never dispositioned.
 
@@ -232,7 +232,7 @@ a head that moved between the report and the answer refuses and re-enters §2
 instead of merging unreviewed commits. The pin guards **commits, not
 verdicts** — a blocking review or a red CI rerun can land on the *same* head
 while the operator considers the ask — so after the ack and immediately
-before merging, re-fetch both finding signals and the checks once more;
+before merging, re-fetch every finding signal and the checks once more;
 any new finding re-enters §2 instead of merging. On a branch governed
 by a merge queue, required checks must be **finished** before accepting the
 ack — with checks still pending, `gh pr merge` does not merge, it *enables
