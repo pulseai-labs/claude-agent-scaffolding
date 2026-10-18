@@ -9,10 +9,10 @@ export const STATUS_LABELS: readonly string[] = [
   'What the PR(s) will carry:',
   'Next steps:',
   'Waiting on (seats live):',
-  'Operator decision pending:',
+  'Waiting on operator:',
 ]
 
-export const STATUS_CONTEXT = 'seat-mods (orchestrator): this is a status turn — no operator typed it. Use tool calls only and write no narration. End the turn with only the status block, these five lines in this order: **What I ruled:** / **What the PR(s) will carry:** / **Next steps:** / **Waiting on (seats live):** / **Operator decision pending:** — each with content ("none" is content) and nothing before or after. A block that waits on no seat and no operator decision while its Next steps names work is not a turn end: do that work first.'
+export const STATUS_CONTEXT = 'seat-mods (orchestrator): this is a status turn — no operator typed it. Use tool calls only and write no narration. End the turn with only the status block, these five fields, one per line, in this order (a blank line between fields is allowed): **What I ruled:** / **What the PR(s) will carry:** / **Next steps:** / **Waiting on (seats live):** / **Waiting on operator:** — each with content ("none" is content) and nothing before or after. **Waiting on operator:** takes "none", "decision: <question>" or "action: <what the operator must do>". A block that waits on no seat and no operator decision or action while its Next steps names work is not a turn end: do that work first.'
 
 export function rewriteReason(failed: string): string {
   return `seat-mods (orchestrator): a status turn ends with only the five-field status block. ${failed}. Rewrite your reply as the block and nothing else.`
@@ -22,7 +22,7 @@ export const STATUS_WARNING = '⚠ seat-mods: status block missing — this stat
 
 // The idle-stop copy (#876). The reason is the one block a turn gets for the
 // idle check; the warning is the line turn.complete shows when it stands.
-export const IDLE_REASON = 'seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the next step now, or name the seat, wake or decision you wait on.'
+export const IDLE_REASON = 'seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the next step now, or name the seat, wake, or operator decision or action you wait on.'
 
 export const IDLE_WARNING = '⚠ seat-mods: status block says nothing waits, but Next steps names work.'
 
@@ -80,27 +80,36 @@ const ESCAPED_LABELS = STATUS_LABELS.map(label => label.replace(/[.*+?^${}()|[\]
 // `What I ruled:** a` are malformed, not labels (AI PR #180 round 3).
 const LABEL_AT_START = ESCAPED_LABELS.map(label => new RegExp(`^\\s*(?:\\*\\*${label}\\*\\*|${label}(?!\\*\\*))`))
 
+// The five fields a status block check reads, in order: the reply's non-blank
+// lines, so a blank (whitespace-only) line between fields is skipped (#879),
+// and the lines past the fifth field apart in `rest`. One home for the
+// blank-line rule, read by both checkBlock and isIdleStop.
+function readBlock(reply: string): { fields: string[]; rest: string[] } {
+  const lines = reply.trim().split('\n').filter(line => line.trim() !== '')
+  return { fields: lines.slice(0, STATUS_LABELS.length), rest: lines.slice(STATUS_LABELS.length) }
+}
+
 export function checkBlock(reply: string): { ok: true } | { ok: false; failed: string } {
   const trimmed = reply.trim()
   if (trimmed === '') return { ok: false, failed: 'The reply is empty' }
-  const lines = trimmed.split('\n')
-  // All five labels take the same path: the line at the label's position must
+  const { fields, rest } = readBlock(reply)
+  // All five labels take the same path: the field at the label's position must
   // start with it and carry content after it — the first field included.
   for (let i = 0; i < STATUS_LABELS.length; i++) {
     const label = STATUS_LABELS[i] ?? ''
-    const line = lines[i]
+    const line = fields[i]
     const match = line === undefined ? null : LABEL_AT_START[i]?.exec(line) ?? null
     if (match === null) {
       // Only the first label's absence reads differently: the plan's copy names
       // text before the block, while a later label is missing or out of order.
       if (i === 0) return { ok: false, failed: 'Text comes before **What I ruled:**' }
-      const later = lines.slice(i + 1).some(candidate => LABEL_AT_START[i]?.test(candidate) === true)
+      const later = fields.slice(i + 1).concat(rest).some(candidate => LABEL_AT_START[i]?.test(candidate) === true)
       return { ok: false, failed: `**${label}** is ${later ? 'out of order' : 'missing'}` }
     }
     if (line.slice(match[0].length).trim() === '') return { ok: false, failed: `**${label}** has no content` }
   }
-  if (lines.length > STATUS_LABELS.length)
-    return { ok: false, failed: 'Text comes after **Operator decision pending:**' }
+  if (rest.length > 0)
+    return { ok: false, failed: 'Text comes after **Waiting on operator:**' }
   return { ok: true }
 }
 
@@ -111,18 +120,19 @@ export function checkBlock(reply: string): { ok: true } | { ok: false; failed: s
 // skips the nudge, which is today's behaviour.
 const NONE_AT_START = /^none\b/i
 
-// The idle-stop contradiction (#876): a valid block whose Waiting on and
-// Operator decision pending fields both read `none` while Next steps names
-// work. Defined only for a block checkBlock accepts; false otherwise.
+// The idle-stop contradiction (#876): a valid block whose two wait fields —
+// Waiting on (seats live) and Waiting on operator — both read `none` while
+// Next steps names work. Defined only for a block checkBlock accepts; false
+// otherwise.
 export function isIdleStop(reply: string): boolean {
   if (!checkBlock(reply).ok) return false
-  const lines = reply.trim().split('\n')
+  const { fields } = readBlock(reply)
   const content = (index: number): string => {
-    const line = lines[index] ?? ''
+    const line = fields[index] ?? ''
     const match = LABEL_AT_START[index]?.exec(line) ?? null
     return match === null ? '' : line.slice(match[0].length).trim()
   }
-  // Next steps is label 2, Waiting on 3, Operator decision pending 4.
+  // Next steps is label 2, Waiting on (seats live) 3, Waiting on operator 4.
   return NONE_AT_START.test(content(3)) && NONE_AT_START.test(content(4)) && !NONE_AT_START.test(content(2))
 }
 

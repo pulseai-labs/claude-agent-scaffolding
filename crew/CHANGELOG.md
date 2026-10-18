@@ -9,6 +9,15 @@ All notable changes to the `crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.4.1
+
+**The status block's second wait field is `Waiting on operator:`** (#879). §8's block names
+`Waiting on operator:` in field 5 (was `Operator decision pending:`), taking `none`,
+`decision: <question>` or `action: <what the operator must do>`, and states five fields, one per
+line, with a blank line between fields allowed — not "exactly five lines". seat-mods 0.7.0
+enforces the label, the forms and the blank-line rule on a Claude Code top's status turn; the
+same text reaches an OMP top through omp-roles 0.7.5's `orchestrator` role.
+
 ## 0.4.0
 
 **The Orca layer ships** (spec §4.1, plan Part C). `layer: orca` now loads

@@ -1,12 +1,19 @@
 import { describe, test, expect } from 'claude-code/testing'
 import { checkBlock, classifyPrompt, isCrewTagged, hasMoltHandoff, isIdleStop, IDLE_REASON, IDLE_WARNING, STATUS_CONTEXT } from '../hooks/status'
 
-const BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
+const BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Waiting on operator:** none'
 
 describe('checkBlock', () => {
   test('the block passes, bold or plain', () => {
     expect(checkBlock(BLOCK)).toEqual({ ok: true })
     expect(checkBlock(BLOCK.replaceAll('**', ''))).toEqual({ ok: true })
+  })
+  test('blank lines between fields pass (#879)', () => {
+    expect(checkBlock(BLOCK.replaceAll('\n', '\n\n'))).toEqual({ ok: true })
+  })
+  test('the old label in field 5 now fails (pinned control, #879)', () => {
+    expect(checkBlock(BLOCK.replace('**Waiting on operator:** none', '**Operator decision pending:** none')))
+      .toEqual({ ok: false, failed: '**Waiting on operator:** is missing' })
   })
   test('narration before the block fails', () => {
     expect(checkBlock('Done.\n' + BLOCK)).toEqual({ ok: false, failed: 'Text comes before **What I ruled:**' })
@@ -35,7 +42,7 @@ describe('checkBlock', () => {
     expect(checkBlock('What I ruled:** a')).toEqual({ ok: false, failed: 'Text comes before **What I ruled:**' })
   })
   test('a line after the block fails; trailing whitespace passes', () => {
-    expect(checkBlock(BLOCK + '\n\nAlso, I checked the logs.')).toEqual({ ok: false, failed: 'Text comes after **Operator decision pending:**' })
+    expect(checkBlock(BLOCK + '\n\nAlso, I checked the logs.')).toEqual({ ok: false, failed: 'Text comes after **Waiting on operator:**' })
     expect(checkBlock(BLOCK + '\n\n')).toEqual({ ok: true })
   })
 })
@@ -88,8 +95,8 @@ test('rotation resumes are status', () => {
 describe('isIdleStop (#876)', () => {
   // Blocks built from the five labels with given contents; the plain variant
   // strips the markers, since a label counts bold or plain.
-  const fb = (next: string, waiting: string, decision: string) =>
-    `**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** ${next}\n**Waiting on (seats live):** ${waiting}\n**Operator decision pending:** ${decision}`
+  const fb = (next: string, waiting: string, operator: string) =>
+    `**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** ${next}\n**Waiting on (seats live):** ${waiting}\n**Waiting on operator:** ${operator}`
 
   test('both wait fields none with work in Next steps is idle, bold or plain', () => {
     const idle = fb('do X', 'none', 'none')
@@ -113,13 +120,26 @@ describe('isIdleStop (#876)', () => {
     expect(isIdleStop(fb('open the PR', 'nonetheless a seat', 'none'))).toBe(false)
   })
 
+  test('a field-5 action: wait with no seat is not idle (#879)', () => {
+    const action = fb('open the PR', 'none', 'action: start a fresh session')
+    expect(checkBlock(action)).toEqual({ ok: true })
+    expect(isIdleStop(action)).toBe(false)
+  })
+
+  test('control for the action wait: the same block with field 5 none is idle (#879)', () => {
+    expect(isIdleStop(fb('open the PR', 'none', 'none'))).toBe(true)
+  })
+
   test('a malformed reply is not idle', () => {
     expect(isIdleStop('Done.')).toBe(false)
   })
 
   test('the context sentence and the idle copy are the plan\'s verbatim', () => {
     expect(STATUS_CONTEXT.endsWith('do that work first.')).toBe(true)
-    expect(IDLE_REASON).toBe('seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the next step now, or name the seat, wake or decision you wait on.')
+    // The context teaches the new field and its forms (#879).
+    expect(STATUS_CONTEXT).toContain('**Waiting on operator:**')
+    expect(STATUS_CONTEXT).toContain('"decision: <question>" or "action: <what the operator must do>"')
+    expect(IDLE_REASON).toBe('seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the next step now, or name the seat, wake, or operator decision or action you wait on.')
     expect(IDLE_WARNING).toBe('⚠ seat-mods: status block says nothing waits, but Next steps names work.')
   })
 })

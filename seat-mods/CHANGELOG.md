@@ -2,6 +2,21 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.7.0 — 2026-10-19
+
+- **The status block waits on the operator, and a blank line between fields is fine** (#879). The
+  fifth field is `Waiting on operator:` (was `Operator decision pending:`), taking `none`,
+  `decision: <question>` or `action: <what the operator must do>` — an action only the operator
+  can take (start a fresh session, /clear, a login) now has a spelling, as a decision did. It is
+  the block's second wait field beside `Waiting on (seats live):`, so the idle-stop contradiction
+  (#876) reads both as before. A blank (whitespace-only) line between fields no longer fails the
+  block as out of order: the five labels still come in order, one field per line, nothing before
+  the first label and no non-blank line after the fifth, and the trailing-text failure names the
+  new label. `checkBlock` and `isIdleStop` now read the fields through one shared reader. The
+  context line teaches the new field, its forms and the blank-line allowance, and the idle copy's
+  last sentence becomes "Do the next step now, or name the seat, wake, or operator decision or
+  action you wait on."
+
 ## 0.6.0 — 2026-10-18
 
 - **A status block that says nothing waits no longer ends the turn** (#876). On a status turn of
