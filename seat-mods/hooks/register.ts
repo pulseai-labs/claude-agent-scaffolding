@@ -1,12 +1,14 @@
 import type { Register } from 'claude-code'
 import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
-import { classifyPrompt, checkBlock, hasMoltHandoff, rewriteReason, STATUS_CONTEXT, STATUS_WARNING } from './status'
+import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, rewriteReason, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING } from './status'
 
 // The live turn's status state, one session per process: set at prompt.submit,
 // read at classic.Stop, cleared at the main loop's turn.complete. It is defined
 // only inside an orchestrator's turn, so every check below skips otherwise.
-let turn: { status: boolean; blocked: boolean; failedAfterRewrite: boolean } | undefined
+// `warning` is the line of the failure that stood at the last stop — the shape
+// check's or the idle check's (#876) — or undefined.
+let turn: { status: boolean; blocked: boolean; warning: string | undefined } | undefined
 
 async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
@@ -141,7 +143,7 @@ export const register: Register = on => {
     // With the prompt confirmed in: a new turn sets the record from its kind; a
     // non-waiting operator prompt typed into the running turn frees it.
     if (e.turnId === undefined) {
-      turn = { status: kind === 'status', blocked: false, failedAfterRewrite: false }
+      turn = { status: kind === 'status', blocked: false, warning: undefined }
     } else if (kind === 'operator' && e.wait !== true && turn !== undefined) {
       turn.status = false
     }
@@ -154,22 +156,28 @@ export const register: Register = on => {
     if (r.block !== undefined) return r
     const state = await roleOf($)
     if (state.kind !== 'free' || state.role !== 'orchestrator' || turn?.status !== true) return r
-    if (hasMoltHandoff(e.last_assistant_message ?? '')) {
-      turn.failedAfterRewrite = false
+    const reply = e.last_assistant_message ?? ''
+    if (hasMoltHandoff(reply)) {
+      turn.warning = undefined
       return r
     }
-    const check = checkBlock(e.last_assistant_message ?? '')
-    if (check.ok) {
-      turn.failedAfterRewrite = false
+    // The shape failure first, else the idle failure (#876): one block per turn
+    // is shared by both checks, in either order.
+    const check = checkBlock(reply)
+    const failure = !check.ok
+      ? { reason: rewriteReason(check.failed), warning: STATUS_WARNING }
+      : isIdleStop(reply) ? { reason: IDLE_REASON, warning: IDLE_WARNING } : undefined
+    if (failure === undefined) {
+      turn.warning = undefined
       return r
     }
     if (turn.blocked) {
-      // The one rewrite stands: let this stop through, and mark it for turn.complete.
-      turn.failedAfterRewrite = true
+      // The one block stands: let this stop through, and mark it for turn.complete.
+      turn.warning = failure.warning
       return r
     }
     turn.blocked = true
-    return { ...r, block: rewriteReason(check.failed) }
+    return { ...r, block: failure.reason }
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -178,13 +186,13 @@ export const register: Register = on => {
     if (e.agentId !== undefined) return r
     const state = await roleOf($)
     if (state.kind !== 'free' || state.role !== 'orchestrator') return r
-    const warn = turn?.failedAfterRewrite === true
+    const warning = turn?.warning
     // The main turn is over.
     turn = undefined
     // Core's result text repeats `e.answer`; only a text a mod beneath set is
     // output of its own. The warning replaces core's text (the reply would
     // otherwise show twice) and appends after any other, its own last line
-    // (review round 2, PR #874).
-    return warn ? { ...r, text: r.text === '' || r.text === e.answer ? STATUS_WARNING : `${r.text}\n${STATUS_WARNING}` } : r
+    // (review round 2, PR #874; the idle warning takes the same place, #876).
+    return warning === undefined ? r : { ...r, text: r.text === '' || r.text === e.answer ? warning : `${r.text}\n${warning}` }
   })
 }
