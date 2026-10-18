@@ -68,7 +68,9 @@ LIFE="$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=228  # 2026-10-17: crew 0.3.0 Task 4 — the `## Send` section gained the PING_SEND
+REF_BUDGET=227  # 2026-10-18 (round 3): the machine-file key left 0.3.0 for 0.4.0 and took the
+# `## Machines` pointer to it with it (one line), so the count went 228 -> 227.
+# 2026-10-17: crew 0.3.0 Task 4 — the `## Send` section gained the PING_SEND
 # slot definition and its one-line statement (3 lines), so the count went 225 -> 228.
 
 # shellcheck source=/dev/null

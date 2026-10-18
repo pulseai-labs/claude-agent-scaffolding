@@ -210,8 +210,7 @@ order, and what a refused remove does, are `roles.md`'s Teardown order.
 A `machine` is a remote server's `herdr machine list` label; this server's machine is its `hostname -s`.
 Every command for a seat on that machine carries `herdr --machine <label>`, with its ids
 discovered there: ids and agent names are scoped to one server, and `--current` reaches no
-remote pane. The operator names one in the machine file's `host:`; the rules for reaching it and
-placing a seat on it are `config.md`'s.
+remote pane.
 
 ## Host: OMP
 

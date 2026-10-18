@@ -23,16 +23,13 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=228          # 2026-10-18 (round 2): +12 for the `host:` row in the profile table and
-                        # the rule that stops a host value crossing a session boundary (PR #871
-                        # round 2, Codex C5).
+REF_BUDGET=208          # 2026-10-18 (round 3): -20 — the machine-file key leaves 0.3.0 and ships in
+                        # 0.4.0 with its first user, so the field entry, the profile-table row and
+                        # the rule that refused a crossing value go with it. This note supersedes
+                        # the +12 (round 2) and the +7 (2026-10-17) notes: both counted those lines.
                         # 2026-10-18: +2 for the `layer:` line in the missing-file remedies (PR #871
                         # round 1): the two bullets that tell the operator to create or move the
                         # project file now name the line it has to open with.
-                        # 2026-10-17: +7 for the machine rules beside `host:` (a seat runs elsewhere only
-                        # when the operator names one, an unknown machine halts, place a seat only where its
-                        # report file is readable, a connection failure proves nothing) — Task 3 fix round moved
-                        # them out of layers/herdr.md into this file (spec §2), the same shared home as the key.
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
@@ -88,7 +85,7 @@ pin "$SKILL_MD" "The layer's health check fails" "§7's first refusal is the lay
 pin "$SKILL_MD" "The layer's Identity step finds no own address" "§7's second refusal is the layer's Identity step"
 
 section "the agent entry"
-for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'review:' 'note:' 'host:'; do
+for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'review:' 'note:'; do
   present "$CONFIG_MD" "$field" "agent field $field is documented"
 done
 present "$CONFIG_MD" 'model_shows: banner' "banner is a documented value"
@@ -98,29 +95,20 @@ present "$CONFIG_MD" 'brief_delivery: file' "file delivery is a documented value
 present "$CONFIG_MD" 'absent, `/code-review <PR> <LEVEL>`.' "a reviewer with no review: field runs /code-review"
 present "$CONFIG_MD" '| reviewer | its agent'"'"'s `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |' "the reviewer's can: need follows its review command"
 
-section "the resolved profile and a host that never travels"
-# PR #871 round 2, Codex C5. The machine file's `host:` may not be dropped, and 0.3.0 does
-# not carry it in a profile that crosses a session boundary — so the table says what it
-# does, the four approval sites that hand a profile over refuse an agent that names one,
-# and the rendered row itself carries no host, which is the shape a row would have to have
-# for one to travel by accident. Phrased flat where the rule wraps: a per-line count would
-# call a reworded-but-present clause absent.
-pin "$CONFIG_MD" '| `host:` | the machine entry | the launch | never in 0.3.0 — the approval sites refuse it (below) |' \
-  "the profile table says a host value never travels in 0.3.0"
-pin "$CONFIG_MD" 'where the seat'"'"'s launcher is another session, an agent that names a `host:` is refused, and the operator is asked for one without it' \
-  "the sites that hand a profile over refuse a host" flat
-pin "$CONFIG_MD" 'a resumed top re-resolves a carried seat'"'"'s name there rather than restoring a host from the handoff' \
-  "a resumed top re-resolves a host instead of restoring one" flat
-# The row is what actually crosses, so its own shape is checked too: a `host` added to it
-# would travel past every check above. A row that is not found FAILS rather than passing —
-# a file nobody matched has not been cleared of anything.
-row_line="$(awk 'index($0, "| model: <expected model> | effort:") { print; exit }' "$CONFIG_MD")"
-if [ -z "$row_line" ]; then
-  fail "the rendered profile row carries no host" "no rendered row found — nothing was cleared"
-elif [ "$(printf '%s' "$row_line" | count_literal host)" -eq 0 ]; then
-  pass "the rendered profile row carries no host — the field that cannot cross a session boundary"
+section "no machine key before 0.4.0"
+# 2026-10-18: 0.4.0 REMOVES THIS GUARD. The machine-file `host` key ships in 0.4.0 with its
+# first user, so until then no shipped field may declare a machine: every seat runs on the
+# orchestrator's own machine, as it did on main. The needle is assembled the way
+# tests/test-crew-rename.sh assembles the old plugin name, so this file does not itself carry
+# the string it sweeps for; a file nobody could read FAILS rather than counting zero.
+HOST_NEEDLE="ho""st:"
+host_sites="$(occurrences "$CONFIG_MD" "$HOST_NEEDLE")" || host_sites=failed
+if [ "$host_sites" = failed ]; then
+  fail "config.md declares no machine key" "count failed — unreadable file or empty needle"
+elif [ "$host_sites" -eq 0 ]; then
+  pass "config.md declares no machine key — the key ships in 0.4.0"
 else
-  fail "the rendered profile row carries no host" "the row names a host: $row_line"
+  fail "config.md declares no machine key" "$host_sites site(s) name it; 0.4.0 removes this guard"
 fi
 
 section "the project file"

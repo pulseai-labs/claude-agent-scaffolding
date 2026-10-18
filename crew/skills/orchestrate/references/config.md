@@ -52,14 +52,6 @@ Each field exists because a measured case needs it:
   status-bar agent returns nothing on the default read.
 - `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
   a file and sends one line pointing at it, for an agent whose composer fragments injects.
-- `host:` — the machine this seat runs on; absent, this machine. A seat runs on the
-  orchestrator's own machine unless the operator names one here, and only a machine the layer
-  knows halts the run rather than being guessed at. Place a seat only on a machine that stays
-  up and whose filesystem the orchestrator can read — its report file is read where it is
-  written, so an unopenable `REPORT_PATH` never reports — and resolve the seat's paths on its
-  own machine, never consuming one from a remote reply. A connection failure does not prove a
-  mutation was not applied, so inspect the remote state before retrying. The layer's Machines
-  step says how to reach one.
 - `can:` — what the agent is able to run, comma-separated: `slash-commands`, `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement, and where it is checked, are stated below.
 - `review:` — optional: the command a reviewer seat on this agent runs, `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP); absent, `/code-review <PR> <LEVEL>`.
 - `note:` — free prose the coordinator reads when it uses that agent.
@@ -93,7 +85,6 @@ carrying a profile conforms rather than restating a field list.
 | `effort:` | the machine entry | the launch | every resolved profile |
 | `model_shows:` | the machine entry | the model read | every resolved profile — the launching session never opens this file |
 | `brief_delivery:` | the machine entry | the brief's delivery | every resolved profile |
-| `host:` | the machine entry | the launch | never in 0.3.0 — the approval sites refuse it (below) |
 | `can:` | the machine entry | the seat's approval | never — checked where a seat is approved |
 | `note:` | the machine entry | the coordinator's read | never |
 
@@ -124,17 +115,6 @@ a session launches nothing with its own profile.
 | PR-fix seat inside work-PR | none — the clause is removed | — |
 | close-review writer | no command | — |
 | an operator-defined role | whatever its `brief:` invokes | as declared |
-
-**A `host:` value never travels.** A profile that crosses to another session — a spine's
-`SEATS` block, the work-PR brief's reviewer and PR-fix rows, a handoff's carried seats — is the
-row above, and that row has no host, so a session that receives one would start the seat on
-its own machine. The four approval sites above therefore check it, seat by seat: where the
-seat's launcher is another session, an agent that names a `host:` is refused, and the operator
-is asked for one without it — a `can:` that is missed fails at the launch, while a `host:` that
-is missed puts the seat on this machine and nothing fails. A seat the approving session
-launches itself needs no check: that dispatch reads the entry in its own machine file, and a
-resumed top re-resolves a carried seat's name there rather than restoring a host from the
-handoff.
 
 ## The project file
 
