@@ -131,8 +131,10 @@ export const register: Register = on => {
     const kind = classifyPrompt(e.origin, e.text)
     if (e.turnId === undefined) {
       turn = { status: kind === 'status', blocked: false, failedAfterRewrite: false }
-    } else if (kind === 'operator' && turn !== undefined) {
+    } else if (kind === 'operator' && e.wait !== true && turn !== undefined) {
       // Typed into a running status turn: the reply now answers the operator (design).
+      // A queued prompt (`wait: true`, ctrl+x enter) waits for a later turn and
+      // leaves this one alone (Codex, PR #874 round 3).
       turn.status = false
     }
     return turn?.status === true

@@ -870,4 +870,12 @@ describe('orchestrator status block (#867)', () => {
     const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
     expect(done.text).toBe('Beneath says so.\n' + STATUS_WARNING)
   })
+
+  test('13. a queued mid-turn prompt (wait: true) does not free the status turn', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    await $.prompt.submit({ text: 'queued for later', origin: { kind: 'composer' }, turnId: 't1', wait: true })
+    const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(s.block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+  })
 })

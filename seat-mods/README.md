@@ -151,7 +151,8 @@ it:
 
 - `prompt.submit` classifies the turn and, on a status turn, adds one line of model-only context
   (tool calls only, then the block). A prompt the operator types into a running status turn makes
-  that turn the operator's, and it is not checked.
+  that turn the operator's, and it is not checked; a queued prompt (`ctrl+x enter`, `wait: true`)
+  waits for a later turn and leaves the status turn alone.
 - `classic.Stop` checks `last_assistant_message`. A miss blocks the stop **once per turn** with the
   failing reason; a second miss lets the stop through. A block raised beneath seat-mods —
   autonomic's autopilot push — passes unchanged and is not counted as seat-mods' rewrite. A turn

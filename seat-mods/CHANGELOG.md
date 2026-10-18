@@ -10,7 +10,8 @@ All notable changes to the `seat-mods` plugin.
   field per line, each label bold or plain and followed on the same line by its content.
   - `prompt.submit` classifies the turn and, on a status turn, adds one line of model-only context
     (tool calls only, then the block). A prompt the operator types into a running status turn makes
-    that turn free.
+    that turn free; a queued prompt (`ctrl+x enter`, `wait: true`) waits for a later turn and
+    leaves the status turn alone.
   - `classic.Stop` checks `last_assistant_message` and blocks **once per turn** with a reason
     naming what failed; a second miss lets the stop through, and `turn.complete` then shows
     `⚠ seat-mods: status block missing — this status reply is not in the required form.` A block
