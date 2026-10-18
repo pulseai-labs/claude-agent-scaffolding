@@ -1,0 +1,1 @@
+{"scores":{"bar_held":5,"disposition_order":5,"round_discipline":5,"ledger_boundary":5,"merge_on_ack":5},"pass":true,"notes":"Output posts the report as one comment, closes C1/C2 classes in one push, answers C3, and hands round 2 to a fresh crew reviewer with --round 2 --previous <comment url> while treating the old verdict as stale, matching the fixture."}

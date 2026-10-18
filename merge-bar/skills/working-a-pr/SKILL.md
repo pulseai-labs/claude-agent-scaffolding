@@ -47,10 +47,10 @@ is such a bar: §3.5 decides when rounds stop, never the body.
 Each stop names what failed and what would unblock it. None of them is a
 refusal to work the PR — they are the order that keeps fixes attributable.
 
-## 2. Fetch the findings — both signals, always
+## 2. Fetch the findings — every signal, always
 
 Reviewers leave findings in two places, and each alone misses what the other
-carries:
+carries; a third is the report of the `reviewing-a-pr` reviewer:
 
 - the **review + conversation stream** — review summaries, CI rollup, top-level
   comments (`gh pr view --comments`, `gh pr checks`, review listings — the
@@ -59,7 +59,11 @@ carries:
 - the **inline line-level comments** — where review bots put nearly everything
   (`gh api --paginate repos/{owner}/{repo}/pulls/{n}/comments`, or the
   equivalent — paginated, because a second page of findings that never loads
-  is a ledger hole wearing a clean look).
+  is a ledger hole wearing a clean look);
+- the **review report** (`reviewing-a-pr`, in the shape of its `references/report.md`) — a
+  crew reviewer seat returns it; without crew, start it as a fresh-context subagent on a
+  checkout prepared at the PR head. Post the report as **one** PR comment, so round 2 can
+  name it.
 
 Read both, then build the **disposition ledger**: one line per finding, every
 line ending in exactly one of the five dispositions in §3. The ledger is the
@@ -73,7 +77,8 @@ Independent fixes to overlapping prose re-anchor the sentences the next finding
 cites, and round N+1 arrives built out of round N's own fixes.
 
 So before each edit pass — the first one, and again after every re-review —
-collapse the ledger into **classes**. A class is one
+collapse the ledger into **classes**; the report's classes, with their sites, are the
+starting list. A class is one
 defect however many findings name it: the same mistake at several sites, two
 reviewers on one site, or several symptoms of one wrong condition. Fix a class
 in one commit, or record why it splits.
@@ -127,8 +132,8 @@ Every ledger line ends in exactly one of these five dispositions:
   against the tree, quoted — never "disagree". Applies to blocking and non-blocking alike.
 - **`answered — <condition it fails>`** — the default for a non-blocking finding. Reply in the
   review thread in one line naming which bar condition it does not meet. If it repeats a
-  Known limit, quote the body line. Reviewers such as Codex are not documented to read the PR
-  body, so repeats are expected: answer them, never fix them.
+  Known limit, quote the body line. A reviewer that does not read the PR body repeats
+  Known limits: answer them, never fix them.
 - **`limit — [KL]`** — a non-blocking finding that names a real edge case of this PR worth
   recording. Add a line to the body's `## Known limits` (`gh pr edit <PR> --body-file <file>`)
   and say so in the thread; §5 writes it to the ledger after the merge. A finding that meets condition 1 cannot be a limit, whatever it is labelled — by the reviewer, by the PR body, or by the operator.
@@ -146,10 +151,12 @@ surfaced it or who asks — "just merge it" included.
 - **Staleness:** a fix commit landing after a review makes that verdict stale. Re-fetch (§2)
   and re-review on the **new** head; the old verdict does not carry forward.
 - **Reviewer completeness:** green CI is not proof a reviewer ran; a skipped reviewer is not
-  approval; a queued reviewer is waited for or surfaced — never assumed. Confirm each expected
-  reviewer actually left something on the current head. Do not busy-wait a queued reviewer:
-  say it is pending, and let the operator decide — unless a standing order in the autopilot
-  policy names the fallback reviewer: then replace it and say so in the ledger.
+  approval. Confirm the `reviewing-a-pr` report exists for the current head; never assume it.
+  If that reviewer cannot run, surface it — unless a standing order in the autopilot policy
+  names the fallback reviewer: then replace it and say so in the ledger.
+- **Extra eyes:** CodeRabbit or any other bot or reviewer is never waited for, and its label
+  never decides what blocks; judge each of its findings against the bar like any other. Say
+  its state (pending, ran) in the report; it gates nothing.
 
 Sort by failure direction before acting: a finding that the boundary **refuses a valid input**
 is blocking — condition 1; a finding that it **correctly refuses an unsupported input** is
@@ -159,10 +166,12 @@ loses state is blocking. Incoherence this diff introduced is this diff's to fix.
 ## 3.5 Rounds
 
 A round is one pass of §2 → §2.5 → §3 ending in one push. Round 1 is the first review of the
-opened PR.
+opened PR. The re-review of a pushed round is a **fresh** reviewer, never you: start it on the
+new head with `--round <n> --previous <URL of the posted report comment>`, so it reviews the
+fix diff and each prior class's closure. Your own sweep is a pre-push check, not the re-review.
 
 - **One push per round.** Commit fixes class by class, then push once, after the sweep below.
-  Reviewers such as Codex review every push, so each extra push buys an extra review.
+  Every push triggers another review, so each extra push buys one.
 - **A fix touches only what its blocking finding needs** — the class §2.5 named, and nothing
   else. No cleanup, no rewording nearby, no fixing a non-blocking finding "while you are there".
   Every extra line is a new review target.
