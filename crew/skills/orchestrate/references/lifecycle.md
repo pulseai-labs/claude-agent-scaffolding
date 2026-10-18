@@ -300,7 +300,8 @@ the path as its first instruction on either. From the handoff on, this session w
 takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.
 Confirm its turn started, then **stand down**: kill this session's armed
 background waits and its heartbeat, write nothing more to the run file and take no dispatch action. One report must
-wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale `REPORT READY` ping that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
+wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale ping — tagged `[crew report <role>]`, or the legacy `REPORT READY: <task id> <kind> <path>`
+from a brief older than 0.3.1 — that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use and that this one can close.
 **A hard stop** — the top died with no handoff (#810) — is resumed only on the operator's word that it died, after
 three steps a rotation does not need:
