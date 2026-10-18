@@ -1,6 +1,6 @@
 ---
 name: working-a-pr
-description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges on the operator's explicit ack, or, for a two-way door, under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority.
+description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges a two-way door on the operator's explicit ack or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority, and hands a one-way door to the merge holder.
 ---
 
 # Working a pull request — against its merge bar
@@ -8,8 +8,8 @@ description: Use when working, driving, babysitting or landing a PR, addressing 
 Drive one PR to mergeable. The finish line is the **`## Merge bar`** in the PR's own body,
 written when it was opened (`opening-a-pr`). Every finding is judged against that bar, not
 against an ideal: the loop fixes what the bar says blocks, answers or records the rest, and
-merges on the operator's explicit ack, or, for a two-way door, under a standing order (see
-**Standing orders**) that binds this role and grants merge authority. The loop is judgment; the shell is only for
+merges a two-way door on the operator's explicit ack or under a standing order (see **Standing
+orders**) that binds this role and grants merge authority, and hands a one-way door to the merge holder. The loop is judgment; the shell is only for
 mechanical `git`/`gh` facts. Nothing here needs a manifest, a worktree, or any plugin state.
 
 **Standing orders.** A standing order is a written order in the project's memory bank
@@ -231,8 +231,11 @@ Then, in one place, give the operator:
   merge.
 
 A one-way door, or a body with no `Door:` line (counted as one-way), is never merged by this
-skill, standing order or not: surface the terminus and hand it to the merge holder — the
-orchestrator where one runs, otherwise the operator — with `references/one-way-door.md`.
+skill — not under a standing order, not on the operator's explicit ack; an ack is answered
+that the merge holder runs `references/one-way-door.md` and merges. Surface the terminus and
+hand it to the merge holder — the orchestrator where one runs, otherwise the operator — with
+the reviewed head OID, the ledger, the §5 lines and `references/one-way-door.md`. After the
+merge, whoever merged writes the §5 lines per §5, or prints them.
 
 Otherwise **ask**: merge, wait, or leave open — or, under a standing order (see **Standing orders**) that binds this role
 and grants merge authority, treat a clean verdict as the ack and say which order
@@ -296,5 +299,5 @@ where they go.
   stop fires only when the reading says your fixes are generating the findings.
 - **Ack-to-merging a blocking finding**, or letting "just merge it" relabel one as a limit.
 - **Trusting a pre-fix verdict on a post-fix head.**
-- **Auto-merging.** The merge is the operator's explicit call, or a standing order's that binds this role; never a
-  merge queue's auto-merge.
+- **Auto-merging.** The merge of a two-way door is the operator's explicit call, or a standing
+  order's that binds this role; never a merge queue's auto-merge. A one-way door is never this skill's merge.
