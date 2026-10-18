@@ -1,0 +1,1 @@
+{"scores":{"class_complete":4,"bar_sorted":5,"coverage_stated":5,"round_scope":5,"inputs_resolved":5},"pass":true,"notes":"Correct baseline-only header and the tautological-test class sorted condition 2 with one real site, but the sweep was not actually run repo-wide and the same site is listed as two lines."}

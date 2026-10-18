@@ -1,0 +1,1 @@
+{"scores":{"class_complete":4,"bar_sorted":5,"coverage_stated":5,"round_scope":5,"inputs_resolved":5},"pass":true,"notes":"Correct template bar, unstated one-way door, condition 1 with admits-what-it-cannot-handle listed first, log line non-blocking, no-Claim noted; minor weakness is sweeps lacking explicit hit counts and an extra non-blocking test-gap class."}
