@@ -69,7 +69,9 @@ SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 # the guarded sentence's actor: 272 -> 275. The adjacent control runs the same predicate on a
 # file one line over the real reference and, when that is accepted, names the remedy (lower
 # REF_BUDGET to the real file's count) instead of reading as an over-budget failure.
-REF_BUDGET=224  # 2026-10-18 (Task 13): +4 — the machine file's `host:` key now maps to this
+REF_BUDGET=223  # 2026-10-18 (V13 fix): -1 — the Machines step dropped the halt it restated
+# for an unknown `host:` value (`config.md` owns it); the label mapping stays. 224 -> 223.
+# 2026-10-18 (Task 13): +4 — the machine file's `host:` key now maps to this
 # layer's labels in `## Machines`, and that Machines names the cross-machine report read a
 # known limit (the route is measured on the Orca layer only).
 # 2026-10-18 (T11 ruling A): the layer-neutral OMP-host rules moved to SKILL.md

@@ -23,7 +23,9 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=230          # 2026-10-18 (0.4.0, Task 13): +22 — the machine-file `host:` key ships
+REF_BUDGET=229          # 2026-10-18 (V13 fix): -1 — the `host:` bullet dropped the restated
+                        # report-read clause (`roles.md` owns that rule). 230 -> 229.
+                        # 2026-10-18 (0.4.0, Task 13): +22 — the machine-file `host:` key ships
                         # with its first user, the demo walk: the field entry with its placement
                         # rules, the profile-table row, the rendered row's host tail and the carry
                         # rule that says a crossing profile names its machine. The key's absence

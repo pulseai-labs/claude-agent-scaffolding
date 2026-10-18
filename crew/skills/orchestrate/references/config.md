@@ -56,10 +56,9 @@ Each field exists because a measured case needs it:
   name the layer file's Machines step accepts, and one that step does not know halts the
   run rather than being guessed at. A seat runs elsewhere only when the operator names one
   here: place it only on a machine that stays up and whose filesystem this run can read —
-  its report file is read where it is written, so an unopenable `REPORT_PATH` never
-  reports — resolve its paths on its own machine, never consuming one from a remote reply,
-  and inspect the remote state before retrying, because a connection failure does not
-  prove a mutation was not applied. The layer's Machines step says how to reach one.
+  resolve its paths on its own machine, never consuming one from a remote reply, and
+  inspect the remote state before retrying, because a connection failure does not prove
+  a mutation was not applied. The layer's Machines step says how to reach one.
 - `can:` — what the agent is able to run, comma-separated: `slash-commands`, `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement, and where it is checked, are stated below.
 - `review:` — optional: the command a reviewer seat on this agent runs, `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP); absent, `/code-review <PR> <LEVEL>`.
 - `note:` — free prose the coordinator reads when it uses that agent.
