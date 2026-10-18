@@ -356,5 +356,7 @@ describe('the orchestrator role states the status block (#867)', () => {
     expect(role).toContain('exactly five lines, one field per line')
     expect(role).toContain('(`none` is content)')
     expect(role).toContain('A turn the operator typed is free and takes any shape.')
+    // crew SKILL.md §8's molt-handoff exception, same wording (#867 fix round).
+    expect(role).toContain('ends with that line instead of the block')
   })
 })

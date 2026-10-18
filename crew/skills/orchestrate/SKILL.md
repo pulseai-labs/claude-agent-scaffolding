@@ -229,4 +229,6 @@ line (`none` is content), and nothing before the first line or after the fifth:
 **Operator decision pending:**
 
 Write no narration on a status turn: tool calls, then the block. A turn the operator
-typed is free and takes any shape. Only the top orchestrator follows this.
+typed is free and takes any shape. Only the top orchestrator follows this. A status turn
+whose reply must end with molt's `MOLT-HANDOFF: <path>` line ends with that line
+instead of the block.

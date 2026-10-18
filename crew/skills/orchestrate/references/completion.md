@@ -74,7 +74,9 @@ that file at that moment and sends through the layer's Send only when `run.orche
 equals `NOTIFY_MACHINE`: pane ids are server-scoped. One single-quoted literal argument (a
 single quote in it is written `'\''`), `<path>` the file actually renamed over. Every other
 dispatch keeps the report-file wait and this session's heartbeat as the whole of its push
-bound. A failed read or send changes nothing.
+bound. A failed read or send changes nothing. A brief older than 0.3.1 still sends the
+legacy `REPORT READY: <task id> <kind> <path>` form; read either it or the tagged
+`[crew report <role>] <task id> <kind> <path>` as this ping.
 
 A ping is one way a report announces itself, beside a completion wake and a heartbeat tick,
 and the generation check governs all three: a new generation is read, noted — the pair the

@@ -12,7 +12,8 @@ typing — your reply is only the status block: exactly five lines, one field pe
 with its content on the same line (`none` is content), and nothing before the first line or after the fifth:
 **What I ruled:** / **What the PR(s) will carry:** / **Next steps:** / **Waiting on (seats live):** /
 **Operator decision pending:**. Write no narration on a status turn: tool calls, then the block. A turn the operator
-typed is free and takes any shape. Only the top orchestrator follows this.
+typed is free and takes any shape. Only the top orchestrator follows this. A status turn whose reply must end with
+molt's `MOLT-HANDOFF: <path>` line ends with that line instead of the block.
 
 Must not: spawn subagents (task, eval agent(), workpool) — seat-mods blocks them; dispatch herdr seats instead — or
 ask the operator what the run, its briefs or autonomic's mode already decide.

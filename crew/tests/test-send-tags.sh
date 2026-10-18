@@ -16,9 +16,12 @@
 #   4. per template fence the role word is the template's own seat role (table below):
 #      facts 1–3 see a tag, never whether it names the right seat;
 #   5. the correction request's re-ping is tagged;
-#   6. the legacy forms stay accepted: completion.md states the acceptance clause;
-#   7. `layers/herdr.md`'s `Send` states the tag rule and the rotation-resume exception;
-#   8. `SKILL.md` states the status block — its five labels, once each, in order.
+#   6. the legacy forms stay accepted: completion.md states the acceptance clause for the
+#      report ping and for the MOLT ping;
+#   7. `layers/herdr.md`'s `Send` scopes the tag to sends up, names what stays untagged
+#      (down-sends, then local slash commands), and lists the orchestrator role word;
+#   8. `SKILL.md` states the status block — its five labels, once each, in order — and
+#      the molt-handoff exception.
 #
 # Wiring: crew/run-tests.sh discovers `tests/test-*.sh` by glob, so this file is the
 # wiring; the runner's own output names it.
@@ -181,6 +184,8 @@ section "the legacy forms stay accepted"
 
 pin "$COMPLETION_MD" 'A brief older than 0.3.1 still sends the legacy `MOLT WARNING` form; read either as this ping.' \
   "completion.md states the legacy form stays accepted" flat
+pin "$COMPLETION_MD" 'A brief older than 0.3.1 still sends the legacy `REPORT READY: <task id> <kind> <path>` form; read either it or the tagged `[crew report <role>] <task id> <kind> <path>` as this ping.' \
+  "completion.md takes the tagged or the legacy report ping" flat
 
 section "the layer's Send states the rule"
 
@@ -192,10 +197,13 @@ send_section "$LAYER_MD" > "$span"
 n="$(grep -c . "$span" | tr -d ' ')"
 if [ "$n" -ge 5 ]; then
   pin "$span" '[crew <kind> <role>]' "the tag grammar is stated"
-  pin "$span" 'stays untagged' "the one untagged send is named"
+  pin "$span" 'sends up to a parent or top session' "the tag rule is scoped to sends up"
+  pin "$span" 'sends down to a worker' "down-sends are named untagged"
+  pin "$span" '`coordinator`, `orchestrator`' "the orchestrator role word is in the grammar"
+  pin "$span" '`/context` or `/clear`' "local slash commands are named with the resume"
   pin "$span" '/ossify:handoff-resume <path>' "the Claude resume form is named"
   pin "$span" 'skill://handoff-resume <path>' "the OMP resume form is named"
-  pin "$span" 'prefix would break the command' "the exception gives its reason"
+  pin "$span" 'prefix would break any slash command' "the exceptions give their reason" flat
 else
   fail "the Send section spans enough lines to carry the rule" "got $n line(s) — an unreadable extraction fails closed"
 fi
@@ -204,6 +212,7 @@ rm -f "$span"
 section "the status block is stated"
 
 pin "$SKILL_MD" 'your reply is only the status block' "SKILL.md states the rule once"
+pin "$SKILL_MD" 'ends with that line instead of the block' "SKILL.md states the molt-handoff exception" flat
 for label in '**What I ruled:**' '**What the PR(s) will carry:**' '**Next steps:**' '**Waiting on (seats live):**' '**Operator decision pending:**'; do
   pin "$SKILL_MD" "$label" "SKILL.md carries $label once"
 done
