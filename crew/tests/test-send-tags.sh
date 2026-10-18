@@ -45,12 +45,33 @@ COMPLETION_MD="$REF/completion.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-# The fifteen dispatched templates, by fence order, and the seat role each is marked
+# The dispatched templates, by fence order, and the seat role each is marked
 # with (`roles.md`: implementer, verifier and reviewer are the guarded roles;
 # coordinator is the spine, lane driver, doctor, close and work-PR marking).
-# `<file>:<fence>:<role>` — the correction request carries no seat and is fence 10 of
+# `<file>:<fence>:<role>` — the correction request carries no seat and is fence 11 of
 # briefs.md, so it appears nowhere here.
-EXPECTED_ROLES='briefs.md:1:implementer
+#
+# Sixteen templates carry a PING line. Fifteen of them also carry a MOLT line; the
+# demo walk (fence 10 of briefs.md, a guarded `verifier`) is the one with no `MOLT:`
+# line, so it appears only in the PING table below.
+EXPECTED_ROLES_PING='briefs.md:1:implementer
+briefs.md:2:implementer
+briefs.md:3:reviewer
+briefs.md:4:verifier
+briefs.md:5:implementer
+briefs.md:6:coordinator
+briefs.md:7:coordinator
+briefs.md:8:implementer
+briefs.md:9:coordinator
+briefs.md:10:verifier
+ossify-briefs.md:1:coordinator
+ossify-briefs.md:2:implementer
+ossify-briefs.md:3:verifier
+ossify-pr-briefs.md:1:coordinator
+ossify-pr-briefs.md:2:coordinator
+ossify-close-writer.md:1:implementer'
+
+EXPECTED_ROLES_MOLT='briefs.md:1:implementer
 briefs.md:2:implementer
 briefs.md:3:reviewer
 briefs.md:4:verifier
@@ -141,9 +162,14 @@ roles_of() { # <references dir> <PING|MOLT> -> "<file>:<fence>:<role>" per send 
   done
 }
 for kind in PING MOLT; do
+  case "$kind" in
+    PING) expected="$EXPECTED_ROLES_PING" ;;
+    MOLT) expected="$EXPECTED_ROLES_MOLT" ;;
+  esac
+  n_expected="$(printf '%s\n' "$expected" | grep -c .)"
   actual="$(roles_of "$REF" "$kind")"
-  if [ "$(printf '%s\n' "$actual" | sort)" = "$(printf '%s\n' "$EXPECTED_ROLES" | sort)" ]; then
-    pass "the $kind lines carry each template's own role word (15)"
+  if [ "$(printf '%s\n' "$actual" | sort)" = "$(printf '%s\n' "$expected" | sort)" ]; then
+    pass "the $kind lines carry each template's own role word ($n_expected)"
   else
     fail "the $kind lines carry each template's own role word" "got: $(printf '%s\n' "$actual" | sort | tr '\n' ' ')"
   fi
