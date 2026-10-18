@@ -2,11 +2,13 @@
 #
 # crew — the send tag (#867), mechanical facts only.
 #
-# Every message crew sends another session starts with its tag, `[crew <kind> <role>]`
-# (`layers/herdr.md`, Send), and the brief templates carry their own seat's role word
-# inside it. The legacy `REPORT READY:` and `MOLT WARNING` forms stay *accepted* — a
-# top still receives pings from workers a brief older than 0.3.1 dispatched — so this
-# file pins the acceptance clause in place instead of forbidding the words.
+# Every message crew sends up to a parent or top session starts with its tag,
+# `[crew <kind> <role>]` (`layers/herdr.md`, Send), and the brief templates carry their
+# own seat's role word inside it; messages sent down to a worker — briefs, plan-gate
+# replies, correction requests — stay verbatim and untagged. The legacy `REPORT READY:`
+# and `MOLT WARNING` forms stay *accepted* — a top still receives pings from workers a
+# brief older than 0.3.1 dispatched — so this file pins the acceptance clause in place
+# instead of forbidding the words.
 #
 # Facts:
 #   1. every `PING:` line carries the report tag — `[crew report <role>] <task id>`;
