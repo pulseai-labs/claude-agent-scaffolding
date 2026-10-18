@@ -21,7 +21,7 @@ Previous report: <path or URL> | none                      ← round 2+ only
 ## Classes
 ### C<n> — <one-line defect>
 Axis: Standards | Claim/Spec | Standards, Claim/Spec
-Bar: condition 1 | condition 2 | condition 3 | condition 4 | raising line | non-blocking
+Bar: condition <n> | condition <n> (also <m>) | raising line | non-blocking
 Direction: refuses valid input | correctly refuses unsupported input | admits what it cannot handle | n/a
 Rule: <the standard, or the Claim sentence, it breaks — quoted>
 Sweep: <the search run> — <hit count>
