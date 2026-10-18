@@ -23,10 +23,14 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=208          # 2026-10-18 (round 3): -20 — the machine-file key leaves 0.3.0 and ships in
-                        # 0.4.0 with its first user, so the field entry, the profile-table row and
-                        # the rule that refused a crossing value go with it. This note supersedes
-                        # the +12 (round 2) and the +7 (2026-10-17) notes: both counted those lines.
+REF_BUDGET=229          # 2026-10-18 (V13 fix): -1 — the `host:` bullet dropped the restated
+                        # report-read clause (`roles.md` owns that rule). 230 -> 229.
+                        # 2026-10-18 (0.4.0, Task 13): +22 — the machine-file `host:` key ships
+                        # with its first user, the demo walk: the field entry with its placement
+                        # rules, the profile-table row, the rendered row's host tail and the carry
+                        # rule that says a crossing profile names its machine. The key's absence
+                        # guard is gone with this task; the -20 (round 3) note it superseded counted
+                        # the key's removal from 0.3.0.
                         # 2026-10-18: +2 for the `layer:` line in the missing-file remedies (PR #871
                         # round 1): the two bullets that tell the operator to create or move the
                         # project file now name the line it has to open with.
@@ -64,7 +68,7 @@ section "the layer"
 pin "$CONFIG_MD" 'layer: herdr' "the herdr layer is one of the two values stated"
 pin "$CONFIG_MD" 'layer: orca' "the orca layer is the other value stated"
 pin "$CONFIG_MD" 'no default' "a missing or unknown layer stops on one question and no default"
-pin "$CONFIG_MD" 'the Orca layer ships in crew 0.4.0' "0.3.0's stop names the release the Orca layer arrives in"
+pin "$CONFIG_MD" 'references/layers/<layer>.md' "the value names the layer file the run loads"
 
 section "the old paths"
 # The old name is ASSEMBLED, the way tests/test-crew-rename.sh assembles its own pattern: that
@@ -85,7 +89,7 @@ pin "$SKILL_MD" "The layer's health check fails" "§7's first refusal is the lay
 pin "$SKILL_MD" "The layer's Identity step finds no own address" "§7's second refusal is the layer's Identity step"
 
 section "the agent entry"
-for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'can:' 'review:' 'note:'; do
+for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delivery:' 'host:' 'can:' 'review:' 'note:'; do
   present "$CONFIG_MD" "$field" "agent field $field is documented"
 done
 present "$CONFIG_MD" 'model_shows: banner' "banner is a documented value"
@@ -95,21 +99,30 @@ present "$CONFIG_MD" 'brief_delivery: file' "file delivery is a documented value
 present "$CONFIG_MD" 'absent, `/code-review <PR> <LEVEL>`.' "a reviewer with no review: field runs /code-review"
 present "$CONFIG_MD" '| reviewer | its agent'"'"'s `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |' "the reviewer's can: need follows its review command"
 
-section "no machine key before 0.4.0"
-# 2026-10-18: 0.4.0 REMOVES THIS GUARD. The machine-file `host` key ships in 0.4.0 with its
-# first user, so until then no shipped field may declare a machine: every seat runs on the
-# orchestrator's own machine, as it did on main. The needle is assembled the way
-# tests/test-crew-rename.sh assembles the old plugin name, so this file does not itself carry
-# the string it sweeps for; a file nobody could read FAILS rather than counting zero.
-HOST_NEEDLE="ho""st:"
-host_sites="$(occurrences "$CONFIG_MD" "$HOST_NEEDLE")" || host_sites=failed
-if [ "$host_sites" = failed ]; then
-  fail "config.md declares no machine key" "count failed — unreadable file or empty needle"
-elif [ "$host_sites" -eq 0 ]; then
-  pass "config.md declares no machine key — the key ships in 0.4.0"
-else
-  fail "config.md declares no machine key" "$host_sites site(s) name it; 0.4.0 removes this guard"
-fi
+section "the machine key and the rows that carry it"
+# 2026-10-18 (0.4.0, Task 13): the machine-file `host:` key ships with its first user, the
+# demo walk, and this time it travels: a resolved row names the seat's machine, so a session
+# that launches from a carried row starts the seat where the resolver would, never on its own
+# by inference. The row is pinned whole in test-ossify-spine-contract.sh; here are the field,
+# the table row, the row's tail, and the one rule that says it crosses.
+pin "$CONFIG_MD" 'the machine this seat runs on; absent, this machine' \
+  "the host field means this machine when the entry names none"
+pin "$CONFIG_MD" 'a machine name the layer file'"'"'s Machines step accepts' \
+  "the host value is a name the layer's Machines step accepts" flat
+pin "$CONFIG_MD" '| `host:` | the machine entry | the launch | every resolved profile that crosses a session' \
+  "the profile table says the host travels in every crossing profile"
+pin "$CONFIG_MD" 'model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>' \
+  "the rendered row ends with the host"
+pin "$CONFIG_MD" 'the row names the resolver'"'"'s own machine under the layer'"'"'s' \
+  "a host-less entry's row names the resolver's own machine, never an inferred one"
+pin "$CONFIG_MD" 'never the words `this machine`' \
+  "the rendered row never carries the ambiguous local words"
+pin "$CONFIG_MD" 'the row'"'"'s command, model and effort only' \
+  "a brief's own launch record is named by field, not by position"
+pin "$CONFIG_MD" 'A profile that crosses a session carries its seat'"'"'s machine and its agent'"'"'s name' \
+  "the carry rule is stated once"
+pin "$CONFIG_MD" 'the close brief'"'"'s demo-walk row' \
+  "the carry rule names the close brief's demo-walk row among the crossing surfaces"
 
 section "the project file"
 for heading in '## Seats' '## My roles' '## Conditions'; do
@@ -171,12 +184,13 @@ brief_pin() {
   if [ "$count" -eq "$want" ]; then pass "$label ($count)"
   else fail "$label" "found $count, expected $want: $needle"; fi
 }
-# Nine dispatched templates: planned implementer, fast implementer, reviewer,
-# verifier, fix round, and the four dedicated dispatch templates — lane driver,
-# doctor dispatch, direct work-item, non-spine close. The correction-request
-# template is a send, not a launch, so it carries no seat.
-brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 9
-brief_pin 'you are already that seat, never run it' "every SEAT_COMMAND says it is a record, never run (#845)" 9
+# Ten dispatched templates: planned implementer, fast implementer, reviewer,
+# verifier, fix round, the four dedicated dispatch templates — lane driver,
+# doctor dispatch, direct work-item, non-spine close — and the demo walk the
+# close dispatch constructs for a `user:` entry on another machine (Task 13).
+# The correction-request template is a send, not a launch, so it carries no seat.
+brief_pin 'SEAT_COMMAND=' "every dispatched template names its seat's command" 10
+brief_pin 'you are already that seat, never run it' "every SEAT_COMMAND says it is a record, never run (#845)" 10
 # The class, not the instance (#845 round 1): every launch-record line in any reference — SEAT_, SPINE_,
 # CLOSE_, WORKPR_, WRITER_COMMAND — carries the never-run clause, so a new *_COMMAND line without it fails here.
 # Every PING line carries the hold-at-gate rule (#810): a worker whose ping finds no top waits, never proceeds.
@@ -196,10 +210,10 @@ for f in "$PLUGIN_ROOT"/skills/orchestrate/references/*.md; do
 done
 if [ "$cmd_total" -ge 13 ] && [ -z "$cmd_bare" ]; then pass "every *_COMMAND launch record says never run ($cmd_total)"
 else fail "every *_COMMAND launch record says never run" "total $cmd_total (want >= 13), bare:$cmd_bare"; fi
-brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 9
-brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 9
-brief_pin 'NOTIFY_RUN=' "every dispatched template names the run file its ping reads" 9
-brief_pin 'NOTIFY_MACHINE=' "every dispatched template names the worker's machine" 9
+brief_pin 'SEAT_EXPECTED_MODEL=' "every dispatched template names its expected model" 10
+brief_pin 'SEAT_EFFORT=' "every dispatched template names its effort" 10
+brief_pin 'NOTIFY_RUN=' "every dispatched template names the run file its ping reads" 10
+brief_pin 'NOTIFY_MACHINE=' "every dispatched template names the worker's machine" 10
 brief_pin 'NOTIFY_PANE' "no template keeps the fixed ping target" 0
 brief_pin 'claude-glm' "no alias name survives in briefs.md" 0
 brief_pin 'REVIEW_INVOCATION=<this seat'"'"'s agent'"'"'s `review:` from agents.md, else `/code-review <PR> <LEVEL>`' "the reviewer brief carries its filled review command" 1

@@ -58,6 +58,7 @@ CONFIG_MD="$REF/config.md"
 PLUGIN_README_MD="$PLUGIN_ROOT/README.md"
 COMMAND_MD="$PLUGIN_ROOT/commands/orchestrate.md"
 MECHANICS_MD="$REF/layers/herdr.md"
+ORCA_MD="$REF/layers/orca.md"
 COMPLETION_MD="$REF/completion.md"
 EVAL_DIR="$PLUGIN_ROOT/tests/eval"
 EVAL_FIXTURE14="$EVAL_DIR/fixtures/ossify-spine-execution/14-close-brief-identities-and-workspace-records.md"
@@ -67,7 +68,10 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=260          # A3: the budget equals the longest budgeted reference (260,
+REF_BUDGET=261          # 2026-10-18 (Task 13): +1 — ossify-briefs.md's SEATS rows take the agent
+                        # name and the host, and gain the sentence that says so; the demo-walk
+                        # paragraph in ossify-pr-briefs.md stayed below the longest reference.
+                        # A3: the budget equals the longest budgeted reference (261,
                         # ossify-briefs.md); 0.2.9 raised it from 214 for the spine brief's 1.14.0
                         # caller rules and re-entry seat rule; Task 4 raised it 257 -> 260 for the
                         # three `PING_SEND=` fill lines its templates gained.
@@ -463,25 +467,30 @@ section "the resolved profile is one contract, stated once"
 
 # Round 2, findings 1-5: a resolved profile carries all five launch fields
 # wherever it travels — config.md defines the row once and every carrier
-# conforms rather than restating a field list that can drift.
-ROW='model_shows: <banner|screen> | brief_delivery: <inject|file>'
+# conforms rather than restating a field list that can drift. Task 13 adds the
+# agent name, which a resumed top re-resolves a carried seat by, and the host,
+# which is what stops a launcher that did not resolve the seat from putting it
+# on its own machine by inference.
+ROW='<agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>'
 pin "$CONFIG_MD" "$ROW" "config.md defines the resolved-profile row"
-n_eq "$BRIEFS_MD" "$ROW" 2 "the SEATS rows carry the full resolved profile"
-n_eq "$PRBRIEFS_MD" "$ROW" 2 "the work-PR launched profiles carry the full resolved profile"
+n_eq "$BRIEFS_MD" "$ROW" 2 "the SEATS rows carry the full resolved profile, name and host included"
+n_eq "$PRBRIEFS_MD" "$ROW" 2 "the work-PR launched profiles carry the full resolved profile, name and host included"
 # Any profile carrier anywhere is complete — no partial rows, and no partial
 # enumerations either: prose listing "command, expected model …" without the
-# delivery fields is the same defect in a sentence. The sweep runs over every
-# shipped surface and the evals, so a seventh site cannot land. The list is
+# delivery fields is the same defect in a sentence, and since Task 13 a row
+# without its `host: ` is partial too: the row is the only place a launcher that
+# did not resolve the seat learns which machine it runs on. The sweep runs over
+# every shipped surface and the evals, so a seventh site cannot land. The list is
 # unconditional: an unmatched fixture glob stays literal and fails the readability
 # guard below, rather than being skipped for a directory that has not arrived.
 CARRIERS=("$REF"/*.md "$SKILL_MD" "$COMMAND_MD" "$PLUGIN_README_MD"
           "$EVAL_DIR"/fixtures/ossify-spine-execution/*.md "$EVAL_RUBRIC_MD")
 for f in "${CARRIERS[@]}"; do
   if [ ! -r "$f" ]; then fail "no partial profile carrier in ${f##*/}" "missing or unreadable: $f"; continue; fi
-  n=$(awk 'index($0, "| model:") > 0 && index($0, "brief_delivery") == 0' "$f" | wc -l | tr -d ' ')
+  n=$(awk 'index($0, "| model:") > 0 && (index($0, "brief_delivery") == 0 || index($0, "host: ") == 0)' "$f" | wc -l | tr -d ' ')
   m=$(awk 'index($0, "command, expected model") + index($0, "expected model and effort") > 0 && index($0, "brief-delivery") + index($0, "brief_delivery") == 0' "$f" | wc -l | tr -d ' ')
   if [ "$n" -eq 0 ] && [ "$m" -eq 0 ]; then pass "no partial profile carrier in ${f##*/}"
-  else fail "no partial profile carrier in ${f##*/}" "$n partial row(s), $m partial enumeration(s)"; fi
+  else fail "no partial profile carrier in ${f##*/}" "$n partial row(s) (delivery or host missing), $m partial enumeration(s)"; fi
 done
 # The handoff persists the coordinator profiles beside the item rows — a
 # resumed top launches them all without a fresh read.
@@ -489,6 +498,88 @@ pin "$EXEC_MD" 'resolved coordinator profiles' \
   "the handoff persists the coordinator profiles beside the item rows"
 pin "$LIFECYCLE_MD" 'resolved coordinator' \
   "lifecycle's handoff persists the coordinator profiles"
+
+section "a seat's machine and name travel with its row (Task 13)"
+
+# The key ships with its first user, the demo walk, and every surface that carries a
+# resolved profile across a session carries the host and the agent name with it: the
+# spine's SEATS rows and the work-PR rows (the ROW pins above), a handoff's carried
+# seats, and the close brief's demo-walk row. The consumer is where the value matters:
+# the launcher that did not resolve the seat starts it on the machine the row names,
+# and the name is what a resumed top re-resolves a carried seat by.
+pin "$EXEC_MD" 'each item row and each of the three resolved coordinator profiles beside its agent'"'"'s name' \
+  "the handoff carries each seat beside its agent's name" flat
+pin "$EXEC_MD" 'with the machine its `host:` names' \
+  "the handoff carries each seat's machine" flat
+pin "$EXEC_MD" 're-resolves that seat by its carried name' \
+  "a carried row that cannot give its machine is re-resolved by the carried name" flat
+pin "$EXEC_MD" 'a carried name that file does not define halts and is asked' \
+  "an undefined carried name halts rather than being guessed at"
+pin "$ROLES_MD" 'runs every step above on that machine' \
+  "roles.md runs a host seat's launch on its machine" flat
+pin "$ROLES_MD" 'A seat with no `host:` runs here' \
+  "a seat with no host runs here"
+pin "$MECHANICS_MD" 'with one of these labels' \
+  "herdr's Machines maps the host value to its own labels" flat
+pin "$MECHANICS_MD" 'this layer names no route that reads it' \
+  "herdr states that the cross-machine report read is not stated for it"
+pin "$ORCA_MD" 'a seat'"'"'s `host:` value is one of those names' \
+  "orca's Machines says a host value is a name its list answers with"
+pin "$ORCA_MD" 'is read where it is written' \
+  "orca's Machines says where a remote seat's report file is read"
+pin "$ORCA_MD" "needs the operator's own allow for that host in their harness settings" \
+  "the ssh read names the operator allow it depends on" flat
+pin "$ORCA_MD" 'a refused read halts the dispatch with one question to the operator' \
+  "a refused read halts with one question, never a silent wait" flat
+
+section "the demo walk runs on the machine its row names (Task 13)"
+
+pin "$PRBRIEFS_MD" 'DEMO_WALK=' \
+  "the close brief injects the demo-walk row exactly once"
+pin "$PRBRIEFS_MD" 'for <the `user:` entry ids it walks>' \
+  "the slot binds the row to the entry ids it walks"
+pin "$PRBRIEFS_MD" 'runs on the machine its row'"'"'s `host:` names' \
+  "a bound entry runs on the machine its row names"
+pin "$PRBRIEFS_MD" 'marked `verifier` before its command (the layer'"'"'s `Seat marking`)' \
+  "the walk seat is marked a guarded verifier before its command" flat
+pin "$PRBRIEFS_MD" 'wait on it through the layer'"'"'s Wait' \
+  "the close waits on the walk seat through the layer"
+pin "$PRBRIEFS_MD" 'read its report where it was written' \
+  "the close reads the walk report where it was written"
+pin "$PRBRIEFS_MD" 'release the seat' \
+  "the walk seat is released once its report is read"
+pin "$PRBRIEFS_MD" 'One seat per entry, from that row only' \
+  "the exception is narrow: one seat per entry, from that row only"
+pin "$EXEC_MD" 'creating any seat but the demo-walk seat a `user:` entry its `DEMO_WALK` names needs — one per entry' \
+  "the close's own row states the seat-creation exception, one demo-walk seat per entry"
+pin "$PRBRIEFS_MD" 'one demo-walk seat per `user:` entry its `DEMO_WALK` names' \
+  "the close's NEVER states the same exception, one demo-walk seat per entry"
+
+section "the demo walk is a whole contract (Task 13)"
+
+pin "$GENERIC_BRIEFS_MD" '## Demo walk' \
+  "briefs.md ships the demo-walk template"
+pin "$GENERIC_BRIEFS_MD" 'DEMO ENTRY' \
+  "the walk template carries the entry verbatim"
+pin "$GENERIC_BRIEFS_MD" 'fail: <what did not match>' \
+  "the walk returns pass or a named failure"
+pin "$GENERIC_BRIEFS_MD" 'write outside the walk' \
+  "the walk's NEVER bounds what it writes"
+pin "$GENERIC_BRIEFS_MD" '| Close session | the demo walk |' \
+  "the dispatch matrix carries the demo-walk body to the close"
+pin "$GENERIC_BRIEFS_MD" 'Ten dispatched templates live in this file' \
+  "the template count is ten"
+# The walk's template carries no handoff line — the one template without one (the walk is
+# bounded; spec §4.5: molt is not required for one, and its NEVER has no handoff
+# exception). Scoped to the section, so the other templates' lines neither satisfy nor
+# break the check; the control below refuses to read a section that did not extract.
+tmpl="$(mktemp)"
+awk '/^## Demo walk/ { seen = 1 } seen && /^## / && !/^## Demo walk/ { exit } seen { print }' "$GENERIC_BRIEFS_MD" > "$tmpl"
+nonempty "$tmpl" "the demo-walk section extracts (control for the check below)"
+m_lines="$(awk '/^MOLT:/ { t++ } END { print t+0 }' "$tmpl")"
+if [ "$m_lines" -eq 0 ]; then pass "the demo-walk template carries no MOLT line"
+else fail "the demo-walk template carries no MOLT line" "$m_lines line(s)"; fi
+rm -f "$tmpl"
 # can: is a per-role approval check, not a reviewer-only one.
 pin "$CONFIG_MD" 'a role whose shipped or declared brief invokes a slash command' \
   "the can: requirement is per role, checked at approval"
@@ -1794,9 +1885,9 @@ for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
   pin "$f" 'On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per MECHANICS' \
     "${f##*/} writes its machine on creation and continuation" flat
 done
-pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md`' \
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file' \
   "the nested spine successor writes its machine on rebind" flat
-pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md`' \
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file' \
   "the nested work-PR dispatch writes its machine on creation and continuation" flat
 pin "$LIFECYCLE_MD" 'with `phase: recorded` and its full locator before the brief goes' \
   "step 3 records the attempt before the send" flat
@@ -1853,9 +1944,9 @@ for f in "$BRIEFS_MD" "$PRBRIEFS_MD"; do
   pin "$f" 'and `run.orchestrator.session` from the layer'"'"'s Identity' \
     "${f##*/} records its session on creation and continuation (#810)" flat
 done
-pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md` — and `run.orchestrator.session`' \
+pin "$NESTED_MD" 'On that rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file — and `run.orchestrator.session`' \
   "the nested spine successor records its session on rebind (#810)" flat
-pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per `layers/herdr.md` — and `run.orchestrator.session`' \
+pin "$NESTED_MD" 'On creation and on continue/rebind it writes `run.orchestrator.machine` beside the pane — this server'"'"'s machine, per the layer file — and `run.orchestrator.session`' \
   "the nested work-PR dispatch records its session (#810)" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
 # Ruling 12: automatic relaunch retired; an unstarted worker is the operator's decision.
@@ -1926,9 +2017,10 @@ n_eq "$LIFECYCLE_MD" 'herdr agent wait' 0 "lifecycle names the layer'"'"'s wait 
 n_eq "$ROLES_MD" 'herdr agent wait' 0 "roles.md names the layer'"'"'s wait instead of repeating its command"
 pin "$SKILL_MD" 'One bounded wait (the' \
   "SKILL.md's wait primitive is one bounded wait of the layer's"
-# Each dispatched brief names the file its report is written to. Nine templates:
-# the generic five, plus the four dedicated dispatch templates in the same file.
-n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 9 \
+# Each dispatched brief names the file its report is written to. Ten templates:
+# the generic five, the four dedicated dispatch templates in the same file, and the
+# demo walk the close dispatch constructs (Task 13).
+n_eq "$GENERIC_BRIEFS_MD" 'REPORT_PATH=<the absolute path this seat writes its report to>' 10 \
   "every dispatched brief names its report path"
 
 section "the clauses the milestone proved revertible"
@@ -1956,13 +2048,14 @@ ATOMIC='replaced whole — a temp file in the same directory renamed over the pa
 n_eq "$BRIEFS_MD" "$ATOMIC" 3 "all three spine-layer report slots rename atomically"
 n_eq "$PRBRIEFS_MD" "$ATOMIC" 2 "both PR-layer report slots rename atomically"
 n_eq "$WRITER_MD" "$ATOMIC" 1 "the close-review writer's report slot renames atomically"
-# The generic layer's nine, added with the writer's slot in T7b. Not part of the
-# six T2's finding named, but the same class and the same file set: measured, a
-# revert of ONE of these nine left every suite green, exactly the hole the writer's
-# slot was. The set is now 9+3+2+1 = all fifteen slot lines in shipped prose, so a
-# revert of any one of them goes RED. The counter is the plain one — measured, this
-# needle sits whole on one line in all fifteen, so no `flat` is needed here.
-n_eq "$GENERIC_BRIEFS_MD" "$ATOMIC" 9 "all nine generic brief slots rename atomically"
+# The generic layer's ten, added with the writer's slot in T7b and the demo walk's
+# in Task 13. Not part of the six T2's finding named, but the same class and the
+# same file set: measured, a revert of ONE of these left every suite green, exactly
+# the hole the writer's slot was. The set is now 10+3+2+1 = all sixteen slot lines
+# in shipped prose, so a revert of any one of them goes RED. The counter is the
+# plain one — measured, this needle sits whole on one line in all sixteen, so no
+# `flat` is needed here.
+n_eq "$GENERIC_BRIEFS_MD" "$ATOMIC" 10 "all ten generic brief slots rename atomically"
 
 # T2 M-E. The identity anchor: reverting it to a four-part "fingerprint" left the
 # suite green. The four ids straddle a wrap, so this is two contiguous halves —
@@ -2039,17 +2132,17 @@ pin "$LIFECYCLE_MD" 'for a retained implementer whose profile can run a local sl
   "lifecycle step 5's probe sentence names both conditions the rule turns on" flat
 
 # The whole-branch review's finding 1: README's What-ships row for `briefs.md` counted
-# five dispatched templates where the file ships nine — the four ossify dispatch
+# five dispatched templates where the file ships ten — the dedicated dispatch
 # templates absent from the listing surface a reader opens first. Measured on a scratch
 # copy before this pin existed: with the row reverted to "Five dispatched brief
 # templates …", the whole suite stayed green (528/0 — 55 in config, the one assertion a
 # standalone clone skips being the repo-root marketplace sweep), so the row was
 # revertible in silence, exactly as the reviewer reported. The needle is the clause and
-# not the count alone: it names the four templates, because their absence was half the
+# not the count alone: it names the five templates, because their absence was half the
 # finding. Per-line, and it sits whole on the row's one line; a later reword of the row
 # fails it loudly rather than silently, which is the direction this suite accepts.
-pin "$PLUGIN_README_MD" 'Nine dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the four dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close)' \
-  "README's What-ships row counts the nine dispatched templates and names the four dedicated ones"
+pin "$PLUGIN_README_MD" 'Ten dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the five dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close, demo walk)' \
+  "README's What-ships row counts the ten dispatched templates and names the five dedicated ones, the demo walk included"
 
 # T4 G2. Deleting these from lifecycle.md left the suite green. The last is
 # `flat` because the file breaks its line inside the clause today.
@@ -2107,9 +2200,10 @@ pin "$ROLES_MD" 'is that variant with `SEAT_MODS_ROLE=orchestrator`' \
   "the launch block marks the top's rotation successor orchestrator" flat
 pin "$ROLES_MD" '`SEAT_MODS_ROLE=coordinator`' \
   "the launch block names the coordinator seat's export once"
-# 0.2.19: scope to the launch export; Host: OMP also names the role's rail.
-pin "$MECHANICS_MD" 'blocks them for `SEAT_MODS_ROLE=orchestrator`' \
-  "the OMP host names the role's rail once"
+# 0.2.19: scope to the launch export; T11 (ruling A) moved the Host rules shared with
+# every layer to SKILL.md, so the rail is named there.
+pin "$SKILL_MD" 'blocks them for `SEAT_MODS_ROLE=orchestrator`' \
+  "the OMP host names the role's rail once (SKILL.md)"
 pin "$ROLES_MD" 'The operator'"'"'s own first top is not launched here' \
   "the launch block says the operator launches its own top" flat
 pin "$ROLES_MD" 'the directory holding the run'"'"'s `run.json`, outside every worktree' \
@@ -2482,16 +2576,16 @@ pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
 # The old PROHIBITIONS line carried Merge acknowledgment in the operator-owned
 # set and left every brief saying the merge is the operator's word, while
 # lifecycle step 12 already merges on `run.merge_word`; slice 1 moves a worker's
-# plan to the top. Sixteen sites change together, and a per-file COUNT is the
+# plan to the top. Seventeen sites change together, and a per-file COUNT is the
 # right check: this line repeats once per template, so a `pin` (unique) cannot
-# assert it — the counts are 10 + 3 + 2 + 1, and a missed, duplicated or extra
+# assert it — the counts are 11 + 3 + 2 + 1, and a missed, duplicated or extra
 # site fails here. The absence pin is a loosening; its adjacent control (the
 # operator-owned gate sentence, at the same counts) means deleting the whole
 # line fails the control even though it would pass the absence pin.
 section "the standing orders reach the seats and the briefs"
 
 NEW_PROHIBITIONS='PROHIBITIONS: every seat-mods denial and narrower task limit wins. Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned; a worker'"'"'s implementation plan is the top'"'"'s to approve, and the merge follows run.merge_word. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.'
-for pair in "$GENERIC_BRIEFS_MD:10" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
+for pair in "$GENERIC_BRIEFS_MD:11" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
   f="${pair%:*}"; want="${pair##*:}"
   n_eq "$f" 'PROHIBITIONS: ' "$want" "${f##*/} carries exactly $want PROHIBITIONS lines"
   n_eq "$f" "$NEW_PROHIBITIONS" "$want" "${f##*/} carries the new PROHIBITIONS line at all $want sites"
@@ -2502,7 +2596,7 @@ for f in "$GENERIC_BRIEFS_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$EXEC_MD
   absent "$f" 'Merge acknowledgment, design/spec/plan/release gates, product choices' \
     "${f##*/} carries no old PROHIBITIONS phrase"
 done
-for pair in "$GENERIC_BRIEFS_MD:10" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
+for pair in "$GENERIC_BRIEFS_MD:11" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
   f="${pair%:*}"; want="${pair##*:}"
   n_eq "$f" 'Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned' "$want" \
     "${f##*/} keeps the operator-owned gate sentence at all $want sites"

@@ -3,9 +3,10 @@
 # crew — the send tag (#867), mechanical facts only.
 #
 # Every message crew sends up to a parent or top session starts with its tag,
-# `[crew <kind> <role>]` (`layers/herdr.md`, Send), and the brief templates carry their
-# own seat's role word inside it; messages sent down to a worker — briefs, plan-gate
-# replies, correction requests — stay verbatim and untagged. The legacy `REPORT READY:`
+# `[crew <kind> <role>]` (`completion.md`, where the ping contract is stated once), and
+# the brief templates carry their own seat's role word inside it; messages sent down to a
+# worker — briefs, plan-gate replies, correction requests — stay verbatim and untagged. The
+# legacy `REPORT READY:`
 # and `MOLT WARNING` forms stay *accepted* — a top still receives pings from workers a
 # brief older than 0.3.1 dispatched — so this file pins the acceptance clause in place
 # instead of forbidding the words.
@@ -20,8 +21,9 @@
 #   5. the correction request's re-ping is tagged;
 #   6. the legacy forms stay accepted: completion.md states the acceptance clause for the
 #      report ping and for the MOLT ping;
-#   7. `layers/herdr.md`'s `Send` scopes the tag to sends up, names what stays untagged
-#      (down-sends, then local slash commands), and lists the orchestrator role word;
+#   7. `completion.md`, where the ping contract is stated once, scopes the tag to sends up,
+#      names what stays untagged (down-sends, then local slash commands), and lists the
+#      orchestrator role word — layer-neutral since D1: an Orca seat's ping is the same text;
 #   8. `SKILL.md` states the status block — its five labels, once each, in order — and
 #      the molt-handoff exception.
 #
@@ -37,19 +39,39 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate/references"
-LAYER_MD="$REF/layers/herdr.md"
 SKILL_MD="$PLUGIN_ROOT/skills/orchestrate/SKILL.md"
 COMPLETION_MD="$REF/completion.md"
 
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-# The fifteen dispatched templates, by fence order, and the seat role each is marked
+# The dispatched templates, by fence order, and the seat role each is marked
 # with (`roles.md`: implementer, verifier and reviewer are the guarded roles;
 # coordinator is the spine, lane driver, doctor, close and work-PR marking).
-# `<file>:<fence>:<role>` — the correction request carries no seat and is fence 10 of
+# `<file>:<fence>:<role>` — the correction request carries no seat and is fence 11 of
 # briefs.md, so it appears nowhere here.
-EXPECTED_ROLES='briefs.md:1:implementer
+#
+# Sixteen templates carry a PING line. Fifteen of them also carry a MOLT line; the
+# demo walk (fence 10 of briefs.md, a guarded `verifier`) is the one with no `MOLT:`
+# line, so it appears only in the PING table below.
+EXPECTED_ROLES_PING='briefs.md:1:implementer
+briefs.md:2:implementer
+briefs.md:3:reviewer
+briefs.md:4:verifier
+briefs.md:5:implementer
+briefs.md:6:coordinator
+briefs.md:7:coordinator
+briefs.md:8:implementer
+briefs.md:9:coordinator
+briefs.md:10:verifier
+ossify-briefs.md:1:coordinator
+ossify-briefs.md:2:implementer
+ossify-briefs.md:3:verifier
+ossify-pr-briefs.md:1:coordinator
+ossify-pr-briefs.md:2:coordinator
+ossify-close-writer.md:1:implementer'
+
+EXPECTED_ROLES_MOLT='briefs.md:1:implementer
 briefs.md:2:implementer
 briefs.md:3:reviewer
 briefs.md:4:verifier
@@ -140,9 +162,14 @@ roles_of() { # <references dir> <PING|MOLT> -> "<file>:<fence>:<role>" per send 
   done
 }
 for kind in PING MOLT; do
+  case "$kind" in
+    PING) expected="$EXPECTED_ROLES_PING" ;;
+    MOLT) expected="$EXPECTED_ROLES_MOLT" ;;
+  esac
+  n_expected="$(printf '%s\n' "$expected" | grep -c .)"
   actual="$(roles_of "$REF" "$kind")"
-  if [ "$(printf '%s\n' "$actual" | sort)" = "$(printf '%s\n' "$EXPECTED_ROLES" | sort)" ]; then
-    pass "the $kind lines carry each template's own role word (15)"
+  if [ "$(printf '%s\n' "$actual" | sort)" = "$(printf '%s\n' "$expected" | sort)" ]; then
+    pass "the $kind lines carry each template's own role word ($n_expected)"
   else
     fail "the $kind lines carry each template's own role word" "got: $(printf '%s\n' "$actual" | sort | tr '\n' ' ')"
   fi
@@ -189,27 +216,19 @@ pin "$COMPLETION_MD" 'A brief older than 0.3.1 still sends the legacy `MOLT WARN
 pin "$COMPLETION_MD" 'A brief older than 0.3.1 still sends the legacy `REPORT READY: <task id> <kind> <path>` form; read either it or the tagged `[crew report <role>] <task id> <kind> <path>` as this ping.' \
   "completion.md takes the tagged or the legacy report ping" flat
 
-section "the layer's Send states the rule"
+section "completion.md states the rule"
 
-send_section() { # <file>
-  awk '/^## Send$/{on=1;next} on && /^## /{exit} on' "$1"
-}
-span="$(mktemp)"
-send_section "$LAYER_MD" > "$span"
-n="$(grep -c . "$span" | tr -d ' ')"
-if [ "$n" -ge 5 ]; then
-  pin "$span" '[crew <kind> <role>]' "the tag grammar is stated"
-  pin "$span" 'sends up to a parent or top session' "the tag rule is scoped to sends up"
-  pin "$span" 'sends down to a worker' "down-sends are named untagged"
-  pin "$span" '`coordinator`, `orchestrator`' "the orchestrator role word is in the grammar"
-  pin "$span" '`/context` or `/clear`' "local slash commands are named with the resume"
-  pin "$span" '/ossify:handoff-resume <path>' "the Claude resume form is named"
-  pin "$span" 'skill://handoff-resume <path>' "the OMP resume form is named"
-  pin "$span" 'prefix would break any slash command' "the exceptions give their reason" flat
-else
-  fail "the Send section spans enough lines to carry the rule" "got $n line(s) — an unreadable extraction fails closed"
-fi
-rm -f "$span"
+# D1: the rule is layer-neutral — an Orca seat's ping reaches the top as the same text — so
+# it lives in the shared file that owns the ping contract (`completion.md`, "The ping and
+# the heartbeat"), and in no layer file, where each layer would need its own copy.
+pin "$COMPLETION_MD" '[crew <kind> <role>]' "the tag grammar is stated"
+pin "$COMPLETION_MD" 'sends up to a parent or top session' "the tag rule is scoped to sends up"
+pin "$COMPLETION_MD" 'sends down to a worker' "down-sends are named untagged"
+pin "$COMPLETION_MD" '`coordinator`, `orchestrator`' "the orchestrator role word is in the grammar"
+pin "$COMPLETION_MD" '`/context` or `/clear`' "local slash commands are named with the resume"
+pin "$COMPLETION_MD" '/ossify:handoff-resume <path>' "the Claude resume form is named"
+pin "$COMPLETION_MD" 'skill://handoff-resume <path>' "the OMP resume form is named"
+pin "$COMPLETION_MD" 'prefix would break any slash command' "the exceptions give their reason" flat
 
 section "the status block is stated"
 

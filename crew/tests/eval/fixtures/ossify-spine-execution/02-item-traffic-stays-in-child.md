@@ -31,12 +31,12 @@ nothing arrived alongside it — and you created the `run.json` you own,
     REPORT_PATH=/runs/r6.s1/spine-report.md, replaced whole — a temp file in the same directory renamed over the path, never in pieces
     RUN_JSON=/runs/r6.s1/run_child77.json
     SEATS — the operator-approved seats for this spine. Use them verbatim.
-    r6.s1.w1 implementer: strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
-    r6.s1.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
-    r6.s1.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject
-    r6.s1.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
-    r6.s1.w3 implementer: strong-coder --effort max | model: strong-v2 | effort: max | model_shows: banner | brief_delivery: inject
-    r6.s1.w3 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r6.s1.w1 implementer: strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
+    r6.s1.w1 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
+    r6.s1.w2 implementer: fast-coder | fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject | host: dev-box
+    r6.s1.w2 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
+    r6.s1.w3 implementer: strong-coder | strong-coder --effort max | model: strong-v2 | effort: max | model_shows: banner | brief_delivery: inject | host: dev-box
+    r6.s1.w3 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
 
 Round 1 holds three items. `r6.s1.w1` has already come back complete; you
 captured the identity its result declares and created its verifier pane at that

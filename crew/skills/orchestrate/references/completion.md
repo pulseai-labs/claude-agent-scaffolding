@@ -68,6 +68,22 @@ the wait/ping fallback, never a rolling foreground loop.
 
 ## The ping and the heartbeat
 
+**The tag.** Every message crew sends up to a parent or top session — a `PING:` line's
+send, a `MOLT:` line's send, a note between tops or from a rotation successor — starts
+with its tag as the first text: `[crew <kind> <role>]`. `<kind>` is `report`, `molt` or
+`message`; `<role>` is the sending seat's role word — `implementer`, `verifier`,
+`reviewer`, `coordinator`, `orchestrator` — lowercase, letters and hyphens only. Each
+brief template's `PING:` and `MOLT:` lines carry their own role word inside the tag; the
+tag is what tells a receiving session a seat's message apart from the operator's typing.
+
+**Sends that stay untagged.** What crew sends down to a worker — a brief, a plan-gate
+reply, a correction request, a `/context` — is delivered verbatim, no preamble, and
+carries no tag (`briefs.md`); the worker's re-ping after a correction is sent up, and
+carries the tag. A local slash command is untagged too — the rotation resume
+(`/ossify:handoff-resume <path>` to a Claude Code top, `skill://handoff-resume <path>`
+to an OMP top; `lifecycle.md`, "The resume"), and `/context` or `/clear` — because the
+tag is a prefix, and a prefix would break any slash command.
+
 The worker's ping is its brief's line (`briefs.md`): after every report rename, one send, no
 wait, no retry, and only when `NOTIFY_RUN` is not `none` — it reads `run.orchestrator` from
 that file at that moment and sends through the layer's Send only when `run.orchestrator.machine`

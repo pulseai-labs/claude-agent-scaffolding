@@ -1,21 +1,23 @@
 # crew
 
-The orchestrator/worker session model over herdr. One prose skill, no runtime library.
+The orchestrator/worker session model over herdr or Orca. One prose skill, no runtime library.
 
 One orchestrator session keeps its context for decisions and dispatches everything else
-to worker sessions launched by seat name through herdr — the seats defined in the
+to worker sessions launched by seat name through the project's layer — the seats defined in the
 operator's own files, not in this plugin. A planned-work seat and a bounded-work seat
 implement by complexity class, one reviewer seat runs its review command (`/code-review` by default) once per PR and
 returns its findings through its report file, the retained implementer works GitHub
 threads to zero, and the merge waits for the operator's word.
 
-Every herdr command's syntax comes from `herdr --skill`, the binary's own
-version-matched guide. This plugin states what a seat is and who does what; it does not
-re-type the guide. `skills/orchestrate/references/layers/herdr.md` is the one file
-that records herdr's half — the launch and its marking, the two readiness paths, the send
-and its turn-start check, the waits, the typed completion states, placement, the teardown
-commands, and the machine labels — and it wins where the two differ. What a finished seat
-means is layer-neutral and lives in `references/completion.md`.
+Every layer's command syntax comes from its own guide: herdr's from `herdr --skill`, the
+binary's own version-matched guide; Orca's from `orca skills get orca-cli`. This plugin
+states what a seat is and who does what; it does not re-type either.
+`skills/orchestrate/references/layers/herdr.md` and
+`skills/orchestrate/references/layers/orca.md` are the two files that record each layer's
+half — the launch, the readiness wait, the send and its turn-start check, the waits, the
+typed completion states, the teardown commands, and the machines — and each wins where it
+differs from its guide. What a finished seat means is layer-neutral and lives in
+`references/completion.md`.
 
 ### Trusted OMP assignment enrollment (unreleased)
 
@@ -33,11 +35,12 @@ For enrolled OMP, operator merge acknowledgment and spec/design/plan/release gat
 |---|---|
 | `orchestrate` (the skill) | The orchestrator session's playbook: the delegation floor and its decidable test, the role list, the run by reference, the briefs, the ossify seam, and the refusals. |
 | `references/layers/herdr.md` | herdr's own half, under the thirteen fixed step headings every layer file carries: the run workspace and the seat worktree, the pane and its command, the two readiness paths, the typed wait, the turn-start check on a send, the health read, the teardown commands and the machine labels. The rules every layer obeys stay in the shared files; this file holds herdr's commands, flags and ids. It overrides the guide's default placement. |
+| `references/layers/orca.md` | Orca's own half, under the same thirteen fixed step headings: the run workspace and the seat worktree, the terminal and its command, the readiness wait and its screen read, the typed completion state, the turn-start check on a send, the health read, the teardown commands and the hosts it can target. The rules every layer obeys stay in the shared files; this file holds Orca's commands, flags and ids. It says where it overrides the guide's default. |
 | `references/completion.md` | How a run learns a seat finished, stated once for every layer: the report-file contract and the dispatch-time generation note, the doorbell and its generation check, the two dead ends, the worker's ping and the heartbeat backstop, a child past molt's warnings, and a child's pain. The layer's `Completion signal` step says how its own state is typed. |
 | `references/roles.md` | The role table and the seats that fill it, the launch sequence and the launch environment every layer sets, retention, the session budget, placement for the dual-repo case, the writers rules, and the teardown order. |
 | `references/lifecycle.md` | The thirteen-step run, the operator's own roles and the named points they run at, and rotation past the context ceiling. |
 | `references/config.md` | The operator's two files, the agent entries and their fields, the resolved profile and where each value travels, the project file's three sections, and what happens when a file is missing. |
-| `references/briefs.md` | Nine dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the four dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close) — plus the correction-request message template, which is a send and not a session; the file's header states the whole-contract rule and the dispatch matrix. |
+| `references/briefs.md` | Ten dispatched brief templates — the generic five (planned implementer, fast implementer, reviewer, verifier, fix round) and the five dedicated dispatch templates the ossify dispatches use (lane driver, doctor dispatch, direct work-item, non-spine close, demo walk) — plus the correction-request message template, which is a send and not a session; the file's header states the whole-contract rule and the dispatch matrix. |
 | `references/ossify-execution.md` | The spine execution-assignment contract: the four activation facts, the seats and the layers that own them, the approved block injected into the spine session's brief, and the three fixed procedures. |
 | `references/ossify-nested-run.md` | The activated spine's nested run: the required worker depth, the nested `run.json`, the round procedure and its gate, the close, and rotation. |
 | `references/ossify-pr-briefs.md` | The two PR-lane briefs: the close session's, and the work-PR session's with the merge bind and its return shapes. |
@@ -217,8 +220,8 @@ launch, one block each, with the field table in `skills/orchestrate/references/c
 saying what each means and where it travels. `<project root>/.crew/roles.md` is the
 project file: which agent fills each role, the operator's own roles, and the conditions
 that choose between seats — it wins for anything it names. Its first non-heading line is the
-mandatory layer line — `layer: herdr` in 0.3.0, and a missing or unknown value stops the run
-with one question; the Orca layer ships in crew 0.4.0. With neither file the
+mandatory layer line — `layer: herdr` or `layer: orca`, and a missing or unknown value stops the run
+with one question. With neither file the
 session's own work needs no setup, and the first delegated dispatch halts naming the file
 to add; a seat name neither defines halts the run.
 

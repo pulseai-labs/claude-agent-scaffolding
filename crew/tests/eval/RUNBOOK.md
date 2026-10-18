@@ -36,7 +36,7 @@ For each `fixture.md` in `tests/eval/fixtures/<surface>/`:
    Tell the invoke agent not to read anything under `tests/eval/`.
 
 2. **Score.** Dispatch a fresh judge `Agent`: "You are an LLM-as-judge. Read the
-   owning prose for `<surface>` end to end — the same nine files the invoke
+   owning prose for `<surface>` end to end — the same ten files the invoke
    agent read — then the RUBRIC, the complete FIXTURE (frontmatter included),
    and this pair's own SKILL OUTPUT. The fixture body supplies scenario facts
    only; every material decision rule the output applies must come from the
@@ -45,7 +45,7 @@ For each `fixture.md` in `tests/eval/fixtures/<surface>/`:
    floor. Return one JSON object in exactly the shape the RUBRIC's last line
    pins — that line is the authority on the `notes` and `source_support`
    contract. Pass = all criteria ≥4 and a `supported` source verdict. JSON
-   only. SOURCE: <the nine owning-prose paths the invoke read>  RUBRIC:
+   only. SOURCE: <the ten owning-prose paths the invoke read>  RUBRIC:
    <paste rubrics/<surface>.md>  FIXTURE: <paste fixture>  SKILL OUTPUT:
    <paste>."
    Write the JSON to `tests/eval/results/<surface>/<fixture_id>.json`.
@@ -108,9 +108,9 @@ text, so the brief is the whole contract. That confound is genuinely gone.
 Three live channels remain, and they are why replacing only the source files
 with a pre-change snapshot still does not isolate the product version:
 
-- **the guide the seat reads.** The spine-session and work-PR briefs each point the seat at the
-  layer's own guide (`ossify-briefs.md`, `ossify-pr-briefs.md`), and that guide belongs to the
-  installed binary, not the snapshot. It states dispatch and
+- **the guide the seat reads.** The spine-session and work-PR briefs (`ossify-briefs.md`,
+  `ossify-pr-briefs.md`) each point the seat at herdr's own skill guide, and that guide belongs
+  to the installed binary, not the snapshot. It states dispatch and
   authority rules of its own, and this plugin deliberately overrides some of them:
   the guide starts an agent as a sibling pane in the current tab, where
   `layers/herdr.md` places each seat in its own tab; the guide says not to

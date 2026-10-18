@@ -6,13 +6,14 @@
 # where the next layer would inherit it as an instruction. So the sweep is the point, and it
 # prints EVERY hit — a truncated list reads as a shorter job than the one actually left.
 #
-# Three facts:
+# Four facts:
 #   1. no shared `.md` under skills/orchestrate/ names a layer's commands (`herdr <word>`,
 #      `HERDR_`, `orca <word>`) — `references/layers/*` is where those live, and is exempt;
-#   2. `references/layers/herdr.md` carries the thirteen step headings, in order;
+#   2. both layer files carry the thirteen step headings, in order — orca.md equal to herdr.md's;
 #   3. a rule true for any layer lives in ONE shared file and in no `layers/*.md` — the
 #      anchors in the last section are checked absent from the layer files and present once
-#      in their owner, so a layer file cannot accumulate the next layer's copy.
+#      in their owner, so a layer file cannot accumulate the next layer's copy;
+#   4. the orchestration-system verb pair appears nowhere under `crew/` (spec §4.3).
 #
 # The exemptions are a LIST with a label each, so a task that is done shrinks it rather than
 # leaving a hole nobody can see:
@@ -35,6 +36,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 REF="$PLUGIN_ROOT/skills/orchestrate"
 LAYER_MD="$REF/references/layers/herdr.md"
+ORCA_MD="$REF/references/layers/orca.md"
 
 # The thirteen steps, in the order every layer file carries them.
 STEPS='Health
@@ -124,11 +126,75 @@ else
   fail "control: the sweep controls leave no fixture behind" "$ctl survived its cleanup"
 fi
 
-section "the layer file carries the thirteen steps, in order"
+section "no shared file points at one layer's own file"
+
+# B2 (#877): a shared file naming `layers/herdr.md` sends an `layer: orca` run to herdr's
+# mechanics — the spine and work-PR briefs' `MECHANICS=` slot and every prose pointer were
+# the sites. The pointer belongs to the run's layer, and `layers/<layer>.md` is the only
+# path-shaped form a shared file may carry; `references/layers/*` is exempt, like the
+# command sweep above.
+layer_pointer_findings() { # <skills/orchestrate dir>
+  local dir="$1" f n line
+  find "$dir" -name '*.md' | sort | while IFS= read -r f; do
+    case "$f" in */references/layers/*) continue ;; esac
+    n=0
+    while IFS= read -r line; do
+      n=$((n + 1))
+      case "$line" in
+        *"layers/herdr.md"*|*"layers/orca.md"*) printf '%s:%s:%s\n' "$f" "$n" "$line" ;;
+      esac
+    done < "$f"
+  done
+}
+
+findings="$(layer_pointer_findings "$REF")"
+if [ -z "$findings" ]; then
+  pass "no shared file names one layer's own file"
+else
+  fail "no shared file names one layer's own file ($(printf '%s\n' "$findings" | wc -l | tr -d ' ') line(s)):"
+  printf '%s\n' "$findings" | sed 's/^/        /'
+fi
+
+# Controls: the check reads a tree, so plant one — the clean fixture is the adjacent
+# control, and the planted pointer is caught with its file and line.
+ctl="$(mktemp -d)"
+mkdir -p "$ctl/references"
+printf '# Roles\n\nThe layer file says how a seat is sent a brief.\n' > "$ctl/references/roles.md"
+out="$(layer_pointer_findings "$ctl")"
+if [ -z "$out" ]; then
+  pass "control: the check passes a shared file that names no layer file"
+else
+  fail "control: the check passes a shared file that names no layer file" "$out"
+fi
+printf 'See `layers/herdr.md` for the send.\n' >> "$ctl/references/roles.md"
+out="$(layer_pointer_findings "$ctl")"
+if [ "$(printf '%s\n' "$out" | grep -c .)" -eq 1 ] && printf '%s' "$out" | grep -F 'layers/herdr.md' >/dev/null; then
+  pass "control: a planted pointer is caught, by name and line"
+else
+  fail "control: a planted pointer is caught, by name and line" "got: ${out:-<none>}"
+fi
+# The layer files themselves are exempt: the same line there is not a finding.
+mkdir -p "$ctl/references/layers"
+mv "$ctl/references/roles.md" "$ctl/references/layers/herdr.md"
+out="$(layer_pointer_findings "$ctl")"
+if [ -z "$out" ]; then
+  pass "control: the same pointer inside references/layers/ is exempt"
+else
+  fail "control: the same pointer inside references/layers/ is exempt" "$out"
+fi
+rm -rf "$ctl"
+if [ ! -e "$ctl" ]; then
+  pass "control: the pointer controls leave no fixture behind"
+else
+  fail "control: the pointer controls leave no fixture behind" "$ctl survived its cleanup"
+fi
+
+section "the layer files carry the thirteen steps, in order"
+headings_of() { sed -n 's/^## //p' "$1"; }
 if [ ! -f "$LAYER_MD" ]; then
   fail "$LAYER_MD exists" "no such file — the thirteen headings cannot be read from a file that is not there"
 else
-  got="$(sed -n 's/^## //p' "$LAYER_MD")"
+  got="$(headings_of "$LAYER_MD")"
   n_got="$(printf '%s\n' "$got" | grep -c .)"
   if [ "$n_got" -eq 0 ]; then
     fail "herdr.md has headings to compare" "the read returned nothing, and two empty lists compare equal"
@@ -138,6 +204,29 @@ else
     fail "herdr.md carries the thirteen step headings, in order" "got: $(printf '%s' "$got" | tr '\n' '|')"
   fi
 fi
+if [ ! -f "$ORCA_MD" ]; then
+  fail "$ORCA_MD exists" "no such file — orca.md's headings cannot be read from a file that is not there"
+else
+  o_got="$(headings_of "$ORCA_MD")"
+  n_o="$(printf '%s\n' "$o_got" | grep -c .)"
+  if [ "$n_o" -eq 0 ]; then
+    fail "orca.md has headings to compare" "the read returned nothing, and two empty lists compare equal"
+  elif cmp -s <(printf '%s\n' "$o_got") <(headings_of "$LAYER_MD"); then
+    pass "orca.md carries herdr.md's thirteen step headings, in order ($n_o)"
+  else
+    fail "orca.md carries herdr.md's thirteen step headings, in order" "got: $(printf '%s' "$o_got" | tr '\n' '|')"
+  fi
+  # Control: the equality must fail on a dropped heading — awk deletes the
+  # first "## " line, the form both GNU sed and BSD sed would disagree on.
+  ctl_layer="$(mktemp)"
+  awk '/^## / && !d { d = 1; next } { print }' "$ORCA_MD" > "$ctl_layer"
+  if ! cmp -s <(headings_of "$ctl_layer") <(headings_of "$LAYER_MD"); then
+    pass "control: a dropped heading fails the equality"
+  else
+    fail "control: a dropped heading fails the equality" "the fixture did not differ from the real file"
+  fi
+  rm -f "$ctl_layer"
+fi
 
 section "rules stay out of the layer file"
 
@@ -146,12 +235,18 @@ section "rules stay out of the layer file"
 # anchor below is such a rule phrase; the pair is the check — the phrase must be ABSENT from
 # every `layers/*.md` AND present EXACTLY ONCE in the shared file that owns it, so a phrase
 # that leaves the layer file and never lands in its home fails too.
+#
+# D1 (2026-10-18): the #867 send-tag rule is layer-neutral — an Orca seat's ping reaches the
+# top as the same text — so the rule left `layers/herdr.md` for `completion.md`; the two
+# send-tag anchors below pin it there and out of every layer file.
 ANCHORS="$(printf '%s\n' \
   "the generation check governs all three	completion.md" \
   "A child's pain	completion.md" \
   "One bounded background timer of about 15 minutes	completion.md" \
   "MOLT WARNING <pct> <task id>	completion.md" \
   "doorbell is the report file	completion.md" \
+  "sends up to a parent or top session	completion.md" \
+  "Sends that stay untagged	completion.md" \
   "SEAT_MODS_ROLE=coordinator	roles.md" \
   "closes last	roles.md")"
 
@@ -203,6 +298,55 @@ if [ ! -e "$ctl" ]; then
   pass "control: the rule controls leave no fixture behind"
 else
   fail "control: the rule controls leave no fixture behind" "$ctl survived its cleanup"
+fi
+
+section "no orchestration system under crew/"
+
+# Spec §4.3: this plugin drives Orca at the terminal and worktree level only.
+# The needle is ASSEMBLED so this file does not itself carry the string it
+# sweeps for; every hit is printed with its file and line.
+ORC_NEEDLE="orca"' '"orchestration"
+
+orchestration_findings() { # <root>
+  local root="$1" f n line
+  find "$root" -type f | sort | while IFS= read -r f; do
+    n=0
+    while IFS= read -r line; do
+      n=$((n + 1))
+      case "$line" in
+        *"$ORC_NEEDLE"*) printf '%s:%s:%s\n' "$f" "$n" "$line" ;;
+      esac
+    done < "$f"
+  done
+}
+
+findings="$(orchestration_findings "$PLUGIN_ROOT")"
+if [ -z "$findings" ]; then
+  pass "no orchestration-system command anywhere under crew/"
+else
+  fail "no orchestration-system command anywhere under crew/ ($(printf '%s\n' "$findings" | wc -l | tr -d ' ') line(s)):"
+  printf '%s\n' "$findings" | sed 's/^/        /'
+fi
+
+# Controls: the scan reads a tree, so plant one — a clean fixture passes, a
+# planted file is caught by name and line.
+ctl="$(mktemp -d)"
+printf 'a clean file\n' > "$ctl/clean.md"
+out="$(orchestration_findings "$ctl")"
+if [ -z "$out" ]; then pass "control: the scan passes a clean fixture"
+else fail "control: the scan passes a clean fixture" "$out"; fi
+printf '%s\n' "the $ORC_NEEDLE dispatch verb" >> "$ctl/clean.md"
+out="$(orchestration_findings "$ctl")"
+if [ "$(printf '%s\n' "$out" | grep -c .)" -eq 1 ] && printf '%s' "$out" | grep -F "$ORC_NEEDLE" >/dev/null; then
+  pass "control: a planted orchestration-system command is caught, by name and line"
+else
+  fail "control: a planted orchestration-system command is caught, by name and line" "got: ${out:-<none>}"
+fi
+rm -rf "$ctl"
+if [ ! -e "$ctl" ]; then
+  pass "control: the scan controls leave no fixture behind"
+else
+  fail "control: the scan controls leave no fixture behind" "$ctl survived its cleanup"
 fi
 
 report

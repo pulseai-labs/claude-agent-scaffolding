@@ -41,12 +41,12 @@ Round 1's other item, `r5.s2.w2`, has already closed and its pair was released.
 Your brief's SEATS block reads:
 
     SEATS — the operator-approved seats for this spine. Use them verbatim.
-    r5.s2.w1 implementer: claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh | model_shows: banner | brief_delivery: inject
-    r5.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
-    r5.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject
-    r5.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
-    r5.s2.w3 implementer: strong-coder --effort max | model: strong-v2 | effort: max | model_shows: banner | brief_delivery: inject
-    r5.s2.w3 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r5.s2.w1 implementer: claude-opus | claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w1 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w2 implementer: fast-coder | fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w2 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w3 implementer: strong-coder | strong-coder --effort max | model: strong-v2 | effort: max | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w3 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
 
 Round 2 holds only `r5.s2.w3`, which depends on both round-1 items.
 

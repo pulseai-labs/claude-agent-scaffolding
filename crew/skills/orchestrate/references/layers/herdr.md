@@ -125,22 +125,6 @@ PING_SEND=herdr agent prompt <that pane>
 This is the one statement of how the orchestrator sends a seat anything; other files say "send" and mean this. The slot `PING_SEND` a brief's `PING:` and `MOLT:` lines carry is this
 file's send, filled by the dispatcher.
 
-**The tag.** Every message crew sends up to a parent or top session — a `PING:` line's
-send, a `MOLT:` line's send, a note between tops or from a rotation successor — starts
-with its tag as the first text: `[crew <kind> <role>]`. `<kind>` is `report`, `molt` or
-`message`; `<role>` is the sending seat's role word — `implementer`, `verifier`,
-`reviewer`, `coordinator`, `orchestrator` — lowercase, letters and hyphens only. Each
-brief template's `PING:` and `MOLT:` lines carry their own role word inside the tag; the
-tag is what tells a receiving session a seat's message apart from the operator's typing.
-
-**Sends that stay untagged.** What crew sends down to a worker — a brief, a plan-gate
-reply, a correction request, a `/context` — is delivered verbatim, no preamble, and
-carries no tag (`briefs.md`); the worker's re-ping after a correction is sent up, and
-carries the tag. A local slash command is untagged too — the rotation resume
-(`/ossify:handoff-resume <path>` to a Claude Code top, `skill://handoff-resume <path>`
-to an OMP top; `lifecycle.md`, "The resume"), and `/context` or `/clear` — because the
-tag is a prefix, and a prefix would break any slash command.
-
 - **Detected:** `herdr agent prompt <pane> "<text>"`. herdr prepends nothing: it submits
   the text and Enter as one submission, and what it adds to a seat is environment such as
   `HERDR_PANE_ID`, never prompt text. A message that starts work takes the turn-start
@@ -226,18 +210,14 @@ order, and what a refused remove does, are `roles.md`'s Teardown order.
 A `machine` is a remote server's `herdr machine list` label; this server's machine is its `hostname -s`.
 Every command for a seat on that machine carries `herdr --machine <label>`, with its ids
 discovered there: ids and agent names are scoped to one server, and `--current` reaches no
-remote pane.
+remote pane. The operator names a seat's machine in the machine file's `host:`, with one of
+these labels; this server's own name needs no `--machine`. A seat on another machine
+writes its report file there, and this layer names no route that reads it from here: that
+read is measured on the Orca layer only (`layers/orca.md`, Machines) — a known limit.
 
 ## Host: OMP
 
 An OMP top (`omp-seat orchestrator --via omp-glm`, omp-roles 0.4.0) runs this skill as written, with these
 substitutions; so does an OMP coordinator for the seats it drives. Background call: omp's bash async job (`async.enabled`, on by default); pass `timeout: 0` on every one
 (omp's default deadline is 300 s and a nonzero value is clamped; 0 disables it), so herdr's `--timeout` bounds the wait; never pass `name:`, which puts omp's bash in service mode and refuses async and timeout.
-Its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one. A send's slash command
-is text on omp: `/<plugin>:<skill>` becomes `skill://<skill>`, except a send to a Claude Code seat. crew's
-`hooks.json` does not run on omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent` tool
-means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
-**New enrolled OMP path only:** before the seat command, the operator/trusted delegated dispatcher independently selects outside-allowance input/event/source paths and invokes `bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root <trusted-root> --worker-root <assignment-worktree> --worker-root <each-extra-root>` (repeat roots). Its JSON binding maps path/sha256/assignmentId/generation/launchId to `AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`, `AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` in the trusted startup export; never take them from a worker/report/model.
-Check the whole allowance, including every `SEAT_MODS_ALLOW` entry, coordinator `.worktrees`, report/scratch/handoff and output roots: authority, parent, input and evidence/policy sources must not overlap in either ancestry direction. omp-seat resolves the installed Autonomic CLI and validates before the via version probe/worker; partial/invalid bindings refuse. Preserve all existing role/path/molt/autonomic markings and extension order seat-mods → Molt → Autonomic. A role or autopilot marks a seat, not a grant; empty grants authorize nothing. No live issuance is supplied by these instructions.
-Every materially new enrolled assignment ends the old agent process and needs fresh issuance/launch, retained pane included. Same-assignment corrections/rechecks use unchanged approvals/grants/lifetime; revocation/completion/replacement invalidates, never rebinds. A parent-handback child ends its unit. Public host evidence cannot distinguish private Molt ownership from generic `/new` plus lineage, so enrolled in-place clears remain suspended and require fresh trusted launch; finish/handoff existing tops/workers before rollout, never hot-enroll via env/report edits. Retain phase/locator.seen/generation/resume ownership and never auto-relaunch a live attempt.
-Enrolled OMP operator merge acknowledgment and design/spec/plan/release gates override standing routing, shared policy prose, role and confidence; all seat-mods denials remain absolute. Read/revalidate the original pinned authority before decisions and immediately before action, with no following model await; failures stay operator handling, never a new digest. Same-UID/shared-process and last-check race limits remain; this is not a sandbox/atomic revocation lock. Unbound OMP and Claude Code keep their legacy behavior; #832 and #831's full parity criterion remain open. Native decision consumers and release/activation remain separately gated.
+Its result returns to the session as a turn, so every readiness and completion wait, and the heartbeat, runs as one.
