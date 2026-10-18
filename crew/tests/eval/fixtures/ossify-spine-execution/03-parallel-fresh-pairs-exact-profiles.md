@@ -31,10 +31,10 @@ them independent within the round.
 Your brief's SEATS block reads:
 
     SEATS — the operator-approved seats for this spine. Use them verbatim.
-    r5.s2.w1 implementer: claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh | model_shows: banner | brief_delivery: inject
-    r5.s2.w1 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
-    r5.s2.w2 implementer: fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject
-    r5.s2.w2 verifier:    strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject
+    r5.s2.w1 implementer: claude-opus | claude --model claude-opus-5 --effort xhigh | model: claude-opus-5 | effort: xhigh | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w1 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w2 implementer: fast-coder | fast-coder | model: fast-v1 | effort: (agent default) | model_shows: banner | brief_delivery: inject | host: dev-box
+    r5.s2.w2 verifier:    strong-coder | strong-coder --effort high | model: strong-v2 | effort: high | model_shows: banner | brief_delivery: inject | host: dev-box
 
 You checked the block against `SPINE.md` at step 1: both items have exactly
 one implementer row and one verifier row, and no row names an item the plan does

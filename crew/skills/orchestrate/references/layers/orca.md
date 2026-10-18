@@ -120,13 +120,22 @@ the operator (`roles.md`).
 ## Machines
 
 `orca host list` names what this host can target and what to pass; every call for a seat on
-another machine carries `--environment <name>` — its handles belong to it. `--host` means
+another machine carries `--environment <name>` — its handles belong to it. That list names
+this machine too, under its own `machineName`: a seat's `host:` value is one of those names,
+this machine's included. `--host` means
 `ssh:<id>` or `runtime:<env-id>`: a different kind of target, and the common way to get an
 empty answer is passing one where the other belongs. On a host crew does not control: create
 the terminal with no `--command`, read until the shell prompt shows, clear any start-up
 prompt (`n` + Enter on the Mac's zsh update question), then send the seat command and verify
 the agent and its environment — Orca injects `--command` at create, so no post-create wait
 protects it.
+
+A seat's report file is read where it is written: its one-line `REPORT:` receipt arrives
+through `Read`, carrying the selector above when the seat is on another machine, and the full
+file is read with `ssh <machineName> 'cat <path>'` — the route measured 2026-10-18 (BatchMode
+key auth; the key is the operator's, outside this layer). That read needs the operator's own
+allow for that host in their harness settings; a refused read halts the dispatch with one
+question to the operator, while the `REPORT:` line through `Read` still arrives.
 
 ## Host: OMP
 

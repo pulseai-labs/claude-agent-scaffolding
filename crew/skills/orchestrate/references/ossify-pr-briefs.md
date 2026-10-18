@@ -11,7 +11,8 @@ whole contract its reader will ever see — fill every slot, delete nothing else
 ## Close session (one fresh seat per dispatch, created by the top)
 
 The top marks it `coordinator` before its command (the layer's `Seat marking`).
-It creates nothing, returns a list; only the successful record pass is single and conditional.
+It creates nothing but the one demo-walk seat `DEMO_WALK` names, and returns a list; only the
+successful record pass is single and conditional.
 
 ```text
 OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
@@ -38,6 +39,9 @@ CLOSE_EXPECTED_MODEL=<the model the banner or screen must show>
 CLOSE_EFFORT=<the effort this seat was launched at>
 CLOSE_REVIEW_LEDGER=<every close review's ledger for this spine, oldest first,
 verbatim — or "none">
+DEMO_WALK=<the demo-walk seat's row> for <the `user:` entry ids it walks> — the top fills the
+row with the seat's resolved profile (the row shape `config.md` defines) and the ids from the
+operator's assignment; otherwise the sentinel `none`, which walks nothing and launches no seat
 Everything you tell the top goes in your report file at REPORT_PATH.
 
 TASK: run `/ossify:close SPINE_ID` and let it complete or halt. Whatever it hands
@@ -50,7 +54,18 @@ it halts no ceremony gate — but this dispatch is stricter, and a `fix now`
 disposition ends this dispatch as `halted: close-review — <ledger>`,
 carrying each finding, its `target_repo`, its decision and the reason; the top
 dispatches the writer — per `ossify-close-writer.md`, one per affected hosting
-repo — and a fresh close. On a record pass, write the accepted findings
+repo — and a fresh close.
+
+**A `user:` entry DEMO_WALK names runs on the machine its row's `host:` names**: launch the
+demo-walk seat from that row — the seat's profile, verbatim — marked `verifier` before its
+command (the layer's `Seat marking`), every call for it carrying the layer's Machines step for
+that host; send it `briefs.md`'s `demo walk` body, carried in this dispatch, with that entry
+verbatim; wait on it through the layer's Wait, read its report where it was written
+(`Machines`), release the seat, and take its result as the entry's — a failing walk halts this
+dispatch as the ceremony's walk does. One seat per entry, from that row only; every other
+entry the ceremony walks as `/ossify:close` says.
+
+On a record pass, write the accepted findings
 CLOSE_REVIEW_LEDGER carries into the retrospective's carried-and-lessons
 section, by class.
 
@@ -68,7 +83,9 @@ naming each finding, its `target_repo`, its decision and the reason: the record 
 cannot reconstruct it. Then: Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 
 MOLT: if molt warns you, send one ping, `<PING_SEND> 'MOLT WARNING <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
-NEVER: create a seat, merge on your own authority, ask the operator anything
+NEVER: create a seat — the one demo-walk seat a `user:` entry its `DEMO_WALK` names is the
+only exception, launched from that row, waited on and released as the TASK says — merge on
+your own authority, ask the operator anything
 (questions go up to the top in your report file), or re-invoke `/ossify:close` — a halt
 settles this dispatch; remediated, the top dispatches a fresh close session, marked
 `coordinator` before its command (the layer's `Seat marking`).
@@ -114,9 +131,9 @@ REPO_ROOT=<abs path of this seat's worktree>
 WORKPR_COMMAND=<the command this seat was launched with, from its machine entry> — a record of your own launch: you are already that seat, never run it
 WORKPR_EXPECTED_MODEL=<the model the banner or screen must show>
 WORKPR_EFFORT=<the effort this seat was launched at>
-REVIEWER=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
+REVIEWER=<agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>
 REVIEW_INVOCATION=<the reviewer's agent's `review:`, else `/code-review <PR> <LEVEL>`, with PR_NUMBER, the PR URL and the level the top decided filled in>
-PRFIX=<command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
+PRFIX=<agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>
 PRIOR_REVIEW=<the prior dispatch's durable review record — ran, reviewed head,
 clean/findings state, summary, fix rounds run, ledger/comment refs — "none", or "covered">
 MERGE_EXECUTOR=<session|operator — the top's explicit assignment>

@@ -210,7 +210,11 @@ order, and what a refused remove does, are `roles.md`'s Teardown order.
 A `machine` is a remote server's `herdr machine list` label; this server's machine is its `hostname -s`.
 Every command for a seat on that machine carries `herdr --machine <label>`, with its ids
 discovered there: ids and agent names are scoped to one server, and `--current` reaches no
-remote pane.
+remote pane. The operator names a seat's machine in the machine file's `host:`, with one of
+these labels; this server's own name needs no `--machine`, and a value this list does not
+return halts the run rather than being guessed at (`config.md`). A seat on another machine
+writes its report file there, and this layer names no route that reads it from here: that
+read is measured on the Orca layer only (`layers/orca.md`, Machines) — a known limit.
 
 ## Host: OMP
 

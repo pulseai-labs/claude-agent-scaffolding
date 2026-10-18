@@ -85,8 +85,18 @@ fi
 
 # One envelope per template. A dropped `PING:` line leaves every fact above green — the
 # survivors are still one byte-identical line — so the count is the fact that catches it:
-# in each file, `PING:`, `MOLT:`, `NOTIFY_RUN=` and `PING_SEND=` are as many as the file's
-# `REPORT_PATH=` fill lines (one per template).
+# in each file, `PING:`, `NOTIFY_RUN=` and `PING_SEND=` are as many as the file's
+# `REPORT_PATH=` fill lines (one per template), and `MOLT:` is as many minus the templates
+# that deliberately carry none. One does today (2026-10-18, Task 13): the demo walk is
+# bounded and hands nothing off, so it has no handoff line — test-ossify-spine-contract.sh
+# pins that absence, and the adjacent control below refuses one further drop.
+MOLT_LESS_TEMPLATES=1
+molt_less_templates() { # <file> -> templates in it that deliberately carry no MOLT line
+  case "$(basename "$1")" in
+    briefs.md) printf '%s\n' "$MOLT_LESS_TEMPLATES" ;;
+    *) printf '0\n' ;;
+  esac
+}
 envelope_counts() { # <file> -> "<report_path> <ping> <molt> <notify_run> <ping_send>"
   printf '%s %s %s %s %s\n' \
     "$(grep -c '^REPORT_PATH=' "$1")" \
@@ -95,15 +105,35 @@ envelope_counts() { # <file> -> "<report_path> <ping> <molt> <notify_run> <ping_
     "$(grep -c 'NOTIFY_RUN=' "$1")" \
     "$(grep -c '^PING_SEND=' "$1")"
 }
+envelope_ok() { # <file> <report_path> <ping> <molt> <notify_run> <ping_send>
+  _less="$(molt_less_templates "$1")"
+  [ "$2" -ge 1 ] && [ "$2" -eq "$3" ] && [ "$2" -eq "$5" ] && [ "$5" -eq "$6" ] \
+    && [ "$4" -eq "$(( $2 - _less ))" ]
+}
 for l in $ENVELOPE_FILES; do
   set -- $(envelope_counts "$REF/$l")
-  if [ "$1" -ge 1 ] && [ "$1" -eq "$2" ] && [ "$2" -eq "$3" ] && [ "$3" -eq "$4" ] && [ "$4" -eq "$5" ]; then
+  if envelope_ok "$REF/$l" "$@"; then
     pass "$l: $1 templates, one PING/MOLT/NOTIFY_RUN/PING_SEND line each"
   else
     fail "$l: one envelope line per template" \
-      "REPORT_PATH=$1 PING=$2 MOLT=$3 NOTIFY_RUN=$4 PING_SEND=$5 — the counts must be equal"
+      "REPORT_PATH=$1 PING=$2 MOLT=$3 NOTIFY_RUN=$4 PING_SEND=$5 — the counts must line up ($(molt_less_templates "$REF/$l") template(s) carry no MOLT line)"
   fi
 done
+
+# Adjacent control for the loosening above: the same predicate over a copy of briefs.md
+# with ONE more MOLT line dropped must refuse it — a check that had stopped noticing a
+# drop would pass the loosened loop alone. The fixture keeps the file's name, so it takes
+# the same exception the real file does; it lives under mktemp, never in a shipped file.
+ctl_env_dir="$(mktemp -d)"; ctl_env="$ctl_env_dir/briefs.md"
+awk '/^MOLT:/ && !dropped { dropped = 1; next } { print }' "$REF/briefs.md" > "$ctl_env"
+set -- $(envelope_counts "$ctl_env")
+if envelope_ok "$ctl_env" "$@"; then
+  fail "control: one more MOLT line dropped is refused" \
+    "accepted REPORT_PATH=$1 MOLT=$3 against $MOLT_LESS_TEMPLATES deliberate exception(s)"
+else
+  pass "control: one more MOLT line dropped is refused"
+fi
+rm -rf "$ctl_env_dir"
 n_ping="$(grep -h '^PING:' "$REF"/briefs.md "$REF"/ossify-briefs.md "$REF"/ossify-pr-briefs.md "$REF"/ossify-close-writer.md | wc -l | tr -d ' ')"
 n_molt="$(grep -h '^MOLT:' "$REF"/briefs.md "$REF"/ossify-briefs.md "$REF"/ossify-pr-briefs.md "$REF"/ossify-close-writer.md | wc -l | tr -d ' ')"
 pass "the envelope covers $n_ping PING lines and $n_molt MOLT lines"

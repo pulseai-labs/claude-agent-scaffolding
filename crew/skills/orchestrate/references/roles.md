@@ -39,6 +39,11 @@ of the layer's steps, and only the layer's file holds their commands and flags:
 5. **Read** — the model read that confirms `expected_model:`.
 6. **Send** — the brief, as `brief_delivery` says.
 
+**A seat on another machine.** A machine entry that names a `host:` (`config.md`) runs
+every step above on that machine, through the layer's Machines step: its workspace, its
+worktree, its pane and its report file all live there, and its report is read where it was
+written. A seat with no `host:` runs here.
+
 **The launch environment.** `Seat marking` writes these into the seat's pane, before the seat's
 command, in one export; every layer sets the same names and meanings, because the mods read
 them and never ask which layer set them. A guarded seat — implementer, verifier or reviewer —

@@ -31,7 +31,7 @@ planned *this* spine.
 | **Top orchestrator** (you) | agreeing one implementer/verifier seat per item and the three coordinator seats — spine, close, work-PR — with the operator into the project file, injecting them into the spine session's brief as its SEATS block, launching the spine session from that seat's resolved profile, verbatim — marked `coordinator` before its command (the layer's `Seat marking`); a model mismatch is a failed launch, exactly as for an item row — approving or amending each relayed worker plan, deciding the reviewer and PR-fix seats at the PR transition, dispatching the close and one work-PR session per returned PR, each launched from its project-file seat — marked `coordinator` before its command (the layer's `Seat marking`) — with the model confirmed as an item row's, assigning each work-PR dispatch's merge executor (`MERGE_EXECUTOR`) and supplying its `PRIOR_REVIEW` — `none` only for a PR no earlier work-PR dispatch has covered, `covered` when one has and left durable evidence its review ran but persisted no record, otherwise the durable record that PR's last `open:` result persisted — and, on a resumed dispatch, the `RUN_JSON` path that record's return named — asking for a writer profile and dispatching one fresh close-review writer per affected hosting repo when a close returns `halted: close-review`, relaying the merge word, dispatching the record pass, and the teardown | launching or supervising an item seat; reading an item seat's report file; reviewing, fixing or merging a spine PR itself |
 | **Spine session** | the ossify lane, a nested `run.json` of its own, launching and supervising both item seats per item, relaying plans up, item-local corrections | changing any ossify contract; writing item tasks into the top's `run.json` |
 | **Item seats** | one item each: implement, verify | crossing into another item |
-| **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any seat; driving a PR it opened |
+| **Close session** | one dispatch of `/ossify:close`, returning every PR it opened | creating any seat but the one demo-walk seat a `user:` entry its `DEMO_WALK` names needs; driving a PR it opened |
 | **Work-PR session** | one returned PR: the reviewer seat, the PR-fix seat, dispositions, ledgers, and the merge on the top's relayed word under its `MERGE_EXECUTOR` assignment — always a merge commit on the named SHA, whoever executes | talking to the operator; merging without that word |
 
 ossify owns worktrees, handoffs, closes, merges and the round barrier, and knows
@@ -86,11 +86,14 @@ nested `run.json` and `NOTIFY_MACHINE` with the child's machine — the dispatch
 that needs to change mid-spine is a new operator
 decision you relay down through the reply; no session re-reads the file for it.
 
-A handoff the top writes **carries the approved seats verbatim** — the item rows
-and the three resolved coordinator profiles beside them; a resumed top
-launches from those, never a fresh read, and marks each seat it launches as
-the layer's `Seat marking` states — a guarded role with its allow paths, `coordinator`
-for a coordinator seat. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat
+A handoff the top writes **carries the approved seats verbatim** — each item row
+and each of the three resolved coordinator profiles beside its agent's name, with
+the machine its `host:` names; a resumed top launches from those rows, never a
+fresh read — and where a carried row cannot give a seat's machine it re-resolves that
+seat by its carried name in its machine file (`config.md`) rather than launching it here by
+default, because a carried name that file does not define halts and is asked. It marks each
+seat it launches as the layer's `Seat marking` states — a guarded role with its allow paths,
+`coordinator` for a coordinator seat. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat
 — under a standing order in the autopilot policy for seats and profiles, it picks the set from the project file, records the pick and why, and continues instead.
 
 ## Fixed procedures

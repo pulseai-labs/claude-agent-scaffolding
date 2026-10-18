@@ -24,6 +24,18 @@ seat on another machine. The layer-neutral OMP host rules move to `SKILL.md` §3
 once with the skill. Manifests and catalogs are 0.4.0; the Codex manifest's keywords add
 `orca`.
 
+**A seat can run on another machine, and a spine's close walks its demo there** (spec §4.5).
+The machine file's agent entry gains `host:` — absent, this machine; a value is a machine name
+the layer's Machines step accepts — and it travels: every resolved profile that crosses a
+session carries the host and the agent's name (a spine's `SEATS` rows, the work-PR brief's
+reviewer and PR-fix rows, a handoff's carried seats, the close brief's `DEMO_WALK` row), so a
+session that did not resolve the seat itself starts it where the row names, and a resumed top
+re-resolves a carried seat by its carried name where a row cannot give its machine. A
+`user:`-type demo-ledger entry an operator assigns to another machine is walked by a
+demo-walk seat on it (`briefs.md`'s `demo walk`, a bounded read-only brief), launched and
+read through the layer's Machines step; the herdr layer states no cross-machine report read
+(the Orca one is measured), and the close launches exactly that one seat and releases it.
+
 ## 0.3.0
 
 **`herdr-crew` becomes `crew`** (spec §4.6, clean cut). The directory, the plugin name, the skill (`/crew:orchestrate`) and all three marketplace catalogs move together in this release; no alias plugin ships, and no in-tree reference to the old name is left outside this file's history. The paths move with them: the machine file is `~/.claude/crew/agents.md` and the project file is `.crew/roles.md`. An operator still holding the old files is told the exact move.

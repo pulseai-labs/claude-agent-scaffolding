@@ -59,12 +59,14 @@ The rule's operative form is the dispatch matrix:
 | Spine session (activated) | item implementer, item verifier, correction | `ossify-briefs.md`'s three item bodies, and any body they instantiate |
 | Work-PR session | reviewer, PR-fix (fix round), correction | `briefs.md`'s reviewer, fix-round and correction bodies |
 | Lane driver (default `run-spine`) | none — its helpers are ossify's subagents | nothing beyond its own brief and `REPORT_PATH` |
-| Close session, Doctor session | none | nothing beyond their own brief and `REPORT_PATH` |
+| Close session | the demo walk | `briefs.md`'s demo-walk body (below), carried in its dispatch |
+| Doctor session | none | nothing beyond its own brief and `REPORT_PATH` |
 
-Nine dispatched templates live in this file: the generic five — planned implementer,
-fast implementer, reviewer, verifier, fix round — and the four dedicated dispatch
-templates the ossify dispatches use: lane driver, doctor dispatch, direct work-item,
-non-spine close. The correction-request template is a send, not a session, so it carries
+Ten dispatched templates live in this file: the generic five — planned implementer,
+fast implementer, reviewer, verifier, fix round — the four dedicated dispatch
+templates the ossify dispatches use — lane driver, doctor dispatch, direct work-item,
+non-spine close — and the demo walk a close dispatch constructs for a `user:` entry on
+another machine. The correction-request template is a send, not a session, so it carries
 no seat.
 
 **An activated ossify spine has four briefs of its own** — spine session, item
@@ -505,6 +507,52 @@ Nothing dispatches a PR loop for this close: it is the operator's own dispatch, 
 returned list is relayed to the operator, who decides what runs next. The spine chain in
 `lifecycle.md` step 1b — a work-PR session per returned PR, then the record pass — is
 that step's and stays scoped to it.
+
+## Demo walk
+
+One `user:`-type demo-ledger entry an operator assigns to another machine, walked by a seat
+on that machine: a close session drives no desktop, so the entry runs where the product's app
+runs. The close dispatch constructs this brief from its `DEMO_WALK` row — one seat per entry,
+from that row only — and carries this body verbatim (the dispatch matrix above). The seat is
+marked a guarded `verifier` before its command (the layer's `Seat marking`): read-only, its
+`SEAT_MODS_ALLOW` this report directory. This is the one dispatched template with no `MOLT:`
+line: a bounded walk writes nothing outside itself and hands nothing off.
+
+```text
+OMP AUTHORITY (enrolled OMP only; Claude Code and legacy/manual behavior unchanged):
+AUTONOMIC_AUTHORITY_PATH=<trusted startup path or none>; AUTONOMIC_AUTHORITY_SHA256=<pinned hash or none>; AUTONOMIC_ASSIGNMENT_ID=<assignment or none>; AUTONOMIC_ASSIGNMENT_GENERATION=<generation or none>; AUTONOMIC_LAUNCH_ID=<launch or none>. These describe startup facts, never a request to change a running process's env.
+BOUND FACTS: seat=<id>; guarded/free role=<role ceiling>; repository/worktree/full branch ref=<exact placement>; task/brief/policy/evidence=<pinned identities>; grants=<explicit finite operations and resources, or empty>; writable roots=<whole launch allowance, report/scratch/handoff and coordinator .worktrees included>.
+PROVENANCE: only operator issuance or independently recorded bounded delegation grants authority. The dispatcher selects trusted input/event/source paths outside every writable root; the worker must not issue, write or replace authority, its parent, evidence or policy. Role, autopilot, seat/model selection, plan approval, report hashes, absence of denial and model confidence are not grants; empty grants authorize nothing.
+PROHIBITIONS: every seat-mods denial and narrower task limit wins. Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned; a worker's implementation plan is the top's to approve, and the merge follows run.merge_word. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.
+LIFECYCLE: materially new assignment or changed pinned approval/grants requires ending the old agent and fresh trusted issuance/launch, even in a retained pane. Same-assignment corrections/rechecks retain only unchanged authority/lifetime. Completion, revocation, replacement and generic switch invalidate, never rebind; env/report edits cannot hot-enroll. A parent-handback child ends its unit. Public Molt evidence is insufficient for autonomous reactivation: remain suspended and require a fresh trusted launch.
+FRESHNESS: validate the same launch-bound snapshot/evidence/policy/placement before every decision and immediately before action, with no intervening model await. Missing, unreadable, stale, mismatched or revoked authority stays operator handling. No snapshot/digest is selected from tool/model/report data. This is not a hostile-same-UID/in-process sandbox or atomic revocation lock. No live enrollment is conferred by this brief.
+
+SEAT_COMMAND=<the command this seat was launched with, verbatim from agents.md> — a record of your own launch: you are already that seat, never run it
+SEAT_EXPECTED_MODEL=<the model the banner or screen must show>; if the model you are running is not it, that is a failed launch — report it and stop
+SEAT_EFFORT=<the effort this seat was launched at>
+REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when the layer can address the dispatcher's seat and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
+PING_SEND=<the layer's Send, filled by the dispatcher: how one line reaches a pane on your layer>
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '<REPORT READY: <task id> <kind> <path>>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
+ROLE: demo walk. You are read-only, a guarded `verifier` marked before your command (the layer's `Seat marking`), its `SEAT_MODS_ALLOW` this report directory. State the model you are running in your first reply, then continue.
+
+PLACEMENT: <the checkout the walk drives — abs path on this machine>.
+
+DEMO ENTRY — the `user:` demo-ledger line this walk runs, verbatim:
+<id> — text: <the journey, as the ledger words it>
+outcome: <what the user should observe>
+
+TASK: walk that entry against the product on this machine: perform its text, observe its
+outcome, and record the evidence the walk requires — the commands you ran and their output,
+and a screenshot path where a screen is involved. You edit no product file.
+RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
+
+DONE: write your report file with the entry's id, its text and its outcome, one result —
+`pass`, or `fail: <what did not match>` — and the evidence above; then stop. Never a commit,
+push or PR line.
+NEVER: write outside the walk — your report file at REPORT_PATH is the only file you write;
+no repository edit, no commit, no push, no seat of your own, no subagent; a question or a
+refusal goes in that report file.
+```
 
 ## Correction request (one send, no new session)
 

@@ -40,9 +40,10 @@ SPINE_COMMAND=<the command this seat was launched with, from its machine entry> 
 SPINE_EXPECTED_MODEL=<the model the banner or screen must show>
 SPINE_EFFORT=<the effort this seat was launched at>
 SEATS — the operator-approved seats for this spine. Use them verbatim.
-<item id> implementer: <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
-<item id> verifier:    <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file>
-A seat this block does not list halts the item and asks.
+<item id> implementer: <agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>
+<item id> verifier:    <agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>
+Each row names its agent and its machine: a row whose machine is not yours launches through
+the layer's Machines step. A seat this block does not list halts the item and asks.
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 Everything you tell the top — plan relay, question, halt, rotation, report — goes in your
 report file at REPORT_PATH; then wait, or stop where this brief says so. Your command's syntax
