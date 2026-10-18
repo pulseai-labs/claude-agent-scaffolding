@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { checkBlock, classifyPrompt, isCrewTagged, hasMoltHandoff } from '../hooks/status'
+import { checkBlock, classifyPrompt, isCrewTagged, hasMoltHandoff, isIdleStop, IDLE_REASON, IDLE_WARNING, STATUS_CONTEXT } from '../hooks/status'
 
 const BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
 
@@ -83,4 +83,43 @@ test('hasMoltHandoff only at the end', () => {
 test('rotation resumes are status', () => {
   expect(classifyPrompt({ kind: 'composer' }, '/ossify:handoff-resume /h.md')).toBe('status')
   expect(classifyPrompt({ kind: 'composer' }, 'skill://handoff-resume /h.md')).toBe('status')
+})
+
+describe('isIdleStop (#876)', () => {
+  // Blocks built from the five labels with given contents; the plain variant
+  // strips the markers, since a label counts bold or plain.
+  const fb = (next: string, waiting: string, decision: string) =>
+    `**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** ${next}\n**Waiting on (seats live):** ${waiting}\n**Operator decision pending:** ${decision}`
+
+  test('both wait fields none with work in Next steps is idle, bold or plain', () => {
+    const idle = fb('do X', 'none', 'none')
+    expect(isIdleStop(idle)).toBe(true)
+    expect(isIdleStop(idle.replaceAll('**', ''))).toBe(true)
+  })
+
+  test('the lenient none reading: the word at the start counts, whatever follows', () => {
+    expect(isIdleStop(fb('open the PR', 'none. No seats are live.', 'None'))).toBe(true)
+  })
+
+  test('Next steps none is the finished run: not idle', () => {
+    expect(isIdleStop(fb('none', 'none', 'none'))).toBe(false)
+    // A false none in Next steps only skips the nudge: lenient by design.
+    expect(isIdleStop(fb('none on #867. #876 is queued and needs a design.', 'none', 'none'))).toBe(false)
+  })
+
+  test('either wait field naming something is not idle', () => {
+    expect(isIdleStop(fb('open the PR', 'reviewer wED:p1 is reviewing', 'none'))).toBe(false)
+    expect(isIdleStop(fb('open the PR', 'none', 'choose the next line'))).toBe(false)
+    expect(isIdleStop(fb('open the PR', 'nonetheless a seat', 'none'))).toBe(false)
+  })
+
+  test('a malformed reply is not idle', () => {
+    expect(isIdleStop('Done.')).toBe(false)
+  })
+
+  test('the context sentence and the idle copy are the plan\'s verbatim', () => {
+    expect(STATUS_CONTEXT.endsWith('do that work first.')).toBe(true)
+    expect(IDLE_REASON).toBe('seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the next step now, or name the seat, wake or decision you wait on.')
+    expect(IDLE_WARNING).toBe('⚠ seat-mods: status block says nothing waits, but Next steps names work.')
+  })
 })

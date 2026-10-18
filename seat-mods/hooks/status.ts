@@ -1,7 +1,8 @@
 // seat-mods status logic: the pure functions behind the orchestrator's status
 // block check, wired to prompt.submit, classic.Stop and turn.complete by
-// register.ts. No `$` and no model call here; the copy is the plan's verbatim
-// (AI workspace docs/superpowers/plans/2026-10-18-orchestrator-status-block.md).
+// register.ts. No `$` and no model call here; the copy is the plans' verbatim
+// (AI workspace docs/superpowers/plans/2026-10-18-orchestrator-status-block.md
+// and 2026-10-18-idle-stop-status-block.md).
 
 export const STATUS_LABELS: readonly string[] = [
   'What I ruled:',
@@ -11,13 +12,19 @@ export const STATUS_LABELS: readonly string[] = [
   'Operator decision pending:',
 ]
 
-export const STATUS_CONTEXT = 'seat-mods (orchestrator): this is a status turn — no operator typed it. Use tool calls only and write no narration. End the turn with only the status block, these five lines in this order: **What I ruled:** / **What the PR(s) will carry:** / **Next steps:** / **Waiting on (seats live):** / **Operator decision pending:** — each with content ("none" is content) and nothing before or after.'
+export const STATUS_CONTEXT = 'seat-mods (orchestrator): this is a status turn — no operator typed it. Use tool calls only and write no narration. End the turn with only the status block, these five lines in this order: **What I ruled:** / **What the PR(s) will carry:** / **Next steps:** / **Waiting on (seats live):** / **Operator decision pending:** — each with content ("none" is content) and nothing before or after. A block that waits on no seat and no operator decision while its Next steps names work is not a turn end: do that work first.'
 
 export function rewriteReason(failed: string): string {
   return `seat-mods (orchestrator): a status turn ends with only the five-field status block. ${failed}. Rewrite your reply as the block and nothing else.`
 }
 
 export const STATUS_WARNING = '⚠ seat-mods: status block missing — this status reply is not in the required form.'
+
+// The idle-stop copy (#876). The reason is the one block a turn gets for the
+// idle check; the warning is the line turn.complete shows when it stands.
+export const IDLE_REASON = 'seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the next step now, or name the seat, wake or decision you wait on.'
+
+export const IDLE_WARNING = '⚠ seat-mods: status block says nothing waits, but Next steps names work.'
 
 // A message crew sends between sessions starts with the tag (crew 0.3.x). The
 // two legacy ping forms also count until no run in flight was dispatched from a
@@ -95,6 +102,28 @@ export function checkBlock(reply: string): { ok: true } | { ok: false; failed: s
   if (lines.length > STATUS_LABELS.length)
     return { ok: false, failed: 'Text comes after **Operator decision pending:**' }
   return { ok: true }
+}
+
+// A field's content reads as `none` when it starts with the whole word, any
+// case (the plan's call): `none.`, `None — the run is closed` and
+// `none on #867. …` count, `nonetheless` does not. Lenient on purpose: a false
+// `none` in a wait field costs one turn, and a false `none` in Next steps only
+// skips the nudge, which is today's behaviour.
+const NONE_AT_START = /^none\b/i
+
+// The idle-stop contradiction (#876): a valid block whose Waiting on and
+// Operator decision pending fields both read `none` while Next steps names
+// work. Defined only for a block checkBlock accepts; false otherwise.
+export function isIdleStop(reply: string): boolean {
+  if (!checkBlock(reply).ok) return false
+  const lines = reply.trim().split('\n')
+  const content = (index: number): string => {
+    const line = lines[index] ?? ''
+    const match = LABEL_AT_START[index]?.exec(line) ?? null
+    return match === null ? '' : line.slice(match[0].length).trim()
+  }
+  // Next steps is label 2, Waiting on 3, Operator decision pending 4.
+  return NONE_AT_START.test(content(3)) && NONE_AT_START.test(content(4)) && !NONE_AT_START.test(content(2))
 }
 
 // True only when the reply's last non-empty line is the handoff line. Unlike
