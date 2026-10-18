@@ -72,20 +72,25 @@ input() {
 #
 # The handler runs inside a herdr pane (HERDR_PANE_ID=w1:p1) with the ceiling
 # option unset. A case names what it varies as NAME=value assignments, of which
-# two are this suite's fixtures: PATH=<dir> — the missing-binary cases run the
-# handler against a stripped PATH — and HERDR_PANE_ID= (empty), the case outside
-# a pane. The pane id is resolved here rather than left to the default, so a
-# caller's empty value is the one the handler sees whether or not env(1) keeps
-# the last of a repeated name (POSIX leaves that unspecified); the caller's own
-# assignment still travels in "$@", so the two cannot disagree.
+# three are this suite's fixtures: PATH=<dir> — the missing-binary cases run the
+# handler against a stripped PATH; HERDR_PANE_ID= (empty), the case outside a
+# herdr pane; and ORCA_TERMINAL_HANDLE=<handle>, the case inside an Orca
+# terminal. Both identity variables are resolved here rather than left to the
+# default, so a caller's empty value is the one the handler sees whether or not
+# env(1) keeps the last of a repeated name (POSIX leaves that unspecified); the
+# caller's own assignment still travels in "$@", so the two cannot disagree.
 run() {
   stdin="$1"; shift
   pane=w1:p1
+  orca=
   for arg in "$@"; do
-    case "$arg" in HERDR_PANE_ID=*) pane="${arg#HERDR_PANE_ID=}" ;; esac
+    case "$arg" in
+      HERDR_PANE_ID=*) pane="${arg#HERDR_PANE_ID=}" ;;
+      ORCA_TERMINAL_HANDLE=*) orca="${arg#ORCA_TERMINAL_HANDLE=}" ;;
+    esac
   done
   OUT="$(printf '%s' "$stdin" | env -u CLAUDE_PLUGIN_OPTION_CONTEXT_CEILING \
-    HERDR_PANE_ID="$pane" "$@" "$BASH_BIN" "$HOOK" 2>/dev/null)"
+    HERDR_PANE_ID="$pane" ORCA_TERMINAL_HANDLE="$orca" "$@" "$BASH_BIN" "$HOOK" 2>/dev/null)"
   RC=$?
 }
 
@@ -125,15 +130,18 @@ expect_notice "at the ceiling: notice on a prompt" UserPromptSubmit \
 run "$(input PreToolUse "$T_PAST" 'herdr agent prompt w7:p2 "implement item 3"')"
 expect_notice "past the ceiling: notice before 'agent prompt'" PreToolUse "context 523114" "ceiling 500000"
 
-section "only commands carrying a new-work verb, only inside a herdr pane"
+section "only commands carrying a new-work verb, only behind a layer's gate"
 # <verb>|<command>: the verb is the substring the matcher keys on, and it is
 # also the case's label, so deleting that substring from the handler names the
-# case it turns RED.
+# case it turns RED. The last two carry the Orca layer's verbs (0.4.0, plan
+# Task 12) in their probed forms.
 for entry in 'tab create|herdr tab create --workspace ws1 --cwd /tmp --label seat' \
              'workspace create|herdr workspace create --cwd /tmp' \
              'worktree create|herdr worktree create' \
              'pane run|herdr pane run w7:p2 "claude"' \
-             'agent prompt|herdr agent prompt w7:p2 "implement item 3"'; do
+             'agent prompt|herdr agent prompt w7:p2 "implement item 3"' \
+             'terminal create|orca terminal create --worktree id:root --title "seat: implementer (claude)" --command "bash"' \
+             'terminal send|orca terminal send --terminal term_de0cb52b --enter --text "go"'; do
   run "$(input PreToolUse "$T_PAST" "${entry#*|}")"
   expect_notice "past the ceiling: notice before '${entry%%|*}'" PreToolUse "context 523114"
 done
@@ -162,11 +170,19 @@ expect_silent "past the ceiling: silent before a non-herdr command"
 # so the silence below belongs to the gate and not to a handler that is mute anyway.
 run "$(input UserPromptSubmit "$T_PAST")"
 expect_notice "control: the same prompt inside a herdr pane fires" UserPromptSubmit "context 523114"
-# The outside-a-pane fixture is an empty HERDR_PANE_ID through the helper: the
-# gate reads `${HERDR_PANE_ID:-}`, which cannot tell an empty value from an
-# unset one, and the invocation shape now lives in one place.
-run "$(input UserPromptSubmit "$T_PAST")" HERDR_PANE_ID=
-expect_silent "past the ceiling but outside a herdr pane: silent"
+# 0.4.0 (plan Task 12): the gate reads the Orca layer's own identity variable
+# too — an Orca seat is told exactly as a herdr one.
+run "$(input UserPromptSubmit "$T_PAST")" HERDR_PANE_ID= ORCA_TERMINAL_HANDLE=term_de0cb52b
+expect_notice "past the ceiling with only the Orca variable set: fires" UserPromptSubmit "context 523114"
+run "$(input PreToolUse "$T_PAST" 'orca terminal send --terminal term_de0cb52b --enter --text "go"')" \
+  HERDR_PANE_ID= ORCA_TERMINAL_HANDLE=term_de0cb52b
+expect_notice "the Orca gate before 'terminal send': fires" PreToolUse "context 523114"
+# The adjacent control the widening needs (CLAUDE.md's testing discipline): the
+# same fixture with neither identity variable stays silent. Both are empty
+# values through the helper: the gate reads `${VAR:-}`, which cannot tell an
+# empty value from an unset one, and the invocation shape now lives in one place.
+run "$(input UserPromptSubmit "$T_PAST")" HERDR_PANE_ID= ORCA_TERMINAL_HANDLE=
+expect_silent "past the ceiling with neither identity variable: silent"
 
 section "the figure is the latest record, never a sum"
 f="$TMP/dup.jsonl"
@@ -548,16 +564,16 @@ else fail "the Claude manifest declares context_ceiling (number, default 500000)
 if [ -x "$PLUGIN_ROOT/hooks-handlers/context-ceiling.sh" ]; then pass "the handler is executable"
 else fail "the handler is executable"; fi
 
-# Task 6 (crew 0.3.0): the notice is crew's and it points at the shared prose that
-# defines a unit; the pane gate and the verb list stay the herdr layer's in 0.3.0,
-# named as the layer's rather than as crew's own, and the Orca layer brings its own
-# (crew 0.4.0, plan Part C). The emitted text is asserted in "the ceiling" above;
-# these guard the source strings that survived Task 1's rename.
-section "the notice names crew, and the gate and verbs are the layer's"
+# Task 6 (crew 0.3.0), Task 12 (crew 0.4.0): the notice is crew's and it points at
+# the shared prose that defines a unit; the gate and the verb list now read both
+# layers — the herdr pane and the Orca terminal — named as the layers' rather than
+# as crew's own. The emitted text is asserted in "the ceiling" above; these guard
+# the source strings that survived Task 1's rename.
+section "the notice names crew, and the gate and verbs are the layers'"
 pin "$HOOK" 'crew lifecycle.md' "the notice points at lifecycle.md by its crew path"
-pin "$HOOK" "the herdr layer's gate" "the pane gate is named as the herdr layer's"
-pin "$HOOK" "The herdr layer's new-work commands" "the verb list is named as the herdr layer's"
-pin "$HOOK" 'the Orca layer brings its own' "the comments say the Orca layer brings its own"
+pin "$HOOK" 'HERDR_PANE_ID' "the gate names the herdr identity variable"
+pin "$HOOK" 'ORCA_TERMINAL_HANDLE' "the gate names the Orca identity variable"
+pin "$HOOK" "The two layers' new-work commands" "the verb list is named as the layers'"
 # Adjacent control: the old plugin name, which the notice, the header and every comment
 # must not carry again. A handler that spelled it would pass every case above and fail
 # only here. Built in two pieces: this suite lives in the tree `tests/test-crew-rename.sh`

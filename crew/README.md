@@ -9,13 +9,15 @@ implement by complexity class, one reviewer seat runs its review command (`/code
 returns its findings through its report file, the retained implementer works GitHub
 threads to zero, and the merge waits for the operator's word.
 
-Every herdr command's syntax comes from `herdr --skill`, the binary's own
-version-matched guide. This plugin states what a seat is and who does what; it does not
-re-type the guide. `skills/orchestrate/references/layers/herdr.md` is the one file
-that records herdr's half — the launch and its marking, the two readiness paths, the send
-and its turn-start check, the waits, the typed completion states, placement, the teardown
-commands, and the machine labels — and it wins where the two differ. What a finished seat
-means is layer-neutral and lives in `references/completion.md`.
+Every layer's command syntax comes from its own guide: herdr's from `herdr --skill`, the
+binary's own version-matched guide; Orca's from `orca skills get orca-cli`. This plugin
+states what a seat is and who does what; it does not re-type either.
+`skills/orchestrate/references/layers/herdr.md` and
+`skills/orchestrate/references/layers/orca.md` are the two files that record each layer's
+half — the launch, the readiness wait, the send and its turn-start check, the waits, the
+typed completion states, the teardown commands, and the machines — and each wins where it
+differs from its guide. What a finished seat means is layer-neutral and lives in
+`references/completion.md`.
 
 ### Trusted OMP assignment enrollment (unreleased)
 
@@ -33,6 +35,7 @@ For enrolled OMP, operator merge acknowledgment and spec/design/plan/release gat
 |---|---|
 | `orchestrate` (the skill) | The orchestrator session's playbook: the delegation floor and its decidable test, the role list, the run by reference, the briefs, the ossify seam, and the refusals. |
 | `references/layers/herdr.md` | herdr's own half, under the thirteen fixed step headings every layer file carries: the run workspace and the seat worktree, the pane and its command, the two readiness paths, the typed wait, the turn-start check on a send, the health read, the teardown commands and the machine labels. The rules every layer obeys stay in the shared files; this file holds herdr's commands, flags and ids. It overrides the guide's default placement. |
+| `references/layers/orca.md` | Orca's own half, under the same thirteen fixed step headings: the run workspace and the seat worktree, the terminal and its command, the readiness wait and its screen read, the typed completion state, the turn-start check on a send, the health read, the teardown commands and the hosts it can target. The rules every layer obeys stay in the shared files; this file holds Orca's commands, flags and ids. It says where it overrides the guide's default. |
 | `references/completion.md` | How a run learns a seat finished, stated once for every layer: the report-file contract and the dispatch-time generation note, the doorbell and its generation check, the two dead ends, the worker's ping and the heartbeat backstop, a child past molt's warnings, and a child's pain. The layer's `Completion signal` step says how its own state is typed. |
 | `references/roles.md` | The role table and the seats that fill it, the launch sequence and the launch environment every layer sets, retention, the session budget, placement for the dual-repo case, the writers rules, and the teardown order. |
 | `references/lifecycle.md` | The thirteen-step run, the operator's own roles and the named points they run at, and rotation past the context ceiling. |
