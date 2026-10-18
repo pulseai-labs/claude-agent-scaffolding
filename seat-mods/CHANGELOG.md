@@ -2,6 +2,26 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.5.0 — 2026-10-18
+
+- **A status turn of an orchestrator ends with only the five-field status block** (#867). A status
+  turn is one the operator did not start by typing; the block is `What I ruled:` / `What the PR(s)
+  will carry:` / `Next steps:` / `Waiting on (seats live):` / `Operator decision pending:`, one
+  field per line, each label bold or plain and followed on the same line by its content.
+  - `prompt.submit` classifies the turn and, on a status turn, adds one line of model-only context
+    (tool calls only, then the block). A prompt the operator types into a running status turn makes
+    that turn free.
+  - `classic.Stop` checks `last_assistant_message` and blocks **once per turn** with a reason
+    naming what failed; a second miss lets the stop through, and `turn.complete` then shows
+    `⚠ seat-mods: status block missing — this status reply is not in the required form.` A block
+    beneath seat-mods (autonomic's push) passes unchanged and is not seat-mods' rewrite; a
+    subagent's `turn.complete` is ignored, and a turn ending on molt's `MOLT-HANDOFF:` is exempt.
+  - Crew tags (`[crew report|molt|message <role>]`), the legacy ping forms (`REPORT READY: `,
+    `MOLT WARNING `) and the two rotation resume forms count as status turns. The check calls no
+    model; coordinator, guarded and unset roles are untouched.
+  - **Known limit:** an operator prompt starting with `REPORT READY: ` is held to the block.
+  - Claude Code only; the OMP extension is unchanged.
+
 ## 0.4.6 — 2026-10-18
 
 - **Naming: the orchestrator's deny text and every launcher reference say `crew`** (crew 0.3.0's

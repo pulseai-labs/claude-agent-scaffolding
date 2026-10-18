@@ -1,5 +1,6 @@
 import { describe, test, expect, mock } from 'claude-code/testing'
 import type { On } from 'claude-code'
+import { STATUS_CONTEXT, STATUS_WARNING, rewriteReason } from '../hooks/status'
 
 // The world beneath the plugin. The test kit routes $.fs, $.process and
 // $.session.cwd as events the test answers, so this is a small file system:
@@ -719,5 +720,134 @@ describe('deny texts point at the way through (#844)', () => {
     const deny = (await $.tool.call({ tool: 'Write', file_path: '/var/commit-message.txt', content: 'x' })).deny
     expect(deny).toContain('no writes outside')
     expect(deny).toContain('go in /reports.')
+  })
+})
+
+// The orchestrator status-block check (#867). The engine has no stand-in for
+// prompt.submit, classic.Stop or turn.complete in the kit, so each test answers
+// them beneath (as world() answers fs and process). `stop` stands in for
+// autonomic's push: it answers as the handler beneath the mod, called once per
+// stop, and a returned block must pass through unchanged.
+function statusWorld(on: On, env: Record<string, string>, stop?: (e: { last_assistant_message?: string }, call: number) => unknown) {
+  world(on, env)
+  let calls = 0
+  on('prompt.submit', (_$, e) => ({ text: e.text, context: e.context }) as never)
+  on('classic.Stop', (_$, e) => (stop === undefined ? {} : stop(e, ++calls)) as never)
+  on('turn.complete', (_$, e) => ({ text: e.answer }) as never)
+}
+
+const STATUS_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
+const notify = () => ({ text: 'T2 final /r.md', origin: { kind: 'task-notification' as const }, wait: false })
+
+describe('orchestrator status block (#867)', () => {
+  test('1. a status turn adds the context line', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    const r = await $.prompt.submit(notify())
+    expect(r.context).toContain(STATUS_CONTEXT)
+  })
+
+  test('2. an operator turn is free: no line, and its stop is not checked', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    const r = await $.prompt.submit({ text: 'consider slice 1 done', origin: { kind: 'composer' }, wait: false })
+    expect(r.context ?? []).not.toContain(STATUS_CONTEXT)
+    const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(s.block).toBeUndefined()
+  })
+
+  test('3. one rewrite per status turn, then the warning line', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    const first = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(first.block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+    const second = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(second.block).toBeUndefined()
+    const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(STATUS_WARNING)
+  })
+
+  test('4. a good block passes and adds no warning', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: STATUS_BLOCK })
+    expect(s.block).toBeUndefined()
+    const done = await $.turn.complete({ answer: STATUS_BLOCK, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(STATUS_BLOCK)
+  })
+
+  test('5. the operator typing mid-turn frees the turn (Review Focus 3)', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    await $.prompt.submit({ text: 'what is this?', origin: { kind: 'composer' }, turnId: 't1', wait: false })
+    const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(s.block).toBeUndefined()
+  })
+
+  test("6. a beneath block is kept unchanged and is not seat-mods' rewrite (Review Focus 4)", async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' }, (_e, call) => (call === 1 ? { block: 'Autopilot: continue — x.' } : {}))
+    await $.prompt.submit(notify())
+    const kept = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(kept.block).toBe('Autopilot: continue — x.')
+    const rewrite = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
+    expect(rewrite.block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+  })
+
+  test('7. a reply ending MOLT-HANDOFF: is exempt and adds no warning (Review Focus 5)', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    const reply = 'Done.\nMOLT-HANDOFF: /h.md'
+    const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: reply })
+    expect(s.block).toBeUndefined()
+    const done = await $.turn.complete({ answer: reply, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(reply)
+  })
+
+  test('8. other roles are untouched: coordinator', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'coordinator' })
+    const r = await $.prompt.submit(notify())
+    expect(r.context ?? []).not.toContain(STATUS_CONTEXT)
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBeUndefined()
+  })
+
+  test('8. other roles are untouched: unset role', async ($, on) => {
+    statusWorld(on, {})
+    const r = await $.prompt.submit(notify())
+    expect(r.context ?? []).not.toContain(STATUS_CONTEXT)
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBeUndefined()
+  })
+
+  test('9. a later good stop clears the warning line', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' }, (_e, call) => (call === 3 ? { block: 'Autopilot: continue — x.' } : {}))
+    await $.prompt.submit(notify())
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Still done.' })).block).toBeUndefined()
+    expect((await $.classic.Stop({ stop_hook_active: true, last_assistant_message: 'Done.' })).block).toBe('Autopilot: continue — x.')
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: STATUS_BLOCK })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: STATUS_BLOCK, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(STATUS_BLOCK)
+  })
+
+  test('9. the molt exemption clears the warning line too', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' }, (_e, call) => (call === 3 ? { block: 'Autopilot: continue — x.' } : {}))
+    await $.prompt.submit(notify())
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Still done.' })).block).toBeUndefined()
+    expect((await $.classic.Stop({ stop_hook_active: true, last_assistant_message: 'Done.' })).block).toBe('Autopilot: continue — x.')
+    const reply = 'Done.\nMOLT-HANDOFF: /h.md'
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: reply })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: reply, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(reply)
+  })
+
+  test('10. a subagent completion is ignored and does not clear the turn', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBeUndefined()
+    const sub = await $.turn.complete({ answer: 'sub', durationMs: 1, isAborted: false, turnId: 't2', agentId: 'a1', reason: 'answer' })
+    expect(sub.text).toBe('sub')
+    const main = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(main.text).toBe(STATUS_WARNING)
+    const after = await $.turn.complete({ answer: 'sub2', durationMs: 1, isAborted: false, turnId: 't3', agentId: 'a1', reason: 'answer' })
+    expect(after.text).toBe('sub2')
   })
 })

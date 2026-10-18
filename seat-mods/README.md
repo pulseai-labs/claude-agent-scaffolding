@@ -132,6 +132,46 @@ that could not be checked; forged self-referencing or excessively nested markers
 
 A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report it instead.`
 
+## Status block (orchestrator)
+
+Claude Code only. In a `SEAT_MODS_ROLE=orchestrator` session, a **status turn** — a turn the
+operator did not start by typing — must end with only the five-field status block:
+
+```
+**What I ruled:** …
+**What the PR(s) will carry:** …
+**Next steps:** …
+**Waiting on (seats live):** …
+**Operator decision pending:** …
+```
+
+One field per line, in that order; each label bold or plain, followed on the same line by its
+content ("none" is content), nothing before the first label or after the fifth. Three hooks carry
+it:
+
+- `prompt.submit` classifies the turn and, on a status turn, adds one line of model-only context
+  (tool calls only, then the block). A prompt the operator types into a running status turn makes
+  that turn the operator's, and it is not checked.
+- `classic.Stop` checks `last_assistant_message`. A miss blocks the stop **once per turn** with the
+  failing reason; a second miss lets the stop through. A block raised beneath seat-mods —
+  autonomic's autopilot push — passes unchanged and is not counted as seat-mods' rewrite. A turn
+  that ends on molt's `MOLT-HANDOFF:` line is exempt.
+- `turn.complete` adds one line under the reply when the second miss stands:
+  `⚠ seat-mods: status block missing — this status reply is not in the required form.` It changes
+  neither the answer nor the transcript, and a subagent's turn end is ignored.
+
+The check calls no model and never calls herdr, Orca or Paseo. Only `SEAT_MODS_ROLE=orchestrator`
+sessions are affected; every other role and an unset role are untouched.
+
+A typed prompt that starts with a crew tag — `[crew report|molt|message <role>]`, crew 0.3.x — is a
+status turn. So are the two legacy ping forms, `REPORT READY: ` and `MOLT WARNING `, and the two
+rotation resume forms, `/ossify:handoff-resume ` and `skill://handoff-resume ` (a slash command a
+tag prefix would break). The legacy forms may go only when no run in flight was dispatched from a
+crew brief older than 0.3.1.
+
+**Known limit:** an operator prompt that itself starts with `REPORT READY: ` is held to the block.
+That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
+
 ## Limits
 
 - **The rails stop mistakes, not an adversary.** Bash matching is whitespace tokens split on `;`,
