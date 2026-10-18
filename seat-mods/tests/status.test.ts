@@ -16,6 +16,12 @@ describe('checkBlock', () => {
     expect(checkBlock(BLOCK.replace('**Next steps:** b', '**Next steps:**'))).toEqual({ ok: false, failed: '**Next steps:** has no content' })
     expect(checkBlock('')).toEqual({ ok: false, failed: 'The reply is empty' })
   })
+  test('an empty first field fails too, bold or plain', () => {
+    expect(checkBlock(BLOCK.replace('**What I ruled:** a', '**What I ruled:**')))
+      .toEqual({ ok: false, failed: '**What I ruled:** has no content' })
+    expect(checkBlock(BLOCK.replaceAll('**', '').replace('What I ruled: a', 'What I ruled:')))
+      .toEqual({ ok: false, failed: '**What I ruled:** has no content' })
+  })
   test('a field in the wrong position is out of order', () => {
     const swapped = BLOCK.replace(
       '**What the PR(s) will carry:** none\n**Next steps:** b',

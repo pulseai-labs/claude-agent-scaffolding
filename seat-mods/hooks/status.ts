@@ -77,13 +77,16 @@ export function checkBlock(reply: string): { ok: true } | { ok: false; failed: s
   const trimmed = reply.trim()
   if (trimmed === '') return { ok: false, failed: 'The reply is empty' }
   const lines = trimmed.split('\n')
-  if (!(LABEL_AT_START[0]?.test(lines[0] ?? '') ?? false))
-    return { ok: false, failed: 'Text comes before **What I ruled:**' }
-  for (let i = 1; i < STATUS_LABELS.length; i++) {
+  // All five labels take the same path: the line at the label's position must
+  // start with it and carry content after it — the first field included.
+  for (let i = 0; i < STATUS_LABELS.length; i++) {
     const label = STATUS_LABELS[i] ?? ''
     const line = lines[i]
     const match = line === undefined ? null : LABEL_AT_START[i]?.exec(line) ?? null
     if (match === null) {
+      // Only the first label's absence reads differently: the plan's copy names
+      // text before the block, while a later label is missing or out of order.
+      if (i === 0) return { ok: false, failed: 'Text comes before **What I ruled:**' }
       const later = lines.slice(i + 1).some(candidate => LABEL_AT_START[i]?.test(candidate) === true)
       return { ok: false, failed: `**${label}** is ${later ? 'out of order' : 'missing'}` }
     }
