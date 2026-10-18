@@ -353,6 +353,7 @@ describe('the orchestrator role states the status block (#867)', () => {
   })
   test('states the rule with crew SKILL.md wording', () => {
     expect(role).toContain('your reply is only the status block')
+    expect(role).toContain('is not a turn end: do the next step first')
     expect(role).toContain('exactly five lines, one field per line')
     expect(role).toContain('(`none` is content)')
     expect(role).toContain('A turn the operator typed is free and takes any shape.')

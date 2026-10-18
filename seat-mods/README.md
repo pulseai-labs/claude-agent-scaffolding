@@ -161,6 +161,17 @@ it:
   `⚠ seat-mods: status block missing — this status reply is not in the required form.` It changes
   neither the answer nor the transcript, and a subagent's turn end is ignored.
 
+On the same block, an **idle check** (#876) reads three fields. When both wait fields — Waiting
+on (seats live) and Operator decision pending — read `none` while Next steps names work, the
+block contradicts itself and does not end the turn: the first stop is blocked with
+`seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the
+next step now, or name the seat, wake or decision you wait on.`, and the second adds
+`⚠ seat-mods: status block says nothing waits, but Next steps names work.` under the reply, the
+way the shape warning sits. A field reads `none` when its content starts with the word `none`,
+any case: `none. No seats are live.` counts, `nonetheless` does not. The one block per turn is
+shared with the shape check, in either order: a turn already nudged for idling gets no later shape
+rewrite, and a turn whose shape rewrite is spent takes the idle warning only, not a second block.
+
 The check calls no model and never calls herdr, Orca or Paseo. Only `SEAT_MODS_ROLE=orchestrator`
 sessions are affected; every other role and an unset role are untouched.
 

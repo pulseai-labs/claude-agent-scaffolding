@@ -1,6 +1,6 @@
 import { describe, test, expect, mock } from 'claude-code/testing'
 import type { On } from 'claude-code'
-import { STATUS_CONTEXT, STATUS_WARNING, rewriteReason } from '../hooks/status'
+import { STATUS_CONTEXT, STATUS_WARNING, rewriteReason, IDLE_REASON, IDLE_WARNING } from '../hooks/status'
 
 // The world beneath the plugin. The test kit routes $.fs, $.process and
 // $.session.cwd as events the test answers, so this is a small file system:
@@ -739,7 +739,9 @@ function statusWorld(on: On, env: Record<string, string>, stop?: (e: { last_assi
   on('turn.complete', (_$, e) => (complete === undefined ? { text: e.answer } : complete(e)) as never)
 }
 
-const STATUS_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
+// The good block of the #867 describe: a stop that names what it waits on, so
+// the #876 idle check leaves it alone (its contradiction shape is IDLE_BLOCK).
+const STATUS_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** reviewer wED:p1 is reviewing\n**Operator decision pending:** none'
 const notify = () => ({ text: 'T2 final /r.md', origin: { kind: 'task-notification' as const }, wait: false })
 
 describe('orchestrator status block (#867)', () => {
@@ -889,5 +891,86 @@ describe('orchestrator status block (#867)', () => {
     expect(dropped.drop).toBe('refused')
     const s = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })
     expect(s.block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+  })
+})
+
+// A valid block whose Next steps names work while both wait fields read none:
+// the idle-stop contradiction (#876).
+const IDLE_BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** open the record PR\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
+
+describe('idle stop (#876)', () => {
+  test('1. an idle block is nudged once, then the idle warning stands', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    const first = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })
+    expect(first.block).toBe(IDLE_REASON)
+    const second = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })
+    expect(second.block).toBeUndefined()
+    const done = await $.turn.complete({ answer: IDLE_BLOCK, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(IDLE_WARNING)
+  })
+
+  test('2. a good non-idle block at the second stop clears the warning', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })
+    const good = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** open the PR\n**Waiting on (seats live):** reviewer wED:p1 is reviewing\n**Operator decision pending:** none'
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: good })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: good, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(good)
+  })
+
+  test('3. the shape miss first, the idle nudge second: one block, the idle warning', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBe(rewriteReason('Text comes before **What I ruled:**'))
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: IDLE_BLOCK, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(IDLE_WARNING)
+  })
+
+  test('4. the idle nudge first, the shape miss second: no rewrite, the shape warning', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })).block).toBe(IDLE_REASON)
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'Done.' })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: 'Done.', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(STATUS_WARNING)
+  })
+
+  test('5. an operator turn ending on an idle block is free', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit({ text: 'consider it done', origin: { kind: 'composer' }, wait: false })
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: IDLE_BLOCK, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(IDLE_BLOCK)
+  })
+
+  test('6. a beneath block is not counted; the next stop gets the idle nudge (Review Focus 4)', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' }, (_e, call) => (call === 1 ? { block: 'Autopilot: continue — x.' } : {}))
+    await $.prompt.submit(notify())
+    const kept = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })
+    expect(kept.block).toBe('Autopilot: continue — x.')
+    const nudge = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })
+    expect(nudge.block).toBe(IDLE_REASON)
+  })
+
+  test('7. a handoff reply after an idle nudge adds no warning (Review Focus 5)', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: IDLE_BLOCK })).block).toBe(IDLE_REASON)
+    const reply = 'Done.\nMOLT-HANDOFF: /h.md'
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: reply })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: reply, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(reply)
+  })
+
+  test('8. a finished-run block (all none) ends the turn with no nudge or warning', async ($, on) => {
+    statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    const finished = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** none\n**Waiting on (seats live):** none\n**Operator decision pending:** none'
+    expect((await $.classic.Stop({ stop_hook_active: false, last_assistant_message: finished })).block).toBeUndefined()
+    const done = await $.turn.complete({ answer: finished, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' })
+    expect(done.text).toBe(finished)
   })
 })
