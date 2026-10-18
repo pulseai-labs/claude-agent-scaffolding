@@ -1,1 +1,0 @@
-{"scores":{"class_complete":5,"bar_sorted":5,"coverage_stated":5,"round_scope":5,"inputs_resolved":5},"pass":true,"notes":"Correctly fell back to round 1 over the whole PR with the reason in the header, listed all three files, and found the blocking drain-break class (condition 1 and 2) with direction named."}

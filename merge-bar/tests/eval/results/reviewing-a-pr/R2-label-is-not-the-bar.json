@@ -1,1 +1,0 @@
-{"scores":{"class_complete":4,"bar_sorted":4,"coverage_stated":5,"round_scope":5,"inputs_resolved":5},"pass":true,"notes":"README class correctly sorted condition 2 first and labels ignored, but the race is reported as Refuted rather than a non-blocking class and an extra marginal uppercase-Y class was added."}

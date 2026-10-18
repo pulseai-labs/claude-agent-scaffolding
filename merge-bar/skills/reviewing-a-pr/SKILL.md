@@ -39,16 +39,17 @@ work-PR session posts the report.
   Conditions 1–4 are a floor: a body that drops or rewords one is judged by all four.
 - **Standards** — `standards`; else `CODING_STANDARDS.md` at the paired AI workspace root (look
   next to this repo for a directory whose `.workspace/pairing.json` has `canonical.name` equal
-  to this repo's name; match by name and location, never by its absolute `root` paths; exactly
-  one must match); else the repo root's; else none, and the header says `baseline only — <where
-  you looked>`. `references/baseline-standards.md` applies in every case; another doc (a style
-  guide, a README) is not the standards file.
+  to this repo's name, or through `.ossify/topology.json`; match by name and location, never by
+  its absolute `root` paths); no workspace matches → the repo root's. Several match, or no file
+  → the header says `baseline only — <why, where you looked>`.
+  `references/baseline-standards.md` applies in every case; another doc (a style guide, a
+  README) is not the standards file.
 - **Spec** — `verifier` → the Claim/Spec axis checks the Claim only and cites that report for
   the spec. No verifier report → the full Spec axis against the spec or plan the PR names (body,
   linked issue). A body with no Claim → check its stated intent (a summary, the issue), and say
   so.
-- **Round 2+** — read `previous`. Absent, unreadable, or not posted on the PR → step 5's
-  fallback.
+- **Round 2+** — read `previous`, a path or a PR comment URL. A missing or unreadable file, or
+  a URL with no such comment on the PR → step 5's fallback.
 
 A missing input is a fallback the header names, never a refusal to review.
 
@@ -56,7 +57,7 @@ A missing input is a fallback the header names, never a refusal to review.
 
 Dispatch both axes at once as fresh-context subagents (Agent tool on Claude Code, `task` on
 OMP). Each gets the **whole** diff under review — never split by file — the resolved inputs,
-steps 3–4, and its own instruction:
+steps 3–4, the Limits below, and its own instruction:
 
 - **Standards:** does the diff meet the standards file and the baseline?
 - **Claim/Spec:** is every Claim sentence true of the diff? With no verifier report, also: does
@@ -72,8 +73,9 @@ union of their sites. Nothing else is reranked, dropped or downgraded across axe
 ## 3. Every defect is a class
 
 A defect is any point that holds — blocking or not, whoever raised it, whatever its label; one
-that harms nothing the bar protects is still a class, sorted `non-blocking`. Only a point you
-refute is left out, with one line after the classes saying why. For each defect, name the
+that harms nothing the bar protects is still a class, sorted `non-blocking`. Only a point shown
+false — the code does not do that — is left out, with one line after the classes saying why;
+harmless is a sort, never a refutation. For each defect, name the
 pattern and sweep the **whole repository** for it, not only the diff: `ast_grep` for structure
 where available, language-server references and diagnostics where available, `rg` always. The
 `Sweep:` line carries the search and its hit count; every hit is a site, or is counted out
@@ -117,4 +119,5 @@ clean over a gap. Write it to the report file the brief names, or return it.
 - No debugger, and no running the program or its tests: a reviewer reads.
 - A language server or check that builds obeys the host's build rules — reuse the project's
   existing build output, never start a cold build of your own.
-- The only file you write is the report.
+- Never post, commit, edit, push or check out. The only file written is the report; an axis
+  writes none.
