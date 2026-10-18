@@ -1,0 +1,120 @@
+---
+name: reviewing-a-pr
+description: Use when reviewing a PR, re-reviewing one after a fix push, or seated as a PR's reviewer — reports every defect as a class with every site in the repo, each sorted against the merge bar in the PR's own body, both axes (standards, and the Claim or spec) in parallel fresh-context subagents, coverage stated per file; round 2+ reviews only the fix diff plus each prior class's closure. Reports only — never posts, commits, edits or checks out.
+---
+
+# Reviewing a pull request — classes against its merge bar
+
+You review; you do not fix. The output is one report in the shape of `references/report.md`.
+Two rules carry the design. **Every finding is a class with every site**: a review that names
+one site of a pattern guarantees a later round that finds the rest. **Round 2 reviews only the
+fix diff**: a fresh read of the whole PR each round re-samples it and brings findings round 1
+should have had. So round 1 carries the burden — whole diff, every class, every site.
+
+You never post, commit, edit, push or check out. The launcher prepared the checkout; the
+work-PR session posts the report.
+
+**Inputs.** Each can come as a slash-command flag or be named in a brief:
+
+| Input | Default |
+|---|---|
+| PR — number or URL | required |
+| `round` | 1 |
+| `previous` — the previous round's report, path or PR comment URL | none |
+| `standards` — a standards file | found as in step 1 |
+| `verifier` — the verifier's report for this PR | none |
+| `head` — the SHA the checkout must equal | the PR's `headRefOid` |
+| `body` — a file replacing the PR's body | the PR's current body |
+
+## 1. Resolve the inputs
+
+- **Body and head.** `gh pr view <PR> --json body,headRefOid,baseRefName,files` (OMP:
+  `read pr://<owner>/<repo>/<N>` also works); `body` replaces the fetched body. `git rev-parse
+  HEAD` must equal `head`, else `headRefOid`. A mismatch is the one stop: name both SHAs and
+  that the launcher must prepare the checkout.
+- **Diff.** `git merge-base HEAD origin/<baseRefName>`..`HEAD`. Round 2+: step 5.
+- **Door** — the body's `## Merge danger` `Door:` line; none → `unstated (treated one-way)`.
+- **Bar** — the body's `## Merge bar` and its raising line. None → the four conditions in
+  `../opening-a-pr/references/pr-body.md`, and the header says `template (body has none)`.
+  Conditions 1–4 are a floor: a body that drops or rewords one is judged by all four.
+- **Standards** — `standards`; else `CODING_STANDARDS.md` at the paired AI workspace root (look
+  next to this repo for a directory whose `.workspace/pairing.json` has `canonical.name` equal
+  to this repo's name; match by name and location, never by its absolute `root` paths; exactly
+  one must match); else the repo root's; else none, and the header says `baseline only — <where
+  you looked>`. `references/baseline-standards.md` applies in every case; another doc (a style
+  guide, a README) is not the standards file.
+- **Spec** — `verifier` → the Claim/Spec axis checks the Claim only and cites that report for
+  the spec. No verifier report → the full Spec axis against the spec or plan the PR names (body,
+  linked issue). A body with no Claim → check its stated intent (a summary, the issue), and say
+  so.
+- **Round 2+** — read `previous`. Absent, unreadable, or not posted on the PR → step 5's
+  fallback.
+
+A missing input is a fallback the header names, never a refusal to review.
+
+## 2. Two axes, in parallel, in fresh context
+
+Dispatch both axes at once as fresh-context subagents (Agent tool on Claude Code, `task` on
+OMP). Each gets the **whole** diff under review — never split by file — the resolved inputs,
+steps 3–4, and its own instruction:
+
+- **Standards:** does the diff meet the standards file and the baseline?
+- **Claim/Spec:** is every Claim sentence true of the diff? With no verifier report, also: does
+  the diff do what the spec or plan says, item by item, and nothing outside Scope?
+
+Each returns its classes in the report shape and every file of the diff marked `read` or
+`not read — <why>`. With no subagent tool, run the axes one after the other, each from the
+diff, never from the other's findings.
+
+**Merging.** A class both axes return is one entry, `Axis: Standards, Claim/Spec`, with the
+union of their sites. Nothing else is reranked, dropped or downgraded across axes.
+
+## 3. Every defect is a class
+
+A defect is any point that holds — blocking or not, whoever raised it, whatever its label; one
+that harms nothing the bar protects is still a class, sorted `non-blocking`. Only a point you
+refute is left out, with one line after the classes saying why. For each defect, name the
+pattern and sweep the **whole repository** for it, not only the diff: `ast_grep` for structure
+where available, language-server references and diagnostics where available, `rg` always. The
+`Sweep:` line carries the search and its hit count; every hit is a site, or is counted out
+there with the reason (already guarded, input refused upstream). Mark each site `in scope` or
+`outside scope` by the body's Scope; with no Scope, the diff's paths are in scope. An
+outside-scope site is listed, not dropped — the work-PR session dispositions it.
+
+## 4. Sort each class against the bar
+
+A class is blocking if and only if it meets a bar condition or the raising line. Name the
+lowest-numbered condition met, then any others — `condition 1 (also 2)` — else
+`non-blocking`. A severity word — P1, nit, critical, any reviewer's or author's — never decides.
+Name the failure direction (`working-a-pr` §3): **refuses valid input** meets condition 1 on a
+touched path; **correctly refuses unsupported input** is non-blocking at most; **admits what
+it cannot handle** blocks when it corrupts or loses state; `n/a` otherwise.
+
+## 5. Round 2 and later
+
+The diff under review is `<previous report's Head>..HEAD` — the fix diff. Then:
+
+- **Closure.** Re-run each prior class's sweep on the current head: `Closes: C<n>`, or
+  `Still open: <sites>`.
+- **The fix diff** gets steps 3–4 like round 1. A new class takes the next free `C<n>`.
+- **New mechanism.** A fix that adds behaviour rather than closing a class — a retry, a
+  fallback, a new flag — is marked `New mechanism: yes — <what>`, so the work-PR session can
+  cut it or split it out.
+- **Nothing else.** Code the fix diff did not touch is not re-read; a defect there is not this
+  round's.
+
+No previous report to read → run round 1 on the whole PR and say why in the header. Never
+review a fix diff with no class list.
+
+## 6. Write the report
+
+Assemble it per `references/report.md`: the header, Coverage from both axes' returns, then the
+classes, blocking first. A file an axis did not read is a stated gap, and nothing is called
+clean over a gap. Write it to the report file the brief names, or return it.
+
+## Limits
+
+- No debugger, and no running the program or its tests: a reviewer reads.
+- A language server or check that builds obeys the host's build rules — reuse the project's
+  existing build output, never start a cold build of your own.
+- The only file you write is the report.
