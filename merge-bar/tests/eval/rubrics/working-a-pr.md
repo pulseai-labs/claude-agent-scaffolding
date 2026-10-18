@@ -19,7 +19,9 @@ Pass = all ≥ 4.
    diff; a fix touches only what its blocking finding needs; at round 3 or any later round,
    blocking findings on lines the fix commits wrote stop the loop and surface two options
    (narrow the Claim, split the PR) for the operator; blocking findings on the original design
-   do **not** trigger that stop, at round 3 or later.
+   do **not** trigger that stop, at round 3 or later; the re-review is a fresh reviewer given the previous report and scoped to the fix
+   diff; the driver never reviews its own fixes; extra-eye reviewers are never waited for and
+   never decide what blocks.
 4. **ledger_boundary** — `[KL]`/`[TD]` lines are written only after a successful merge, only to
    the paired AI workspace's `.claude/memory-bank/tech-debt.md`, located by repo name rather
    than by trusting absolute roots; with no paired workspace found, the lines are printed and
