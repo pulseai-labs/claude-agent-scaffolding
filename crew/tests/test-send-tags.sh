@@ -233,6 +233,7 @@ pin "$COMPLETION_MD" 'prefix would break any slash command' "the exceptions give
 section "the status block is stated"
 
 pin "$SKILL_MD" 'your reply is only the status block' "SKILL.md states the rule once"
+pin "$SKILL_MD" 'is not a turn end: do the next step first' "SKILL.md states the idle-stop rule"
 pin "$SKILL_MD" 'ends with that line instead of the block' "SKILL.md states the molt-handoff exception" flat
 for label in '**What I ruled:**' '**What the PR(s) will carry:**' '**Next steps:**' '**Waiting on (seats live):**' '**Operator decision pending:**'; do
   pin "$SKILL_MD" "$label" "SKILL.md carries $label once"

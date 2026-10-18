@@ -36,7 +36,11 @@ demo-walk seat on it (`briefs.md`'s `demo walk`, a bounded read-only brief), lau
 read through the layer's Machines step; the herdr layer states no cross-machine report read
 (the Orca one is measured), and the close launches exactly that one seat and releases it.
 
-**This release includes 0.3.1** — its tagged sends and the top's status block (#867); that section is kept whole beneath as history.
+**This release includes 0.3.1 and 0.3.2** — the tagged sends and the top's status block (#867), and the idle-stop rule (#876); those sections are kept whole beneath as history.
+
+## 0.3.2
+
+**A block that waits on nothing ends no turn** (#876). `orchestrate` §8 now says, after the status block's field list: "A block that waits on no seat and no operator decision while its Next steps names work is not a turn end: do the next step first, and write the block when something outside you holds the turn." seat-mods 0.6.0 enforces it on a Claude Code top's status turn — one nudge, then a warning line, sharing the turn's one block with the shape check — and the same sentence reaches an OMP top as text in omp-roles 0.7.4's `orchestrator` role.
 
 ## 0.3.1
 

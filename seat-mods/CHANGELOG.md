@@ -2,6 +2,22 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.6.0 — 2026-10-18
+
+- **A status block that says nothing waits no longer ends the turn** (#876). On a status turn of
+  an orchestrator, a block `checkBlock` accepts is also read for the idle-stop contradiction:
+  Waiting on (seats live) and Operator decision pending both read `none` (content starting with
+  the word `none`, any case) while Next steps names work. The first stop is blocked once with
+  `seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do
+  the next step now, or name the seat, wake or decision you wait on.`; the second lets the stop
+  through and adds `⚠ seat-mods: status block says nothing waits, but Next steps names work.`
+  under the reply. The one block per turn is shared with the shape check in either order: a turn
+  nudged for idling gets no later shape rewrite, and a spent shape rewrite leaves the idle check
+  warning only. The turn record now carries `warning` — the line of the failure that stood at the
+  last stop — instead of `failedAfterRewrite`, and `STATUS_CONTEXT` gains one sentence teaching
+  the rule. A finished run (all three fields `none`) ends the turn untouched; the molt exemption,
+  the beneath-block rule and every role other than an orchestrator are unchanged.
+
 ## 0.5.0 — 2026-10-18
 
 - **A status turn of an orchestrator ends with only the five-field status block** (#867). A status
