@@ -11,6 +11,7 @@ import { STATUS_CONTEXT, rewriteReason, STATUS_WARNING, IDLE_REASON, IDLE_WARNIN
 export type StatusTurn = { status: boolean; blocked: boolean; warning: string | undefined }
 type Stop = { block: { decision: 'block'; reason: string } | undefined; warning: string | undefined }
 const NOTHING: Stop = { block: undefined, warning: undefined }
+const MOLT_ARM = '/molt-arm '
 
 // The reply as text: a string as-is, a message's text blocks joined (autonomic's textOf reading).
 export function replyText(m: unknown): string {
@@ -35,7 +36,8 @@ export function createStatusCheck(roleEnv: () => string | undefined) {
   return {
     onInput(text: string, idle: boolean): void {
       if (!on()) return
-      const status = isCrewTagged(text)
+      // molt loads first and rewrites a new process's first prompt to `/molt-arm <text>` (its fixed prefix).
+      const status = isCrewTagged(text.startsWith(MOLT_ARM) ? text.slice(MOLT_ARM.length) : text)
       if (idle || turn === undefined) turn = { status, blocked: false, warning: undefined }
       else if (!status) turn.status = false
       context = status && turn.status

@@ -45,6 +45,14 @@ describe('the stop check', () => {
       expect(k.turn()?.status).toBe(true)
     }
   })
+  test("molt's first-prompt rewrite (/molt-arm <text>) is read through", () => {
+    c.onInput('/molt-arm skill://handoff-resume /h.md', true) // molt loads first and arms its route on a new process
+    expect(c.turn()?.status).toBe(true)
+    expect(c.onBeforeAgentStart('skill://handoff-resume /h.md')?.message.content).toBe(STATUS_CONTEXT)
+    const k = createStatusCheck(() => 'orchestrator')
+    k.onInput('/molt-arm fix the bug', true)
+    expect(k.turn()?.status).toBe(false)
+  })
   test('a stop with no input before it is a status turn', () => {
     expect(c.onSessionStop({ last_assistant_message: BAD, stop_hook_active: false }).block).toBeDefined()
   })
