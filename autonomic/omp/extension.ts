@@ -971,6 +971,7 @@ export function createAutonomic(io: AutonomicIO) {
         return `autopilot is off for this session, but its record could not be saved: a molt successor may still start in autopilot. Check that ${sessionPath(home(), id)} can be written.`
       return 'autopilot is off for this session: every ask reaches you.'
     }
+    if (c.kind !== 'on') return USAGE_TEXT
     const h = home()
     const scope = c.scope.map(p => resolveDoc(p, io.cwd, h))
     const missing: string[] = []

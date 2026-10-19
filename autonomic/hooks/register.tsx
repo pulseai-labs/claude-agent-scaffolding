@@ -466,6 +466,7 @@ export const register: Register = (on, options) => {
         return { text: `autopilot is off for this session, but its record could not be saved: a molt successor may still start in autopilot. Check that ${sessionPath(await home($), id)} can be written.` }
       return { text: 'autopilot is off for this session: every ask reaches you.' }
     }
+    if (c.kind !== 'on') return { text: USAGE_TEXT }
     const cwd = await $.session.cwd()
     const h = await home($)
     const scope = c.scope.map(p => resolveDoc(p, cwd, h))
