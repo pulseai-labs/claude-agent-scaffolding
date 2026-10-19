@@ -137,6 +137,9 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 | `/autopilot on [doc …]` | autopilot from now; the docs become the scope, and their paths go into the prompt box for one Enter |
 | `/autopilot off` | manual from now |
 | `/autopilot status` | mode, source, scope, policy (`default`, `edited`, or missing), `yieldAtPercent`, `loopMax`, `tailChars`, the enabled never-approve rules, molt's stage for this session (or `none`), ledger, bell, pain file, loop count |
+| `/autopilot parks` | every open park: id, what stopped it, the call's shape, its cwd, and whether it is approved |
+| `/autopilot approve <id>` | your yes for one use: the exact tool, command text (or file-tool input) and cwd release once within 72 hours |
+| `/autopilot drop <id>` | clears a park; the call it named parks again on its next try |
 | unset, empty, `manual` | manual |
 | any other value | manual; the status line names the value |
 
@@ -221,13 +224,33 @@ you, and the bell rings.
 
 **Permission asks.** A `deny` is never changed (a deny rings once per tool and reason, as "hard
 deny"; a deny from a plugin beneath autonomic's `tool.call` hook, such as a seat guard, rings the
-same way). On an `ask` verdict, first, in code, the **never-approve list** keeps the ask with you
-and rings when a command's own words match a rule. Since 0.5.1 a match found only in text (a message,
-a quoted argument, an interpreter's script, a command whose verb is a variable) goes to the fork
-instead, with the finding in its prompt.
-On an `allow` verdict — bypass permissions, or a settings allow rule — a command that
-matches the list becomes an `ask`, so you get the normal permission dialog, and it rings (the
-**bypass floor**; see "Permission modes").
+same way). In autopilot the permission lane is one shared decision on both hosts, with four parts:
+
+- **The floor** holds red lines 1–3 in code, whatever the policy or the task says. Its four
+  rules and their red lines are below; a match found only in text goes to the judge.
+- **The routing check** (`ROUTE_WORDS` in `never.ts`) sends a call to the judge when it names a
+  word that could belong to any red line 1–6, a merge or the park store. Routing only adds a
+  judgment, never an approval: a call that names none of its words runs unjudged, as before.
+- **The judge** reads the shared permission prompt: the six red lines, the policy, the live
+  turn, the floor's text-only findings and, when a host binds them, the seat's role and grants.
+  Only an `allow` that names no red line allows; an `ask`, a red-line `allow` and an unparseable
+  reply all park.
+- **The integrity guard** parks a call whose input names the park store or invokes
+  `/autopilot approve` or `/autopilot drop`: a model's call to the operator's own route is not
+  the operator's yes.
+
+A call the decision stops is **parked for the operator**: one park file under
+`~/.local/state/autonomic/parks` (`AUTONOMIC_PARKS_DIR` overrides), one ledger row with
+`src: floor|judge|integrity`, and a reason the seat sees, naming the park id and saying not to
+retry the call or an equivalent one. On Claude Code a park returns `deny` from `tool.check`,
+because that is the only return that does not wait; **that deny is a deferral, not a refusal** —
+the call waits for your yes rather than being rejected. On OMP it blocks with the same text.
+
+`/autopilot parks` lists every open park: its id, what stopped it (red line N, the judge asked,
+or operator-only state), the call's shape and cwd, and whether it is approved.
+`/autopilot approve <id>` approves one exact call for one use within 72 hours: the tool, the
+command text (or a file tool's whole input) and the cwd must all match exactly, and a second run
+parks again. `/autopilot drop <id>` clears it.
 
 Since 0.5.0 the list judges **each simple command on its own words** when the text parses. First
 it joins a backslash-newline and drops every `\`, `'` and `"`. Then it splits the text at spaces,
@@ -244,33 +267,25 @@ wrapper or an interpreter cannot hide a word there: `python3 -c 'git push -f'` s
 `-f`. In the bag, a danger word beside a harmless command is an extra ask; that is the cost of
 this reading. The rules, read per command or on the bag:
 
-- `force-push` — a push verb (`push`, `send-pack`, `http-push`, `git-push`, a word holding
-  `.push=`) and a short-flag cluster with `f` (`-f`, `-uf`), an abbreviation
-  of `--force`, `--force-with-lease`, `--force-if-includes` or `--mirror`, or a word starting `+`;
-- `branch-delete` — a push verb and a cluster with `d`, `--delete`, `--prune`, `--mirror`, or a
-  word starting `:`; or `branch` and a cluster with `D`, or `-d`/`--delete` with a force flag (a
-  plain `git branch -d` is not on the list);
-- `default-branch-push` — a push verb and the default branch's name (`origin/HEAD`, or
-  `main`/`master` when unknown) as a word or after `:`, `/` or `=`, `--all`, `--branches`,
-  `--mirror`, the matching refspec `:`, or a word holding `$`, `*`, `?`, `[` or `{`; or any push
-  while the session's branch is the default branch or unknown; or a push after a move (`cd`,
-  `pushd`, `git -C` to a directory other than the session's own or the repo root, `popd`,
-  `--git-dir`, `--work-tree`, `GIT_DIR=`, `GIT_WORK_TREE=`) or after a branch switch (a `checkout`,
-  `switch`, `branch -m`/`-c` or `symbolic-ref` that names a default branch name or a variable),
-  unless since 0.5.0 the list reads
-  that one command and it names a remote and only literal destinations that are not the default
-  branch, `main`, `master`, `HEAD`, `@` or empty, with no option outside `-u -q -v -n`,
-  `--set-upstream`, `--quiet`, `--verbose`, `--tags`, `--follow-tags`, `--atomic`, `--porcelain`,
-  `--progress`, `--no-progress`, `--dry-run`, `--thin` and `--no-thin`; or any `send-pack` or
-  `http-push`;
-- `rm-outside` — `rm` with a recursive flag, and a move, `xargs`, or a later word that starts
-  with `/` outside the worktree or with `~`, holds a `..` segment, a `$` or a `{`, or a glob on a
-  dot name (`.?`); a plain glob (`build/*`) stays where it is;
-- `no-verify` — an abbreviation of `--no-verify`, or `commit` and a cluster with `n`.
+- `force-push` (red line 2) — a push verb (`push`, `send-pack`, `http-push`, `git-push`, a word
+  holding `.push=`) and a short-flag cluster with `f` (`-f`, `-uf`), an abbreviation of
+  `--force-with-lease`, `--force-if-includes` or `--mirror`, or a word starting `+`, unless every
+  destination is literally the current branch and that branch is not the default; a destination
+  the floor cannot read stays on the floor (call 4);
+- `default-branch-push` (red line 1) — a push that names the default branch's name (`main`,
+  `master`, the session's default) as a word or after `:`, `/` or `=`, `--all`, `--branches`,
+  `--mirror`, the matching refspec `:`/`+:`, or a word holding `$`, `*`, `?`, `[` or `{`; a push
+  while the session's branch is the default branch; a push after a move or branch switch (unless
+  the one command names a remote and only literal non-default destinations); or any `send-pack`
+  or `http-push`;
+- `no-verify` (red line 3) — an abbreviation of `--no-verify`, or `commit` and a cluster with `n`;
+- `ai-trailer` (red line 3) — a `commit` whose `-m`/`--message` values hold a `Co-Authored-By:`
+  or `🤖 Generated with` trailer; a `-F`/`--file` message, a heredoc body or a substitution the
+  floor cannot read is the judge's.
 
 A flag word that holds `$`, `*`, `?`, `[` or `{` (`--forc*`, `-$X`) counts as every flag. Beside a
-push or an `rm`, so does a bare variable (`git push $OPTS`). Beside `branch` or `commit`, a bare
-variable is not read as a flag: it is mostly a message or a path.
+push, so does a bare variable (`git push $OPTS`). Beside `branch` or `commit`, a bare variable is
+not read as a flag: it is mostly a message or a path.
 
 **Inert commands leave the bag (since 0.4.2).** When the text holds no program that may run text
 (the list below), no `<(` or `>(`, no `$((`, no heredoc left in place, no function or
@@ -366,15 +381,16 @@ inert `sed`, a Python file edit, or a runner word in an argument it cannot run. 
 that option (`--r` is `--recursive`, `git push --de` is `--delete`), as git and GNU tools accept
 it; an ambiguous prefix the tools refuse is only an extra ask.
 
-`unreadable` matches nothing since 0.2.0: no rule depends on following a command's shape. The
-name stays valid, so an existing `neverApprove` value still parses.
-
 Each rule can be turned off: `neverApprove` (below) names the enforced rules. A rule you remove
-is the fork's to judge on an ask, and is left alone on an allow. A repo whose default branch takes
+is the judge's on a routed call, and is left alone on an allow. A repo whose default branch takes
 direct pushes by design removes `default-branch-push`.
 
-When no rule matches, the fork judges the call against the policy's
-permission scope and the live turn: `allow` is recorded and the tool runs; anything else leaves the ask and rings. The list applies to any tool whose input has a `command` (Bash, Monitor). A call whose input is longer than the fork is shown (64,000 characters since 0.5.1; 4000 before) stays an ask and rings: no call is allowed with a part the fork did not see. `AskUserQuestion` and `ExitPlanMode` are never approved here: their permission prompt is your own dialog.
+When no floor rule matches, a routed call goes to the judge against the policy's permission
+scope and the live turn: an `allow` with no red line named is recorded with `src: judge` and the
+tool runs; anything else parks. The floor applies to any tool whose input has a `command` (Bash,
+Monitor). A call whose input is longer than the judge is shown (64,000 characters) stays with
+you: no call is allowed with a part the judge did not see. `AskUserQuestion` and `ExitPlanMode`
+are never reached here: their permission prompt is your own dialog.
 
 **The live turn.** The permission and ask forks also get the turn digest: the session's last 12
 prompts and main-thread tool results since the fork's transcript was sent, one line each (a
@@ -387,31 +403,30 @@ The turn-end fork does not get it.
 
 ## Permission modes
 
-- **Bypass permissions** (`--dangerously-skip-permissions`). Claude Code never asks, so the
-  permission fork never runs and no "nothing to judge yet" ring occurs. In autopilot, a command
-  whose own words match an enabled `neverApprove` rule still reaches you as a permission dialog with
-  the reason `autonomic: never-approve — <rules>`, and the pain signal names the line that matched.
-  A text-only match goes to the fork: its `allow` keeps the allow, anything
-  else reaches you. This is the floor that makes autopilot safe under bypass.
-- **Auto or default.** Claude Code asks, and the ask path above applies. The first ask after a
-  clear rings "nothing to judge yet": the fork has no request to copy until the session's first
-  response.
+- **Bypass permissions** (`--dangerously-skip-permissions`). Claude Code never asks, so no
+  "nothing to judge yet" ring occurs. In autopilot the shared decision still runs: a floor or
+  integrity stop returns `deny` with the park text (a deferral, not a refusal; see "The
+  reflexes"), and a judge `allow` keeps the allow. This is the floor that makes autopilot safe
+  under bypass.
+- **Auto or default.** Claude Code asks, and the permission path above applies: a parked call
+  returns `deny` with the park text, which the caller reads as the operator's stop.
 - **Manual mode**, in any permission mode: autonomic never touches an `allow` — except in a
   session that left autopilot through a failure (an unwritable ledger or record, a removed
   policy). That session keeps the floor, because under bypass, manual means no asks at all.
   `/autopilot off` turns it off.
 - **What the floor guards against:** a cooperative model writing a dangerous command, judged
-  from the command text alone. These pass it: a script or program that runs git itself
+  from the command text alone. These can pass it: a script or program that runs git itself
   (`./deploy.sh`, `make release`); a git alias defined in config or an earlier command; `sed`'s
   `e` command or any program that builds the command at run time; a brace or glob that builds
-  the verb (`git pu{s..s}h`); a bare variable beside `branch` or `commit`; and a danger only the
-  filesystem shows (`rm -rf /repo/link/x` where `link` points outside the worktree).
-- **What a never-approve match records.** The ledger line and every pain signal carry the
-  command's *shape* — verbs, a git subcommand and flag names, with every value only counted
-  (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`, an assignment is `NAME=`) — so no credential is
-  written, however it is spelled; a command name outside a known list shows as `?`, and a flag
-  outside a known list as `-?`. The
-  permission dialog shows you the whole command.
+  the verb (`git pu{s..s}h`); and a bare variable beside `branch` or `commit`. A call that names
+  a routing word still reaches the judge, which holds all six red lines.
+- **What a park records.** The park file holds the exact call — the command text, or a file
+  tool's whole input JSON — so the operator's approval can match it. The ledger row and every
+  pain signal carry the command's *shape* — verbs, a git subcommand and flag names, with every
+  value only counted (`git push -f https://u:TOKEN@… feat/x` is `git push -f (+2 args)`, an
+  assignment is `NAME=`) — so no credential is written, however it is spelled; a command name
+  outside a known list shows as `?`, and a flag outside a known list as `-?`. `/autopilot parks`
+  lists the call's key, redacted and bounded.
 - **What an allowed ask records.** Since 0.2.1, an ask the fork allows records no input value
   either: a command's shape, as above, or another tool's input key names only (`Write:
   {file_path, content}`).
@@ -426,8 +441,13 @@ The turn-end fork does not get it.
 One line per decision:
 
 ```
-- <ISO time> · <session id> · <case> · Q: <question> · A: <answer> · why: <reason>[ · usage: in=<n> cached=<n> out=<n>]
+- <ISO time> · <session id> · <case> · Q: <question> · A: <answer> · why: <reason>[ · src: <source>][ · usage: in=<n> cached=<n> out=<n>]
 ```
+
+`src` names who decided: `floor` (a never-approve rule), `judge`, `grant` (an enrolled OMP
+grant), `operator` (your approval of a park) or `integrity` (the guard). A row without it is a
+0.9.1 line. A park row says `A: parked for the operator`; a release by an approved park is an
+allow row with `src: operator`.
 
 Path: `AUTONOMIC_LEDGER` when set (relative to the repo root when relative), else
 `<repo root>/.autonomic/ledger.md`, else `<cwd>/.autonomic/ledger.md` outside git. autonomic only
@@ -542,7 +562,7 @@ every change, and removes it at shutdown. Mark a child for autopilot only when t
 | `loopMax` | 3 | blocks in a row with no change before the loop guard |
 | `tailChars` | 4000 | how much of the last reply the turn-end fork quotes |
 | `yieldAtPercent` | 65 | used only without a molt stage file: context fill at or above which every turn end is molt's |
-| `neverApprove` | all six rules | the never-approve rules enforced, separated by spaces or commas: `force-push default-branch-push branch-delete rm-outside no-verify unreadable` (`unreadable` matches nothing since 0.2.0). Empty means none (`/autopilot status` says so). Only these names exist. |
+| `neverApprove` | all four rules | the never-approve floor rules enforced, separated by spaces or commas: `force-push default-branch-push no-verify ai-trailer` (red lines 1–3). Empty means none (`/autopilot status` says so). A retired 0.9.x name (`branch-delete`, `rm-outside`, `unreadable`) still loads and is skipped; the status line says it is now judged. An unknown name is a settings problem. |
 | `readers` | `gh pr create; gh pr edit; gh issue create; gh issue comment` | command prefixes, separated by `;`, that name a file but never run it: a reader that names a file the command just wrote does not keep that file's words for the never-approve list. Add your own, for example `herdr agent prompt`. Empty means none. `/autopilot status` lists them. |
 
 No `/plugin configure` step is needed: every setting has a default except the optional `bell`.
@@ -589,23 +609,30 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
 
 ## OMP
 
-- Since 0.6.0 autonomic also ships `omp/extension.ts` for omp 18.8.9: the turn-end reflex, the `ask` reflex and the never-approve
-  floor over the same policy, pain list and ledger in `../hooks`. Only `omp-seat` (the `omp-roles` plugin) loads it, with `-e`.
+- Since 0.6.0 autonomic also ships `omp/extension.ts` for omp 18.8.9, over the same policy,
+  pain list and ledger in `../hooks`; since 0.10.0 it carries the same shared permission
+  decision as Claude Code (`../hooks/decide.ts`). Only `omp-seat` (the `omp-roles` plugin)
+  loads it, with `-e`.
 - `~/.omp/agent/autonomic.json` holds the same keys as the settings table below; the policy file, `/autopilot`, `AUTONOMIC_MODE`
   and the molt hand-over (a lineage file, a stage file) are the ones above. The `ask` tool exists in `rpc-ui` and the TUI only.
-- OMP seats run `--approval-mode yolo`, so there is no permission fork: a never-approve match in autopilot blocks the `bash` call, writes
-  a `permission` ledger line and raises a pain signal. The floor reads `bash` (the command, judged in the call's own `cwd`) and `github` `pr_push`
-  with `forceWithLease`; `eval`, `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
-- **Grant-bounded decisions (0.7.x, unactivated).** An enrolled session with a decision service now has one extra branch in that floor: a matched
-  call whose *complete literal* effects are bounded by live positive grants is decided by `permissionEligibility` (`hooks/operations.ts`) and
-  recorded, then the original tool runs unchanged and exactly once. It is deterministic when a bounded command's evidence and a matching grant
-  already agree, and otherwise one native judgment inside the matched grants, with the semantic route requiring the judge, the accepted choice and
-  the deterministic grant/fact checks to all agree. Nothing widens what autonomy may do: `executionSegments` parses only the bash grammar it can
-  read (literal wrappers, `cd`, `git -C`, explicit ref/config effects) and marks anything it cannot — expansions, substitutions, interpreters,
-  aliases, functions, config writes — opaque, and an opaque segment never gains authority. A grant never mints authority for an operation it does
-  not cover, a command outside its approved evidence is not enough, and a default or protected destination, force, delete, `--no-verify`, an AI
-  trailer, a merge or any unsupported effect always stays with the operator. This is not universal enforcement: the other OMP tools, and any call
-  the floor never matched, are untouched. It is gated until Tasks 6–8 and both releases.
+- OMP seats run `--approval-mode yolo`, so the permission lane is `tool_call`, not a dialog: in
+  autopilot a routed `bash` call (the command, judged in the call's own `cwd`), a `github`
+  `pr_push` with `forceWithLease`, a `read`/`write`/`edit` call whose input names a route word,
+  or a call that invokes the operator's own `/autopilot approve|drop` takes the shared plan. A
+  floor or integrity stop blocks the call with the park text; a judge plan runs one isolated,
+  tool-free side turn with the shared prompt, and the shared rule then allows or parks. `eval`,
+  `debug` and scripts are not read, and a subagent's calls are covered by seat-mods' child rails.
+- **The enrolled grant lane (0.10.0).** An enrolled session's command call that reaches a judge
+  plan takes the grant-bounded transaction instead of the side turn: `operationFacts`
+  (`hooks/operations.ts`) bounds its complete literal effects and `permissionEligibility`
+  decides. A role ceiling, a red line, an incomplete fact or a missing covering grant keeps the
+  call with the operator; an exact approved decision is deterministic; otherwise one side turn
+  runs inside the matched grants, and the deterministic grant/fact checks must still agree.
+  `executionSegments` reads only the bash grammar it can bound (literal wrappers, `cd`, `git -C`,
+  explicit ref/config effects) and marks anything it cannot opaque, and an opaque segment never
+  gains authority. A default or protected destination, force, `--no-verify`, an AI trailer, a
+  merge, or any effect without a covering grant and approved evidence always stays with the
+  operator. The role/grants binding is Task 8's and stays deferred.
 - The `github` route's bounded facts read the repository's configured remote URLs locally (read-only `git config`) so a PR/API mutation can resolve
   its exact repository from the pinned facts; no network call is made while deciding.
 - There is no band: a turn-end pain lists its options, numbered, in the notice, the bell, the pain file and the human ledger row,

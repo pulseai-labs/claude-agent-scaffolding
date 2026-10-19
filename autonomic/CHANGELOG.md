@@ -2,6 +2,56 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.10.0 — 2026-10-19
+
+Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared decision.
+
+- **One shared permission decision on both hosts** (`hooks/decide.ts`, spec §4): `planPermission`
+  settles a call in a fixed order — an approved park releases, an enabled `ask` finding parks
+  (the floor), the park store or an invocation of `/autopilot approve|drop` parks (the integrity
+  guard), no route and no finding passes, otherwise the judge. `settlePermission` allows only an
+  unambiguous `allow` with no red line named: an `ask`, a red-line `allow` and an unparseable
+  reply all park. The judge's prompt carries all six red lines (spec §3, verbatim), the policy,
+  the live turn, the floor's text-only findings and, when a host binds them, the seat's role and
+  grants. `DEFAULT_POLICY` gains the spec's seeded run-evidence order.
+- **The floor holds red lines 1–3 only** (`hooks/never.ts`): `force-push` (red line 2: `-f`,
+  `--force-with-lease`, `--force-if-includes`, `--mirror`, a `+` destination, unless every
+  destination is the seat's own non-default branch; an unreadable destination stays on the
+  floor), `default-branch-push` (red line 1), and `no-verify`/`ai-trailer` (red line 3). The
+  `branch-delete`, `rm-outside` and `unreadable` rules leave the floor and are judged; a 0.9.x
+  `neverApprove` value that names them still loads, the status line says they are judged, and an
+  unknown name is still a settings problem. The trailer rule reads a commit's own
+  `-m`/`--message` values; a `-F` message is the judge's.
+- **The routing check** (`routes`/`ROUTE_WORDS` in `hooks/never.ts`) sends a call naming any
+  red-line-1–6 word, a merge or the park store to the judge. Routing only adds a judgment: a
+  call that names none of its words runs unjudged, as before.
+- **The park store** (`hooks/parks.ts`): one file per park (`<parksDir>/<id>.json`, mode 0600 in
+  a 0700 store), keyed on the call's exact input (its command text, or a file tool's whole input
+  JSON). `/autopilot parks` lists the open ones; `/autopilot approve <id>` approves one exact
+  call for one use within 72 hours; `/autopilot drop <id>` clears it; an almost-match (another
+  cwd, one extra space, a second use) parks again. The listing prints the call's key redacted and
+  bounded, the same line on both hosts.
+- **The Claude Code adapter** (`hooks/register.tsx`) is a thin wrapper over the shared decision:
+  a park returns `deny` with the park text verbatim — a deferral, not a refusal, because `deny`
+  is the only return that does not wait. A release writes its ledger row before consuming the
+  park, and a judge `allow` the ledger cannot record is not taken. `decidingModel` uses
+  `$.model.complete` when set, else `$.model.fork`.
+- **The OMP adapter** (`omp/extension.ts`) takes the same plan for a routed `bash` call, a
+  `github pr_push` with `forceWithLease`, a `read`/`write`/`edit` call naming a route word, and a
+  call invoking the operator route. An unenrolled judge plan runs one isolated, tool-free side
+  turn with the shared prompt; an enrolled command takes the grant-bounded transaction. Jev
+  leaves the deciding path. A release or judge allow whose ledger row cannot be written is not
+  taken, and the release does not consume the park (verify-T7a 5).
+- **The ledger** gains `src: floor|judge|grant|operator|integrity` after `why:` and before
+  `usage:`; a row without it is the 0.9.1 line, byte for byte.
+- **Parity** (`omp/tests/permission-parity.test.ts`, `autonomic/tests/fixtures/parity-corpus.json`):
+  40 synthetic calls, none from a private ledger (10 floor parks across red lines 1–3, 10
+  retired-rule shapes now judged, 10 routed red-line-4–6 shapes, 5 text-only matches, 5 that do
+  not route), replayed through the Claude Code plan step and the real OMP adapter under one
+  `DecideContext` and one stub verdict table: equal Plan kinds, byte-equal prompts, equal
+  settled outcomes. The corpus carries the part-a shapes: the Skill `/autopilot approve` shape,
+  a command line invoking `/autopilot drop`, and a file-tool credential read.
+
 ## 0.9.1 — 2026-10-18
 
 - **Naming: the per-seat launcher patch names `crew`** (crew 0.3.0's rename, spec §4.6). One
