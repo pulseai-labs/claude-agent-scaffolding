@@ -10,6 +10,10 @@
 // the operator and never approves one, so a call the floor misses goes on to the judge exactly as
 // if the check were absent.
 //
+// Skill-first Q3: routes (0.10.0 Task 2, ROUTE_WORDS below) likewise only adds a judgment — a call
+// whose text meets the word list is judged, never approved or stopped by the routing itself, and a
+// call the list misses runs unjudged exactly as it did before 0.10.0.
+//
 // Since 0.5.0 the floor judges each simple command on its own words when the text parses, with
 // context from the whole text (moves, branch switches, variables assigned once to a literal, git
 // config writes).
@@ -613,7 +617,7 @@ function splice(text: string): string {
 type Vars = Map<string, { value: string; at: number }>
 type Judged = { words: string[]; own: string[]; text: string; at: number }
 type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][] }
-// namesDanger and neverRules read the same command back to back (register.tsx): keep the last
+// routes and neverRules read the same command back to back (register.tsx): keep the last
 // reading, keyed by the text and the readers, so a large script is read once, not twice.
 let last: { command: string; readers: string; r: Reading } | undefined
 function wordsOf(command: string, readers: Readers): Reading {
@@ -813,9 +817,39 @@ function moves(words: readonly string[], where: Where): boolean {
 // the values of assignment-only commands (an opaque verb reads them).
 const allWords = (r: Reading) => ('whole' in r ? r.whole : [...r.groups.flatMap(g => [...g.words, ...substitute(g.words, r.vars, g.at)]), ...r.values])
 const dangerWord = (w: string) => isPush(w) || isVerb(w, 'branch') || isVerb(w, 'commit') || isVerb(w, 'rm') || abbrev(w, '--no-verify', 6)
-// The cheap pre-check: every rule needs one of these words, so a command without one runs no git.
-export const namesDanger = (command: string, readers: Readers = DEFAULT_READERS): boolean =>
-  allWords(wordsOf(command, readers)).some(dangerWord)
+// The routing word list (0.10.0 Task 2): the words that send a call to the judge. Routing only
+// adds a judgment, never approves (skill-first Q3): a word that routes too much costs one
+// judgment, a word that routes too little leaves the call unjudged — the README's known limit.
+export const ROUTE_WORDS: readonly string[] = [
+  // red lines 1–3: the floor's own words. A match here is judged, and the floor may park it.
+  'push', 'branch', 'commit', 'rm', 'no-verify',
+  // red line 4: a production deploy
+  'deploy', 'publish', 'apply', 'upgrade',
+  // red line 5: spending money
+  'stripe', 'subscribe', 'purchase', 'billing',
+  // red line 6: credentials — the commands that read them and the file shapes that hold them
+  'printenv', 'env', 'security', 'op', 'pass', 'ssh', 'credentials', 'auth.json', 'agent.db', 'pem', 'key',
+  // the merge gate (operator-owned until Task 10)
+  'merge',
+  // the park store (Task 3's PARKS_DIR_MARK): a path, matched anywhere in the text
+  'autonomic/parks',
+]
+// The routing check (0.10.0 Task 2): true when a call could name a red line, the park store or a
+// merge, and so is the judge's. The whole input is matched as words — quotes included, so a word
+// inside quoted text still routes — where a dotted file shape matches its stem (env names .env,
+// prod.env and certs/x.key, never environment) and an entry holding / matches as a substring.
+// The floor's own reading of a command is matched too, so this stays a strict superset of the old
+// namesDanger pre-check: an escape-route spelling (git pu""sh, --no-verif) still routes.
+export const routes = (call: { tool: string; input: unknown }, readers: Readers = DEFAULT_READERS): boolean => {
+  const input = call.input
+  const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input)
+  const lower = text.toLowerCase()
+  const command = input !== null && typeof input === 'object' && 'command' in input && typeof input.command === 'string' ? input.command : undefined
+  const words = lower.split(/[^a-z0-9_.-]+/).filter(w => w !== '')
+  if (command !== undefined) words.push(...allWords(wordsOf(command, readers)).map(w => w.toLowerCase()))
+  return words.some(w => dangerWord(w) || ROUTE_WORDS.some(e => !e.includes('/') && (w === e || w.endsWith(`.${e}`)))) ||
+    ROUTE_WORDS.some(e => e.includes('/') && lower.includes(e))
+}
 
 // Section 1: a group's words with each literal variable assigned before it read as its value.
 function substitute(words: readonly string[], vars: Vars, at: number): string[] {

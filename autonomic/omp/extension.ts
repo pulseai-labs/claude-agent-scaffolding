@@ -17,7 +17,7 @@ import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields
 import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
 import type { LedgerCase } from '../hooks/ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from '../hooks/mode'
-import { DEFAULT_READERS, floorFindings, namesDanger } from '../hooks/never'
+import { DEFAULT_READERS, floorFindings, routes } from '../hooks/never'
 import type { Finding, Where } from '../hooks/never'
 import { operationFacts, permissionEligibility } from '../hooks/operations'
 import { DEFAULT_POLICY, expandHome } from '../hooks/policy'
@@ -460,7 +460,7 @@ export function createAutonomic(io: AutonomicIO) {
   // The pain text leads with the line that names a danger, so the notice shows what tripped.
   function painFocus(rules: readonly string[], command: string): string {
     const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
-    const hit = lines.find(l => namesDanger(l)) ?? lines[0] ?? command
+    const hit = lines.find(l => routes({ tool: 'bash', input: { command: l } })) ?? lines[0] ?? command
     // The shape, never the text: no credential reaches a pain signal.
     return `${rules.join(', ')} — ${shape(hit)}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
   }
@@ -647,7 +647,7 @@ export function createAutonomic(io: AutonomicIO) {
   // adds one branch: a matched call whose effects are fully bounded by positive authority is decided (and recorded)
   // through the native judgment route, and only then does the original tool proceed.
   async function floor(command: string, from?: { tool?: 'bash' | 'github'; cwd?: unknown; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
-    if (!namesDanger(command, cfg.readers)) return undefined
+    if (!routes({ tool: from?.tool ?? 'bash', input: { command } }, cfg.readers)) return undefined
     const tool = from?.tool ?? 'bash'
     // From here every failure keeps the call blocked: an unneeded block costs one operator decision, a missed one a force push.
     let findings: Finding[]

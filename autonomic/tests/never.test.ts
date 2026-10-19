@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { DEFAULT_READERS, floorFindings, namesDanger, neverRules, parseReaders, redLineOf } from '../hooks/never'
+import { DEFAULT_READERS, floorFindings, neverRules, parseReaders, redLineOf, routes } from '../hooks/never'
 import type { Where } from '../hooks/never'
 
 const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
@@ -70,7 +70,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git push "$REMOTE" feat/x:main')).toEqual(expect.arrayContaining(['force-push', 'default-branch-push']))
   })
   test('an abbreviated --no-verify passes the pre-check (PR #681 round 10)', () => {
-    expect(namesDanger('git am --no-verif patch.mbox')).toBe(true)
+    expect(routes({ tool: 'bash', input: { command: 'git am --no-verif patch.mbox' } })).toBe(true)
     expect(rules('git am --no-verif patch.mbox')).toContain('no-verify')
   })
   test('a push flag that holds a variable may be any flag (PR #681 round 9)', () => {
@@ -179,10 +179,10 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git push --dry-run origin feat/x')).toEqual([])
     expect(rules('git push --follow-tags origin feat/x')).toEqual([])
   })
-  test('namesDanger is the cheap pre-check (Review Focus 2)', () => {
-    for (const c of ['git push', 'rm -rf x', 'git commit -m x', 'x --no-verify', 'git branch -D y']) expect(namesDanger(c)).toBe(true)
-    for (const c of ['ls -la', 'npm test', 'git status', 'cat README.md']) expect(namesDanger(c)).toBe(false)
-    for (const c of ['git pu\\sh', 'git pu""sh', "r'm' -rf x"]) expect(namesDanger(c)).toBe(true)
+  test('routes is the cheap pre-check (Review Focus 2)', () => {
+    for (const c of ['git push', 'rm -rf x', 'git commit -m x', 'x --no-verify', 'git branch -D y']) expect(routes({ tool: 'bash', input: { command: c } })).toBe(true)
+    for (const c of ['ls -la', 'npm test', 'git status', 'cat README.md']) expect(routes({ tool: 'bash', input: { command: c } })).toBe(false)
+    for (const c of ['git pu\\sh', 'git pu""sh', "r'm' -rf x"]) expect(routes({ tool: 'bash', input: { command: c } })).toBe(true)
   })
   test('force push, in every spelling', () => {
     for (const c of ['git push -f', 'git push --force origin feat/x', 'git push --force-with-lease', 'git push origin +feat/x', 'git push --mirror'])
@@ -378,7 +378,7 @@ describe('never-approve false positives (0.4.2 spec §4)', () => {
   test('case B: a report written to a temp file and renamed over the path', () => {
     const c = "T=/s/r.md.tmp\ncat > \"$T\" <<'EOF'\nper the standing no-rm rule.\nEOF\nmv \"$T\" /s/r.md"
     expect(rules(c)).toEqual([])
-    expect(namesDanger(c)).toBe(false)
+    expect(routes({ tool: 'bash', input: { command: c } })).toBe(false)
   })
   test('case C: rules prose saved to scratch and counted', () => {
     const c = "cat > $R/rules.txt <<'EOF'\nNever force-push; never rm -rf outside a worktree; no branch-delete.\nEOF\nwc -l $R/rules.txt"
@@ -443,7 +443,7 @@ describe('review focus (0.4.2 plan)', () => {
     expect(rules("echo 'git push -f origin feat/x' > x.sh 2>&1; ./x.sh")).toContain('force-push')
   })
   test('the pre-check sees an escape route', () => {
-    expect(namesDanger("echo 'git push -f' > x.sh; ./x.sh")).toBe(true)
+    expect(routes({ tool: 'bash', input: { command: "echo 'git push -f' > x.sh; ./x.sh" } })).toBe(true)
   })
   test('a file run through a differently spelled variable keeps its body (0.4.1 dropped it)', () => {
     expect(rules("cat > x.sh <<'X'\ngit push -f origin feat/x\nX\nT=x; \"$T.sh\"")).toContain('force-push')
@@ -732,8 +732,8 @@ describe('0.4.3 PR review: shapes 0.4.2 asked on still ask', () => {
 })
 
 // ---- autonomic 0.5.0: each command judged on its own words (spec 2026-10-10) ----
-// A must-ask case also passes the cheap pre-check (namesDanger), which runs first on the allow path.
-const ask = (c: string, w: Where = W) => expect([c, rules(c, w).length > 0, namesDanger(c)]).toEqual([c, true, true])
+// A must-ask case also passes the cheap pre-check (routes), which runs first on the allow path.
+const ask = (c: string, w: Where = W) => expect([c, rules(c, w).length > 0, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, true, true])
 const silent = (c: string, w: Where = W) => expect([c, rules(c, w)]).toEqual([c, []])
 
 describe('0.5.0 §3.5 backticks are substitutions', () => {
@@ -1009,7 +1009,7 @@ describe('0.5.0 final review: shapes 0.4.3 asked on still ask', () => {
     for (const big of [same, distinct]) {
       const t0 = Date.now()
       silent(big)
-      namesDanger(big)
+      routes({ tool: 'bash', input: { command: big } })
       expect(Date.now() - t0 < 2000).toEqual(true)
     }
   })
@@ -1211,6 +1211,57 @@ describe('0.10.0 red lines', () => {
   test('text-only red-line words never park (Review Focus 5)', () => {
     expect(levels('grep -n "push -f" x.ts')).toEqual({ ask: [], fork: [] })
     expect(levels("cat <<'EOF' | sh\ngit push origin main\nEOF")).toEqual({ ask: [], fork: ['default-branch-push'] })
+  })
+})
+
+// ---- autonomic 0.10.0: the routing check (Task 2) ----
+// routes decides which calls reach the judge at all: a call it does not see runs unjudged, as
+// before 0.10.0. It only adds a judgment, never approves, so a word that routes too much is the
+// safe direction (plan Task 2). Each routed case sits beside a quiet one that must not route.
+describe('0.10.0 routing', () => {
+  test('every Task 1 own-word case routes', () => {
+    for (const c of ['git push origin main', 'git push origin HEAD:main', 'git push --all origin',
+      'git push', 'git push origin feat/y', 'git push -f origin feat/x', 'git push -f origin feat/y',
+      'git push --force-with-lease origin main', 'git push -f origin "$B"',
+      'git commit -m "x" -m "Co-Authored-By: A <a@b>"', 'git commit --no-verify -m x'])
+      expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, true])
+  })
+  test('the retired rules and an own-branch force still route to the judge (#764)', () => {
+    for (const c of ['git push origin --delete feat/y', 'git branch -D x', 'rm -rf "$tmp"', 'git push -f origin feat/x'])
+      expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, true])
+  })
+  test('the escape-route spellings the old pre-check caught still route (superset pin)', () => {
+    for (const c of ['git pu""sh -f origin feat/y', 'git pu\\sh -f origin feat/y', 'git am --no-verif patch.mbox', "r'm' -rf x"])
+      expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, true])
+  })
+  test('red line 4 words route', () => {
+    for (const c of ['vercel deploy --prod', 'fly deploy', 'kubectl apply -f x', 'helm upgrade x', 'terraform apply', 'docker push x', 'npm publish', 'cargo publish'])
+      expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, true])
+  })
+  test('red line 6 words route: credential commands and file shapes', () => {
+    for (const c of ['cat ~/.ssh/id_ed25519', 'printenv', 'env', 'security find-generic-password', 'op read x', 'pass show x',
+      'cat .env', 'cat prod.env', 'cat certs/x.pem', 'cat certs/x.key', 'cat ~/.aws/credentials', 'cat ~/.config/auth.json', 'sqlite3 agent.db .dump'])
+      expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, true])
+  })
+  test('red line 5 words and the merge gate route', () => {
+    for (const c of ['stripe payments list', 'subscribe plan b', 'purchase extra seats', 'billing report', 'gh pr merge 12'])
+      expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, true])
+  })
+  test('the file tools route by their path (red line 6)', () => {
+    for (const tool of ['Read', 'Write', 'Edit', 'NotebookEdit'])
+      expect([tool, routes({ tool, input: { file_path: '/repo/.env' } })]).toEqual([tool, true])
+  })
+  test('an input naming the park store directory routes (Task 3 formalises the mark)', () => {
+    expect(routes({ tool: 'bash', input: { command: 'cat /home/u/.local/state/autonomic/parks/ab12.json' } })).toBe(true)
+    expect(routes({ tool: 'Write', input: { file_path: '/home/u/.local/state/autonomic/parks/ab12.json' } })).toBe(true)
+  })
+  test('text-only red-line words still route: the floor decides what parks, routing decides what is judged', () => {
+    expect(routes({ tool: 'bash', input: { command: 'grep -n "push -f" x.ts' } })).toBe(true)
+    expect(routes({ tool: 'bash', input: { command: "cat <<'EOF' | sh\ngit push origin main\nEOF" } })).toBe(true)
+  })
+  test('a quiet call does not route (the adjacent controls)', () => {
+    for (const c of ['git status', 'bun test', 'gh release create v1', 'ls -la', 'cat README.md'])
+      expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, false])
   })
 })
 

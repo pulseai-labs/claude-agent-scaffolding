@@ -345,8 +345,10 @@ Known limits since 0.5.0: a moved push trusts only `main`, `master` and the sess
 branch as default names, so `git -C /other push origin develop` is silent in a repo whose default
 is `develop`; the Python deny list is a judgment rule, and a body that starts a process without
 naming a listed identifier is silent; namers and message consumers are trusted by name, like
-readers; the floor still needs a danger word (`$CMD -f …`, an alias in a `GIT_CONFIG_GLOBAL` file,
-a Python body that builds `git push -f` from pieces stay silent); variable values come from the
+readers; the routing word list (`ROUTE_WORDS` in `never.ts`) decides what reaches the judge: a
+call that names none of its words runs unjudged, as it did before (`$CMD -f …`, an alias in a
+`GIT_CONFIG_GLOBAL` file, a Python body that builds `git push -f` from pieces stay silent);
+variable values come from the
 text only, so `export N=…` and `N=… cmd` ask; a shell inside `$( )` is not read through, and an
 unquoted Python heredoc stays a runner; the run-later file-name resolver does not check order;
 a command word disguised by quotes (`p""rintf -v "$N"`) is not read as that command, and a Python

@@ -11,7 +11,7 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
-import { DEFAULT_READERS, floorFindings, namesDanger } from './never'
+import { DEFAULT_READERS, floorFindings, routes } from './never'
 import { enforced } from './enforce'
 import { inputShape, shape } from './shape'
 import type { Finding, Where } from './never'
@@ -600,7 +600,7 @@ export const register: Register = (on, options) => {
         // The bypass floor (0.1.1 §3.1): in autopilot a never-approve match in a command's own
         // words reaches the operator whatever allowed it. Manual mode never touches an allow.
         const raw = (e.input as { command?: unknown } | undefined)?.command
-        if (typeof raw !== 'string' || !namesDanger(raw, cfg.readers)) return r
+        if (typeof raw !== 'string' || !routes({ tool: e.tool, input: e.input }, cfg.readers)) return r
         // From here every failure keeps the call with the operator (final review I1): an
         // unneeded ask costs one dialog, a missed one a force push.
         let f: FloorRead
