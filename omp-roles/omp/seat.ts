@@ -15,7 +15,8 @@ export const ROLES: Record<string, string | undefined> = {
 }   // role → roles/<file>.md; the crew-* roles follow a crew activated brief (#839)
 // A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798) and
 // autonomic's live mode file, so the herdr seats it launches inherit autopilot.
-const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.4.4', autonomic: '0.7.0' } }
+// The orchestrator also needs seat-mods 0.8.0's status entry (omp/status-extension.ts), loaded after the three.
+const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.8.0', autonomic: '0.7.0' } }
 // A role whose procedure is another plugin's skill: the orchestrator follows crew's orchestrate skill, whose
 // "Host: OMP" section ships in 0.3.0. Only omp's own record counts: omp does not discover a Claude Code user-scope
 // plugin unless its claude-plugins provider is enabled.
@@ -77,6 +78,16 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     }
     argv.push('-e', ext)
     extensions.push(ext)
+  }
+  // MODS keeps seat-mods first: its guard must see a tool call before molt's and autonomic's tool_call handlers,
+  // because omp stops at the first block and adds up input rewrites in order. The status check is a second entry,
+  // loaded last, so molt's and autonomic's session_stop blocks win as they do beneath seat-mods on Claude Code.
+  if (o.role === 'orchestrator') {
+    const root = (omp.get('seat-mods') ?? claude.get('seat-mods')) as string
+    const status = join(root, 'omp', 'status-extension.ts')
+    if (!existsSync(status)) return { error: `omp-seat: seat-mods at ${root} ships no omp/status-extension.ts; the orchestrator needs seat-mods 0.8.0 or later` }
+    argv.push('-e', status)
+    extensions.push(status)
   }
   // The seat overlay keeps omp's todo reminders from restarting a turn molt needs to end (#843); without it the
   // seat would launch but stall at every handoff, so a missing file stops the launch like a missing role file.
