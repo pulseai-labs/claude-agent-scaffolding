@@ -840,11 +840,12 @@ export const ROUTE_WORDS: readonly string[] = [
 
 // The park store's directory mark, read as the shell joins a literal path: a backslash-newline
 // pair is removed as one unit first (the shell's line continuation, so `autonomic/\<newline>parks`
-// is one path), then quotes and backslashes, repeated slashes collapsed and `.` segments dropped,
-// and matched on the segment, so `autonomic//parks`, `autonomic/./parks`, `par""ks` and the
-// line-split spelling name the same directory. Variables, globs, substitutions and encodings are
-// not resolved (the README's Known limit). Skill-first Q3: this only adds a stop — a near miss
-// that parks too costs one dialog.
+// is one path), then quotes and backslashes, repeated slashes collapsed, `.` segments dropped and
+// `..` segments resolved against the segment before them, and matched on the segment, so
+// `autonomic//parks`, `autonomic/./parks`, `autonomic/x/../parks`, `par""ks` and the line-split
+// spelling name the same directory. Variables, globs, substitutions and encodings are not resolved
+// (the README's Known limit). Skill-first Q3: this only adds a stop — a near miss that parks too
+// costs one dialog.
 const SEGMENT_CHAR = /[a-z0-9_.-]/
 export const normalizeCallText = (text: string): string => {
   // A shell line continuation is removed as one unit before anything else: a raw backslash-LF
@@ -860,10 +861,25 @@ export const normalizeCallText = (text: string): string => {
     const part = parts[i]!
     if (part === '.') continue
     if (part === '' && i !== 0) continue
+    if (part === '..') {
+      // Resolve lexically: `..` removes the segment before it. At the root (a leading `/`) it
+      // cannot climb, so it is dropped. Leading `..` on relative text is kept as the marker the
+      // caller resolves against the call's cwd before the store match.
+      const prev = kept[kept.length - 1]
+      if (prev === undefined || prev === '..') kept.push('..')
+      else if (prev !== '') kept.pop()
+      continue
+    }
     kept.push(part)
   }
   return kept.join('/')
 }
+// A relative path in the normalized text that leads with `..` names nothing until it is read
+// against the call's cwd: `../parks/<id>.json` from a sibling of the store is the store. The
+// normalizer keeps a leading `..` (it cannot climb past a root it does not have), so each such
+// path-like word is resolved lexically and matched as its absolute path too.
+const relativePaths = (normalized: string, dir: string): string[] =>
+  normalized.split(/[^a-z0-9_.\/-]+/).filter(w => w.startsWith('../')).map(w => collapseDots(`${dir}/${w}`.split('/')))
 // The mark names a directory of its own, never a prefix: `parkside` and `parks-notes.md` stay quiet.
 const hasMark = (s: string, mark: string): boolean => {
   if (mark === '') return false
@@ -887,6 +903,7 @@ const namesStore = (normalized: string, dir: string | undefined, store: string):
   const base = mark.slice(at + 1)
   if (at === -1 || base === '' || dir === undefined) return false
   if (dir === mark || dir.startsWith(`${mark}/`)) return true
+  if (relativePaths(normalized, dir).some(p => hasMark(p, mark))) return true
   return dir === mark.slice(0, at) && normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === base || w.startsWith(`${base}/`))
 }
 // Does the whole input, or the call's cwd, name the park store (plan call 3's integrity guard)?
@@ -897,9 +914,10 @@ const namesStore = (normalized: string, dir: string | undefined, store: string):
 export const namesParkStore = (input: unknown, cwd?: string, store?: string): boolean => {
   const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
   const normalized = normalizeCallText(text)
-  if (hasMark(normalized, PARKS_DIR_MARK)) return true
   const dir = cwd === undefined ? undefined : normalizeCallText(cwd)
-  if (store !== undefined && namesStore(normalized, dir, store)) return true
+  const relative = dir === undefined ? [] : relativePaths(normalized, dir)
+  if (hasMark(normalized, PARKS_DIR_MARK) || relative.some(p => hasMark(p, PARKS_DIR_MARK))) return true
+  if (store !== undefined && (namesStore(normalized, dir, store) || relative.some(p => namesStore(p, undefined, store)))) return true
   if (dir === undefined) return false
   return hasMark(dir, PARKS_DIR_MARK) || (/(?:^|\/)autonomic$/.test(dir) &&
     normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === 'parks' || w.startsWith('parks/')))

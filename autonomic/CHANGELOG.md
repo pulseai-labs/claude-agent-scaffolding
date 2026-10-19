@@ -101,6 +101,14 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
 - **A failed drop says so** (review 882c): OMP's `dropCommand` catches a remove failure and
   Claude Code's `dropPark` checks the `rm` exit status, both answering
   `could not drop <id>: the store could not be changed` and leaving the park in place.
+- **The store guard resolves `..`** (review 882c round 3 P0): `normalizeCallText` resolves a `..`
+  segment against the segment before it — never above the root — in the text and in the call's
+  cwd, and `namesParkStore` resolves a relative `../`-led path in the text against the normalized
+  cwd before the store match. `autonomic/x/../parks/<id>.json`, a cwd
+  `<storeParent>/x/../parks`, and `../parks/<id>.json` from cwd `<storeParent>/x` now park as
+  integrity on both hosts and both of Bash and Write, while
+  `autonomic/x/../parks-notes.md` stays a near miss. Variables, globs, substitutions and
+  encodings remain the README's Known limit.
 
 ## 0.9.1 — 2026-10-18
 

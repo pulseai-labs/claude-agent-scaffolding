@@ -105,6 +105,57 @@ describe('the permission reflex (spec §3.3)', () => {
     expect(parks(w)).toHaveLength(3)
     expect(parks(w).every(p => p.source === 'integrity')).toBe(true)
   })
+  test('a `..` segment in a store path parks on Bash and Write (fix round 3 P0)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    const path = 'autonomic/x/../parks/ab12cd34ef56.json'
+    for (const call of [
+      BASH(`cat > ${path}`),
+      { tool: 'Write', input: { file_path: path, content: '{}' } } as never,
+    ]) {
+      const r = await $.tool.check(call)
+      expect(r.decision).toBe('deny')
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(2)
+  })
+  test('a cwd that reaches the store through `..` parks on Bash and Write (fix round 3 P0)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    w.session.cwd = '/home/u/.local/state/autonomic/x/../parks'
+    for (const call of [
+      BASH('cat > deadbeef0001.json'),
+      { tool: 'Write', input: { file_path: 'deadbeef0002.json', content: '{}' } } as never,
+    ]) {
+      const r = await $.tool.check(call)
+      expect(r.decision).toBe('deny')
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(2)
+  })
+  test('a relative ../parks/… climb from a sibling cwd parks on Bash and Write (fix round 3 P0)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    w.session.cwd = '/home/u/.local/state/autonomic/x'
+    const path = '../parks/ab12cd34ef56.json'
+    for (const call of [
+      BASH(`cat > ${path}`),
+      { tool: 'Write', input: { file_path: path, content: '{}' } } as never,
+    ]) {
+      const r = await $.tool.check(call)
+      expect(r.decision).toBe('deny')
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(2)
+  })
+  test('a `..` beside the mark does not park: autonomic/x/../parks-notes.md (fix round 3 control)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    const path = 'autonomic/x/../parks-notes.md'
+    for (const call of [
+      BASH(`cat > ${path}`),
+      { tool: 'Write', input: { file_path: path, content: '{}' } } as never,
+    ]) {
+      expect((await $.tool.check(call)).decision).toBe('ask')
+    }
+    expect(parks(w)).toHaveLength(0)
+  })
   test('near misses do not park: parkside and autonomic/parks-notes.md (R2 controls)', async ($, on) => {
     const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
     for (const file_path of ['/repo/parkside', '/repo/autonomic/parks-notes.md']) {
