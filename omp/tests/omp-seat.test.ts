@@ -16,6 +16,11 @@ function install(name: string, withExt = true, version = ({ 'seat-mods': '0.4.1'
   if (withExt) writeFileSync(join(p, 'omp', 'extension.ts'), 'export default function () {}')
   return p
 }
+// seat-mods' second OMP entry, which the orchestrator loads last (0.8.0).
+function statusEntry(p: string): string {
+  writeFileSync(join(p, 'omp', 'status-extension.ts'), 'export default function () {}')
+  return p
+}
 function record(path: string, paths: Record<string, string>) {
   mkdirSync(join(path, '..'), { recursive: true })
   const plugins: Record<string, unknown[]> = {}
@@ -47,23 +52,28 @@ describe('planLaunch', () => {
   test('an unknown role is an error', () => {
     expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator, crew-spine, crew-work-pr)' })
   })
-  test('orchestrator appends its role file when seat-mods is 0.4.4, autonomic 0.7.0 and crew 0.3.0 or later', () => {
-    const [s, m, a] = [install('seat-mods', true, '0.4.4'), install('molt'), install('autonomic', true, '0.7.0')]
+  test("orchestrator appends its role file and loads seat-mods' status entry last (seat-mods 0.8.0, autonomic 0.7.0, crew 0.3.0)", () => {
+    const [s, m, a] = [statusEntry(install('seat-mods', true, '0.8.0')), install('molt'), install('autonomic', true, '0.7.0')]
     record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a, 'crew': install('crew', false, '0.3.0') })
     const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
     expect(planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir })).toMatchObject({
       argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
-        '--append-system-prompt', join(rolesDir, 'orchestrator.md')],
+        '-e', join(s, 'omp/status-extension.ts'), '--append-system-prompt', join(rolesDir, 'orchestrator.md')],
     })
   })
-  test('orchestrator refuses seat-mods 0.4.3, naming the 0.4.4 minimum (no top without the #798 rail)', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.3'), molt: install('molt'), autonomic: install('autonomic', true, '0.7.0'), 'crew': install('crew', false, '0.3.0') })
+  test('orchestrator refuses seat-mods 0.7.0, naming the 0.8.0 minimum (no top without the status check)', () => {
+    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.7.0')), molt: install('molt'), autonomic: install('autonomic', true, '0.7.0'), 'crew': install('crew', false, '0.3.0') })
     const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
-    expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.4.3') })
-    expect((r as { error: string }).error).toContain('0.4.4')
+    expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.7.0') })
+    expect((r as { error: string }).error).toContain('0.8.0')
+  })
+  test('orchestrator refuses a seat-mods install with no omp/status-extension.ts', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.8.0'), molt: install('molt'), autonomic: install('autonomic', true, '0.7.0'), 'crew': install('crew', false, '0.3.0') })
+    const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
+    expect((r as { error: string }).error).toContain('status-extension.ts')
   })
   const orch = () => planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
-  const orchMods = (autonomic = '0.7.0') => ({ 'seat-mods': install('seat-mods', true, '0.4.4'), molt: install('molt'), autonomic: install('autonomic', true, autonomic) })
+  const orchMods = (autonomic = '0.7.0') => ({ 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt'), autonomic: install('autonomic', true, autonomic) })
   test('orchestrator refuses autonomic 0.6.0, naming the 0.7.0 minimum (children inherit autopilot through the mode file)', () => {
     record(ompRecord, { ...orchMods('0.6.0'), 'crew': install('crew', false, '0.3.0') })
     const r = orch() as { error: string }
@@ -98,6 +108,12 @@ describe('planLaunch', () => {
   test('control: worker launches with SEAT_MODS_ROLE unset', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
     expect(launch('worker')).toHaveProperty('argv')
+  })
+  test('control: a worker does not load the status entry, even when seat-mods ships it', () => {
+    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt'), autonomic: install('autonomic') })
+    const r = launch('worker') as { argv: string[] }
+    expect(r.argv.filter(a => a === '-e')).toHaveLength(3)
+    expect(r.argv.some(a => a.endsWith('status-extension.ts'))).toBe(false)
   })
   test('control: worker needs neither crew nor autonomic 0.7.0', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
