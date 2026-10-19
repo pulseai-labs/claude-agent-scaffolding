@@ -9,7 +9,7 @@ import { existsSync } from 'node:fs'
 import type { EvidenceMaterial, Operation, PlacementFacts, Resource, Snapshot } from './authority'
 import { rolePermits } from './authority'
 import type { Finding, Where } from './never'
-import { executionSegments, floorFindings } from './never'
+import { executionSegments, floorFindings, TRAILER } from './never'
 
 export type Effect = {
   operation: Operation | null; resource: Resource | null; argv: string[]; cwd: string
@@ -44,8 +44,6 @@ const SHORT_DELETE = /^-[A-Za-z]*d/
 // `--follow-tags` writes annotated tag refs the push resource never names, so the grant no longer
 // bounds every ref the push writes: like --tags/--mirror/--all/--branches it stays unresolved.
 const PUSH_UNSUPPORTED = /^--(?:mirror|all|branches|tags|follow-tags)/
-// A commit message never becomes authority, but a trailer in it is a red line.
-const TRAILER = /(?:^|\n)\s*(?:Co-Authored-By:|🤖\s*Generated with)/i
 // The commit options whose value is a separate argv word: the short letters and the long names.
 // A word one of these consumes is a value, never a path target, so `-m hello` cannot bound the
 // commit to a file called hello. An option outside this table does not consume the next word, so a
@@ -448,7 +446,6 @@ export function permissionEligibility(facts: OperationFacts, context: OperationC
     if (e.unresolved !== null) return { kind: 'ask', reason: e.unresolved }
     if (e.resource?.kind === 'push' && inProtected(e.resource.destinationRef, context.facts)) return { kind: 'ask', reason: 'the destination is a default or protected ref' }
   }
-  if (facts.findings.some(f => f.rule === 'rm-outside')) return { kind: 'ask', reason: 'no delete grant exists' }
   // 3. Complete facts for every segment.
   if (facts.unresolved.length > 0) return { kind: 'ask', reason: facts.unresolved[0]! }
   for (const e of facts.effects) if (e.operation === null || e.resource === null) return { kind: 'ask', reason: 'an effect is not bounded by the approved vocabulary' }

@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 import type { Pain, PainOption } from '../types'
-import { DEFAULTS, parseConfig } from './config'
+import { DEFAULTS, parseConfig, retiredNote } from './config'
 import type { AutonomicConfig } from './config'
 import { APPEND, TOUCH } from './io'
 import { ledgerLine, ledgerPathFor, oneLine } from './ledger'
@@ -305,12 +305,14 @@ async function statusReport($: Engine, id: string): Promise<string> {
   const painPath = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
   const pol = await policyText($)
   const stageNow = safeSessionId(id) ? parseStage(await readText($, stagePath(await home($), id))) : undefined
+  const retired = retiredNote(cfg.retired)
   const lines = [
     `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
     `scope: ${rec.scope.length === 0 ? 'none named (what the session has read)' : rec.scope.join(', ')}`,
     `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
     `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
     `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
+    ...(retired === undefined ? [] : [retired]),
     `readers: ${(cfg.readers ?? DEFAULT_READERS).map(r => r.join(' ')).join('; ') || 'none'}`,
     `molt stage: ${stageNow ?? 'none'}`,
     `ledger: ${await ledgerPath($)}`,

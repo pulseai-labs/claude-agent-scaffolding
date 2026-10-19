@@ -248,8 +248,6 @@ describe('red lines and out-of-bound effects stay blocked', () => {
     ['wrong remote', [pushGrant()], () => `git push upstream ${MAIN}:${MAIN}`],
     ['wrong source ref', [pushGrant()], () => `git push origin refs/heads/other:${MAIN}`],
     ['no-verify on a commit', [pushGrant()], () => 'git commit --no-verify -m x'],
-    ['rm outside the worktree', [pushGrant()], () => 'rm -rf /etc/passwd'],
-    ['rm of the filesystem root', [pushGrant()], () => 'rm -rf /'],
     ['branch delete on push', [pushGrant()], () => `git push origin :${MAIN}`],
     ['unknown flag', [pushGrant()], () => `git push --frobnicate origin ${MAIN}:${MAIN}`],
     ['a compound mixed effect (eligible push AND force)', [pushGrant()], () => `git push origin ${MAIN}:${MAIN} && git push --force origin ${MAIN}:${MAIN}`],
@@ -264,6 +262,21 @@ describe('red lines and out-of-bound effects stay blocked', () => {
       setNative(w)
       const r = await w.invoke('bash', { command: command(w), cwd: w.tree })
       expect(r?.block).toBe(true)
+    })
+  }
+
+  // rm left the floor in 0.10.0 (red lines 1–3 only); the judge lane releases it. This pins the
+  // current lane — Tasks 2/4 give it a judge of its own and update this file then.
+  const leftTheFloor: Array<[string, Grant[], (w: RoutingWorld) => string]> = [
+    ['rm outside the worktree', [pushGrant()], () => 'rm -rf /etc/passwd'],
+    ['rm of the filesystem root', [pushGrant()], () => 'rm -rf /'],
+  ]
+  for (const [name, grants, command] of leftTheFloor) {
+    test(`${name} leaves the floor (0.10.0: 1-3 only)`, async () => {
+      w = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode: 'autopilot' })
+      w.addRemote('origin', join(w.root, 'out', 'origin.git'))
+      setNative(w)
+      expect(await w.invoke('bash', { command: command(w), cwd: w.tree })).toBeUndefined()
     })
   }
 

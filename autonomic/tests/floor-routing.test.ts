@@ -9,7 +9,7 @@ const REPLY = "gh api repos/o/r/pulls/1/comments/2/replies -f body='we do not pu
 describe('0.5.1 routing: an ask (spec §6)', () => {
   test('an own-words match asks the operator; no fork', async ($, on) => {
     const w = world(on, { env: AP })
-    expect((await $.tool.check(BASH('git push -f origin feat/x'))).decision).toBe('ask')
+    expect((await $.tool.check(BASH('git push -f origin feat/y'))).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
     expect(JSON.stringify(w.notices.at(-1))).toContain('never-approve')
   })
@@ -26,17 +26,19 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect((await $.tool.check(BASH(REPLY))).decision).toBe('ask')
     expect(JSON.stringify(w.notices.at(-1))).toContain('permission for you')
   })
-  test('detached HEAD: a push to a named branch still asks, as in 0.5.0 (#766)', async ($, on) => {
+  test("detached HEAD: a push to a named branch is the fork's now (#766; 0.10.0 leaves the floor)", async ($, on) => {
     const w = world(on, { env: AP })
     w.git.branch = undefined
-    expect((await $.tool.check(BASH('git push -u origin record/x'))).decision).toBe('ask')
-    expect(w.forkPrompts).toEqual([])
+    w.forks.push(fork({ decision: 'allow', reason: 'a named branch push' }))
+    expect((await $.tool.check(BASH('git push -u origin record/x'))).decision).toBe('allow')
+    expect(w.forkPrompts).toHaveLength(1)
   })
-  test('a branch delete asks, merged or not: merged-delete routing is #764 (PR #763 round 5)', async ($, on) => {
+  test('a branch delete is the judge\'s now: merged-delete routing left the floor (0.10.0; #764)', async ($, on) => {
     const w = world(on, { env: AP })
+    w.forks.push(fork({ decision: 'allow', reason: 'a branch delete' }), fork({ decision: 'allow', reason: 'a branch delete' }))
     for (const c of ['git branch -D record/x', 'git push origin --delete feat/x'])
-      expect([c, (await $.tool.check(BASH(c))).decision]).toEqual([c, 'ask'])
-    expect(w.forkPrompts).toEqual([])
+      expect([c, (await $.tool.check(BASH(c))).decision]).toEqual([c, 'allow'])
+    expect(w.forkPrompts).toHaveLength(2)
     expect(w.runs.some(r => r.includes('merge-base') || r.includes('ls-remote'))).toBe(false)
   })
   test('a 30k Write is judged whole', async ($, on) => {
@@ -73,7 +75,7 @@ describe('0.5.1 routing: the bypass floor (spec §6)', () => {
   test('an own-words match turns the allow into an ask; no fork', async ($, on) => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
-    expect((await $.tool.check(BASH('git push -f origin feat/x'))).decision).toBe('ask')
+    expect((await $.tool.check(BASH('git push -f origin feat/y'))).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
   })
   test('a text-only match the fork allows keeps the allow, recorded', async ($, on) => {

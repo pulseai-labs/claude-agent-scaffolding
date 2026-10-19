@@ -1,8 +1,12 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { DEFAULT_READERS, floorFindings, namesDanger, neverRules, parseReaders } from '../hooks/never'
+import { DEFAULT_READERS, floorFindings, namesDanger, neverRules, parseReaders, redLineOf } from '../hooks/never'
 import type { Where } from '../hooks/never'
 
 const W: Where = { cwd: '/repo/sub', root: '/repo', home: '/h', branch: 'feat/x', defaultBranch: 'main' }
+// 0.10.0: an own-branch force leaves the floor. A case that proves the reader still catches a
+// spelling or an escape route keeps its point on a branch the seat does not own, where force-push
+// is a live red line; a case whose rule is retired flips to what now reaches the judge.
+const FOREIGN: Where = { ...W, branch: 'feat/other' }
 const rules = (c: string, w: Where = W) => neverRules(c, w).sort()
 
 // autonomic 0.2.0 (#684 direction 2′): the floor reads the text as one bag of words, so every
@@ -12,8 +16,8 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git merge --no-""verify feat/x')).toContain('no-verify')
     expect(rules('git commit -m "msg"')).toEqual([])
   })
-  test('~name is another home: outside (PR #681 round 18)', () => {
-    expect(rules('rm -rf ~root')).toContain('rm-outside')
+  test('~name is another home: outside (PR #681 round 18; rm leaves the floor in 0.10.0)', () => {
+    expect(rules('rm -rf ~root')).toEqual([])
   })
   test('GIT_DIR or GIT_WORK_TREE makes the repository unknown (PR #681 round 17)', () => {
     expect(rules('GIT_DIR=/other/.git git push')).toContain('default-branch-push')
@@ -23,23 +27,24 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git push origin heads/main')).toContain('default-branch-push')
   })
   test('nothing is below a worktree at / (PR #681 round 16)', () => {
-    expect(rules('rm -rf --no-preserve-root /', { ...W, root: '/', cwd: '/' })).toContain('rm-outside')
+    expect(rules('rm -rf --no-preserve-root /', { ...W, root: '/', cwd: '/' })).toEqual([])
   })
   test('with --repo, a positional may be the remote or a refspec: both readings are checked (PR #681 round 16)', () => {
     expect(rules('git push --repo x origin', { ...W, branch: 'main' })).toContain('default-branch-push')
     expect(rules('git push --repo origin main')).toContain('default-branch-push')
   })
   test('a quoted command word after a wrapper is read (PR #681 round 15)', () => {
-    expect(rules('prlimit "git" push -f origin feat/x')).toContain('force-push')
-    expect(rules("prlimit 'rm' -rf /tmp/x")).toContain('rm-outside')
+    expect(rules('prlimit "git" push -f origin feat/x', FOREIGN)).toContain('force-push')
+    expect(rules("prlimit 'rm' -rf /tmp/x")).toEqual([])
     expect(rules('echo "done" && git push origin feat/x')).toEqual([])
   })
   test('an abbreviated option keeps its attached value (PR #681 round 15)', () => {
     expect(rules('git push --force-w=feat/x origin feat/x')).toContain('force-push')
   })
-  test('any unlisted wrapper before git or rm is unreadable (PR #681 round 14)', () => {
-    for (const c of ['prlimit git push -f origin feat/x', 'mywrap --x /usr/bin/git push -f', 'cgexec -g cpu:x rm -rf /tmp/x'])
-      expect([c, rules(c).length > 0]).toEqual([c, true])
+  test('any unlisted wrapper before git is unreadable; rm leaves the floor (PR #681 round 14; 0.10.0)', () => {
+    for (const c of ['prlimit git push -f origin feat/x', 'mywrap --x /usr/bin/git push -f'])
+      expect([c, rules(c, FOREIGN).length > 0]).toEqual([c, true])
+    expect(rules('cgexec -g cpu:x rm -rf /tmp/x')).toEqual([])
     expect(rules('npm test && git push origin feat/x')).toEqual([])
   })
   test('an inline alias value shows its verb (PR #681 round 14)', () => {
@@ -53,10 +58,10 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('a cluster that starts with a numeric flag is split (PR #681 round 12)', () => {
     expect(rules('git push -4f origin feat/x')).toContain('force-push')
-    expect(rules('git push -4d origin feat/x')).toContain('branch-delete')
+    expect(rules('git push -4d origin feat/x')).toEqual([])
   })
-  test('a mirror push deletes refs too (PR #681 round 11)', () => {
-    expect(rules('git push --mirror origin')).toContain('branch-delete')
+  test('a mirror push is a default and a force push (PR #681 round 11; 0.10.0)', () => {
+    expect(rules('git push --mirror origin')).toEqual(['default-branch-push', 'force-push'])
   })
   test('an inline alias key is matched whatever its case (PR #681 round 10)', () => {
     expect(rules('git -c Alias.p=push p -f origin feat/x')).toContain('force-push')
@@ -69,22 +74,22 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git am --no-verif patch.mbox')).toContain('no-verify')
   })
   test('a push flag that holds a variable may be any flag (PR #681 round 9)', () => {
-    expect(rules('git push --force$EMPTY origin feat/x')).toEqual(['branch-delete', 'default-branch-push', 'force-push'])
+    expect(rules('git push --force$EMPTY origin feat/x')).toEqual(['default-branch-push', 'force-push'])
   })
   test('a Bash builtin that runs a command is a runner (PR #681 round 7)', () => {
     for (const c of ['coproc git push -f origin feat/x', 'builtin command git push -f', "trap 'git push -f' EXIT"])
-      expect(rules(c)).not.toEqual([])
+      expect(rules(c, FOREIGN)).not.toEqual([])
   })
   test('a substitution in an unquoted heredoc is read; a quoted cat heredoc is text (PR #681 round 6)', () => {
-    expect(rules('cat <<EOF\n$(git push -f origin feat/x)\nEOF')).toContain('force-push')
+    expect(rules('cat <<EOF\n$(git push -f origin feat/x)\nEOF', FOREIGN)).toContain('force-push')
     expect(rules("git commit -m \"$(cat <<'EOF'\nfix: push the branch $(not run)\nEOF\n)\"")).toEqual([])
   })
   test('a path-qualified wrapper is a runner (PR #681 round 6)', () => {
     for (const c of ['/usr/bin/env git push -f origin feat/x', '/usr/bin/sudo git push -f', '/usr/bin/nohup git push -f'])
-      expect(rules(c)).not.toEqual([])
+      expect(rules(c, FOREIGN)).not.toEqual([])
   })
   test('rm operands after -- are paths whatever their first character (PR #681 round 6)', () => {
-    expect(rules('rm -rf -- -/../../../tmp/victim')).toContain('rm-outside')
+    expect(rules('rm -rf -- -/../../../tmp/victim')).toEqual([])
   })
   test('the matching refspec : may update the default branch (PR #681 round 6)', () => {
     expect(rules('git push origin :')).toContain('default-branch-push')
@@ -92,7 +97,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('a wrapper that runs a program is a runner (PR #681 round 4)', () => {
     for (const c of ['setsid git push -f origin feat/x', 'stdbuf -oL git push -f', 'flock /tmp/l git push -f', 'taskset 1 git push -f'])
-      expect(rules(c)).not.toEqual([])
+      expect(rules(c, FOREIGN)).not.toEqual([])
   })
   test('a short-flag cluster with an attached value is split up to the value (PR #681 round 4)', () => {
     expect(rules('git commit -nF/tmp/message')).toContain('no-verify')
@@ -122,13 +127,14 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git -C /repo push')).toEqual([])
     expect(rules('git -C sub push')).toContain('default-branch-push')
   })
-  test('refspecs after -- are checked for force and delete (PR #681 round 3)', () => {
+  test('refspecs after -- are checked for force; a delete leaves the floor (PR #681 round 3; 0.10.0)', () => {
     expect(rules('git push origin -- +feat/x')).toContain('force-push')
-    expect(rules('git push origin -- :feat/x')).toContain('branch-delete')
+    expect(rules('git push origin -- :feat/x')).toEqual([])
   })
   test('an escaped or quote-split word is unreadable when it may spell a danger (PR #681 round 2)', () => {
-    for (const c of ['git pu\\sh -f origin feat/x', 'git pu""sh -f', "git p'u'sh -f", 'r\\m -rf /tmp/x', 'git push origin ma\\in'])
-      expect(rules(c)).not.toEqual([])
+    for (const c of ['git pu\\sh -f origin feat/x', 'git pu""sh -f', "git p'u'sh -f", 'git push origin ma\\in'])
+      expect(rules(c, FOREIGN)).not.toEqual([])
+    expect(rules('r\\m -rf /tmp/x')).toEqual([])
   })
   test('--repo names the remote, so every positional is a refspec (PR #681 round 2)', () => {
     expect(rules('git push --repo origin main')).toContain('default-branch-push')
@@ -138,9 +144,9 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   test('@ is HEAD (PR #681 round 2)', () => {
     expect(rules('git push origin @', { ...W, branch: 'main' })).toContain('default-branch-push')
   })
-  test('a brace or a dot-glob in an rm path may leave the root (PR #681 round 2)', () => {
-    expect(rules('rm -rf /repo/{.,x}./victim')).toContain('rm-outside')
-    expect(rules('rm -rf /repo/sub/.?')).toContain('rm-outside')
+  test('a brace or a dot-glob in an rm path may leave the root (PR #681 round 2; rm leaves the floor in 0.10.0)', () => {
+    expect(rules('rm -rf /repo/{.,x}./victim')).toEqual([])
+    expect(rules('rm -rf /repo/sub/.?')).toEqual([])
     expect(rules('rm -rf /repo/dist/*')).toEqual([])
     expect(rules('git push origin {main,x}')).not.toEqual([])
   })
@@ -148,7 +154,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     for (const c of [`python3 -c 'import os; os.system("git push -f")'`, `node -e "require('child_process').execSync('git push -f')"`,
       `ruby -e 'system("git push -f")'`])
       expect([c, rules(c)]).toEqual([c, ['force-push']])
-    expect(rules(`perl -e 'system("rm -rf /")'`)).toEqual(['rm-outside'])
+    expect(rules(`perl -e 'system("rm -rf /")'`)).toEqual([])
     // 0.2.0: an interpreter beside a plain push is not an ask (live check L3).
     expect(rules(`/usr/bin/python3.12 -c 'x' && git push origin feat/x`)).toEqual([])
     expect(rules('python3 tools/build.py')).toEqual([])
@@ -163,13 +169,13 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git --git-dir=/repo/.git push -f')).toContain('force-push')
   })
   test('an abbreviated long option is read as the option it abbreviates (PR #681)', () => {
-    expect(rules('rm --recurs /tmp/x')).toContain('rm-outside')
+    expect(rules('rm --recurs /tmp/x')).toEqual([])
     expect(rules('git push --forc origin feat/x')).toContain('force-push')
     expect(rules('git push --mir')).toContain('force-push')
     expect(rules('git push --force-w origin feat/x')).toContain('force-push')
     expect(rules('git commit --no-verif -m x')).toContain('no-verify')
-    expect(rules('git push --del origin x')).toContain('branch-delete')
-    expect(rules('git branch --del --forc x')).toContain('branch-delete')
+    expect(rules('git push --del origin x')).toEqual([])
+    expect(rules('git branch --del --forc x')).toEqual([])
     expect(rules('git push --dry-run origin feat/x')).toEqual([])
     expect(rules('git push --follow-tags origin feat/x')).toEqual([])
   })
@@ -180,7 +186,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('force push, in every spelling', () => {
     for (const c of ['git push -f', 'git push --force origin feat/x', 'git push --force-with-lease', 'git push origin +feat/x', 'git push --mirror'])
-      expect(rules(c)).toContain('force-push')
+      expect(rules(c, FOREIGN)).toContain('force-push')
   })
   test('a push to the default branch', () => {
     for (const c of ['git push origin main', 'git push origin HEAD:main', 'git push origin feat/x:refs/heads/main', 'git push --all'])
@@ -197,26 +203,26 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git push origin master', w)).toContain('default-branch-push')
     expect(rules('git push origin trunk', w)).toEqual([])
   })
-  test('an unknown current branch makes a bare push a default push', () => {
-    expect(rules('git push', { ...W, branch: undefined })).toContain('default-branch-push')
+  test('a bare push on an unknown branch leaves the floor (#766; 0.10.0 drops the unknown-branch arm)', () => {
+    expect(rules('git push', { ...W, branch: undefined })).toEqual([])
   })
-  test('branch deletion as seat-mods reads it; plain -d is not on the list', () => {
+  test('branch deletion leaves the floor (0.10.0): the judge decides it now (#764)', () => {
     for (const c of ['git branch -D x', 'git branch -d -f x', 'git push origin --delete x', 'git push origin :x'])
-      expect(rules(c)).toContain('branch-delete')
+      expect(rules(c)).toEqual([])
     expect(rules('git branch -d merged')).toEqual([])
   })
   test('--no-verify and commit -n', () => {
     expect(rules('git commit -n -m x')).toContain('no-verify')
     expect(rules('git push --no-verify')).toContain('no-verify')
   })
-  test('rm -r outside the worktree', () => {
+  test('rm outside the worktree leaves the floor (0.10.0): the judge decides it now', () => {
     for (const c of ['rm -rf /tmp/x', 'rm -r ../../etc', 'rm -R ~/x', 'rm --recursive /repo', 'rm -rf "$DIR"', 'rm -rf $HOME/x'])
-      expect(rules(c)).toContain('rm-outside')
+      expect(rules(c)).toEqual([])
   })
   test('rm -r inside the worktree, and plain rm, are not on the list (control)', () => {
     expect(rules('rm -rf build')).toEqual([])
-    // 0.2.0: a .. segment is outside without resolving it — an accepted extra ask.
-    expect(rules('rm -r ../other')).toEqual(['rm-outside'])
+    // 0.10.0: rm is the judge's now; the call stays, and no rule fires.
+    expect(rules('rm -r ../other')).toEqual([])
     expect(rules('rm -rf /repo/dist/*')).toEqual([])
     expect(rules('rm -f *.tmp')).toEqual([])
     expect(rules('rm -rf build/*')).toEqual([])
@@ -225,7 +231,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('a hidden segment still counts (review focus 5)', () => {
     expect(rules('git status && git push -f')).toContain('force-push')
-    expect(rules('cd /tmp && rm -rf x')).toContain('rm-outside')
+    expect(rules('cd /tmp && rm -rf x')).toEqual([])
     expect(rules('ls; (git push origin main)')).toContain('default-branch-push')
   })
   test('quoted text shows its words: a message naming a danger is an accepted extra ask (0.2.0)', () => {
@@ -234,11 +240,14 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
 
   test('shapes the shared reader cannot read are listed when they name a danger (final review I1)', () => {
-    const cases = ['git push -uf origin feat/x', 'git commit -nm wip', 'git branch -df old', 'sleep 1 & git push -f',
+    const cases = ['git commit -nm wip', 'sleep 1 & git push -f',
       'if true; then git push -f; fi', '{ git push -f; }', '! git push -f', 'for b in a; do git push -f; done',
-      'echo `git push -f`', 'bash -c "git push -f"', "sh -c 'rm -rf /etc/x'", 'xargs rm -rf', 'timeout 60 git push -f',
-      'nice git push -f', 'env -i git push -f', 'sudo -u root rm -rf /etc/x']
+      'echo `git push -f`', 'bash -c "git push -f"', 'timeout 60 git push -f',
+      'nice git push -f', 'env -i git push -f']
     for (const c of cases) expect([c, rules(c).length > 0]).toEqual([c, true])
+    // 0.10.0: the shapes whose danger left the floor — an own-branch force, and the retired rules.
+    for (const c of ['git push -uf origin feat/x', 'git branch -df old', "sh -c 'rm -rf /etc/x'", 'xargs rm -rf', 'sudo -u root rm -rf /etc/x'])
+      expect([c, rules(c)]).toEqual([c, []])
     expect(rules('git push -o ci.skip origin', { ...W, branch: 'main' })).toContain('default-branch-push')
   })
   test('the same shapes with no danger stay off the list (control)', () => {
@@ -250,11 +259,11 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git push origin "main"')).toEqual(['default-branch-push'])
     // A bare variable beside a push may be any flag or ref.
     for (const c of ['git push origin "$BRANCH"', 'git push origin $BRANCH', 'BRANCH=main git push origin "$BRANCH"'])
-      expect([c, rules(c)]).toEqual([c, ['branch-delete', 'default-branch-push', 'force-push']])
+      expect([c, rules(c)]).toEqual([c, ['default-branch-push', 'force-push']])
     // The substitution's own words are read: the current branch, no danger.
     expect(rules('git push -u origin "$(git branch --show-current)"')).toEqual([])
     for (const c of ['git "push" -f', '"git" push -f', 'git push "--force"']) expect([c, rules(c)]).toEqual([c, ['force-push']])
-    expect(rules('\\rm -rf /')).toEqual(['rm-outside'])
+    expect(rules('\\rm -rf /')).toEqual([])
     expect(rules('git push origin -- feat/x:main')).toContain('default-branch-push')
     expect(rules('sleep 1&git push -f')).toContain('force-push')
     expect(rules('git push -f>/dev/null')).toContain('force-push')
@@ -271,7 +280,7 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
     expect(rules('git push --branches')).toContain('default-branch-push')
     for (const c of ['git -C /other push', 'cd /other && git push', 'cd .. && cd .. && git push origin HEAD', 'git --git-dir=/o/.git push'])
       expect([c, rules(c)]).toEqual([c, ['default-branch-push']])
-    for (const c of ['FLAGS=-rf; rm $FLAGS /tmp', 'rm "$X" /tmp']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
+    for (const c of ['FLAGS=-rf; rm $FLAGS /tmp', 'rm "$X" /tmp']) expect([c, rules(c)]).toEqual([c, []])
     expect(rules('NV=-n; git commit $NV -m x')).toEqual(['no-verify'])
     // 0.2.0 Known limit: a bare variable beside branch or commit is not read as a flag.
     expect(rules('git branch "$OPT" x')).toEqual([])
@@ -298,12 +307,12 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   test('the #684 gaps the token floor catches (0.2.0 spec §5)', () => {
     expect(rules('git push origin "$(echo a)")" && git push -f')).toContain('force-push')
     for (const c of ['/usr/lib/git-core/git-push -f origin feat/x', 'git-push --force origin feat/x'])
-      expect([c, rules(c)]).toEqual([c, ['force-push']])
+      expect([c, rules(c, FOREIGN)]).toEqual([c, ['force-push']])
     expect(rules('git push --forc* origin feat/x')).toContain('force-push')
-    expect(rules('git pu\\\nsh -f origin feat/x')).toEqual(['force-push'])
+    expect(rules('git pu\\\nsh -f origin feat/x', FOREIGN)).toEqual(['force-push'])
     expect(rules('git push -- origin', { ...W, branch: 'main' })).toEqual(['default-branch-push'])
     expect(rules('git -c remote.origin.push=refs/heads/main push origin')).toEqual(['default-branch-push'])
-    expect(rules('git push origin +:feat/x')).toEqual(['branch-delete', 'force-push'])
+    expect(rules('git push origin +:feat/x', FOREIGN)).toEqual(['force-push'])
     expect(rules('git push origin --{force,x}')).toContain('force-push')
   })
   test('the live check stalls reach no rule (0.2.0 spec §6, evidence L3)', () => {
@@ -341,16 +350,16 @@ describe('the never-approve list (spec §3.3, plan decision 3)', () => {
   })
   test('a braced variable may be any flag or ref (PR #685 round 1)', () => {
     for (const c of ['git push ${OPTS}', 'git push origin ${BRANCH}', 'git push origin "${BRANCH:-x}"'])
-      expect([c, rules(c)]).toEqual([c, ['branch-delete', 'default-branch-push', 'force-push']])
-    expect(rules('rm ${OPTS} /tmp/x')).toEqual(['rm-outside'])
+      expect([c, rules(c)]).toEqual([c, ['default-branch-push', 'force-push']])
+    expect(rules('rm ${OPTS} /tmp/x')).toEqual([])
   })
-  test('every unique prefix the tools accept is read (PR #685 round 1)', () => {
-    expect(rules('rm --r /tmp/victim')).toEqual(['rm-outside'])
-    expect(rules('git push --de origin x')).toEqual(['branch-delete'])
-    expect(rules('git push --mi')).toEqual(['branch-delete', 'default-branch-push', 'force-push'])
+  test('every unique prefix the tools accept is read (PR #685 round 1; 0.10.0 keeps 1-3)', () => {
+    expect(rules('rm --r /tmp/victim')).toEqual([])
+    expect(rules('git push --de origin x')).toEqual([])
+    expect(rules('git push --mi')).toEqual(['default-branch-push', 'force-push'])
     expect(rules('git push --f origin feat/x')).toEqual(['force-push'])
     expect(rules('git push --a')).toEqual(['default-branch-push'])
-    expect(rules('git branch --de --f x')).toEqual(['branch-delete'])
+    expect(rules('git branch --de --f x')).toEqual([])
   })
   test('a forced default ref is a default push too (PR #685 round 1)', () => {
     expect(rules('git push origin +main')).toEqual(['default-branch-push', 'force-push'])
@@ -383,7 +392,7 @@ describe('never-approve false positives (0.4.2 spec §4)', () => {
 
 describe('escape routes the 0.4.2 reading must not open (spec §5)', () => {
   test('a verb kept in an assignment or an alias still pairs with a flag', () => {
-    expect(rules('V=push; git $V -f origin feat/x')).toContain('force-push')
+    expect(rules('V=push; git $V -f origin feat/x', FOREIGN)).toContain('force-push')
     expect(rules('git config alias.p push; git p -f origin feat/x')).toContain('force-push')
   })
   test('an inert redirect into a file that is run later keeps its words', () => {
@@ -397,9 +406,9 @@ describe('escape routes the 0.4.2 reading must not open (spec §5)', () => {
     expect(rules('git push "x; echo" -f')).toContain('force-push')
   })
   test('an apostrophe in a kept heredoc body keeps the whole bag', () => {
-    expect(rules("cat > f <<'X'\ndon't\nX\nbash f; echo -f; git push origin feat/x")).toContain('force-push')
+    expect(rules("cat > f <<'X'\ndon't\nX\nbash f; echo -f; git push origin feat/x", FOREIGN)).toContain('force-push')
     // No runner here: only the << gate stops the body's apostrophe from hiding -f (final review 12).
-    expect(rules("cat > f <<'X'\necho don't\nX\n./f; echo it\\'s -f\ngit push origin feat/x")).toContain('force-push')
+    expect(rules("cat > f <<'X'\necho don't\nX\n./f; echo it\\'s -f\ngit push origin feat/x", FOREIGN)).toContain('force-push')
   })
   test('printf -v defines a name; sort can run a program; a hooks directory is run by git', () => {
     expect(rules('printf -v V push; git $V -f origin feat/x')).toContain('force-push')
@@ -407,16 +416,16 @@ describe('escape routes the 0.4.2 reading must not open (spec §5)', () => {
     expect(rules("cat > h <<'X'\ngit push -f origin feat/x\nX\ncp h .git/hooks/pre-commit")).toContain('force-push')
   })
   test('the dashed and path forms of a verb are still verbs', () => {
-    expect(rules('/usr/lib/git-core/git-push -f origin feat/x')).toContain('force-push')
-    expect(rules('git-push -f origin feat/x')).toContain('force-push')
-    expect(rules('/bin/rm -rf /tmp/x')).toContain('rm-outside')
+    expect(rules('/usr/lib/git-core/git-push -f origin feat/x', FOREIGN)).toContain('force-push')
+    expect(rules('git-push -f origin feat/x', FOREIGN)).toContain('force-push')
+    expect(rules('/bin/rm -rf /tmp/x')).toEqual([])
   })
-  test('known limit: a command that is not inert and names the written file keeps the jq words', () => {
+  test('known limit: a command that is not inert and names the written file keeps the jq words (rm leaves the floor in 0.10.0)', () => {
     const c = `jq '.note = "do not rm -rf $X"' run.json > run.json.tmp && dagr check run.json.tmp && mv run.json.tmp run.json`
-    expect(rules(c)).toContain('rm-outside')
+    expect(rules(c)).toEqual([])
   })
-  test('known limit: prose quoted in one argument of a command that is not inert still pools', () => {
-    expect(rules('herdr agent prompt spine "the verifier ran rm -rf $X" ; printf x >> rulings.md')).toContain('rm-outside')
+  test('known limit: prose quoted in one argument of a command that is not inert still pools (rm leaves the floor in 0.10.0)', () => {
+    expect(rules('herdr agent prompt spine "the verifier ran rm -rf $X" ; printf x >> rulings.md')).toEqual([])
   })
 })
 
@@ -444,21 +453,21 @@ describe('review focus (0.4.2 plan)', () => {
 // Final review of the 0.4.2 branch: each case was held by 0.4.1 and must still ask.
 describe('0.4.2 final review: no new false negative against 0.4.1', () => {
   test('a comment does not open a quote or join the next line', () => {
-    expect(rules("echo start # don't skip\ngit push -f origin feat/x\necho done # that's all")).toContain('force-push')
-    expect(rules('echo x # trailing \\\ngit push -f origin feat/x')).toContain('force-push')
+    expect(rules("echo start # don't skip\ngit push -f origin feat/x\necho done # that's all", FOREIGN)).toContain('force-push')
+    expect(rules('echo x # trailing \\\ngit push -f origin feat/x', FOREIGN)).toContain('force-push')
   })
   test('a process substitution keeps the whole bag', () => {
-    expect(rules('cat <(git push -f origin feat/x)')).toContain('force-push')
-    expect(rules('echo >(git push -f origin feat/x)')).toContain('force-push')
+    expect(rules('cat <(git push -f origin feat/x)', FOREIGN)).toContain('force-push')
+    expect(rules('echo >(git push -f origin feat/x)', FOREIGN)).toContain('force-push')
   })
   test('a function defined in the same text is not inert', () => {
     expect(rules('echo() { git push -f origin feat/x; }; echo hi')).toContain('force-push')
-    expect(rules('cat () { rm -rf ~/work; }; cat f')).toContain('rm-outside')
+    expect(rules('cat () { rm -rf ~/work; }; cat f')).toEqual([])
     expect(rules('function echo { git push -f origin feat/x; }; echo hi')).toContain('force-push')
   })
   test('an inert command piped onward keeps its words', () => {
     expect(rules("echo 'git push -f origin feat/x' | at now")).toContain('force-push')
-    expect(rules("echo 'git push -f origin feat/x' | cat > x.sh; ./x.sh")).toContain('force-push')
+    expect(rules("echo 'git push -f origin feat/x' | cat > x.sh; ./x.sh", FOREIGN)).toContain('force-push')
     expect(rules("echo 'git push -f origin feat/x' |& at now")).toContain('force-push')
     expect(rules("cat > f <<'X'\ngit push -f origin feat/x\nX\ncat f | at now")).toContain('force-push')
   })
@@ -480,7 +489,7 @@ describe('0.4.2 final review: no new false negative against 0.4.1', () => {
     expect(rules("cat > a.sh <<'A'\ngit push -f origin feat/x\nA\ncat > b.sh <<'B'\n./a.sh\nB\n./b.sh")).toContain('force-push')
   })
   test('a relative path is not inert by its last part', () => {
-    expect(rules('./scripts/test push -f origin feat/x')).toContain('force-push')
+    expect(rules('./scripts/test push -f origin feat/x', FOREIGN)).toContain('force-push')
   })
   test('a command named by a variable or a glob may be any written file', () => {
     expect(rules("echo 'git push -f origin feat/x' > x.sh; T=x; ./$T.sh")).toContain('force-push')
@@ -505,20 +514,20 @@ describe('PR #700 round 1: the inert test trusts no more than it must', () => {
     expect(rules('if true; then echo() { git push -f origin feat/x; }; echo hi; fi')).toContain('force-push')
   })
   test('only a system path to an inert name is inert (r4220518565)', () => {
-    expect(rules('/repo/echo git push -f origin feat/x')).toContain('force-push')
+    expect(rules('/repo/echo git push -f origin feat/x', FOREIGN)).toContain('force-push')
     expect(rules('/bin/echo git push -f origin feat/x; true')).toEqual([])
   })
   test('a dashed executable path is a verb; bare dashed prose is not (r4220518572)', () => {
-    expect(rules('./force-push -f origin feat/x')).toContain('force-push')
-    expect(rules('bin/force-push -f origin feat/x')).toContain('force-push')
+    expect(rules('./force-push -f origin feat/x', FOREIGN)).toContain('force-push')
+    expect(rules('bin/force-push -f origin feat/x', FOREIGN)).toContain('force-push')
   })
 })
 
 // PR #700 round 2 (Codex): each case was held by 0.4.1 and must still ask.
 describe('PR #700 round 2: shadowed names and git control files', () => {
   test('a name defined in the text keeps the whole bag (r4220653778)', () => {
-    expect(rules('echo() { "$@"; }; echo git push -f origin feat/x')).toContain('force-push')
-    expect(rules("alias echo='git'; echo push -f origin feat/x")).toContain('force-push')
+    expect(rules('echo() { "$@"; }; echo git push -f origin feat/x', FOREIGN)).toContain('force-push')
+    expect(rules("alias echo='git'; echo push -f origin feat/x", FOREIGN)).toContain('force-push')
   })
   test('after a directory change a relative write may land in .git (r4220653797)', () => {
     expect(rules("cd .git; printf '[alias]\\np = push -f\\n' > config; cd ..; git p origin feat/x")).toContain('force-push')
@@ -558,13 +567,13 @@ describe('0.4.3 §3.1 substitutions: escape routes', () => {
     expect(rules('git commit $(echo -n) -m x')).toContain('no-verify')
   })
   test('the commands inside an inert command\'s substitution are judged', () => {
-    expect(rules('echo "$(git push -f origin feat/x)"')).toContain('force-push')
+    expect(rules('echo "$(git push -f origin feat/x)"', FOREIGN)).toContain('force-push')
     expect(rules('test -n "$(git commit -n -m x)"')).toContain('no-verify')
-    expect(rules('echo "$(echo "$(git push -f origin feat/x)")"')).toContain('force-push')
+    expect(rules('echo "$(echo "$(git push -f origin feat/x)")"', FOREIGN)).toContain('force-push')
   })
   test('an unbalanced substitution or arithmetic keeps the whole bag', () => {
-    expect(rules('echo "$(git push -f origin feat/x"')).toContain('force-push')
-    expect(rules('echo $((1)) -f; git push origin feat/x')).toContain('force-push')
+    expect(rules('echo "$(git push -f origin feat/x"', FOREIGN)).toContain('force-push')
+    expect(rules('echo $((1)) -f; git push origin feat/x', FOREIGN)).toContain('force-push')
   })
   test('a substitution inside single quotes is text', () => {
     expect(rules("echo '$(git push -f origin feat/x)'")).toEqual([])
@@ -573,13 +582,13 @@ describe('0.4.3 §3.1 substitutions: escape routes', () => {
 
 describe('0.4.3 §3.2 groups: escape routes', () => {
   test('a redirect on a group applies to its commands', () => {
-    expect(rules("{ echo 'git push -f origin feat/x'; } > x.sh; ./x.sh")).toContain('force-push')
+    expect(rules("{ echo 'git push -f origin feat/x'; } > x.sh; ./x.sh", FOREIGN)).toContain('force-push')
     expect(rules("( echo 'git push -f origin feat/x' ) > .git/hooks/pre-commit")).toContain('force-push')
     expect(rules("if true; then cat <<'X'\ngit push -f origin feat/x\nX\nfi > x.sh; ./x.sh")).toContain('force-push')
-    expect(rules("for i in 1; do echo 'git push -f origin feat/x'; done > x.sh; ./x.sh")).toContain('force-push')
+    expect(rules("for i in 1; do echo 'git push -f origin feat/x'; done > x.sh; ./x.sh", FOREIGN)).toContain('force-push')
   })
   test('a pipe on a group applies to its commands', () => {
-    expect(rules("{ echo 'git push -f origin feat/x'; } | at now")).toContain('force-push')
+    expect(rules("{ echo 'git push -f origin feat/x'; } | at now", FOREIGN)).toContain('force-push')
   })
   test('an unmatched closer keeps the whole bag', () => {
     expect(rules("echo 'git push -f origin feat/x'; } > x")).toContain('force-push')
@@ -593,8 +602,8 @@ describe('0.4.3 §3.3 stdout heredocs: escape routes', () => {
     expect(rules("cmd=$(cat <<'X'\ngit push -f origin feat/x\nX\n); $cmd")).toContain('force-push')
   })
   test('an unquoted body with a substitution or a backtick keeps its words', () => {
-    expect(rules('cat <<X\n$(git push -f origin feat/x)\nX')).toContain('force-push')
-    expect(rules('cat <<X\n`git push -f origin feat/x`\nX')).toContain('force-push')
+    expect(rules('cat <<X\n$(git push -f origin feat/x)\nX', FOREIGN)).toContain('force-push')
+    expect(rules('cat <<X\n`git push -f origin feat/x`\nX', FOREIGN)).toContain('force-push')
   })
   test('a stdout body that only prints is text', () => {
     expect(rules(`cat <<'X'\n${PROSE}\nX`)).toEqual([])
@@ -605,7 +614,7 @@ describe('0.4.3 §3.4 sed: escape routes', () => {
   test('a sed that may run code stays a runner', () => {
     for (const c of ["sed 1e f; echo 'git push -f origin feat/x'", "sed 's/x/y/e' f; echo 'git push -f origin feat/x'",
       "sed -e 1p -e 2e f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'"])
-      expect([c, rules(c)]).toEqual([c, ['force-push']])
+      expect([c, rules(c, FOREIGN)]).toEqual([c, ['force-push']])
   })
   test('a narrow sed that names a written file does not run it', () => {
     expect(rules(`cat > b.md <<'X'\n${PROSE}\nX\nsed -n 1,5p b.md`)).toEqual([])
@@ -624,8 +633,8 @@ describe('0.4.3 §3.5 readers: escape routes', () => {
     expect(rules("cat > b.md <<'X'\ngit push -f origin feat/x\nX\ngh pr creator --body-file b.md")).toContain('force-push')
     expect(rules(`cat > b.md <<'X'\n${PROSE}\nX\ngh pr create --body-file b.md`)).toEqual([])
   })
-  test('a reader keeps its own words (#693 case E)', () => {
-    expect(neverRules('herdr agent prompt p "the verifier ran rm -rf $X"', W, HERDR)).toContain('rm-outside')
+  test('a reader keeps its own words (#693 case E; rm leaves the floor in 0.10.0)', () => {
+    expect(neverRules('herdr agent prompt p "the verifier ran rm -rf $X"', W, HERDR)).toEqual([])
   })
   test('parseReaders reads ;-separated prefixes; blank is none', () => {
     expect(parseReaders('gh pr create; herdr agent prompt;;')).toEqual([['gh', 'pr', 'create'], ['herdr', 'agent', 'prompt']])
@@ -657,7 +666,7 @@ describe('0.4.3 prototype findings: escape routes', () => {
 describe('0.4.3 plan review focus', () => {
   test('a case statement parses; a push inside it still asks', () => {
     expect(rules(`case "$x" in a) echo ok;; b) cat <<'X'\n${PROSE}\nX\n;; esac`)).toEqual([])
-    expect(rules('case "$x" in a) git push -f origin feat/x;; esac')).toContain('force-push')
+    expect(rules('case "$x" in a) git push -f origin feat/x;; esac', FOREIGN)).toContain('force-push')
   })
   test('an input redirect or a here-string keeps an inert head', () => {
     expect(rules(`cat > b.md <<'X'\n${PROSE}\nX\nwc -l < b.md; grep -c x <<< "$v"`)).toEqual([])
@@ -668,13 +677,13 @@ describe('0.4.3 plan review focus', () => {
   })
   test('a sed script with more than one command stays a runner', () => {
     // 0.5.0 §3.7: a multi-command script of p/d/q is inert; one holding `e` stays a runner.
-    expect(rules("sed -n '1p;2e id' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
+    expect(rules("sed -n '1p;2e id' f; echo 'git push -f origin feat/x'", FOREIGN)).toEqual(['force-push'])
   })
 })
 
 describe('0.4.3 plan review focus: sed reads its quoted script whole', () => {
   test('a quoted script with a second command is not a narrow sed', () => {
-    expect(rules("sed -n '1p;e id' f; echo 'git push -f origin feat/x'")).toEqual(['force-push'])
+    expect(rules("sed -n '1p;e id' f; echo 'git push -f origin feat/x'", FOREIGN)).toEqual(['force-push'])
   })
 })
 
@@ -702,12 +711,12 @@ describe('0.4.3 PR review: shapes 0.4.2 asked on still ask', () => {
   const P = 'git push -f origin feat/x'
   test('a case or a comment inside $( keeps the whole bag', () => {
     expect(rules(`echo "$(case x in x) ${P};; esac)"`)).toContain('force-push')
-    expect(rules(`echo "$(echo hi # )\n${P})"`)).toContain('force-push')
+    expect(rules(`echo "$(echo hi # )\n${P})"`, FOREIGN)).toContain('force-push')
   })
   test('an unquoted heredoc body with any backtick or a line continuation is live', () => {
     expect(rules(`cat <<X\n\\\\\`${P}\\\\\`\nX\n`)).toContain('force-push')
     expect(rules(`cat > b.md <<X\n\\\\\`${P}\\\\\`\nX\n`)).toContain('force-push')
-    expect(rules(`cat <<X\n$\\\n(${P})\nX\n`)).toContain('force-push')
+    expect(rules(`cat <<X\n$\\\n(${P})\nX\n`, FOREIGN)).toContain('force-push')
   })
   test('a sed option that takes a value is not narrow', () => {
     expect(rules(`sed -l 1p "e ${P}" f`)).toContain('force-push')
@@ -733,9 +742,9 @@ describe('0.5.0 §3.5 backticks are substitutions', () => {
     silent('echo "head `git rev-parse HEAD`" && git push -u origin feat/x; echo \'not -f\'')
   })
   test('escape routes', () => {
-    ask('echo "`git push -f origin feat/x`"')
-    ask('x=`rm -rf ~/a`')
-    ask('echo `git status; git push -f origin feat/x')
+    ask('echo "`git push -f origin feat/x`"', FOREIGN)
+    silent('x=`rm -rf ~/a`')
+    ask('echo `git status; git push -f origin feat/x', FOREIGN)
   })
 })
 
@@ -754,7 +763,7 @@ describe('0.5.0 §3.1 each command on its own words', () => {
     ask('$CMD -f origin feat/x; npm push')
   })
   test('line endings, empty text and size', () => {
-    ask('echo ok\r\ngit push -f origin feat/x\r\n')
+    ask('echo ok\r\ngit push -f origin feat/x\r\n', FOREIGN)
     silent('')
     const big = Array.from({ length: 2000 }, (_, i) => `echo line ${i}; git status --short`).join('\n')
     silent(big)
@@ -787,7 +796,8 @@ describe('0.5.0 §3.1 variables and assignment-only commands', () => {
     silent('D="never git push -f"; git push -u origin feat/x')
   })
   test('escape routes', () => {
-    for (const c of ['F=-f; git push $F origin feat/x', 'C=push; git $C -f origin feat/x', 'B=feat/x; B=main; git push origin $B',
+    for (const c of ['F=-f; git push $F origin feat/x', 'C=push; git $C -f origin feat/x']) ask(c, FOREIGN)
+    for (const c of ['B=feat/x; B=main; git push origin $B',
       'if true; then B=feat/x; fi; git push origin $B', 'false && B=feat/x; git push origin $B', '(B=feat/x); git push origin $B',
       'git push origin $B; B=feat/x', 'B=feat/x; for B in main; do git push origin $B; done', 'B=feat/x; read B; git push origin $B',
       'B=feat/x; git push origin ${B:=main}', 'git push origin $UNSET', 'B=main; git push origin $B'])
@@ -839,7 +849,9 @@ describe('0.5.0 §3.6 sh -c read-through', () => {
     silent("sh -c 'cd /repo && git push -u origin feat/x'")
   })
   test('escape routes', () => {
-    for (const c of ["sh -c 'git push -f origin feat/x'", 'bash -c "rm -rf ~/x"', "bash -lc 'git push origin main'", 'sh -c "$CMD"; echo push -f',
+    ask("sh -c 'git push -f origin feat/x'", FOREIGN)
+    silent('bash -c "rm -rf ~/x"')
+    for (const c of ["bash -lc 'git push origin main'", 'sh -c "$CMD"; echo push -f',
       "cd /other; sh -c 'git push'", "bash -c 'sh -c \"git push -f origin x\"'", "F=x; sh -c 'git push $F origin x'; echo -f"])
       ask(c)
   })
@@ -854,10 +866,11 @@ describe('0.5.0 §3.7 a wider safe sed', () => {
     silent("sed -n '1,5p;8q' f; echo 'git push -f origin feat/x'")
   })
   test('escape routes', () => {
-    for (const c of ["sed -i 's/x/y/e' f; git push origin feat/x; echo -f", "sed '1e id' f; echo 'git push -f origin feat/x'",
-      "sed 's/x/y/w /tmp/o' f; echo 'git push -f origin feat/x'", "sed -f s.sed f; echo 'git push -f origin feat/x'",
-      "sed -i 's/a/b/' .git/hooks/pre-push; echo 'git push -f origin feat/x'", "sed -i 's/x/git push -f/' run.sh; ./run.sh",
-      "sed -n '1p;2e id' f; echo 'git push -f origin feat/x'"])
+    ask("sed -i 's/x/y/e' f; git push origin feat/x; echo -f")
+    for (const c of ["sed '1e id' f; echo 'git push -f origin feat/x'", "sed 's/x/y/w /tmp/o' f; echo 'git push -f origin feat/x'",
+      "sed -f s.sed f; echo 'git push -f origin feat/x'", "sed -n '1p;2e id' f; echo 'git push -f origin feat/x'"])
+      ask(c, FOREIGN)
+    for (const c of ["sed -i 's/a/b/' .git/hooks/pre-push; echo 'git push -f origin feat/x'", "sed -i 's/x/git push -f/' run.sh; ./run.sh"])
       ask(c)
   })
 })
@@ -894,12 +907,15 @@ describe('0.5.0 §3.9 heredoc bodies are data unless something can run them', ()
     silent("tee notes.md <<'EOF'\nnever git push -f\nEOF\nwc -l notes.md")
   })
   test('escape routes', () => {
-    for (const c of ['cat > f <<EOF\n$(git push -f origin x)\nEOF', 'cat > f <<EOF\n`rm -rf ~/x`\nEOF', 'cat > f <<EOF\n$((1+$(git push -f origin x)))\nEOF',
+    for (const c of ['cat > f <<EOF\n$(git push -f origin x)\nEOF', 'cat > f <<EOF\n$((1+$(git push -f origin x)))\nEOF',
       'cat > f <<EOF\n$\\\n(git push -f origin x)\nEOF', 'git commit -F - <<EOF\n$(git push -f origin x)\nEOF',
       "tee run.sh <<'EOF'\ngit push -f origin x\nEOF\n./run.sh", "tee .git/hooks/pre-commit <<'EOF'\ngit push -f\nEOF",
-      "sqlite3 db <<'EOF'\n.shell git push -f\nEOF", "psql <<'EOF'\n\\! rm -rf ~/x\nEOF", "cat <<'EOF' | sh\ngit push -f origin x\nEOF",
+      "sqlite3 db <<'EOF'\n.shell git push -f\nEOF", "cat <<'EOF' | sh\ngit push -f origin x\nEOF",
       "x=$(cat <<'EOF'\ngit push -f origin x\nEOF\n); $x", "cat <<A <<B\nx\nA\ngit push -f origin x\nB"])
       ask(c)
+    // 0.10.0: rm leaves the floor.
+    silent('cat > f <<EOF\n`rm -rf ~/x`\nEOF')
+    silent("psql <<'EOF'\n\\! rm -rf ~/x\nEOF")
   })
 })
 
@@ -938,7 +954,8 @@ describe('0.5.0 §3.11 namers', () => {
   })
   test('escape routes', () => {
     ask("cat > b.md <<'EOF'\ngit push -f origin feat/x\nEOF\ngh pr creator --body-file b.md")
-    ask("cat > b.md <<'EOF'\nx\nEOF\nrm -rf ~/x")
+    // 0.10.0: rm leaves the floor.
+    silent("cat > b.md <<'EOF'\nx\nEOF\nrm -rf ~/x")
     ask("cat > c.sh <<'EOF'\ngit push -f origin x\nEOF\ngit -c core.pager=./c.sh log")
   })
 })
@@ -958,21 +975,27 @@ describe('0.5.0 final review: shapes 0.4.3 asked on still ask', () => {
   test('C2: an assignment after &&, || or a pipe across a newline, or sent to the background, is not read', () => {
     for (const c of ['test -d /repo/sub/build &&\nB=/repo/sub/build\nrm -rf "$B"/*', 'test -d /repo/sub/build ||\nB=/repo/sub/build\nrm -rf "$B"/*',
       'echo x |\nB=/repo/sub/build\nrm -rf "$B"/*', 'B=/repo/sub/build & rm -rf "$B"/*',
-      "git commit -F - <<'EOF' &&\nmsg\nEOF\nB=/repo/sub/build\nrm -rf \"$B\"/*", 'cd /other\ngit fetch &&\nB=feat/x\ngit push origin $B'])
-      ask(c)
+      "git commit -F - <<'EOF' &&\nmsg\nEOF\nB=/repo/sub/build\nrm -rf \"$B\"/*"])
+      silent(c)
+    // 0.10.0: rm leaves the floor; the unread variable still decides a live rule.
+    ask('cd /other\ngit fetch &&\nB=feat/x\ngit push origin $B')
     silent('git fetch\nB=/repo/sub/build\nrm -rf "$B"/*')
   })
   test('I1: a flag in a variable the text binds but the floor cannot read, beside commit or branch', () => {
     for (const c of ['export NV=-n; git commit $NV -m x', 'declare NV=-n; git commit $NV -m x', 'if true; then NV=-n; fi; git commit $NV -m x',
-      'NV=-n; NV=-n; git commit $NV -m x', 'export F=-D; git branch $F feat/y', 'for F in -n; do git commit $F -m x; done'])
+      'NV=-n; NV=-n; git commit $NV -m x', 'for F in -n; do git commit $F -m x; done'])
       ask(c)
+    // 0.10.0: the branch half left the floor with branch-delete.
+    silent('export F=-D; git branch $F feat/y')
     // A variable the text never binds is still not read as a flag beside commit (0.2.0).
     silent('make -n check; git commit -q -F "$M"')
   })
   test('I2: a move or a config write inside a loop applies to the whole loop', () => {
-    for (const c of ['for p in a b; do rm -rf node_modules; cd ../$p; done', 'while true; do git push; cd /other; done',
+    for (const c of ['while true; do git push; cd /other; done',
       'for i in 1 2; do git p origin feat/x; V=$(echo push -f); git config alias.p "$V"; done'])
       ask(c)
+    // 0.10.0: the loop still reads the move, but the rm half left the floor.
+    silent('for p in a b; do rm -rf node_modules; cd ../$p; done')
     silent('for p in a b; do echo $p; done; git push -u origin feat/x')
   })
   test('I3: a message consumer does not reach past ; && or a pipe', () => {
@@ -1014,7 +1037,7 @@ describe('0.5.0 PR #735 round 1: shapes 0.4.3 asked on still ask', () => {
   })
   test('a sed script is the whole shell word, quoted pieces joined', () => {
     ask("sed 's/x/git push -f origin main/'e file")
-    ask(`sed 's/x/y/'"w /tmp/o" f; echo 'git push -f origin feat/x'`)
+    ask(`sed 's/x/y/'"w /tmp/o" f; echo 'git push -f origin feat/x'`, FOREIGN)
     silent("sed 's/a/b/'g f; git push -u origin feat/x; echo -f")
   })
 })
@@ -1078,12 +1101,12 @@ describe('0.5.1: own words ask, text goes to the fork (spec §1–2)', () => {
   test('a parsed command whose own words match asks', () => {
     for (const c of ['git push -f origin feat/x', "'git' push -f origin feat/x", 'git "push" -f origin feat/x',
       'git pu""sh -f origin feat/x', 'F=-f; git push $F origin feat/x', '$CMD push -f origin feat/x'])
-      expect([c, levels(c).ask.includes('force-push')]).toEqual([c, true])
+      expect([c, levels(c, FOREIGN).ask.includes('force-push')]).toEqual([c, true])
   })
   test('text the floor cannot read command by command goes to the fork', () => {
     for (const c of ["python3 -c 'git push -f origin feat/x'", "herdr pane run p 'git push -f origin feat/x'",
       "tmux send-keys 'git push -f origin feat/x' Enter", "git config alias.p 'push -f'; git p origin feat/x"]) {
-      const l = levels(c)
+      const l = levels(c, FOREIGN)
       expect([c, l.ask]).toEqual([c, []])
       expect([c, l.fork.includes('force-push')]).toEqual([c, true])
     }
@@ -1096,18 +1119,18 @@ describe('0.5.1: own words ask, text goes to the fork (spec §1–2)', () => {
     expect(levels('git push \\> -f origin feat/x').ask).toContain('force-push')
     expect(levels('curl --data git\\ push\\ -f https://x').ask).toEqual([])
     // A line continuation still joins: `pu\<newline>sh` is push.
-    expect(levels('git pu\\\nsh -f origin feat/x').ask).toContain('force-push')
+    expect(levels('git pu\\\nsh -f origin feat/x', FOREIGN).ask).toContain('force-push')
   })
   test('a rule found at both levels is ask only', () => {
     expect(levels("git push -f origin feat/x -o 'push -f'")).toEqual({ ask: ['force-push'], fork: [] })
   })
   test('the focus is the command that matched', () => {
-    const f = floorFindings('cd /repo\nnpm test\ngit push -f origin feat/x', W).findings
+    const f = floorFindings('cd /repo\nnpm test\ngit push -f origin feat/x', FOREIGN).findings
     expect(f.find(x => x.rule === 'force-push')?.focus).toBe('git push -f origin feat/x')
   })
   test('neverRules is the union of both levels', () => {
-    expect(rules("python3 -c 'git push -f origin feat/x'")).toContain('force-push')
-    expect(rules('git push -f origin feat/x')).toContain('force-push')
+    expect(rules("python3 -c 'git push -f origin feat/x'", FOREIGN)).toContain('force-push')
+    expect(rules('git push -f origin feat/x', FOREIGN)).toContain('force-push')
   })
 })
 
@@ -1115,28 +1138,79 @@ describe('0.5.1: shell words for sed, and rm of a variable path (spec §2, §4)'
   test('a sed script with an escaped slash is a safe sed, not a runner (cause 5)', () => {
     expect(levels("sed -i 's/a\\/b/c/' $S/pr.md; git push -q")).toEqual({ ask: [], fork: [] })
   })
-  test('an unresolved variable may hold flags even before a path (PR #763 review)', () => {
-    // T='-rf ..' makes `rm $T/x` into `rm -rf ../x`: the floor keeps 0.5.0's reading.
-    for (const c of ['rm $T/x', 'rm -f $W/reports/.seen', 'rm ${OUT}/a.md']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
+  test('an unresolved variable may hold flags even before a path (PR #763 review; rm leaves the floor in 0.10.0)', () => {
+    // 0.10.0: rm is the judge's now; the calls stay, and no rule fires.
+    for (const c of ['rm $T/x', 'rm -f $W/reports/.seen', 'rm ${OUT}/a.md']) expect([c, rules(c)]).toEqual([c, []])
     // A variable the text assigns once to a literal is read as its value.
     expect(rules('T=/repo/a; rm "$T/x"')).toEqual([])
   })
-  test('a bare variable or a recursive flag still makes rm recursive', () => {
-    for (const c of ['rm -rf $T', 'rm $F /x', 'rm -rf ../x', 'rm -r ~/x']) expect([c, rules(c)]).toEqual([c, ['rm-outside']])
+  test('a bare variable or a recursive flag still makes rm recursive (rm leaves the floor in 0.10.0)', () => {
+    for (const c of ['rm -rf $T', 'rm $F /x', 'rm -rf ../x', 'rm -r ~/x']) expect([c, rules(c)]).toEqual([c, []])
   })
 })
 
 describe('0.5.1: the session branch still decides a push (0.5.0 reading; #766)', () => {
   test('a text-only finding survives beside an own-words one in another command (PR #763 round 2)', () => {
-    const f = floorFindings("herdr pane run p 'git branch -D victim'; git branch -D merged", W).findings
-    expect(f.filter(x => x.rule === 'branch-delete').map(x => x.level).sort()).toEqual(['ask', 'fork'])
+    const f = floorFindings("herdr pane run p 'git push -f origin feat/y'; git push -f origin feat/z", W).findings
+    expect(f.filter(x => x.rule === 'force-push').map(x => x.level).sort()).toEqual(['ask', 'fork'])
   })
   test('the default branch, HEAD, no refspec and an opaque destination still ask', () => {
-    for (const branch of [undefined, 'main']) {
-      const w = { ...W, branch }
-      for (const c of ['git push origin main', 'git push origin HEAD', 'git push origin x:main', 'git push', 'git push origin $B', 'git push origin --delete main'])
-        expect([branch, c, rules(c, w).includes('default-branch-push')]).toEqual([branch, c, true])
-    }
+    for (const c of ['git push origin main', 'git push origin HEAD', 'git push origin x:main', 'git push', 'git push origin $B', 'git push origin --delete main'])
+      expect([c, rules(c, { ...W, branch: 'main' }).includes('default-branch-push')]).toEqual([c, true])
+    // 0.10.0 (#766): a detached session's push leaves the floor unless the text names the default.
+    for (const c of ['git push', 'git push origin HEAD']) expect([c, rules(c, { ...W, branch: undefined })]).toEqual([c, []])
+    for (const c of ['git push origin main', 'git push origin x:main', 'git push origin $B', 'git push origin --delete main'])
+      expect([c, rules(c, { ...W, branch: undefined }).includes('default-branch-push')]).toEqual([c, true])
+  })
+})
+
+// ---- autonomic 0.10.0: the floor holds red lines 1–3 only (slice 2 plan, Task 1) ----
+// The floor's ask level parks a call for the operator. 0.10.0 keeps exactly three red lines on
+// it: 1 (a direct push to the default branch), 2 (a force-push to a branch the seat does not
+// own) and 3 (--no-verify, an AI trailer in a message the floor can read). Everything else
+// leaves the floor for the judge (Task 2's routing).
+describe('0.10.0 red lines', () => {
+  test('redLineOf names each rule its red line (spec §3)', () => {
+    expect([redLineOf('default-branch-push'), redLineOf('force-push'), redLineOf('no-verify'), redLineOf('ai-trailer')]).toEqual([1, 2, 3, 3])
+  })
+  test('red line 1: the default branch, named, matched, or the session branch itself', () => {
+    for (const c of ['git push origin main', 'git push origin HEAD:main', 'git push --all origin', 'git push origin x:refs/heads/main'])
+      expect([c, levels(c).ask]).toEqual([c, ['default-branch-push']])
+    expect(levels('git push', { ...W, branch: 'main' }).ask).toEqual(['default-branch-push'])
+  })
+  test('red line 2: a force-push to a branch the seat does not own', () => {
+    for (const c of ['git push -f origin feat/y', 'git push -f origin "$B"', 'git push -f', 'git push --mirror origin',
+      'git push origin +refs/heads/feat/x', 'git push -f origin feat/x feat/y'])
+      expect([c, levels(c).ask.includes('force-push')]).toEqual([c, true])
+    expect(levels('git push --force-with-lease origin main').ask).toEqual(['default-branch-push', 'force-push'])
+  })
+  test('an own-branch force leaves the floor; the controls above still park', () => {
+    for (const c of ['git push -f origin feat/x', 'git push origin +feat/x', 'git push -f origin feat/x:feat/x', 'git push --force-with-lease origin feat/x'])
+      expect([c, rules(c)]).toEqual([c, []])
+  })
+  test('red line 3: --no-verify and a trailer in a message the floor can read', () => {
+    expect(levels('git commit --no-verify -m x').ask).toEqual(['no-verify'])
+    for (const c of ['git commit -m "x" -m "Co-Authored-By: A <a@b>"', 'git commit -m "🤖 Generated with [Claude Code]"',
+      "git commit -am 'Co-Authored-By: A <a@b>'"])
+      expect([c, levels(c).ask]).toEqual([c, ['ai-trailer']])
+  })
+  test("a message the floor cannot read is the judge's (red line 3 is in its prompt)", () => {
+    for (const c of ['git commit -m "x"', 'git commit -F msg.txt', "git commit -F - <<'EOF'\nCo-Authored-By: A\nEOF",
+      'git commit -m "$(cat <<\'EOF\'\nCo-Authored-By: A <a@b>\nEOF\n)"'])
+      expect([c, levels(c)]).toEqual([c, { ask: [], fork: [] }])
+  })
+  test('the retired rules leave the floor: the judge decides them now (#764, call 7)', () => {
+    for (const c of ['git push origin --delete feat/y', 'git branch -D feat/y', 'git branch -d -f x', 'git push origin :feat/y', 'rm -rf ../x'])
+      expect([c, levels(c)]).toEqual([c, { ask: [], fork: [] }])
+  })
+  test('a detached session leaves the floor unless the text names the default branch (#766)', () => {
+    expect(levels('git push origin feat/y', { ...W, branch: undefined })).toEqual({ ask: [], fork: [] })
+    expect(levels('git push', { ...W, branch: undefined })).toEqual({ ask: [], fork: [] })
+    expect(levels('git push origin main', { ...W, branch: undefined }).ask).toEqual(['default-branch-push'])
+  })
+  test('text-only red-line words never park (Review Focus 5)', () => {
+    expect(levels('grep -n "push -f" x.ts')).toEqual({ ask: [], fork: [] })
+    expect(levels("cat <<'EOF' | sh\ngit push origin main\nEOF")).toEqual({ ask: [], fork: ['default-branch-push'] })
   })
 })
 

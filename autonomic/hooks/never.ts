@@ -1,6 +1,15 @@
 // The never-approve list (spec §3.3; autonomic 0.2.0, #684 direction 2′): checked in code
 // before any fork. A match leaves the ask in place.
 //
+// 0.10.0 holds red lines 1–3 only: a direct push to the default branch, a force-push to a branch
+// the seat does not own, and --no-verify or an AI trailer in a commit. Everything else (branch
+// deletes, rm outside the worktree, an undetermined current branch) leaves the floor and reaches
+// the judge with the red lines, the grants and the role attached (slice 2 plan, Task 1).
+//
+// Skill-first Q3: the floor reads open shell text and only adds stops. A match parks the call for
+// the operator and never approves one, so a call the floor misses goes on to the judge exactly as
+// if the check were absent.
+//
 // Since 0.5.0 the floor judges each simple command on its own words when the text parses, with
 // context from the whole text (moves, branch switches, variables assigned once to a literal, git
 // config writes).
@@ -9,9 +18,16 @@
 // `python3 -c 'git push -f'` shows `push` and `-f`. Text that never runs (messages, heredoc
 // bodies, a literal `sh -c` string read as commands) is data.
 
-// 'unreadable' matches nothing since 0.2.0; the name stays valid so an existing setting parses.
-export type NeverRule = 'force-push' | 'default-branch-push' | 'branch-delete' | 'rm-outside' | 'no-verify' | 'unreadable'
+export type NeverRule = 'default-branch-push' | 'force-push' | 'no-verify' | 'ai-trailer'
 export type Where = { cwd: string; root: string; home: string; branch?: string; defaultBranch?: string }
+// Red line 3's trailer half (spec §3): the commit footer that never belongs in our commits.
+// operations.ts reads the same shape for an effect's `trailer` fact, so it is defined here and
+// imported there — that module already imports this one, one definition and no cycle.
+export const TRAILER = /(?:^|\n)\s*(?:Co-Authored-By:|🤖\s*Generated with)/i
+// Which of the operator's six red lines each floor rule belongs to (spec §3): the floor holds
+// 1–3, the judge's prompt holds all six.
+const RED_LINE: Record<NeverRule, 1 | 2 | 3> = { 'default-branch-push': 1, 'force-push': 2, 'no-verify': 3, 'ai-trailer': 3 }
+export const redLineOf = (rule: NeverRule): 1 | 2 | 3 => RED_LINE[rule]
 
 // Bash joins a backslash-newline, drops a backslash and joins quoted pieces, so `pu\sh`,
 // `pu""sh` and `'git' push` are push. A substitution or a backtick opens new words; `${`
@@ -1169,16 +1185,63 @@ function namedRefs(words: readonly string[], names: readonly string[]): boolean 
   })
 }
 
+// The push flags whose words never name a destination: one that consumes no value, or a force
+// flag (an attached value names a lease or a ref, never the destination word). Anything else may
+// change the destination set the force arm is about to read.
+const NO_VALUE_PUSH = /^(?:-[uqvnf]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin))$/
+const FORCE_LONG = /^--(?:force|force-with-lease|force-if-includes)(?:=.*)?$/
+// Red line 2 (0.10.0) leaves the floor for a force whose destinations all name the session's own
+// non-default branch and nothing else: at least one refspec word, every one readable, and each
+// destination literally that branch. No refspec, an unreadable word, or a flag that may change the
+// destination set (--all, --branches, --mirror, an opaque or value-taking flag) answers false and
+// the force stays on the floor (call 4: fail closed).
+function ownForceDestination(words: readonly string[], branch: string | undefined, names: readonly string[]): boolean {
+  if (branch === undefined || names.includes(branch)) return false
+  const at = words.findIndex(w => PUSH.some(v => isVerb(w, v)))
+  if (at < 0) return false
+  const refs: string[] = []
+  let remote = false
+  for (let i = at + 1; i < words.length; i++) {
+    const w = words[i]!
+    if (w.startsWith('-') || w.startsWith('$')) {
+      if (anyFlag(w) || !(NO_VALUE_PUSH.test(w) || FORCE_LONG.test(w))) return false
+      continue
+    }
+    if (!remote) { if (opaque(w)) return false; remote = true; continue }
+    refs.push(w)
+  }
+  return refs.length > 0 && refs.every(ref => {
+    const dst = ref.replace(/^\+/, '')
+    if (opaque(dst)) return false
+    return (dst.includes(':') ? dst.slice(dst.lastIndexOf(':') + 1) : dst) === branch
+  })
+}
+// Red line 3's trailer half (0.10.0): the AI trailer in a commit message the floor can read. The
+// values of `-m`/`--message` (`-m x`, `-mx`, `-am x`, `--message=x`), unmasked for the separators
+// a quoted value hides. A message the floor cannot read — `-F`/`--file`, a heredoc body, the
+// substitution the reading() step drops — is the judge's: red line 3 is in its prompt.
+function trailerIn(words: readonly string[]): boolean {
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]!
+    if (w === '-m' || w === '--message') { const v = words[i + 1]; if (v !== undefined && TRAILER.test(unmask(v))) return true; continue }
+    if (w.startsWith('--message=')) { if (TRAILER.test(unmask(w.slice(10)))) return true; continue }
+    if (!/^-[A-Za-z0-9]/.test(w)) continue
+    const m = letters(w).indexOf('m')
+    if (m < 0) continue
+    // The cluster's value is what follows its 'm', or the next word when the cluster ends there.
+    const tail = w.slice(2 + m)
+    const v = tail === '' ? words[i + 1] : tail
+    if (v !== undefined && TRAILER.test(unmask(v))) return true
+  }
+  return false
+}
+
 function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>, switched = false): void {
   const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
   const anyNamed = (f: (w: string) => boolean) => words.some(w => f(w) || flagLike(w))
   const short = (c: string) => (w: string) => letters(w).includes(c)
 
   if (words.some(isPush)) {
-    if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
-      abbrev(w, '--mirror', 3) || w.startsWith('+'))) found.add('force-push')
-    if (any(w => short('d')(w) || abbrev(w, '--delete', 3) || abbrev(w, '--prune', 3) || abbrev(w, '--mirror', 3) ||
-      w.startsWith(':') || w.startsWith('+:'))) found.add('branch-delete')
     const names = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
     // A leading + forces the update; the ref after it is still the destination (+main).
     const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
@@ -1187,28 +1250,17 @@ function rulesOf(words: readonly string[], where: Where, moved: boolean, single:
     // 0.5.0 cause 3: only when the floor reads this one command, never the whole bag.
     // A branch switch earlier in the text (final review C1) is read the same way as a move.
     const away = (moved || switched) && !(single && namedRefs(words, names))
-    if (plumbing || where.branch === undefined || names.includes(where.branch) || away ||
+    // Red line 2 (0.10.0): the force arm fires unless every destination is the session's own
+    // non-default branch; ownForceDestination carries the fail-closed cases (call 4).
+    if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
+      abbrev(w, '--mirror', 3) || w.startsWith('+'))) {
+      if (!ownForceDestination(words, where.branch, names)) found.add('force-push')
+    }
+    if (plumbing || (where.branch !== undefined && names.includes(where.branch)) || away ||
       any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
       found.add('default-branch-push')
   }
-  // -D, or -d with a force flag; a plain -d refuses an unmerged branch (as seat-mods reads it).
-  if (words.some(w => isVerb(w, 'branch'))) {
-    const del = anyNamed(w => short('d')(w) || abbrev(w, '--delete', 3))
-    if (anyNamed(short('D')) || (del && anyNamed(w => short('f')(w) || abbrev(w, '--force', 3)))) found.add('branch-delete')
-  }
-  if (words.some(w => abbrev(w, '--no-verify', 6)) || (words.some(w => isVerb(w, 'commit')) && anyNamed(short('n')))) found.add('no-verify')
-
-  const rm = words.findIndex(w => isVerb(w, 'rm'))
-  if (rm >= 0) {
-    const after = words.slice(rm + 1)
-    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || anyFlag(w))
-    // Strictly below the root: nothing is below a worktree at /.
-    const root = where.root.replace(/\/+$/, '')
-    const below = (w: string) => root !== '' && w.startsWith(`${root}/`)
-    // A variable, a brace or a glob on a dot name may reach `..`; a plain glob stays where it is.
-    const unknown = (w: string) => /[${]/.test(w) || /(?:^|\/)\.[^/]*[*?[]/.test(w)
-    const outside = (w: string) => (!w.startsWith('-') || w.includes('/')) &&
-      (w.startsWith('~') || w.split('/').includes('..') || unknown(w) || (w.startsWith('/') && !below(w)))
-    if (recursive && (moved || words.includes('xargs') || after.some(outside))) found.add('rm-outside')
-  }
+  const commit = words.some(w => isVerb(w, 'commit'))
+  if (words.some(w => abbrev(w, '--no-verify', 6)) || (commit && anyNamed(short('n')))) found.add('no-verify')
+  if (commit && trailerIn(words)) found.add('ai-trailer')
 }

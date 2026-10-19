@@ -11,7 +11,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync
 import { execFile } from 'node:child_process'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, parseConfig } from '../hooks/config'
+import { DEFAULTS, parseConfig, retiredNote } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from '../hooks/floor'
 import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
@@ -471,6 +471,7 @@ export function createAutonomic(io: AutonomicIO) {
     const painPath = (io.env.AUTONOMIC_PAIN_PATH ?? '').trim()
     const pol = await policyText()
     const stageNow = safeSessionId(id) ? parseStage(await io.readText(stagePath(home(), id))) : undefined
+    const retired = retiredNote(cfg.retired)
     const lines = [
       `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
       ...(enrolled ? [`authority: ${authority.signal.aborted ? 'suspended; fresh trusted launch required' : authorityState}`] : []),
@@ -478,6 +479,7 @@ export function createAutonomic(io: AutonomicIO) {
       `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
       `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
       `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
+      ...(retired === undefined ? [] : [retired]),
       `readers: ${(cfg.readers ?? DEFAULT_READERS).map(r => r.join(' ')).join('; ') || 'none'}`,
       `molt stage: ${stageNow ?? 'none'}`,
       `ledger: ${await ledgerPath()}`,

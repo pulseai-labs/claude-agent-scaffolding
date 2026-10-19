@@ -343,10 +343,10 @@ describe('the never-approve floor', () => {
       expect(await a.onToolCall(at('git push', '/feat'))).toBeUndefined()
     })
 
-    test('rm -rf is judged against the folder it runs in, not the session\'s worktree', async () => {
+    test('rm leaves the floor (0.10.0: 1-3 only); its cwd no longer matters', async () => {
       const { w, a } = world({ files: autopilot() })
       w.gitBy['/elsewhere'] = { top: '/elsewhere', branch: 'feat/z', originHead: 'origin/main' }
-      expect((await a.onToolCall(at('rm -rf /repo/x', '/elsewhere')))?.reason).toContain('rm-outside')
+      expect(await a.onToolCall(at('rm -rf /repo/x', '/elsewhere'))).toBeUndefined()
       expect(await a.onToolCall(bash('rm -rf /repo/x'))).toBeUndefined()
       expect(await a.onToolCall(at('rm -rf /elsewhere/x', '/elsewhere'))).toBeUndefined()
     })
@@ -373,12 +373,13 @@ describe('the never-approve floor', () => {
   describe('github pr_push', () => {
     const push = (input: Record<string, unknown>) => ({ toolName: 'github', input: { op: 'pr_push', ...input } })
 
-    test('forceWithLease is blocked as a force push, with a permission ledger line and a pain signal', async () => {
+    test('forceWithLease off the session branch is blocked, with a permission ledger line and a pain signal; the own-branch force passes (0.10.0)', async () => {
       const { w, a } = world({ files: autopilot() })
-      const r = await a.onToolCall(push({ branch: 'feat/x', forceWithLease: true }))
+      const r = await a.onToolCall(push({ branch: 'feat/y', forceWithLease: true }))
       expect(r?.reason).toMatch(/^autonomic: never-approve — .*force-push.*; the operator decides$/)
       expect(ledger(w)[0]).toContain(' · permission · Q: github pr_push: ')
       expect(w.notes[0]).toContain('autopilot: never-approve')
+      expect(await a.onToolCall(push({ branch: 'feat/x', forceWithLease: true }))).toBeUndefined()
       expect((await a.onToolCall(push({ forceWithLease: 'true' })))?.block).toBe(true)
     })
 
@@ -402,10 +403,13 @@ describe('the never-approve floor', () => {
     })
   })
 
-  test('a rule the operator switched off in autonomic.json passes', async () => {
+  test('a retired name in autonomic.json enables nothing, with no problem, and the status names it (0.10.0; call 7)', async () => {
     const { a } = world({ files: { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ neverApprove: 'branch-delete' }) } })
     expect(await a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
-    expect((await a.onToolCall(bash('git push origin --delete old-branch')))?.block).toBe(true)
+    expect(await a.onToolCall(bash('git push origin --delete old-branch'))).toBeUndefined()
+    const s = await a.onCommand('status')
+    expect(s).toContain('retired in 0.10.0, now judged: branch-delete')
+    expect(s).not.toContain('settings:')
   })
 
   test('a session that left autopilot through a failure keeps the floor', async () => {
@@ -560,10 +564,17 @@ describe('mode, record and command', () => {
     const { a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'warn' }) } })
     const s = await a.onCommand('status')
     expect(s).toContain('policy: edited (/home/u/.claude/autonomic/policy.md)')
-    expect(s).toContain('never-approve: force-push default-branch-push branch-delete rm-outside no-verify unreadable')
+    expect(s).toContain('never-approve: force-push default-branch-push no-verify ai-trailer')
     expect(s).toContain('molt stage: warn')
     expect(s).toContain(`ledger: ${LEDGER}`)
     expect(s).toContain('pushes in a row with no change: 0 of 3')
+  })
+
+  test('a retired name in the stored list is shown as judged, and the live list keeps its rules (0.10.0; call 7)', async () => {
+    const { a } = world({ files: { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ neverApprove: 'force-push branch-delete' }) } })
+    const s = await a.onCommand('status')
+    expect(s).toContain('retired in 0.10.0, now judged: branch-delete')
+    expect(s).toContain('never-approve: force-push')
   })
 
   test('an invalid autonomic.json means the defaults plus a stated problem', async () => {
