@@ -2,6 +2,18 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.8.0 — 2026-10-19
+
+- **The status-block check runs on OMP** (AI spec 2026-10-19-omp-status-block-port-design.md). A
+  second OMP entry, `omp/status-extension.ts`, gives an OMP orchestrator the Claude Code status
+  check: a status turn whose reply is not the five-field block gets one block, a block that waits on
+  nothing while Next steps names work gets the idle block, and a second miss in the same turn goes
+  through with an OMP warning notification. It reuses `hooks/status.ts` for every check and string.
+  OMP's `input` cannot tell typing from a herdr send, so a turn is status by its crew tag, or when no
+  input started it. It is a separate entry because OMP stops `session_stop` and `tool_call` at the
+  first block in load order: `omp-seat` (omp-roles 0.8.0) keeps the guard first and loads this entry
+  last, for the orchestrator only, so molt's and autonomic's stop blocks win as on Claude Code.
+
 ## 0.7.0 — 2026-10-19
 
 - **The status block waits on the operator, and a blank line between fields is fine** (#879). The

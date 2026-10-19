@@ -9,6 +9,11 @@ All notable changes to the `crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.4.2
+
+**The status block is checked on OMP too.** `orchestrate`'s OMP host notes say seat-mods 0.8.0
+checks an OMP top's status block (one block per turn, then a warning), as on Claude Code.
+
 ## 0.4.1
 
 **The status block's second wait field is `Waiting on operator:`** (#879). §8's block names

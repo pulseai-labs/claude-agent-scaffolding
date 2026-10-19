@@ -18,6 +18,7 @@ names work is not a turn end: do the next step first, and write the block when s
 turn. Write no narration on a status turn: tool calls, then the block. A turn the operator typed is free and
 takes any shape. Only the top orchestrator follows this. A status turn whose reply must end with
 molt's `MOLT-HANDOFF: <path>` line ends with that line instead of the block.
+On OMP, seat-mods 0.8.0 checks the status block too (one block per turn, then a warning).
 
 Must not: spawn subagents (task, eval agent(), workpool) — seat-mods blocks them; dispatch herdr seats instead — or
 ask the operator what the run, its briefs or autonomic's mode already decide.

@@ -105,6 +105,7 @@ only its own mechanics. A send's slash command is text on omp: `/<plugin>:<skill
 `skill://<skill>`, except a send to a Claude Code seat. crew's `hooks.json` does not run on
 omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent`
 tool means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
+On OMP, seat-mods 0.8.0 checks the status block too (one block per turn, then a warning).
 
 Only a separately approved operator issuance or bounded recorded delegation may enroll a
 new OMP autonomous assignment. Use Autonomic's real file/CLI contract and omp-seat

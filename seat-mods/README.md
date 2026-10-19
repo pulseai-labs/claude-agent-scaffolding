@@ -259,6 +259,8 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 
 Under `SEAT_MODS_ROLE=orchestrator`, the OMP guard blocks the `task` tool and every `before_subagent_spawn` (eval `agent()`, workpool) with a #798 denial directing the top to dispatch a herdr seat; other tools stay free, coordinator and every guarded role are unchanged, and the Claude Code hook is unchanged.
 
+`omp/status-extension.ts` (0.8.0) is the status-block check and idle stop for an OMP orchestrator, over the same `hooks/status.ts`: one block per turn, then the warning as an OMP notification. `omp-seat` loads it last, after molt and autonomic, for the orchestrator only, so their `session_stop` blocks win as they do beneath seat-mods on Claude Code; the guard stays first. OMP's `input` cannot tell typing from a herdr send, so a turn is status by its crew tag, or when no input started it (a job completion, an idle wake). **Known limit:** a turn that no prompt starts gets the check but not the status-turn context line.
+
 `omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
 
 | Child agent | Rails |
@@ -284,5 +286,5 @@ A child may not spawn (`task`, eval `agent()` and workpool workers are blocked).
 
 ```bash
 bash seat-mods/run-tests.sh   # claude plugin validate + claude plugin test
-bun test omp/                 # repo root: the OMP guard (omp/tests/seat-mods.test.ts)
+bun test omp/                 # repo root: the OMP guard (omp/tests/seat-mods.test.ts) and status check (omp/tests/seat-mods-status.test.ts)
 ```
