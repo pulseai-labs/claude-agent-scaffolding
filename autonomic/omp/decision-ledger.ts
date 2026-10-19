@@ -2,7 +2,7 @@
 // a partial record is an intent, never execution proof. Both required writes must land, and the
 // authority must be fresh before each write and after the last, or nothing is released.
 import { ledgerLine } from '../hooks/ledger'
-import type { LedgerCase } from '../hooks/ledger'
+import type { LedgerCase, LedgerSource } from '../hooks/ledger'
 import { redact } from '../hooks/ledger'
 import { oneLine } from '../hooks/ledger'
 import type { DecisionDraft, DecisionFrame, DecisionIO } from './judgment'
@@ -52,7 +52,7 @@ function leaseEvidenceIds(frame: DecisionFrame, ids: readonly string[]): string[
  * after the last. On any required-write failure or timeout, publish manual/failure and never act.
  */
 export async function commitDecision(io: DecisionIO, frame: DecisionFrame, draft: DecisionDraft,
-  rows: readonly { kase: LedgerCase; q: string; a: string; answerMax?: number }[]): Promise<void> {
+  rows: readonly { kase: LedgerCase; q: string; a: string; answerMax?: number; src?: LedgerSource }[]): Promise<void> {
   const session = frame.host.sessionId
   try {
     const record = recordFor(frame, draft)
@@ -61,6 +61,8 @@ export async function commitDecision(io: DecisionIO, frame: DecisionFrame, draft
     const humanLines = rows.map(r => ledgerLine({ time, session, kase: r.kase, q: r.q, a: r.a,
       // A row type may carry content past the default bound (the pain row holds complete option texts).
       ...(r.answerMax === undefined ? {} : { answerMax: r.answerMax }),
+      // Who decided the call (spec §9): absent on a 0.9.1-shaped row, so those stay byte-identical.
+      ...(r.src === undefined ? {} : { src: r.src }),
       why: `decisionId=${frame.id}; ${redactedReason}` }))
     await frame.budget.run('final', async signal => {
       const path = await io.ledgerPath()

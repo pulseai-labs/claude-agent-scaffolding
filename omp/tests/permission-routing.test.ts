@@ -17,6 +17,8 @@ import { operationFacts, permissionEligibility } from '../../autonomic/hooks/ope
 import type { OperationContext, OperationFacts, PermissionEligibility } from '../../autonomic/hooks/operations'
 import { captureFrame } from '../../autonomic/omp/judgment'
 import type { PolicyBundle } from '../../autonomic/omp/judgment'
+import { planPermission } from '../../autonomic/hooks/decide'
+import { DEFAULT_POLICY } from '../../autonomic/hooks/policy'
 import molt from '../../molt/omp/extension'
 import seatMods from '../../seat-mods/omp/extension'
 import { clockShift } from './judgment-world'
@@ -27,7 +29,11 @@ beforeEach(neutralizeSeatRole)
 afterAll(restoreSeatRole)
 
 const MAIN = 'refs/heads/main'
-const PUSH = `git push origin ${MAIN}:${MAIN}`
+// The fixture world's own branch: not a default name, so the floor holds nothing on a plain push of
+// it and the release path (a granted own-feature push) is what decides (0.10.0).
+const FEAT = 'refs/heads/fixture'
+const PUSH = `git push origin ${FEAT}:${FEAT}`
+const PUSH_MAIN = `git push origin ${MAIN}:${MAIN}`
 // The plan's real text-only finding (C0 autonomic/tests/floor-routing.test.ts): a command whose
 // only floor match is text, never an executable push.
 const QUOTE_API = "gh api repos/o/r/pulls/1/comments/2/replies -f body='we do not push here'"
@@ -39,7 +45,7 @@ const evidence = (id: string, text: string): EvidenceRef => ({ id, source: join(
 function pushGrant(over: Partial<{ id: string; remote: string; sourceRef: string; destinationRef: string; repository: string }> = {}): Grant {
   return { id: over.id ?? 'fixture-push', operation: 'git.push-own-branch',
     resource: { kind: 'push', repository: over.repository ?? '/fixture/repo', remote: over.remote ?? 'origin',
-      sourceRef: over.sourceRef ?? MAIN, destinationRef: over.destinationRef ?? MAIN },
+      sourceRef: over.sourceRef ?? FEAT, destinationRef: over.destinationRef ?? FEAT },
     authorityRefs: ['fixture-approval'] }
 }
 
@@ -61,22 +67,20 @@ function pushPolicy(withEvidence = true): PolicyBundle {
 }
 
 // A configured local origin (no network, no origin/HEAD): the push effect resolves its remote
-// from the placement facts, and the authority store re-reads the configured URL.
+// from the placement facts, and the authority store re-reads the configured URL. The branch is the
+// fixture's own (not a default name), so a plain push of it reaches the judge lane.
 function pushWorld(grants: Grant[] = [pushGrant()], mode: 'autopilot' | 'manual' = 'autopilot'): RoutingWorld {
-  const w = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode })
+  const w = routingWorld({ grants, policy: pushPolicy(), branch: 'fixture', mode })
   w.addRemote('origin', join(w.root, 'out', 'origin.git'))
   return w
 }
 
-// One native judgment stub: the fixture policy's own approved route, with the ruled allow/ask choice.
-function setNative(w: RoutingWorld, choice: 'allow' | 'ask' = 'allow'): void {
-  w.setNative(async (request: JudgmentRequest) => ({
-    judgment: { api: 'openrouter-decisions', provider: 'openrouter', model: 'fixture-response',
-      answers: { permission: { type: 'choice' as const, choice, probabilities: choice === 'allow' ? { allow: 1, ask: 0 } : { allow: 0, ask: 1 }, confidence: 1 } },
-      usage: fixtureUsage(1, 1) },
-    route: { requestId: 'fixture-request', purpose: 'extension:fixture:autonomic.permission:fixture-request',
-      selected: { api: 'openrouter-decisions', provider: 'openrouter', model: 'fixture-selected' }, questions: 1, cachedQuestions: 0 },
-  }) as unknown as ExtensionJudgment<typeof request.questions>)
+// One isolated side turn (call 5): Jev is off the permission path, so this is the only judge the
+// adapter may call. No stub at all means the host exposes none, and every judged call parks.
+function setGeneration(w: RoutingWorld, choice: 'allow' | 'ask' = 'allow'): void {
+  w.setGeneration(async () => ({
+    replyText: JSON.stringify({ decision: choice, red_line: null, reason: choice === 'allow' ? 'inside the granted task' : 'not covered by the task' }),
+  }) as never)
 }
 
 const bash = (command: string, cwd: string) => ({ command, cwd })
@@ -90,7 +94,7 @@ const secondRepo = (root: string, out: string): string => {
     if (r.status !== 0) throw new Error(`fixture git ${args.join(' ')} failed: ${r.stderr}`)
     return r.stdout.trim()
   }
-  git(other, 'init', '-b', 'main')
+  git(other, 'init', '-b', 'side')
   git(other, '-c', 'user.name=Synthetic', '-c', 'user.email=synthetic@example.invalid', 'commit', '--allow-empty', '-m', 'synthetic second repository')
   git(other, 'remote', 'add', 'origin', join(out, 'other-origin.git'))
   return other
@@ -109,31 +113,33 @@ describe('the plan\'s verbatim cases (Plan Task 5 §7 Step 1)', () => {
   test('high-confidence native allow cannot mint a missing task grant', async () => {
     const w = routingWorld({ grants: [], policy: fixturePolicy(), branch: 'main', mode: 'autopilot' })
     try {
-      setNative(w)
-      const original = { command: PUSH, cwd: w.tree }
+      const original = { command: PUSH_MAIN, cwd: w.tree }
       const before = structuredClone(original)
       expect((await w.invoke('bash', original))?.block).toBe(true)
       expect(original).toEqual(before)
-      expect(w.nativeRequests).toEqual([]) // authority failure is decided before inference
+      expect(w.nativeRequests).toEqual([])     // the floor parks it before any inference
+      expect(w.generationRequests).toEqual([])
     } finally { w.close() }
   })
 
   test('a granted exact own-feature push can pass the original intercepted call after recording', async () => {
     const policy = pushPolicy()
     const grants: Grant[] = [pushGrant()]
-    const w = routingWorld({ grants, policy, branch: 'main', mode: 'autopilot' })
+    const w = routingWorld({ grants, policy, branch: 'fixture', mode: 'autopilot' })
     try {
       w.addRemote('origin', join(w.root, 'out', 'origin.git'))
-      setNative(w)
+      setGeneration(w)
       const original = { command: PUSH, cwd: w.tree }
       const before = structuredClone(original)
       expect(await w.invoke('bash', original)).toBeUndefined()
       expect(original).toEqual(before)
       const all = rows(w)
       expect(all.at(-1)).toMatchObject({ consumer: 'permission', outcome: 'allow',
-        authority: { grantIds: ['fixture-push'] }, response: { api: 'openrouter-decisions', model: 'fixture-response' } })
+        authority: { grantIds: ['fixture-push'] }, payloadSource: { kind: 'generation', id: null } })
+      expect(all.at(-1)!.response).toBeNull()
       expect(readFileSync(w.ledgerPath, 'utf8')).toContain(all.at(-1)!.decisionId as string)
-      expect(w.nativeRequests).toHaveLength(1)
+      expect(w.generationRequests).toHaveLength(1)
+      expect(w.nativeRequests).toEqual([])     // Jev is off the deciding path (call 5)
     } finally { w.close() }
   })
 })
@@ -148,44 +154,47 @@ describe('an eligible intercepted call: records first, one original execution', 
 
   test('the sidecar is written before the human row, and the original input identity is unchanged', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     const original = { command: PUSH, cwd: w.tree }
     w.armAppend(() => { /* observe only */ })
     expect(await w.invoke('bash', original)).toBeUndefined()
     expect(w.order).toEqual(['sidecar', 'human'])
   })
 
-  test('the record states the matched evidence locator and never invents policy prose', async () => {
+  test('the record states the matched grant and the side turn it took, never policy prose', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     await w.invoke('bash', { command: PUSH, cwd: w.tree })
     const record = rows(w).at(-1)!
     expect(record.consumer).toBe('permission')
     expect(record.outcome).toBe('allow')
-    expect(record.payloadSource).toEqual({ kind: 'candidate', id: null })
-    expect(JSON.stringify(record.response)).toContain('fixture-response')
+    expect(record.payloadSource).toEqual({ kind: 'generation', id: null })
+    expect(record.response).toBeNull()
+    expect(record.authority).toMatchObject({ grantIds: ['fixture-push'] })
     expect(human(w)).toContain(`decisionId=${record.decisionId as string}`)
+    expect(human(w)).toContain(' · src: judge')
   })
 
   test('the shielded tool/cwd are the call\'s own, and an unintercepted ordinary tool is untouched', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     expect(await w.invoke('bash', { command: 'git status', cwd: w.tree })).toBeUndefined()
-    expect(w.nativeRequests).toEqual([])
+    expect(w.generationRequests).toEqual([])
     expect(rows(w)).toEqual([])
   })
 
-  test('a covered deterministic approved decision makes zero native calls', async () => {
+  test('a covered deterministic approved decision makes zero side turns', async () => {
     // The approved permission is keyed on the JSON identity of the whole captured input. An input
     // without `cwd` is stable across worlds: the fixture fills the call's cwd from io.cwd (the tree).
     const input = { command: PUSH }
     const policy = pushPolicy()
     policy.approved.permissions.push({ inputSha256: digest(JSON.stringify(input)), grantIds: ['fixture-push'], decision: 'allow', evidenceIds: [] })
-    w = routingWorld({ grants: [pushGrant()], policy, branch: 'main', mode: 'autopilot' })
+    w = routingWorld({ grants: [pushGrant()], policy, branch: 'fixture', mode: 'autopilot' })
     w.addRemote('origin', join(w.root, 'out', 'origin.git'))
     expect(await w.invoke('bash', input)).toBeUndefined()
-    expect(w.nativeRequests).toEqual([]) // the approved decision is deterministic
+    expect(w.generationRequests).toEqual([]) // the approved decision is deterministic
     expect(rows(w).at(-1)).toMatchObject({ outcome: 'allow', payloadSource: { kind: 'deterministic', id: null } })
+    expect(human(w)).toContain(' · src: grant')
   })
 })
 
@@ -197,36 +206,38 @@ describe('text-only floor findings', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })
 
-  test('the real quote with a completely bounded own-PR effect uses native permission once', async () => {
+  test('the real quote with a completely bounded own-PR effect takes one side turn', async () => {
     const text = 'Synthetic approved task: the fixture-pr grant covers commenting on our own pull request 1.'
     const policy = fixturePolicy()
     policy.evidence.push({ ref: evidence('fixture-pr-evidence', text), text })
     const grants: Grant[] = [{ id: 'fixture-pr', operation: 'pr.update-own',
-      resource: { kind: 'pr', repository: '/fixture/repo', headRef: MAIN, number: 1 }, authorityRefs: ['fixture-approval'] }]
-    w = routingWorld({ grants, policy, branch: 'main', mode: 'autopilot' })
+      resource: { kind: 'pr', repository: '/fixture/repo', headRef: FEAT, number: 1 }, authorityRefs: ['fixture-approval'] }]
+    w = routingWorld({ grants, policy, branch: 'fixture', mode: 'autopilot' })
     // The repository fact comes from the configured origin URL (U1): owner/repo = o/r.
     w.addRemote('origin', 'https://github.com/o/r.git')
-    setNative(w)
+    setGeneration(w)
     const original = { command: QUOTE_API, cwd: w.tree }
     expect(await w.invoke('bash', original)).toBeUndefined()
-    expect(w.nativeRequests).toHaveLength(1)
+    expect(w.generationRequests).toHaveLength(1)
+    expect(w.nativeRequests).toEqual([])
     expect(rows(w).at(-1)).toMatchObject({ outcome: 'allow', authority: { grantIds: ['fixture-pr'] } })
     expect(original).toEqual({ command: QUOTE_API, cwd: w.tree })
   })
 
-  test('the same quote on an opaque interpreter effect stays ask, with no inference', async () => {
+  test('the same quote on an opaque interpreter effect parks, with no inference', async () => {
     const text = 'Synthetic approved task: the fixture-pr grant covers commenting on our own pull request 1.'
     const policy = fixturePolicy()
     policy.evidence.push({ ref: evidence('fixture-pr-evidence', text), text })
     const grants: Grant[] = [{ id: 'fixture-pr', operation: 'pr.update-own',
-      resource: { kind: 'pr', repository: '/fixture/repo', headRef: MAIN, number: 1 }, authorityRefs: ['fixture-approval'] }]
-    w = routingWorld({ grants, policy, branch: 'main', mode: 'autopilot' })
+      resource: { kind: 'pr', repository: '/fixture/repo', headRef: FEAT, number: 1 }, authorityRefs: ['fixture-approval'] }]
+    w = routingWorld({ grants, policy, branch: 'fixture', mode: 'autopilot' })
     w.addRemote('origin', 'https://github.com/o/r.git')
-    setNative(w)
+    setGeneration(w)
     const command = `python3 -c "print(1)" ; ${QUOTE_API}`
     const r = await w.invoke('bash', { command, cwd: w.tree })
     expect(r?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([])
+    expect(r?.reason).toContain('parked for the operator')
+    expect(w.generationRequests).toEqual([])   // the unresolved effect is decided before any judge
   })
 })
 
@@ -259,46 +270,50 @@ describe('red lines and out-of-bound effects stay blocked', () => {
     test(`${name} stays blocked`, async () => {
       w = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode: 'autopilot' })
       w.addRemote('origin', join(w.root, 'out', 'origin.git'))
-      setNative(w)
       const r = await w.invoke('bash', { command: command(w), cwd: w.tree })
       expect(r?.block).toBe(true)
+      expect(w.generationRequests).toEqual([])   // the floor or the effect bounds decide it, never the judge
     })
   }
 
-  // rm left the floor in 0.10.0 (red lines 1–3 only); the judge lane releases it. This pins the
-  // current lane — Tasks 2/4 give it a judge of its own and update this file then.
+  // rm left the floor in 0.10.0 (red lines 1–3 only) and has no Operation vocabulary behind it, so
+  // an enrolled call parks at the bound step: no grant can cover an effect the vocabulary does not
+  // name (the plan-vs-code gap T6 reports; the judge lane is the unenrolled hosts').
   const leftTheFloor: Array<[string, Grant[], (w: RoutingWorld) => string]> = [
     ['rm outside the worktree', [pushGrant()], () => 'rm -rf /etc/passwd'],
     ['rm of the filesystem root', [pushGrant()], () => 'rm -rf /'],
   ]
   for (const [name, grants, command] of leftTheFloor) {
-    test(`${name} leaves the floor (0.10.0: 1-3 only)`, async () => {
+    test(`${name} is judged now and parks on the effect bound (0.10.0: 1-3 only)`, async () => {
       w = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode: 'autopilot' })
       w.addRemote('origin', join(w.root, 'out', 'origin.git'))
-      setNative(w)
-      expect(await w.invoke('bash', { command: command(w), cwd: w.tree })).toBeUndefined()
+      setGeneration(w)
+      const r = await w.invoke('bash', { command: command(w), cwd: w.tree })
+      expect(r?.block).toBe(true)
+      expect(r?.reason).toContain('parked for the operator')
+      expect(r?.reason).toContain('an effect is not bounded by the approved vocabulary')
+      expect(w.generationRequests).toEqual([])
     })
   }
 
-  test('native github pr_push with forceWithLease true is a force red line', async () => {
+  test('native github pr_push with forceWithLease true parks on the force line', async () => {
     w = pushWorld()
-    setNative(w)
     const r = await w.invoke('github', { op: 'pr_push', branch: 'main', forceWithLease: true })
     expect(r?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([])
+    expect(r?.reason).toContain('never-approve: force-push, default-branch-push')
+    expect(w.generationRequests).toEqual([])
   })
 
   test("native github pr_push with forceWithLease 'true' (string) is a force red line too", async () => {
     w = pushWorld()
-    setNative(w)
     const r = await w.invoke('github', { op: 'pr_push', branch: 'main', forceWithLease: 'true' })
     expect(r?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([])
+    expect(w.generationRequests).toEqual([])
   })
 
   test('a cwd outside the assignment blocks rather than releasing', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     const outside = join(w.root, 'home')
     mkdirSync(outside, { recursive: true })
     const r = await w.invoke('bash', { command: PUSH, cwd: outside })
@@ -314,37 +329,40 @@ describe('operator handling and mode semantics', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })
 
-  test('a granted call whose native judgment says ask blocks with the plan\'s verbatim reason', async () => {
+  test('a granted call whose side turn says ask parks with the judge\'s reason', async () => {
     w = pushWorld()
-    setNative(w, 'ask')
+    setGeneration(w, 'ask')
     const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
-    expect(r).toEqual({ block: true, reason: 'autonomic: the operator decides' })
+    expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('parked for the operator')
+    expect(r?.reason).toContain('the judge asked): not covered by the task')
     expect(rows(w)).toEqual([])
   })
 
   test('an explicit normal manual session keeps the ordinary allow: no interception', async () => {
     w = pushWorld([pushGrant()], 'manual')
-    setNative(w)
+    setGeneration(w)
     expect(await w.invoke('bash', { command: 'git commit --no-verify -m x', cwd: w.tree })).toBeUndefined()
+    expect(w.generationRequests).toEqual([])
     expect(w.nativeRequests).toEqual([])
   })
 
-  test('a failure-induced manual keeps the floor and still records an operator decision', async () => {
+  test('a floor park is recorded even when the mode is not autopilot any more', async () => {
     w = pushWorld()
-    setNative(w)
-    // No policy file: the record is written manual-with-problem, so the floor stays live.
-    w.armAppend(() => {})
+    w.armAppend(() => { /* observe only */ })
     const r = await w.invoke('bash', { command: 'git push --force origin main', cwd: w.tree })
     expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('parked for the operator')
+    expect(human(w)).toContain(' · permission · ')
   })
 
   test('a memory-capped input above 64,000 code units stays with the operator', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     const pad = 'a'.repeat(65_000)
     const r = await w.invoke('bash', { command: `${PUSH} # ${pad}`, cwd: w.tree })
     expect(r?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([])
+    expect(w.generationRequests).toEqual([])
   })
 
   test('the shown-input bound is measured in code units, not bytes', async () => {
@@ -362,28 +380,37 @@ describe('operator handling and mode semantics', () => {
 
   test('a malformed, unparsable whole input never returns undefined once intercepted', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // The command still names a danger, so the floor intercepts it; its effects cannot be parsed.
     const r = await w.invoke('bash', { command: 'git push "unclosed', cwd: w.tree })
     expect(r?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([])
+    expect(r?.reason).toContain('parked for the operator')
+    expect(w.generationRequests).toEqual([])
   })
 
-  test('a rule the operator left out of neverApprove does not intercept', async () => {
+  test('a rule the operator left out of neverApprove does not park: the call reaches the judge', async () => {
     w = routingWorld({ grants: [pushGrant()], policy: pushPolicy(), branch: 'main', mode: 'autopilot' })
     w.addRemote('origin', join(w.root, 'out', 'origin.git'))
-    setNative(w)
+    setGeneration(w)
     // default-branch-push is a configured rule but this operator did not enable it, so a
-    // default-branch push is not autonomic's to intercept.
+    // default-branch push is judged like any other routed call instead of parking on the floor.
     w.writeConfig({ neverApprove: 'force-push' })
     await w.handlers.get('session_start')?.({}, w.ctx)
-    expect(await w.invoke('bash', { command: PUSH, cwd: w.tree })).toBeUndefined()
-    expect(w.nativeRequests).toEqual([])
+    expect(await w.invoke('bash', { command: PUSH_MAIN, cwd: w.tree })).toBeUndefined()
+    expect(w.generationRequests).toHaveLength(1)
+    // Adjacent control: the default list parks the same call on the floor, before any judge.
+    w.close()
+    w = routingWorld({ grants: [pushGrant()], policy: pushPolicy(), branch: 'main', mode: 'autopilot' })
+    w.addRemote('origin', join(w.root, 'out', 'origin.git'))
+    setGeneration(w)
+    const parked = await w.invoke('bash', { command: PUSH_MAIN, cwd: w.tree })
+    expect(parked?.reason).toContain('never-approve: default-branch-push')
+    expect(w.generationRequests).toEqual([])
   })
 
   test('a command with no danger word is never intercepted', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // No push, branch, commit or rm word: the pre-check skips the whole reading.
     expect(await w.invoke('bash', { command: 'echo hello', cwd: w.tree })).toBeUndefined()
     expect(w.nativeRequests).toEqual([])
@@ -391,7 +418,7 @@ describe('operator handling and mode semantics', () => {
 
   test('a bash call with no command string is not intercepted at all (unchanged pre-gate)', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     expect(await w.invoke('bash', { cwd: w.tree })).toBeUndefined()
     expect(w.nativeRequests).toEqual([])
   })
@@ -405,17 +432,18 @@ describe('no intercepted exception path returns undefined', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })
 
-  test('a missing native bridge blocks with the plan\'s unavailable-or-stale reason', async () => {
+  test('a missing side turn parks with the judge\'s non-answer, never releasing', async () => {
     w = pushWorld()
-    // No setNative: the fixture ctx.judge throws.
+    // No setGeneration: the host exposes no isolated turn, so the judge cannot answer.
     const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
     expect(r?.block).toBe(true)
-    expect(String(r?.reason)).toContain('decision unavailable or stale')
+    expect(r?.reason).toContain('the judge did not answer')
+    expect(rows(w)).toEqual([])                 // nothing was recorded as decided
   })
 
   test('a revoked authority during append blocks and writes nothing that can release', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     w.armAppend(path => { if (path === w.ledgerPath) w.revoke() })
     const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
     expect(r?.block).toBe(true)
@@ -423,7 +451,7 @@ describe('no intercepted exception path returns undefined', () => {
 
   test('an authority replaced during append blocks', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     w.armAppend(path => { if (path === w.ledgerPath) w.replace() })
     const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
     expect(r?.block).toBe(true)
@@ -431,7 +459,7 @@ describe('no intercepted exception path returns undefined', () => {
 
   test('an authority that goes stale after both writes still blocks the release', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // Revoke on the LAST (human) append: commitDecision's own final check must already throw, and
     // the caller's post-commit freshness check is the second guard. Either way the call blocks.
     w.armAppend(path => { if (path === w.ledgerPath) w.revoke() })
@@ -442,7 +470,7 @@ describe('no intercepted exception path returns undefined', () => {
 
   test('a ledger append that never lands blocks', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     let restore: (() => void) | undefined
     w.armAppend(() => { restore ??= clockShift(30_000) })
     try {
@@ -451,15 +479,12 @@ describe('no intercepted exception path returns undefined', () => {
     } finally { restore?.() }
   })
 
-  test('a native judgment that takes the whole window blocks', async () => {
+  test('a side turn that takes the whole window blocks', async () => {
     w = pushWorld()
     let restore: (() => void) | undefined
-    w.setNative(async request => {
+    w.setGeneration(async () => {
       restore = clockShift(30_000)
-      return { judgment: { api: 'openrouter-decisions', provider: 'openrouter', model: 'fixture-response',
-        answers: { permission: { type: 'choice' as const, choice: 'allow', probabilities: { allow: 1, ask: 0 }, confidence: 1 } },
-        usage: fixtureUsage(1, 1) },
-        route: { requestId: 'r', purpose: 'p', selected: { api: 'openrouter-decisions', provider: 'openrouter', model: 'fixture-selected' }, questions: 1, cachedQuestions: 0 } } as unknown as ExtensionJudgment<typeof request.questions>
+      return { replyText: JSON.stringify({ decision: 'allow', red_line: null, reason: 'yes' }) } as never
     })
     try {
       const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
@@ -469,13 +494,14 @@ describe('no intercepted exception path returns undefined', () => {
 
   test('redaction that would hide material input abstains rather than judging an unseen suffix', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // The whole captured input is judged; a secret in any field is hidden by redaction, so the
     // unseen suffix must not be sent to judgment.
     const token = 'ghp_' + 'A'.repeat(36)
     const r = await w.invoke('bash', { command: PUSH, cwd: w.tree, env: { TOKEN: token } })
     expect(r?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([]) // the secret never reached judgment state
+    expect(r?.reason).toContain('redaction would hide')
+    expect(w.generationRequests).toEqual([])   // the secret never reached judgment state
   })
 })
 
@@ -489,18 +515,22 @@ describe('the origin/HEAD→granted ref world refuses the lease', () => {
 
   test('a push grant whose destination is the configured default ref cannot be leased', async () => {
     w = pushWorld()
-    w.setRemoteHead('origin', MAIN)
+    w.setRemoteHead('origin', FEAT)
     const facts = await w.decisions.placement({ cwd: w.tree }, new AbortController().signal)
-    expect(facts.defaultRefs).toContain(MAIN)
+    expect(facts.defaultRefs).toContain(FEAT)
     expect(() => w.decisions.authority.lease('S1', facts)).toThrow(/protected\/default destination/)
   })
 
   test('the same world blocks the intercepted call instead of releasing it', async () => {
     w = pushWorld()
-    w.setRemoteHead('origin', MAIN)
-    setNative(w)
-    const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
+    w.setRemoteHead('origin', FEAT)
+    setGeneration(w)
+    // A routed call that is no floor case still needs the lease to capture its frame — and in this
+    // world the snapshot's own granted destination is the configured default, so the lease refuses.
+    const r = await w.invoke('bash', { command: 'git commit -m x', cwd: w.tree })
     expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('the never-approve check failed')
+    expect(w.generationRequests).toEqual([])
   })
 })
 
@@ -513,7 +543,7 @@ describe('the ordered seat-mods → Molt → Autonomic dispatch', () => {
   afterEach(() => { if (w) w.close() })
 
   async function ordered(mode: 'autopilot' | 'manual' = 'autopilot', grants: Grant[] = [pushGrant()]) {
-    w = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode })
+    w = routingWorld({ grants, policy: pushPolicy(), branch: 'fixture', mode })
     w.addRemote('origin', join(w.root, 'out', 'origin.git'))
     w.registerOrdered(seatMods)
     w.registerOrdered(molt)
@@ -522,7 +552,7 @@ describe('the ordered seat-mods → Molt → Autonomic dispatch', () => {
     return w
   }
 
-  test('a preserved early seat refusal blocks before any native inference and no receipt runs', async () => {
+  test('a preserved early seat refusal blocks before any inference and no receipt runs', async () => {
     await ordered('autopilot')
     process.env.SEAT_MODS_ROLE = 'verifier'   // a verifier may not push
     try {
@@ -530,26 +560,60 @@ describe('the ordered seat-mods → Molt → Autonomic dispatch', () => {
       expect(r.block).toBe(true)
       expect(r.receipt).toBe(0)               // no original-tool receipt
       expect(w.nativeRequests).toEqual([])    // Autonomic never ran
+      expect(w.generationRequests).toEqual([])
       expect(r.order).toEqual(['dispatch'])   // seat-mods refused first
+    } finally { delete process.env.SEAT_MODS_ROLE }
+  })
+
+  test('the implementer\'s own force push of the default branch is a floor park through the chain', async () => {
+    await ordered('autopilot')
+    process.env.SEAT_MODS_ROLE = 'implementer'
+    try {
+      // seat-mods denies implementer force-pushes first (its own guard); the seat-mods denial is
+      // the outer stop. The floor park is what an unguarded host would apply — pinned elsewhere.
+      const r = await w.dispatch('bash', { command: `git push --force origin ${MAIN}:${MAIN}`, cwd: w.tree })
+      expect(r.block).toBe(true)
+      expect(String(r.reason)).toContain('seat-mods (implementer)')
+      expect(r.receipt).toBe(0)
     } finally { delete process.env.SEAT_MODS_ROLE }
   })
 
   test('one valid bounded release writes both records BEFORE the original-tool receipt', async () => {
     await ordered('autopilot')
-    process.env.SEAT_MODS_ROLE = 'coordinator' // a free role has no seat deny for this push
-    setNative(w)
+    process.env.SEAT_MODS_ROLE = 'coordinator'
+    setGeneration(w)
     try {
       const r = await w.dispatch('bash', { command: PUSH, cwd: w.tree })
       expect(r.block).toBe(false)
       expect(r.receipt).toBe(1)               // the original tool ran exactly once
       expect(r.order).toEqual(['dispatch', 'sidecar', 'human', 'receipt:bash'])
+      expect(w.generationRequests).toHaveLength(1)   // the side turn decided it, not Jev
+      expect(w.nativeRequests).toEqual([])
+    } finally { delete process.env.SEAT_MODS_ROLE }
+  })
+
+  test('a routed file tool goes through the same chain: judged when it names a word, integrity-parked for the store', async () => {
+    await ordered('autopilot')
+    process.env.SEAT_MODS_ROLE = 'coordinator'
+    setGeneration(w)
+    try {
+      const judged = await w.dispatch('write', { path: join(w.tree, 'x.txt'), content: 'note: git push --force origin main' })
+      expect(judged.block).toBe(false)
+      expect(judged.receipt).toBe(1)
+      expect(w.generationRequests).toHaveLength(1)
+      // A write that names the park store is the integrity guard's, with no judge consulted.
+      const denied = await w.dispatch('write', { path: join(w.tree, 'x.txt'), content: 'autonomic/parks/abc.json' })
+      expect(denied.block).toBe(true)
+      expect(String(denied.reason)).toContain('operator-only state')
+      expect(w.generationRequests).toHaveLength(1)
+      expect(denied.receipt).toBe(judged.receipt)   // no further original-tool receipt
     } finally { delete process.env.SEAT_MODS_ROLE }
   })
 
   test('a later handler refusal after an allow still prevents the receipt', async () => {
     await ordered('autopilot')
     process.env.SEAT_MODS_ROLE = 'coordinator'
-    setNative(w)
+    setGeneration(w)
     // A handler registered after Autonomic that refuses: the receipt never runs.
     w.registerOrdered(pi => { pi.on('tool_call', () => ({ block: true, reason: 'a later host handler refused' })) })
     try {
@@ -570,8 +634,8 @@ describe('the eligibility red-line clauses, driven directly', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })
 
-  async function ctxFor(command: string, grants: Grant[]): Promise<OperationContext> {
-    w = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode: 'autopilot' })
+  async function ctxFor(command: string, grants: Grant[], branch = 'main'): Promise<OperationContext> {
+    w = routingWorld({ grants, policy: pushPolicy(), branch, mode: 'autopilot' })
     w.addRemote('origin', join(w.root, 'out', 'origin.git'))
     const f = await captureFrame(w.decisions, performance.now(), 'permission', { command, cwd: w.tree })
     return { inputSha256: f.inputSha256, facts: f.facts, snapshot: f.lease.snapshot,
@@ -579,9 +643,9 @@ describe('the eligibility red-line clauses, driven directly', () => {
   }
   const factsFor = (command: string, ctx: OperationContext) => operationFacts('bash', { command, cwd: w.tree }, ctx, DEFAULT_READERS)
 
-  test('a force refspec is decided on the force clause', async () => {
+  test('a force refspec on the default-named branch is decided on the force clause', async () => {
     const command = `git push origin +${MAIN}:${MAIN}`
-    const ctx = await ctxFor(command, [pushGrant()])
+    const ctx = await ctxFor(command, [pushGrant({ sourceRef: MAIN, destinationRef: MAIN })])
     const facts = factsFor(command, ctx)
     expect(facts.effects[0]!.force).toBe(true)
     expect(facts.effects[0]!.unresolved).toBeNull() // complete facts: only the red line can decide
@@ -591,16 +655,31 @@ describe('the eligibility red-line clauses, driven directly', () => {
     if (el.kind === 'ask') expect(el.reason).toContain('force')
   })
 
-  test('a delete refspec is decided on the deletion clause once its facts are complete', async () => {
-    // --delete with a resolvable branch ref: complete facts, so the deletion clause decides.
-    const command = `git push --delete origin ${MAIN.split('/').pop()}`
-    const ctx = await ctxFor(command, [pushGrant()])
+  test('a force whose destination is the seat\'s own non-default branch is no clause of its own', async () => {
+    // The world is on refs/heads/fixture and the grant names exactly that ref pair: complete facts
+    // and a covering grant, so the semantic judge decides instead of the force clause.
+    const command = `git push --force origin ${FEAT}:${FEAT}`
+    const ctx = await ctxFor(command, [pushGrant()], 'fixture')
     const facts = factsFor(command, ctx)
+    expect(facts.effects[0]!.force).toBe(true)
+    expect(permissionEligibility(facts, ctx)).toMatchObject({ kind: 'semantic', grantIds: ['fixture-push'] })
+    // Adjacent control: the same force whose destination IS the default name still asks.
+    const main = await ctxFor(`git push --force origin ${MAIN}:${MAIN}`, [pushGrant({ sourceRef: MAIN, destinationRef: MAIN })])
+    expect(permissionEligibility(factsFor(`git push --force origin ${MAIN}:${MAIN}`, main), main))
+      .toEqual({ kind: 'ask', reason: 'a force effect is operator-owned' })
+  })
+
+  test('a delete refspec has no clause of its own: facts plus a covering grant reach the judge', async () => {
+    // --delete with a resolvable branch ref: complete facts, so the grant (or its absence) decides.
+    const command = `git push --delete origin ${MAIN.split('/').pop()}`
+    const bare = await ctxFor(command, [])
+    const facts = factsFor(command, bare)
     expect(facts.effects[0]!.deletion).toBe(true)
     expect(facts.effects[0]!.unresolved).toBeNull()
-    const el = permissionEligibility(facts, ctx)
-    expect(el.kind).toBe('ask')
-    if (el.kind === 'ask') expect(el.reason).toBe('a delete effect is operator-owned')
+    expect(permissionEligibility(facts, bare)).toEqual({ kind: 'ask', reason: 'no applicable grant' })
+    // The adjacent control: a grant naming exactly that ref pair makes the same call semantic.
+    const own = await ctxFor(command, [pushGrant({ sourceRef: MAIN, destinationRef: MAIN })])
+    expect(permissionEligibility(factsFor(command, own), own)).toMatchObject({ kind: 'semantic', grantIds: ['fixture-push'] })
   })
 
   test('a complete no-verify commit is decided on the no-verify clause', async () => {
@@ -755,97 +834,98 @@ describe('a segment cwd outside the pinned worktree is never released', () => {
 
   test('git -C into a real second repository blocks instead of releasing', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // A real second repository, with its own origin, exists inside the fixture root but outside
     // the pinned worktree: the granted own-feature push must not authorize a push performed there.
     const other = secondRepo(w.root, join(w.root, 'out'))
-    const r = await w.invoke('bash', { command: `git -C ${other} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const r = await w.invoke('bash', { command: `git -C ${other} push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(r?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([])
+    expect(w.generationRequests).toEqual([])
     expect(rows(w)).toEqual([])
     expect(human(w)).not.toContain('allow')
   })
 
   test('git -C into a nonexistent directory blocks', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // Inside the pinned worktree (so the segment cwd resolves to the task's own root) but the
     // directory does not exist: the effects still cannot be established there.
-    const r = await w.invoke('bash', { command: `git -C ${join(w.tree, 'gone')} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const r = await w.invoke('bash', { command: `git -C ${join(w.tree, 'gone')} push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(r?.block).toBe(true)
     expect(rows(w)).toEqual([])
     // And a nonexistent target outside the worktree blocks too (the segment is opaque there).
-    const outside = await w.invoke('bash', { command: `git -C ${join(w.root, 'nowhere')} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const outside = await w.invoke('bash', { command: `git -C ${join(w.root, 'nowhere')} push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(outside?.block).toBe(true)
   })
 
   test('git -C into a subdirectory of the pinned worktree stays eligible', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     const sub = join(w.tree, 'sub')
     mkdirSync(sub, { recursive: true })
-    expect(await w.invoke('bash', { command: `git -C ${sub} push origin ${MAIN}:${MAIN}`, cwd: w.tree })).toBeUndefined()
+    expect(await w.invoke('bash', { command: `git -C ${sub} push origin ${FEAT}:${FEAT}`, cwd: w.tree })).toBeUndefined()
+    expect(w.generationRequests).toHaveLength(1)
     expect(rows(w).at(-1)).toMatchObject({ outcome: 'allow' })
   })
 
   test('an env -C relocation outside the pinned worktree blocks', async () => {
     w = pushWorld()
-    setNative(w)
-    const r = await w.invoke('bash', { command: `env -C ${secondRepo(w.root, join(w.root, 'out'))} git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    setGeneration(w)
+    const r = await w.invoke('bash', { command: `env -C ${secondRepo(w.root, join(w.root, 'out'))} git push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(r?.block).toBe(true)
     expect(rows(w)).toEqual([])
   })
 
   test('an absolute relocation target with .. cannot escape the pinned worktree', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // A real second repo, reached by an absolute path whose `..` segment points outside the pin.
     secondRepo(w.root, join(w.root, 'out'))
     const escape = `${w.tree}/../other`
-    const viaGit = await w.invoke('bash', { command: `git -C ${escape} push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const viaGit = await w.invoke('bash', { command: `git -C ${escape} push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(viaGit?.block).toBe(true)
-    expect(w.nativeRequests).toEqual([])
+    expect(w.generationRequests).toEqual([])
     expect(rows(w)).toEqual([])
     expect(human(w)).not.toContain('allow')
     // The same escape through env's own relocation flags.
-    const viaEnvC = await w.invoke('bash', { command: `env -C ${escape} git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const viaEnvC = await w.invoke('bash', { command: `env -C ${escape} git push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(viaEnvC?.block).toBe(true)
-    const viaChdir = await w.invoke('bash', { command: `env --chdir=${escape} git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const viaChdir = await w.invoke('bash', { command: `env --chdir=${escape} git push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(viaChdir?.block).toBe(true)
     expect(rows(w)).toEqual([])
   })
 
   test('absolute and relative dot segments that stay inside the worktree remain eligible', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     mkdirSync(join(w.tree, 'sub'), { recursive: true })
     mkdirSync(join(w.tree, 'sub2'), { recursive: true })
     // `<tree>/./sub` and `<tree>/sub/../sub2` both normalize inside the pinned worktree.
-    const dot = await w.invoke('bash', { command: `git -C ${w.tree}/./sub push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const dot = await w.invoke('bash', { command: `git -C ${w.tree}/./sub push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(dot).toBeUndefined()
-    const normalized = await w.invoke('bash', { command: `git -C ${w.tree}/sub/../sub2 push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const normalized = await w.invoke('bash', { command: `git -C ${w.tree}/sub/../sub2 push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(normalized).toBeUndefined()
     expect(rows(w).at(-1)).toMatchObject({ outcome: 'allow' })
   })
 
   test('a relative .. traversal and a nonexistent .. target still block', async () => {
     w = pushWorld()
-    setNative(w)
-    expect((await w.invoke('bash', { command: `git -C ../other push origin ${MAIN}:${MAIN}`, cwd: w.tree }))?.block).toBe(true)
-    expect((await w.invoke('bash', { command: `git -C ${w.tree}/../gone push origin ${MAIN}:${MAIN}`, cwd: w.tree }))?.block).toBe(true)
+    setGeneration(w)
+    expect((await w.invoke('bash', { command: `git -C ../other push origin ${FEAT}:${FEAT}`, cwd: w.tree }))?.block).toBe(true)
+    expect((await w.invoke('bash', { command: `git -C ${w.tree}/../gone push origin ${FEAT}:${FEAT}`, cwd: w.tree }))?.block).toBe(true)
     expect(rows(w)).toEqual([])
   })
 
   test('the existing cd-segment semantics are unchanged', async () => {
     w = pushWorld()
-    setNative(w)
+    setGeneration(w)
     // `cd` is not a known program, so its own segment is opaque and a `cd && …` call asks — this
     // predates the cwd pin and must not change. The push segment itself resolves its own cwd.
-    const r = await w.invoke('bash', { command: `cd ${join(w.root, 'other')} && git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const r = await w.invoke('bash', { command: `cd ${join(w.root, 'other')} && git push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(r?.block).toBe(true)
-    const inside = await w.invoke('bash', { command: `cd sub && git push origin ${MAIN}:${MAIN}`, cwd: w.tree })
+    const inside = await w.invoke('bash', { command: `cd sub && git push origin ${FEAT}:${FEAT}`, cwd: w.tree })
     expect(inside?.block).toBe(true)
-    expect(executionSegments(`cd sub && git push origin ${MAIN}:${MAIN}`, w.tree, w.tree)[1]!.cwd).toBe(join(w.tree, 'sub'))
+    expect(executionSegments(`cd sub && git push origin ${FEAT}:${FEAT}`, w.tree, w.tree)[1]!.cwd).toBe(join(w.tree, 'sub'))
   })
 })
 
@@ -857,15 +937,15 @@ describe('operationFacts and permissionEligibility', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })
 
-  async function ctxOf(command: string, grants: Grant[], mode: 'autopilot' | 'manual' = 'autopilot'): Promise<{ w: RoutingWorld; ctx: OperationContext }> {
-    w = routingWorld({ grants, policy: pushPolicy(), branch: 'main', mode })
+  async function ctxOf(command: string, grants: Grant[], mode: 'autopilot' | 'manual' = 'autopilot', branch = 'main'): Promise<{ w: RoutingWorld; ctx: OperationContext }> {
+    w = routingWorld({ grants, policy: pushPolicy(), branch, mode })
     w.addRemote('origin', join(w.root, 'out', 'origin.git'))
     const f = await captureFrame(w.decisions, performance.now(), 'permission', { command, cwd: w.tree })
     return { w, ctx: { inputSha256: f.inputSha256, facts: f.facts, snapshot: f.lease.snapshot, approved: f.policy.approved.permissions, evidence: f.lease.evidence, commands: f.policy.approved.commands } }
   }
 
   test('a bounded own-feature push is eligible under its positive grant', async () => {
-    const { ctx } = await ctxOf(PUSH, [pushGrant()])
+    const { ctx } = await ctxOf(PUSH, [pushGrant()], 'autopilot', 'fixture')
     const facts = operationFacts('bash', { command: PUSH, cwd: w.tree }, ctx, DEFAULT_READERS)
     const el = permissionEligibility(facts, ctx)
     expect(el.kind).toBe('semantic')
@@ -873,7 +953,7 @@ describe('operationFacts and permissionEligibility', () => {
   })
 
   test('the same push without the grant is ask, never semantic', async () => {
-    const { ctx } = await ctxOf(PUSH, [])
+    const { ctx } = await ctxOf(PUSH, [], 'autopilot', 'fixture')
     const facts = operationFacts('bash', { command: PUSH, cwd: w.tree }, ctx, DEFAULT_READERS)
     expect(permissionEligibility(facts, ctx).kind).toBe('ask')
   })
@@ -886,7 +966,7 @@ describe('operationFacts and permissionEligibility', () => {
   })
 
   test('a guarded role ceiling cannot be passed by a matching grant', async () => {
-    const { ctx } = await ctxOf(PUSH, [pushGrant()])
+    const { ctx } = await ctxOf(PUSH, [pushGrant()], 'autopilot', 'fixture')
     const verifier = { ...ctx, snapshot: { ...ctx.snapshot, seat: { ...ctx.snapshot.seat, role: 'verifier' as const } } }
     const facts = operationFacts('bash', { command: PUSH, cwd: w.tree }, verifier, DEFAULT_READERS)
     expect(permissionEligibility(facts, verifier).kind).toBe('ask')
@@ -894,7 +974,7 @@ describe('operationFacts and permissionEligibility', () => {
 
   test('an approved deterministic decision is covered with no inference', async () => {
     const command = PUSH
-    const { w: world, ctx } = await ctxOf(command, [pushGrant()])
+    const { w: world, ctx } = await ctxOf(command, [pushGrant()], 'autopilot', 'fixture')
     void world
     const approved = { inputSha256: digest(JSON.stringify({ command, cwd: w.tree })), grantIds: ['fixture-push'], decision: 'allow' as const, evidenceIds: [] }
     const withApproved = { ...ctx, approved: [approved] }
@@ -912,19 +992,21 @@ describe('an enrolled decline is recorded and rings', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })
 
-  test('a native judgment that answers ask writes the row and the pain line', async () => {
+  test('a side turn that answers ask parks, writes the row and rings', async () => {
     w = pushWorld()
-    setNative(w, 'ask')
-    expect(await w.invoke('bash', { command: PUSH, cwd: w.tree })).toEqual({ block: true, reason: 'autonomic: the operator decides' })
+    setGeneration(w, 'ask')
+    const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
+    expect(r?.reason).toContain('parked for the operator')
     expect(human(w)).toContain(' · permission · ')
-    expect(w.painLines().join('\n')).toContain('never-approve')
+    expect(w.painLines().join('\n')).toContain('autopilot: parked')
   })
 
-  test('a decision route that fails writes the row and the pain line too', async () => {
-    w = pushWorld()   // no native bridge: the fixture's own ctx.judge throws
-    expect(String((await w.invoke('bash', { command: PUSH, cwd: w.tree }))?.reason)).toContain('decision unavailable or stale')
+  test('a judge that cannot answer parks too, with the row and the pain line', async () => {
+    w = pushWorld()   // no side turn: the host exposes none
+    const r = await w.invoke('bash', { command: PUSH, cwd: w.tree })
+    expect(String(r?.reason)).toContain('the judge did not answer')
     expect(human(w)).toContain(' · permission · ')
-    expect(w.painLines().join('\n')).toContain('never-approve')
+    expect(w.painLines().join('\n')).toContain('autopilot: parked')
   })
 })
 
@@ -1007,7 +1089,7 @@ describe('the commit path bound, redirections, config injection and the gh metho
     const deleted = await factsFor('gh api -X DELETE repos/o/r/pulls/1', [grant])
     expect(deleted.facts.effects[0]!.deletion).toBe(true)
     expect(deleted.facts.effects[0]!.operation).toBeNull()
-    expect(deleted.eligibility).toEqual({ kind: 'ask', reason: 'a delete effect is operator-owned' })
+    expect(deleted.eligibility).toEqual({ kind: 'ask', reason: 'a delete is operator-owned' })
     // A method that is not a bounded update is never classified as one.
     const put = await factsFor('gh api -X PUT repos/o/r/pulls/1', [grant])
     expect(put.facts.effects[0]!.operation).toBeNull()
@@ -1111,5 +1193,30 @@ describe('the commit path bound, redirections, config injection and the gh metho
     // Control: the same commit without them is bounded by its grant.
     expect((await factsFor('git commit -m x src/app.ts', [commitGrant()])).eligibility)
       .toMatchObject({ kind: 'semantic', grantIds: ['fixture-commit'] })
+  })
+})
+
+// =====================================================================================
+// Host parity: the adapter adds no policy the shared plan does not carry (Plan Task 6)
+// =====================================================================================
+
+describe('the OMP adapter carries no policy of its own', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  test('the prompt the side turn is sent is byte-equal to the shared plan\'s prompt for the same call', async () => {
+    w = pushWorld()
+    await w.handlers.get('session_start')?.({}, w.ctx)   // a real lease: the role and grant binding
+    setGeneration(w)
+    const input = { command: PUSH, cwd: w.tree }
+    expect(await w.invoke('bash', input)).toBeUndefined()
+    const sent = (w.generationRequests[0] as { promptText: string }).promptText
+    const frame = await captureFrame(w.decisions, performance.now(), 'permission', input)
+    const plan = planPermission({ tool: 'bash', input, command: PUSH, cwd: w.tree,
+      where: { cwd: w.tree, root: w.tree, home: process.env.HOME!, branch: 'fixture' } },
+      { policy: DEFAULT_POLICY.trim(), recent: '', role: frame.lease.snapshot.seat.role,
+        grants: frame.lease.snapshot.grants, parks: [], now: new Date().toISOString(), enabled: [] })
+    expect(plan.kind).toBe('judge')
+    expect(sent).toBe(plan.kind === 'judge' ? plan.prompt : '')
   })
 })

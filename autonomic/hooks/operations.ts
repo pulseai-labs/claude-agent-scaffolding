@@ -436,10 +436,17 @@ export function permissionEligibility(facts: OperationFacts, context: OperationC
   for (const e of facts.effects) {
     if (e.operation !== null && !rolePermits(role, e.operation)) return { kind: 'ask', reason: `the ${role} seat does not hold ${e.operation}` }
   }
-  // 2. Red lines and operator gates.
+  // 2. Red lines and operator gates. A force effect leaves red line 2 only when its destination is
+  // the seat's own branch and that branch is not the default (the same reading as never.ts's
+  // ownForceDestination; call 4: no resource, another destination, a missing branch or the default
+  // name all stay on the floor). Delete effects have no clause of their own any more (0.10.0):
+  // complete facts plus a covering grant reach the judge, and anything else asks below.
+  const own = context.facts.branch
+  const ownShort = own === null ? null : own.replace(/^refs\/heads\//, '')
+  const ownBranchDefault = defaultBranchOf(context.facts)
+  const defaultNames = ownBranchDefault === undefined ? ['main', 'master'] : [ownBranchDefault]
   for (const e of facts.effects) {
-    if (e.force) return { kind: 'ask', reason: 'a force effect is operator-owned' }
-    if (e.deletion) return { kind: 'ask', reason: 'a delete effect is operator-owned' }
+    if (e.force && !(ownShort !== null && e.resource?.kind === 'push' && e.resource.destinationRef === own && !defaultNames.includes(ownShort))) return { kind: 'ask', reason: 'a force effect is operator-owned' }
     if (e.noVerify) return { kind: 'ask', reason: '--no-verify is operator-owned' }
     if (e.merge) return { kind: 'ask', reason: 'a merge is operator-owned' }
     if (e.trailer) return { kind: 'ask', reason: 'an AI trailer is operator-owned' }

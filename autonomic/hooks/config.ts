@@ -24,7 +24,9 @@ export type AutonomicConfig = {
   // they are now judged. Empty when none were given.
   retired: RetiredRule[]
   // The model a judgment asks through `$.model.complete` when set (0.10.0 call 8); that call
-  // sees the prompt alone. Absent: the judge forks the session's own model, as before.
+  // sees the prompt alone. Absent: the judge forks the session's own model, as before. OMP's
+  // isolated side turn always runs the session model, so on OMP a set value is a status line,
+  // never a problem and never policy.
   decidingModel?: string
   // Absent: never.ts's DEFAULT_READERS. Set only when the readers key is given (0.4.3 §3.5).
   readers?: string[][]
