@@ -1,0 +1,91 @@
+// seat-mods on OMP, second entry: the orchestrator's status-block check and idle stop, the same
+// rules as hooks/register.ts's prompt.submit / classic.Stop / turn.complete, over OMP's input,
+// before_agent_start and session_stop. A separate entry because OMP runs session_stop and
+// tool_call handlers in extension order and stops at the first block: the guard (omp/extension.ts)
+// must load first, and this check must load last, after molt and autonomic, so their stop blocks
+// win as they do beneath seat-mods on Claude Code (AI workspace spec
+// 2026-10-19-omp-status-block-port-design.md §6.3). omp-seat loads it for the orchestrator only.
+import { parseRole } from '../hooks/rules'
+import { STATUS_CONTEXT, rewriteReason, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, isCrewTagged, checkBlock, isIdleStop, hasMoltHandoff } from '../hooks/status'
+
+export type StatusTurn = { status: boolean; blocked: boolean; warning: string | undefined }
+type Stop = { block: { decision: 'block'; reason: string } | undefined; warning: string | undefined }
+const NOTHING: Stop = { block: undefined, warning: undefined }
+
+// The reply as text: a string as-is, a message's text blocks joined (autonomic's textOf reading).
+export function replyText(m: unknown): string {
+  if (typeof m === 'string') return m
+  const content = m !== null && typeof m === 'object' ? (m as { content?: unknown }).content : undefined
+  if (!Array.isArray(content)) return ''
+  return content.filter(b => b?.type === 'text' && typeof b.text === 'string').map(b => b.text as string).join('\n')
+}
+
+// One session per process, as register.ts's `turn`. OMP's input cannot tell typing from a herdr
+// send (both are `interactive`), so a turn is status only by its crew tag, or when no input
+// started it at all (a job completion, an idle wake). The record is born at an idle input or at a
+// stop with none, survives the hidden turn after any extension's block, and ends when this entry
+// lets a stop through. An aborted turn fires no session_stop, so the next idle input replaces it.
+export function createStatusCheck(roleEnv: () => string | undefined) {
+  let turn: StatusTurn | undefined
+  // The next before_agent_start is a status prompt's: its prompt arrives expanded for a slash
+  // command, so the input's classification is carried here, not re-read from the prompt.
+  let context = false
+  const on = (): boolean => { const s = parseRole(roleEnv()); return s.kind === 'free' && s.role === 'orchestrator' }
+
+  return {
+    onInput(text: string, idle: boolean): void {
+      if (!on()) return
+      const status = isCrewTagged(text)
+      if (idle || turn === undefined) turn = { status, blocked: false, warning: undefined }
+      else if (!status) turn.status = false
+      context = status && turn.status
+    },
+    onBeforeAgentStart(_prompt: string): { message: { customType: 'seat-mods-status'; content: string; display: false } } | undefined {
+      if (!on() || !context) return undefined
+      context = false
+      return { message: { customType: 'seat-mods-status', content: STATUS_CONTEXT, display: false } }
+    },
+    onSessionStop(e: { last_assistant_message?: unknown; stop_hook_active?: unknown }): Stop {
+      if (!on()) return NOTHING
+      if (turn === undefined) {
+        if (e.stop_hook_active === true) return NOTHING
+        turn = { status: true, blocked: false, warning: undefined }
+      }
+      const live = turn
+      if (!live.status) { turn = undefined; return NOTHING }
+      const reply = replyText(e.last_assistant_message)
+      const check = checkBlock(reply)
+      // The shape failure first, else the idle failure (#876): one block per turn for both.
+      const failure = hasMoltHandoff(reply) ? undefined
+        : !check.ok ? { reason: rewriteReason(check.failed), warning: STATUS_WARNING }
+        : isIdleStop(reply) ? { reason: IDLE_REASON, warning: IDLE_WARNING } : undefined
+      if (failure === undefined) { turn = undefined; return NOTHING }
+      if (live.blocked) { turn = undefined; return { block: undefined, warning: failure.warning } }
+      live.blocked = true
+      return { block: { decision: 'block', reason: failure.reason }, warning: undefined }
+    },
+    turn: (): StatusTurn | undefined => turn,
+  }
+}
+
+const main = (ctx: any): boolean => ctx?.agent?.kind === 'main'
+
+export default function (pi: any) {
+  const check = createStatusCheck(() => process.env.SEAT_MODS_ROLE)
+  // The check can only add a stop: a throw lets the event through unchanged.
+  pi.on('input', (e: any, ctx: any) => {
+    try { if (main(ctx)) check.onInput(String(e?.text ?? ''), typeof ctx.isIdle === 'function' ? ctx.isIdle() === true : false) } catch {}
+    return undefined
+  })
+  pi.on('before_agent_start', (e: any, ctx: any) => {
+    try { return main(ctx) ? check.onBeforeAgentStart(String(e?.prompt ?? '')) : undefined } catch { return undefined }
+  })
+  pi.on('session_stop', (e: any, ctx: any) => {
+    try {
+      if (!main(ctx)) return undefined
+      const r = check.onSessionStop(e ?? {})
+      if (r.warning !== undefined) ctx.ui?.notify?.(r.warning, 'warning')
+      return r.block
+    } catch { return undefined }
+  })
+}
