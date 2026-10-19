@@ -57,6 +57,11 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
   quotes, backslashes, repeated slashes and `.` segments before matching the park-store mark, so
   `autonomic//parks`, `autonomic/./parks` and quote-split spellings park; a tool outside the
   routed lanes takes only that check and is never judged. Non-force `github pr_push` is unchanged.
+- **The OMP pre-check resolves a bash call's own `cwd` before matching the store** (fix D1):
+  `parks` and `./parks` from the store's parent now park as integrity, because the pre-check
+  reads the cwd through the same `bashCwd` the plan uses. A cwd `bashCwd` cannot place skips the
+  early return instead of falling back to the raw string, so the plan's own failure keeps the
+  call with the operator rather than passing it unjudged.
 - **A release whose park consume write fails does not allow** on Claude Code (fix B1):
   `writeParkFile` reports whether the write landed, and a release that cannot mark the park used
   asks instead of allowing, as OMP already did.

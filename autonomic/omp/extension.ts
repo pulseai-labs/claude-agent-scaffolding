@@ -781,17 +781,24 @@ export function createAutonomic(io: AutonomicIO) {
       : call.input !== null && typeof call.input === 'object' ? { ...call.input, command: call.command }
       : { command: call.command }
     const store = parksDir(io.env, home())
-    // A file tool carries no cwd of its own: the pre-check reads the session's, as the plan
-    // will, or a relative path into the store would return before the integrity guard runs.
-    const checkCwd = typeof call.cwd === 'string' && call.cwd.trim() !== '' ? call.cwd : io.cwd
-    if (invokesParkCommand({ tool: call.tool, input: call.input, command: call.command }) === null &&
+    // The pre-check resolves a bash call's own cwd exactly as the plan does, so a relative cwd
+    // (`parks`, `./parks`) is read against the session folder before it is matched; a file tool
+    // carries no cwd and reads the session's. A cwd bashCwd cannot place (undefined or a throw)
+    // skips the pre-check rather than falling back to the raw string, so the plan's own
+    // `cwd … is not a folder the floor can read` keeps the call with the operator.
+    const rawCwd = typeof call.cwd === 'string' && call.cwd.trim() !== '' ? call.cwd : undefined
+    let checkCwd: string | undefined = io.cwd
+    if (rawCwd !== undefined) {
+      try { checkCwd = bashCwd(rawCwd, io.cwd, home()) } catch { checkCwd = undefined }
+    }
+    if (checkCwd !== undefined &&
+        invokesParkCommand({ tool: call.tool, input: call.input, command: call.command }) === null &&
         !routes({ tool: call.tool, input: routed, cwd: checkCwd }, cfg.readers, store)) return undefined
     try {
       const m = await modeOf()
       if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
-      const raw = typeof call.cwd === 'string' && call.cwd.trim() !== '' ? call.cwd : undefined
-      const dir = raw === undefined ? io.cwd : bashCwd(raw, io.cwd, home())
-      if (dir === undefined) throw new Error(`cwd ${raw} is not a folder the floor can read`)
+      const dir = rawCwd === undefined ? io.cwd : bashCwd(rawCwd, io.cwd, home())
+      if (dir === undefined) throw new Error(`cwd ${rawCwd} is not a folder the floor can read`)
       const at = await where(dir)
       const parks = await readParks()
       const now = new Date().toISOString()

@@ -31,7 +31,9 @@ describe('the Claude Code park store IO (0.10.0 fixes B2 and B4)', () => {
     const dir = root()
     const bin = join(dir, 'bin'), log = join(dir, 'modes')
     mkdirSync(bin, { recursive: true })
-    writeFileSync(join(bin, 'chmod'), '#!/bin/sh\nfor last; do :; done\n[ -e "$last" ] && stat -c "%a %n" "$last" >> "$CHMOD_LOG"\nexec /bin/chmod "$@"\n')
+    // GNU stat first, BSD (macOS) second: `-c` is a hard error there, so the fallback branch is the
+    // one macOS takes; both print "<octal mode> <path>". Test tooling only, outside the plugin.
+    writeFileSync(join(bin, 'chmod'), '#!/bin/sh\nfor last; do :; done\n[ -e "$last" ] && { stat -c "%a %n" "$last" 2>/dev/null || stat -f "%Lp %N" "$last"; } >> "$CHMOD_LOG"\nexec /bin/chmod "$@"\n')
     chmodSync(join(bin, 'chmod'), 0o755)
     const store = join(dir, 'store'), path = join(store, 'aabbccddeeff.json')
     const previous = process.umask(0)

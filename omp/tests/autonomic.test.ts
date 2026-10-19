@@ -444,10 +444,13 @@ describe('the never-approve floor', () => {
       expect(await a.onToolCall(at('git push', ''))).toBeUndefined()
     })
 
-    test('a cwd the floor cannot place (an omp URL) keeps a dangerous command blocked and lets a safe one through', async () => {
-      const { a } = world({ files: autopilot() })
+    test('a cwd the floor cannot place never passes unjudged: the plan\'s failure keeps both calls (D1)', async () => {
+      const { w, a } = world({ files: autopilot() })
       expect((await a.onToolCall(at('git push', 'sftp://host/x')))?.reason).toBe('autonomic: the never-approve check failed; this call stays with the operator')
-      expect(await a.onToolCall(at('ls', 'sftp://host/x'))).toBeUndefined()
+      // The pre-check cannot resolve this cwd, so it skips its early return (never the raw string):
+      // the plan's own `cwd … is not a folder the floor can read` keeps even a safe command.
+      expect((await a.onToolCall(at('ls', 'sftp://host/x')))?.reason).toBe('autonomic: the never-approve check failed; this call stays with the operator')
+      expect(w.prompts).toEqual([])
     })
   })
 
@@ -543,6 +546,28 @@ describe('the never-approve floor', () => {
     expect(r?.block).toBe(true)
     expect(r?.reason).toContain('operator-only state')
     expect(parksIn(w)).toHaveLength(1)
+  })
+
+  test("a bash cwd relative to the session folder is resolved before the store check (fix D1)", async () => {
+    const parent = `${HOME}/.local/state/autonomic`
+    for (const cwd of ['parks', './parks']) {
+      const { w, a, io } = world({ files: autopilot() })
+      io.cwd = parent
+      const r = await a.onToolCall({ toolName: 'bash', input: { command: 'cat > aabbccddeeff.json', cwd } })
+      expect([cwd, r?.block]).toEqual([cwd, true])
+      expect(r?.reason).toContain('operator-only state')
+      expect(w.prompts).toEqual([])               // integrity only: no side turn
+      expect(parksIn(w)).toHaveLength(1)
+      expect(parkOf(w)).toMatchObject({ source: 'integrity', redLine: null })
+    }
+  })
+
+  test("a sibling cwd from the store's parent does not park the same command (D1 control)", async () => {
+    const { w, a, io } = world({ files: autopilot() })
+    io.cwd = `${HOME}/.local/state/autonomic`
+    expect(await a.onToolCall({ toolName: 'bash', input: { command: 'cat > aabbccddeeff.json', cwd: 'x' } })).toBeUndefined()
+    expect(w.prompts).toEqual([])
+    expect(parksIn(w)).toHaveLength(0)
   })
 
   test('equivalent spellings of the park store park: //, /./ and quote splitting (R2)', async () => {
@@ -715,8 +740,12 @@ describe('the never-approve floor', () => {
   })
 
   test('manual: the same store-naming calls are untouched (autopilot off)', async () => {
-    const { w, a } = world()
+    const { w, a, io } = world()
     expect(await a.onToolCall({ toolName: 'bash', input: { command: 'cat > deadbeef0001.json', cwd: PARKS } })).toBeUndefined()
+    // Relative spellings the D1 pre-check now resolves still change nothing with autopilot off.
+    io.cwd = `${HOME}/.local/state/autonomic`
+    expect(await a.onToolCall({ toolName: 'bash', input: { command: 'cat > deadbeef0002.json', cwd: 'parks' } })).toBeUndefined()
+    expect(await a.onToolCall({ toolName: 'bash', input: { command: 'cat > deadbeef0003.json', cwd: './parks' } })).toBeUndefined()
     expect(await a.onToolCall({ toolName: 'apply_patch', input: { patch: '/home/u/.local/state/autonomic/parks/ab12cd34ef56.json' } })).toBeUndefined()
     expect(parksIn(w)).toHaveLength(0)
   })
