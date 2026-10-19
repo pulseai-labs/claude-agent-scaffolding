@@ -355,16 +355,84 @@ describe('the bypass floor after a failure (PR #681: never toward fewer asks)', 
     expect(ledgerLines(w).at(-1)).toContain('Bash: git push -f (+2 args)')
   })
 
-  test('an allowed ask records a value-free summary, not the input (#683)', async ($, on) => {
+  test('a secret-shaped input parks and records a value-free summary, not the input (#683; fix round 2)', async ($, on) => {
     const w = world(on, { env: AP })
-    w.forks.push(fork({ decision: 'allow', reason: 'r1' }), fork({ decision: 'allow', reason: 'r2' }), fork({ decision: 'allow', reason: 'r3' }))
-    await $.tool.check(BASH('GITHUB_TOKEN="verysecret" git push -u origin feat/x'))
-    await $.tool.check(BASH('TOKEN=a\\ b git push -u origin feat/y'))
-    await $.tool.check({ tool: 'Write', input: { file_path: '/repo/.env', content: 'API=s3cr3tvalue' } } as never)
+    // The first two calls are judge-bound and redaction would change them: the shared rule parks
+    // them before any fork (fix round 2, C4). The third has no secret shape and is judged.
+    w.forks.push(fork({ decision: 'allow', reason: 'r1' }))
+    expect((await $.tool.check(BASH('GITHUB_TOKEN="verysecret" git push -u origin feat/x'))).decision).toBe('deny')
+    expect((await $.tool.check(BASH('TOKEN=a\\ b git push -u origin feat/y'))).decision).toBe('deny')
+    expect((await $.tool.check({ tool: 'Write', input: { file_path: '/repo/.env', content: 'API=s3cr3tvalue' } } as never)).decision).toBe('allow')
+    expect(w.forkPrompts).toHaveLength(1)
     const lines = ledgerLines(w)
     for (const secret of ['verysecret', 'a\\ b', ' b ', 's3cr3tvalue', '.env']) expect([secret, lines.join('\n').includes(secret)]).toEqual([secret, false])
-    expect(lines.at(-3)).toContain('Q: Bash: NAME= git push -u (+2 args) · A: allow')
-    expect(lines.at(-2)).toContain('Q: Bash: NAME= git push -u (+2 args) · A: allow')
+    expect(lines.at(-3)).toContain('Q: Bash: NAME= git push -u (+2 args) · A: parked for the operator · why: the input holds content that redaction would hide')
+    expect(lines.at(-2)).toContain('Q: Bash: NAME= git push -u (+2 args) · A: parked for the operator')
     expect(lines.at(-1)).toContain('Q: Write: {file_path, content} · A: allow')
+  })
+})
+
+// Review round 2 (F2). Each pin drives the real `tool.check` dispatch, the way a live call does.
+describe('the store guard joins line continuations (F2/C1)', () => {
+  const CONT = '\\' + '\n'   // a shell line continuation: a backslash and the newline it hides
+  test('an absolute store path split across lines parks: Bash and Write', async ($, on) => {
+    const w = world(on, { env: AP })
+    const path = `/home/u/.local/state/autonomic/${CONT}parks/ab12cd34ef56.json`
+    for (const call of [
+      { tool: 'Bash', input: { command: `cat > ${path}` } },
+      { tool: 'Write', input: { file_path: path, content: '{}' } },
+    ]) {
+      const r = await $.tool.check(call as never)
+      expect([call.tool, r.decision]).toEqual([call.tool, 'deny'])
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(2)
+    expect(parks(w).every(p => p.source === 'integrity')).toBe(true)
+  })
+  test("a relative path split inside parks/ from the store's parent parks: Bash and Write", async ($, on) => {
+    const w = world(on, { env: AP })
+    w.session.cwd = STORE.replace(/\/parks$/, '')
+    const path = `par${CONT}ks/ab12cd34ef56.json`
+    for (const call of [
+      { tool: 'Bash', input: { command: `cat > ${path}` } },
+      { tool: 'Write', input: { file_path: path, content: '{}' } },
+    ]) {
+      const r = await $.tool.check(call as never)
+      expect([call.tool, r.decision]).toEqual([call.tool, 'deny'])
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(2)
+  })
+})
+
+describe('the configured park store is the store (F2/C2)', () => {
+  test('AUTONOMIC_PARKS_DIR without the mark: Bash and Write park; parks-old does not', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot', AUTONOMIC_PARKS_DIR: '/tmp/parks' } })
+    for (const call of [
+      { tool: 'Bash', input: { command: 'cat > /tmp/parks/ab12cd34ef56.json' } },
+      { tool: 'Write', input: { file_path: '/tmp/parks/ab12cd34ef56.json', content: '{}' } },
+    ]) {
+      const r = await $.tool.check(call as never)
+      expect([call.tool, r.decision]).toEqual([call.tool, 'deny'])
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(2)
+    const control = await $.tool.check({ tool: 'Write', input: { file_path: '/tmp/parks-old/x.json', content: '{}' } } as never)
+    expect(control.decision).toBe('ask')
+    expect(parks(w)).toHaveLength(2)
+  })
+})
+
+describe('a judge-bound input redaction would change parks (F2/C4)', () => {
+  test('a secret-shaped routed call parks with no fork', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    w.forks.push(fork({ decision: 'allow', reason: 'r' }))
+    const r = await $.tool.check(BASH(`git push -u origin feat/x # ghp_${'A'.repeat(36)}`))
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('redaction would hide')
+    expect(w.forkPrompts).toEqual([])
+    expect(parks(w)).toHaveLength(1)
+    expect(parks(w)[0]!.source).toBe('integrity')
   })
 })

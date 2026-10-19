@@ -12,11 +12,12 @@
 // "allow" with no red line named: a red-line allow, an "ask", and an unparseable reply all park.
 
 import type { Grant } from './authority'
-import { floorFindings, namesParkStore, redLineOf, routes } from './never'
-import type { NeverRule, Where } from './never'
+import { DEFAULT_READERS, floorFindings, namesParkStore, redLineOf, routes } from './never'
+import type { NeverRule, Readers, Where } from './never'
+import { redact } from './ledger'
 import { PARKS_DIR_MARK, callKey, matches } from './parks'
 import type { Park } from './parks'
-import { permissionPrompt } from './prompts'
+import { permissionPrompt, shownInput } from './prompts'
 import type { FloorNote } from './prompts'
 import type { PermissionVerdict } from './verdict'
 
@@ -30,6 +31,12 @@ export type DecideContext = {
   parks: readonly Park[]
   now: string
   enabled: readonly NeverRule[]
+  // The operator's readers setting (0.10.0 fix round 2, C3): the floor and the router read a
+  // command with it, as the adapters' pre-check already does. Absent means DEFAULT_READERS.
+  readers?: Readers
+  // The configured park store directory (C2): the adapters pass the exact path they read and
+  // write, so a store outside the fixed mark (`/tmp/parks`) is still the store.
+  store?: string
 }
 
 export type Plan =
@@ -74,18 +81,24 @@ export function invokesParkCommand(call: { tool: string; input: unknown; command
 // judged like any other routed call.
 export function planPermission(i: PermissionInput, c: DecideContext): Plan {
   const key = callKey(i)
+  const readers = c.readers ?? DEFAULT_READERS
   for (const p of c.parks) if (matches(p, { tool: i.tool, command: key, cwd: i.cwd }, c.now)) return { kind: 'release', park: p }
-  const findings = i.command === null ? [] : floorFindings(i.command, i.where).findings.filter(f => c.enabled.includes(f.rule))
+  const findings = i.command === null ? [] : floorFindings(i.command, i.where, readers).findings.filter(f => c.enabled.includes(f.rule))
   const asks = findings.filter(f => f.level === 'ask')
   if (asks.length > 0) {
     const rules = [...new Set(asks.map(f => f.rule))]
     return { kind: 'park', source: 'floor', redLine: redLineOf(rules[0]!), reason: `never-approve: ${rules.join(', ')}` }
   }
-  if (namesParkStore(i.input, i.cwd)) return { kind: 'park', source: 'integrity', redLine: null, reason: `the call names the park store (${PARKS_DIR_MARK}): only the operator clears a park` }
+  if (namesParkStore(i.input, i.cwd, c.store)) return { kind: 'park', source: 'integrity', redLine: null, reason: `the call names the park store (${PARKS_DIR_MARK}): only the operator clears a park` }
   const invocation = invokesParkCommand(i)
   if (invocation !== null) return { kind: 'park', source: 'integrity', redLine: null, reason: `the call invokes /autopilot ${invocation}: only the operator ${invocation === 'approve' ? 'approves' : 'clears'} a park` }
   const notes = findings.filter(f => f.level === 'fork')
-  if (!routes({ tool: i.tool, input: i.input, cwd: i.cwd }) && notes.length === 0) return { kind: 'pass' }
+  if (!routes({ tool: i.tool, input: i.input, cwd: i.cwd }, readers, c.store) && notes.length === 0) return { kind: 'pass' }
+  // A judge-bound input that redaction would change is never shown to the judge (0.10.0 fix
+  // round 2, C4): both hosts park it with this reason, so a secret-shaped value cannot reach the
+  // prompt, the ledger or a release. The shown-input bound stays each host's own (MAX_INPUT).
+  const shown = shownInput(i.input)
+  if (redact(shown) !== shown) return { kind: 'park', source: 'integrity', redLine: null, reason: 'the input holds content that redaction would hide' }
   return { kind: 'judge', prompt: permissionPrompt(i.tool, i.input, c.policy, c.recent, notes, { role: c.role, grants: c.grants }), notes }
 }
 

@@ -261,7 +261,7 @@ const targets = (text: string) => [...text.matchAll(REDIRECT)].map(m => m[1]!).f
 // `readers` setting replaces the default.
 export const DEFAULT_READERS: readonly (readonly string[])[] = [['gh', 'pr', 'create'], ['gh', 'pr', 'edit'], ['gh', 'issue', 'create'], ['gh', 'issue', 'comment']]
 export const parseReaders = (s: string): string[][] => s.split(';').map(r => r.trim().split(/\s+/).filter(Boolean)).filter(r => r.length > 0)
-type Readers = readonly (readonly string[])[]
+export type Readers = readonly (readonly string[])[]
 // Namers (0.5.0): commands that name a file to read, remove or change its mode, and never run it. A file they
 // name passes on as an inert command's would (a pipe or a redirect from them still counts).
 const NAMER = new Set(['rm', 'unlink', 'chmod', 'chown', 'wc', 'diff', 'cmp', 'sha1sum', 'sha256sum', 'sha512sum', 'md5sum', 'b2sum', 'file', 'du', 'readlink', 'realpath', 'basename', 'dirname'])
@@ -838,14 +838,23 @@ export const ROUTE_WORDS: readonly string[] = [
   'autonomic/parks',
 ]
 
-// The park store's directory mark, read as the shell joins a literal path: quotes and backslashes
-// removed, repeated slashes collapsed and `.` segments dropped, then matched on the segment, so
-// `autonomic//parks`, `autonomic/./parks` and `par""ks` name the same directory. Variables,
-// globs, substitutions and encodings are not resolved (the README's Known limit). Skill-first Q3:
-// this only adds a stop — a near miss that parks too costs one dialog.
+// The park store's directory mark, read as the shell joins a literal path: a backslash-newline
+// pair is removed as one unit first (the shell's line continuation, so `autonomic/\<newline>parks`
+// is one path), then quotes and backslashes, repeated slashes collapsed and `.` segments dropped,
+// and matched on the segment, so `autonomic//parks`, `autonomic/./parks`, `par""ks` and the
+// line-split spelling name the same directory. Variables, globs, substitutions and encodings are
+// not resolved (the README's Known limit). Skill-first Q3: this only adds a stop — a near miss
+// that parks too costs one dialog.
 const SEGMENT_CHAR = /[a-z0-9_.-]/
 export const normalizeCallText = (text: string): string => {
-  const parts = text.toLowerCase().replace(/["'\\]/g, '').split('/')
+  // A shell line continuation is removed as one unit before anything else: a raw backslash-LF
+  // (or backslash-CRLF) in a command string, and the same pair as JSON encodes it in a tool's
+  // whole input (`\\` for the backslash, `\n` for the newline: three backslashes and an n).
+  const parts = text.toLowerCase()
+    .replace(/\\\r?\n/g, '')
+    .replace(/\\\\\\(?:n|r\\n)/g, '')
+    .replace(/["'\\]/g, '')
+    .split('/')
   const kept: string[] = []
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]!
@@ -856,25 +865,43 @@ export const normalizeCallText = (text: string): string => {
   return kept.join('/')
 }
 // The mark names a directory of its own, never a prefix: `parkside` and `parks-notes.md` stay quiet.
-const hasParkMark = (s: string): boolean => {
-  for (let at = s.indexOf(PARKS_DIR_MARK); at !== -1; at = s.indexOf(PARKS_DIR_MARK, at + 1)) {
+const hasMark = (s: string, mark: string): boolean => {
+  if (mark === '') return false
+  for (let at = s.indexOf(mark); at !== -1; at = s.indexOf(mark, at + 1)) {
     const before = at === 0 ? undefined : s[at - 1]
-    const after = s[at + PARKS_DIR_MARK.length]
+    const after = s[at + mark.length]
     if ((before === undefined || !SEGMENT_CHAR.test(before)) && (after === undefined || !SEGMENT_CHAR.test(after))) return true
   }
   return false
 }
+// The configured store (AUTONOMIC_PARKS_DIR) may not carry the fixed mark at all (`/tmp/parks`):
+// its own resolved path is matched the same normalized, segment-bounded way, plus the cwd forms —
+// any directory inside the store, and the store's parent with the store's name as a relative
+// `parks/…` path in the text. One definition for both hosts: each adapter passes the exact path it
+// reads and writes the store at.
+const namesStore = (normalized: string, dir: string | undefined, store: string): boolean => {
+  const mark = normalizeCallText(store)
+  if (mark === '') return false
+  if (hasMark(normalized, mark)) return true
+  const at = mark.lastIndexOf('/')
+  const base = mark.slice(at + 1)
+  if (at === -1 || base === '' || dir === undefined) return false
+  if (dir === mark || dir.startsWith(`${mark}/`)) return true
+  return dir === mark.slice(0, at) && normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === base || w.startsWith(`${base}/`))
+}
 // Does the whole input, or the call's cwd, name the park store (plan call 3's integrity guard)?
 // The cwd counts twice: any directory inside the store, and the store's parent with a relative
 // `parks/…` path in the text. The pre-check and the plan call this same function, so neither
-// host can see a different store.
-export const namesParkStore = (input: unknown, cwd?: string): boolean => {
+// host can see a different store; `store` is the configured store directory when the caller has
+// it, and the fixed mark still holds when it does not.
+export const namesParkStore = (input: unknown, cwd?: string, store?: string): boolean => {
   const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
   const normalized = normalizeCallText(text)
-  if (hasParkMark(normalized)) return true
-  if (cwd === undefined) return false
-  const dir = normalizeCallText(cwd)
-  return hasParkMark(dir) || (/(?:^|\/)autonomic$/.test(dir) &&
+  if (hasMark(normalized, PARKS_DIR_MARK)) return true
+  const dir = cwd === undefined ? undefined : normalizeCallText(cwd)
+  if (store !== undefined && namesStore(normalized, dir, store)) return true
+  if (dir === undefined) return false
+  return hasMark(dir, PARKS_DIR_MARK) || (/(?:^|\/)autonomic$/.test(dir) &&
     normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === 'parks' || w.startsWith('parks/')))
 }
 
@@ -884,8 +911,10 @@ export const namesParkStore = (input: unknown, cwd?: string): boolean => {
 // prod.env and certs/x.key, never environment) and the park-store entry is namesParkStore's
 // normalized, segment-bounded match of the text and cwd.
 // The floor's own reading of a command is matched too, so this stays a strict superset of the old
-// namesDanger pre-check: an escape-route spelling (git pu""sh, --no-verif) still routes.
-export const routes = (call: { tool: string; input: unknown; cwd?: string }, readers: Readers = DEFAULT_READERS): boolean => {
+// namesDanger pre-check: an escape-route spelling (git pu""sh, --no-verif) still routes. `store`
+// is the configured park store directory when the caller has it (a store outside the fixed mark
+// routes too, or the pre-check would return the call before the plan runs).
+export const routes = (call: { tool: string; input: unknown; cwd?: string }, readers: Readers = DEFAULT_READERS, store?: string): boolean => {
   const input = call.input
   const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input)
   const lower = text.toLowerCase()
@@ -893,7 +922,7 @@ export const routes = (call: { tool: string; input: unknown; cwd?: string }, rea
   const words = lower.split(/[^a-z0-9_.-]+/).filter(w => w !== '')
   if (command !== undefined) words.push(...allWords(wordsOf(command, readers)).map(w => w.toLowerCase()))
   return words.some(w => dangerWord(w) || ROUTE_WORDS.some(e => !e.includes('/') && (w === e || w.endsWith(`.${e}`)))) ||
-    namesParkStore(lower, call.cwd)
+    namesParkStore(lower, call.cwd, store)
 }
 
 // Section 1: a group's words with each literal variable assigned before it read as its value.

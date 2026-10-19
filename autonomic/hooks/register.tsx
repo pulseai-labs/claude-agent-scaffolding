@@ -720,20 +720,21 @@ export const register: Register = (on, options) => {
       const raw = (e.input as { command?: unknown } | undefined)?.command
       const command = typeof raw === 'string' ? raw : null
       const cwd = await $.session.cwd()
-      if (dialog && !namesParkStore(e.input, cwd)) return r
-      // The cheap pre-check (0.10.0 Tasks 5 and 7a): an empty park store, a call the routing does
-      // not name (its whole input or its cwd) and no invocation of the operator's approval route
-      // are exactly planPermission's pass — no git run, no judge, no store read.
       const dir = await parksDirOf($)
+      if (dialog && !namesParkStore(e.input, cwd, dir)) return r
+      // The cheap pre-check (0.10.0 Tasks 5 and 7a): an empty park store, a call the routing does
+      // not name (its whole input or its cwd, with the operator's readers) and no invocation of
+      // the operator's approval route are exactly planPermission's pass — no git run, no judge,
+      // no store read. The configured store rides in, or a call naming it would return here.
       const parks = await readParks($, dir)
-      if (parks.length === 0 && !routes({ tool: e.tool, input: e.input, cwd }, cfg.readers) &&
+      if (parks.length === 0 && !routes({ tool: e.tool, input: e.input, cwd }, cfg.readers, dir) &&
           invokesParkCommand({ tool: e.tool, input: e.input, command }) === null) return r
       // From here every failure keeps the call with the operator (final review I1): an
       // unneeded ask costs one dialog, a missed one a force push.
       const w = await where($)
       const now = new Date().toISOString()
       const input: PermissionInput = { tool: e.tool, input: e.input, command, cwd: w.cwd, where: w }
-      const ctx: DecideContext = { policy: (await policyText($)) ?? '', recent: digestOf(id), role: null, grants: null, parks, now, enabled: cfg.neverApprove }
+      const ctx: DecideContext = { policy: (await policyText($)) ?? '', recent: digestOf(id), role: null, grants: null, parks, now, enabled: cfg.neverApprove, readers: cfg.readers, store: dir }
       // A release must first win the park's one use (fix B2). A lost claim means an overlapping
       // call took it; that park is dropped and the call re-plans without it, so it parks again
       // (floor, integrity, or judge) instead of releasing from an approval it did not win.

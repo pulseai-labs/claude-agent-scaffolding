@@ -17,7 +17,7 @@ import type { AutonomicConfig } from '../hooks/config'
 import { invokesParkCommand, planPermission, settlePermission } from '../hooks/decide'
 import type { DecideContext, PermissionVerdict, Plan } from '../hooks/decide'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from '../hooks/floor'
-import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
+import { ledgerLine, ledgerPathFor, oneLine } from '../hooks/ledger'
 import type { LedgerCase, LedgerSource } from '../hooks/ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from '../hooks/mode'
 import { DEFAULT_READERS, namesParkStore, routes } from '../hooks/never'
@@ -683,8 +683,10 @@ export function createAutonomic(io: AutonomicIO) {
   }
 
   // ---- the park store (Task 3's module, this host's IO) ----------------------------------------
-  // OMP ships no notebook tool, so the routed file-tool set is read/write/edit (ruling 5: the
-  // narrower set is a known limit, recorded in the report).
+  // The routed lane is bash, a force `github pr_push` and read/write/edit; every other tool
+  // (notebook, apply_patch, ast_edit, eval, js, python, debug, an MCP tool) is outside it and
+  // gets the integrity check only (ruling 2: the narrower set is a known limit, recorded in the
+  // report). Claude Code judges every tool's call, so this is a coverage difference, not policy.
   const FILE_TOOLS: Record<string, true> = { read: true, write: true, edit: true }
   // The id grammar is the shared PARK_ID and the park key is the shared callKey (Task 7a): the
   // guards below check the imported grammar before an id becomes a path, as register.tsx does.
@@ -742,12 +744,12 @@ export function createAutonomic(io: AutonomicIO) {
     return undefined
   }
 
-  // The whole input must survive redaction and the shown-input bound before a judge sees it: an
-  // unseen suffix is never sent to judgment and never released.
+  // The shown-input bound is this host's own (each host keeps MAX_INPUT as it does it). A
+  // judge-bound input that redaction would change is the shared decision's park (fix round 2,
+  // C4, in `planPermission`): the same rule and reason on both hosts, before any judge.
   function inputRefusal(input: unknown): string | null {
     const shown = shownInput(input)
     if (shown.length > MAX_INPUT) return 'the input exceeds the 64,000-code-unit shown-input bound'
-    if (redact(shown) !== shown) return 'the input holds content that redaction would hide'
     return null
   }
 
@@ -775,8 +777,12 @@ export function createAutonomic(io: AutonomicIO) {
     const routed = call.command === null ? call.input
       : call.input !== null && typeof call.input === 'object' ? { ...call.input, command: call.command }
       : { command: call.command }
+    const store = parksDir(io.env, home())
+    // A file tool carries no cwd of its own: the pre-check reads the session's, as the plan
+    // will, or a relative path into the store would return before the integrity guard runs.
+    const checkCwd = typeof call.cwd === 'string' && call.cwd.trim() !== '' ? call.cwd : io.cwd
     if (invokesParkCommand({ tool: call.tool, input: call.input, command: call.command }) === null &&
-        !routes({ tool: call.tool, input: routed, cwd: typeof call.cwd === 'string' ? call.cwd : undefined }, cfg.readers)) return undefined
+        !routes({ tool: call.tool, input: routed, cwd: checkCwd }, cfg.readers, store)) return undefined
     try {
       const m = await modeOf()
       if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
@@ -787,7 +793,7 @@ export function createAutonomic(io: AutonomicIO) {
       const parks = await readParks()
       const now = new Date().toISOString()
       const c: DecideContext = { policy: (await policyText()) ?? '', recent: '', role: authorityLease?.snapshot.seat.role ?? null,
-        grants: authorityLease?.snapshot.grants ?? null, parks, now, enabled: cfg.neverApprove }
+        grants: authorityLease?.snapshot.grants ?? null, parks, now, enabled: cfg.neverApprove, readers: cfg.readers, store }
       // A release must first win the park's one use (fix B2). A lost claim means an overlapping
       // call took it; that park is dropped and the call re-plans without it, so it parks again
       // (floor, integrity, or judge) instead of releasing from an approval it did not win.
@@ -876,7 +882,7 @@ export function createAutonomic(io: AutonomicIO) {
       // The integrity guard covers every tool call's whole input (ruling 2), the ask reflex
       // included: a dialog that names the park store is parked first; everything else reaches the
       // reflex exactly as today.
-      if (namesParkStore(e.input, io.cwd)) {
+      if (namesParkStore(e.input, io.cwd, parksDir(io.env, home()))) {
         const blocked = await route({ tool: 'ask', command: null, input: e.input })
         if (blocked !== undefined) return blocked
       }
@@ -905,7 +911,7 @@ export function createAutonomic(io: AutonomicIO) {
     // outside today's permission lanes: the integrity check only (ruling 2). A call whose whole
     // input names the park store parks; every other call returns exactly what 0.9.1 returned, so
     // routing words in its input never send it to the judge.
-    if (typeof e?.toolName === 'string' && namesParkStore(e.input, io.cwd)) return route({ tool: e.toolName, command: null, input: e.input })
+    if (typeof e?.toolName === 'string' && namesParkStore(e.input, io.cwd, parksDir(io.env, home()))) return route({ tool: e.toolName, command: null, input: e.input })
     return undefined
   }
 

@@ -1064,3 +1064,78 @@ describe('round 2 autonomic parity', () => {
     expect([...w.files.values()].join('')).toContain('pain session=S1')
   })
 })
+
+// Review round 2 (F2): the pins for C1, C2, C3 and C4 through the real extension.
+describe('the store guard joins line continuations (F2/C1)', () => {
+  const CONT = '\\' + '\n'   // a shell line continuation: a backslash and the newline it hides
+  test('an absolute store path split across lines parks: Bash and Write', async () => {
+    const { w, a } = world({ files: autopilot() })
+    const path = `/home/u/.local/state/autonomic/${CONT}parks/ab12cd34ef56.json`
+    for (const call of [
+      { toolName: 'bash', input: { command: `cat > ${path}` } },
+      { toolName: 'write', input: { path, content: '{}' } },
+    ]) {
+      const r = await a.onToolCall(call)
+      expect([call.toolName, r?.block]).toEqual([call.toolName, true])
+      expect(r?.reason).toContain('operator-only state')
+    }
+    expect([...w.files.keys()].filter(p => p.startsWith(`${HOME}/.local/state/autonomic/parks/`) && p.endsWith('.json'))).toHaveLength(2)
+  })
+  test("a relative path split inside parks/ from the store's parent parks: Bash and Write", async () => {
+    const { w, a, io } = world({ files: autopilot() })
+    io.cwd = `${HOME}/.local/state/autonomic`
+    const path = `par${CONT}ks/ab12cd34ef56.json`
+    for (const call of [
+      { toolName: 'bash', input: { command: `cat > ${path}`, cwd: io.cwd } },
+      { toolName: 'write', input: { path, content: '{}' } },
+    ]) {
+      const r = await a.onToolCall(call)
+      expect([call.toolName, r?.block]).toEqual([call.toolName, true])
+      expect(r?.reason).toContain('operator-only state')
+    }
+    expect([...w.files.keys()].filter(p => p.startsWith(`${HOME}/.local/state/autonomic/parks/`) && p.endsWith('.json'))).toHaveLength(2)
+  })
+})
+
+describe('the configured park store is the store (F2/C2)', () => {
+  test('AUTONOMIC_PARKS_DIR without the mark: Bash and Write park; parks-old does not', async () => {
+    const { w, a } = world({ files: autopilot(), env: { AUTONOMIC_PARKS_DIR: '/tmp/parks' } })
+    for (const call of [
+      { toolName: 'bash', input: { command: 'cat > /tmp/parks/ab12cd34ef56.json' } },
+      { toolName: 'write', input: { path: '/tmp/parks/ab12cd34ef56.json', content: '{}' } },
+    ]) {
+      const r = await a.onToolCall(call)
+      expect([call.toolName, r?.block]).toEqual([call.toolName, true])
+      expect(r?.reason).toContain('operator-only state')
+    }
+    expect([...w.files.keys()].filter(p => p.startsWith('/tmp/parks/') && p.endsWith('.json'))).toHaveLength(2)
+    expect(await a.onToolCall({ toolName: 'write', input: { path: '/tmp/parks-old/x.json', content: '{}' } })).toBeUndefined()
+    expect([...w.files.keys()].filter(p => p.startsWith('/tmp/parks/') && p.endsWith('.json'))).toHaveLength(2)
+  })
+})
+
+describe('the operator readers reach the floor and the judge prompt (F2/C3)', () => {
+  const HERDR = `cat > /run/briefs/impl-1.md <<'EOF'\nNever rm -rf outside a worktree; never git push -f or --force; never --no-verify; no git branch -D.\nEOF\nherdr pane read w1:p1 --source visible | grep -oE 'Model [a-z]+' | tail -1\nherdr agent prompt w1:p1 'Your brief is /run/briefs/impl-1.md. Read it in full.' | jq -r .ok`
+  const allow: SideTurn = () => ({ replyText: JSON.stringify({ decision: 'allow', red_line: null, reason: 'r' }) })
+  test('the saved readers setting empties the <floor> block; the defaults keep it', async () => {
+    const saved = world({ files: { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ readers: 'herdr agent prompt' }) }, sideTurn: allow })
+    expect(await saved.a.onToolCall({ toolName: 'bash', input: { command: HERDR } })).toBeUndefined()
+    expect(saved.w.prompts).toHaveLength(1)
+    expect(saved.w.prompts[0]).not.toContain('<floor>')
+    // the adjacent control: no saved setting means the default readers, and the note returns
+    const plain = world({ files: autopilot(), sideTurn: allow })
+    expect(await plain.a.onToolCall({ toolName: 'bash', input: { command: HERDR } })).toBeUndefined()
+    expect(plain.w.prompts[0]).toContain('<floor>')
+  })
+})
+
+describe('a judge-bound input redaction would change parks (F2/C4)', () => {
+  const allow: SideTurn = () => ({ replyText: JSON.stringify({ decision: 'allow', red_line: null, reason: 'r' }) })
+  test('a secret-shaped routed call parks before the side turn', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: allow })
+    const r = await a.onToolCall({ toolName: 'bash', input: { command: `git push -u origin feat/x # ghp_${'A'.repeat(36)}` } })
+    expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('redaction would hide')
+    expect(w.prompts).toEqual([])
+  })
+})

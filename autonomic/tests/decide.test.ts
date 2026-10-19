@@ -141,3 +141,28 @@ describe('the store is the only route to release (0.10.0 Task 4)', () => {
     for (const call of calls) expect(planPermission(call, ctx({ parks: [parked()] })).kind).not.toBe('release')
   })
 })
+
+// Review round 2 (F2/C3): the operator's readers setting reaches the floor and the judge's
+// <floor> block. The command is the 0.4.3 live fixture never.test.ts:541 holds. `$.tool.check`
+// cannot carry a saved readers value (the host registers the mod with the manifest readers,
+// byte-equal to DEFAULT_READERS), so this pins the exact planPermission it calls.
+const HERDR = [['herdr', 'agent', 'prompt']]
+const HERDR_COMMAND = `cat > /run/briefs/impl-1.md <<'EOF'\nNever rm -rf outside a worktree; never git push -f or --force; never --no-verify; no git branch -D.\nEOF\nherdr pane read w1:p1 --source visible | grep -oE 'Model [a-z]+' | tail -1\nherdr agent prompt w1:p1 'Your brief is /run/briefs/impl-1.md. Read it in full.' | jq -r .ok`
+
+describe('the operator readers reach the plan (F2/C3)', () => {
+  test('the reviewer case: readers=[herdr agent prompt] empties the floor notes; the defaults keep them', () => {
+    const plan = planPermission(bash(HERDR_COMMAND), ctx({ readers: HERDR }))
+    expect(plan.kind).toBe('judge')
+    if (plan.kind === 'judge') {
+      expect(plan.notes).toEqual([])
+      expect(plan.prompt).not.toContain('<floor>')
+    }
+    // the adjacent control: the same call with the defaults carries the floor's note
+    const control = planPermission(bash(HERDR_COMMAND), ctx())
+    expect(control.kind).toBe('judge')
+    if (control.kind === 'judge') {
+      expect(control.notes.length).toBeGreaterThan(0)
+      expect(control.prompt).toContain('<floor>')
+    }
+  })
+})

@@ -29,8 +29,9 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
   a 0700 store), keyed on the call's exact input (its command text, or a file tool's whole input
   JSON). `/autopilot parks` lists the open ones; `/autopilot approve <id>` approves one exact
   call for one use within 72 hours; `/autopilot drop <id>` clears it; an almost-match (another
-  cwd, one extra space, a second use) parks again. The listing prints the call's key redacted and
-  bounded, the same line on both hosts.
+  cwd, one extra space, a second use) parks again. The listing prints the call's key (the command
+  text, or a file tool's whole input JSON), secret-redacted and cut to 160 characters, the same
+  line on both hosts.
 - **The Claude Code adapter** (`hooks/register.tsx`) is a thin wrapper over the shared decision:
   a park returns `deny` with the park text verbatim — a deferral, not a refusal, because `deny`
   is the only return that does not wait. A release writes its ledger row before consuming the
@@ -70,7 +71,26 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
   (never argv), and re-asserts both modes; no window exists at the host's default mode.
 - **`/autopilot parks` is the same line on both hosts** (fix B5): only open parks (not used or
   expired, not claimed) are listed, an approved-unused one ends `· approved`, and both print the
-  id, what stopped it, the call's tool and redacted shape, and its cwd, oldest first.
+  id, what stopped it, the call's tool, its key (the command text, or a file tool's whole input
+  JSON), secret-redacted and cut to 160 characters, and its cwd, oldest first.
+- **The store guard joins shell line continuations** (fix round 2, C1): `normalizeCallText`
+  removes a backslash-newline pair — a raw LF or CRLF, and the JSON-encoded form it takes inside
+  a tool's whole input — as one unit before the quote and slash normalization, so
+  `autonomic/\<newline>parks/<id>.json` names the store and parks as integrity, as the literal
+  spelling does.
+- **The configured park store is matched by its own path** (fix round 2, C2): both adapters pass
+  the directory they read and write (`AUTONOMIC_PARKS_DIR`, else the state dir) into
+  `namesParkStore`/`routes`, which match it normalized and segment-bounded, plus the cwd forms,
+  so a store outside the `autonomic/parks` mark (e.g. `/tmp/parks`) parks and `/tmp/parks-old`
+  does not.
+- **The operator's `readers` setting reaches the shared decision** (fix round 2, C3):
+  `planPermission` reads the floor and routes with the `readers` on `DecideContext`, and both
+  adapters supply `cfg.readers`, so a call the setting exempts no longer carries a `<floor>` note
+  and the judge's prompt matches 0.9.1.
+- **A judge-bound input redaction would change parks on both hosts** (fix round 2, C4): the park
+  lives in `planPermission` with the reason `the input holds content that redaction would hide`,
+  so Claude Code no longer writes a secret-shaped value into the judge prompt and both hosts
+  decide the call the same way. OMP's `inputRefusal` keeps only its own `MAX_INPUT` bound.
 
 ## 0.9.1 — 2026-10-18
 
