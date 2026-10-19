@@ -31,4 +31,7 @@ describe('the default policy carries the 0.9.0 standing orders (Task 1)', () => 
   test('the old execution-method clause is gone', () => {
     expect(DEFAULT_POLICY).not.toContain('or choosing how a plan is executed')
   })
+  test('the Run evidence standing order is present verbatim (0.10.0 Task 4)', () => {
+    expect(DEFAULT_POLICY).toContain("- **Run evidence:** a run's evidence or report directories are never deleted without asking the operator.")
+  })
 })

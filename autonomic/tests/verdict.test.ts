@@ -54,10 +54,19 @@ describe('ask verdicts (spec §3.2, review focus 4)', () => {
 
 describe('permission verdicts (spec §3.3)', () => {
   test('allow and ask parse; a deny becomes ask; junk does not parse', () => {
-    expect(parsePermission('{"decision":"allow","reason":"own branch push"}')).toEqual({ decision: 'allow', reason: 'own branch push' })
+    expect(parsePermission('{"decision":"allow","reason":"own branch push"}')).toEqual({ decision: 'allow', red_line: null, reason: 'own branch push' })
     expect(parsePermission('{"decision":"ask","reason":"r"}')?.decision).toBe('ask')
     expect(parsePermission('{"decision":"deny","reason":"r"}')?.decision).toBe('ask')
     expect(parsePermission('{"decision":"allow"}')).toBeUndefined()
     expect(parsePermission('{"decision":"yes","reason":"r"}')).toBeUndefined()
+  })
+  test('the red line parses; missing and null both mean none (0.10.0 Task 4)', () => {
+    expect(parsePermission('{"decision":"allow","red_line":null,"reason":"r"}')).toEqual({ decision: 'allow', red_line: null, reason: 'r' })
+    expect(parsePermission('{"decision":"allow","reason":"r"}')?.red_line).toBeNull()
+    expect(parsePermission('{"decision":"ask","red_line":4,"reason":"r"}')).toEqual({ decision: 'ask', red_line: 4, reason: 'r' })
+  })
+  test('a malformed red line does not parse, so the call parks (Review Focus 4)', () => {
+    for (const bad of ['7', '0', '"4"', '2.5', 'true'])
+      expect(parsePermission(`{"decision":"allow","red_line":${bad},"reason":"r"}`)).toBeUndefined()
   })
 })

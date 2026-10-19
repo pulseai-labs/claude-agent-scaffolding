@@ -12,6 +12,13 @@ describe('the decision ledger (spec §1, D6)', () => {
     expect(ledgerLine({ time: 'T', session: 's1', kase: 'covered', q: 'Proceed?', a: 'yes', why: 'plan step 3' }))
       .toBe('- T · s1 · covered · Q: Proceed? · A: yes · why: plan step 3')
   })
+  test('the src field rides after why: and before usage: (0.10.0 Task 4)', () => {
+    // A row without src is the 0.9.1 line, byte for byte (the test above is that control).
+    expect(ledgerLine({ time: 'T', session: 's1', kase: 'permission', q: 'q', a: 'parked for the operator', why: 'x', src: 'floor' }))
+      .toBe('- T · s1 · permission · Q: q · A: parked for the operator · why: x · src: floor')
+    expect(ledgerLine({ time: 'T', session: 's1', kase: 'permission', q: 'q', a: 'a', why: 'x', src: 'operator', usage: { input_tokens: 1, output_tokens: 2 } }))
+      .toBe('- T · s1 · permission · Q: q · A: a · why: x · src: operator · usage: in=1 cached=0 out=2')
+  })
   test('usage is appended as fork cost', () => {
     const line = ledgerLine({ time: 'T', session: 's1', kase: 'stalled', q: 'q', a: 'a', why: 'w',
       usage: { input_tokens: 900, cache_creation_input_tokens: 100, cache_read_input_tokens: 50_000, output_tokens: 40 } })
