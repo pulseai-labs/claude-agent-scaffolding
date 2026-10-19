@@ -57,6 +57,7 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
       return [...files.keys()].filter(k => k.startsWith(prefix) && !k.slice(prefix.length).includes('/')).map(k => k.slice(prefix.length))
     },
     writePark: async (p, t) => { if (over.failWrite?.test(p)) throw new Error('read-only'); files.set(p, t) },
+    claimPark: async p => { if (files.has(p)) return false; files.set(p, ''); return true },
     captureHost: () => ({
       sessionId: w.id, cwd: '/repo', sessionFile: undefined, judge: undefined,
       generate: over.sideTurn === undefined ? undefined : async (opts: unknown) => {
@@ -650,9 +651,9 @@ describe('the park store, the approval and the command surface (calls 2-3, #815)
     expect(await a.onCommand('parks')).toBe('parks: none')
     const first = await a.onToolCall(bash('git push --force origin main'))
     const id = parkIdOf(first?.reason)
-    expect(await a.onCommand('parks')).toBe(`parks:\n${id} · red line 2 · bash: git push --force origin main · /repo`)
+    expect(await a.onCommand('parks')).toBe(`parks:\n${id} · red line 2 · Bash: git push --force origin main · /repo`)
     await a.onCommand(`approve ${id}`)
-    expect(await a.onCommand('parks')).toContain(`${id} · red line 2`)   // approved, not yet used: still open
+    expect(await a.onCommand('parks')).toContain(`${id} · red line 2 · Bash: git push --force origin main · /repo · approved`)   // approved, not yet used: still open
     expect(await a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
     expect(await a.onCommand('parks')).toBe('parks: none')
   })

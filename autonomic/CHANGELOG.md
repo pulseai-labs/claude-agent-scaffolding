@@ -51,6 +51,26 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
   `DecideContext` and one stub verdict table: equal Plan kinds, byte-equal prompts, equal
   settled outcomes. The corpus carries the part-a shapes: the Skill `/autopilot approve` shape,
   a command line invoking `/autopilot drop`, and a file-tool credential read.
+- **The integrity guard holds on every call's whole input** (part a, R1–R3): the OMP pre-routing
+  check carries the call's full input and its bash `cwd`, and `namesParkStore`/`routes` normalize
+  quotes, backslashes, repeated slashes and `.` segments before matching the park-store mark, so
+  `autonomic//parks`, `autonomic/./parks` and quote-split spellings park; a tool outside the
+  routed lanes takes only that check and is never judged. Non-force `github pr_push` is unchanged.
+- **A release whose park consume write fails does not allow** on Claude Code (fix B1):
+  `writeParkFile` reports whether the write landed, and a release that cannot mark the park used
+  asks instead of allowing, as OMP already did.
+- **A release wins an exclusive claim on the park's one use** (fix B2, both hosts): it creates
+  `<id>.used` beside the park (`O_EXCL` on OMP, `set -C` on Claude Code) before the ledger row;
+  an overlapping call that loses the claim re-plans without that park and parks again, so one
+  operator yes releases one run. A claimed park is not listed as open.
+- **`/autopilot approve` reports a failed store write** as `was not approved: the store could not
+  be written` instead of claiming success (fix B3), matching OMP.
+- **The park file and its store are created 0600/0700 from the first byte** on Claude Code (fix
+  B4): one `umask 077` run creates the directory and file, writes the serialized park from stdin
+  (never argv), and re-asserts both modes; no window exists at the host's default mode.
+- **`/autopilot parks` is the same line on both hosts** (fix B5): only open parks (not used or
+  expired, not claimed) are listed, an approved-unused one ends `· approved`, and both print the
+  id, what stopped it, the call's tool and redacted shape, and its cwd, oldest first.
 
 ## 0.9.1 — 2026-10-18
 

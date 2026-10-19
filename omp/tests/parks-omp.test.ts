@@ -76,7 +76,7 @@ describe('the park file the OMP adapter writes (Q2: our own state files)', () =>
     expect(await w.onCommand('parks')).toBe('parks: none')
     const first = await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })
     const id = parkIdOf(first?.reason)
-    expect(await w.onCommand('parks')).toBe(`parks:\n${id} · red line 2 · bash: ${FORCE_MAIN} · ${w.tree}`)
+    expect(await w.onCommand('parks')).toBe(`parks:\n${id} · red line 2 · Bash: ${FORCE_MAIN} · ${w.tree}`)
     expect(await w.onCommand(`approve ${id}`)).toBe(`park ${id} approved for one use.`)
     expect(JSON.parse(readFileSync(join(w.parksRoot, `${id}.json`), 'utf8')).approval)
       .toMatchObject({ by: 'operator', usedAt: null })
@@ -102,6 +102,36 @@ describe('the park file the OMP adapter writes (Q2: our own state files)', () =>
     const again = await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })
     expect(again?.block).toBe(true)
     expect(parkIdOf(again?.reason)).not.toBe(id)
+  })
+
+  test('two overlapping releases of one approval: the lost claim parks the second (fix B2)', async () => {
+    w = world()
+    const first = await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })
+    const id = parkIdOf(first?.reason)
+    const file = join(w.parksRoot, `${id}.json`)
+    await w.onCommand(`approve ${id}`)
+    const approved = readFileSync(file, 'utf8')
+    expect(await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })).toBeUndefined()
+    expect(existsSync(join(w.parksRoot, `${id}.used`))).toBe(true)
+    // The overlapping call read the store before the winner consumed it: put the unused approval back.
+    writeFileSync(file, approved)
+    const second = await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })
+    expect(second?.block).toBe(true)
+    expect(parkIdOf(second?.reason)).not.toBe(id)
+    expect(JSON.parse(readFileSync(file, 'utf8')).approval.usedAt).toBeNull()
+    expect(readdirSync(w.parksRoot).filter(n => n.endsWith('.json'))).toHaveLength(2)
+  })
+
+  test('the listing is one line on both hosts: only open parks, approved marked (fix B5)', async () => {
+    w = world()
+    const first = await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })
+    const id = parkIdOf(first?.reason)
+    const line = `${id} · red line 2 · Bash: ${FORCE_MAIN} · ${w.tree}`
+    expect(await w.onCommand('parks')).toBe(`parks:\n${line}`)
+    await w.onCommand(`approve ${id}`)
+    expect(await w.onCommand('parks')).toBe(`parks:\n${line} · approved`)
+    expect(await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })).toBeUndefined()
+    expect(await w.onCommand('parks')).toBe('parks: none')
   })
 
   test('an unparseable park file is ignored and logged, never matched', async () => {

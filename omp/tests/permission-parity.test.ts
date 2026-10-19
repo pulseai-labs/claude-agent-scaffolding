@@ -61,7 +61,14 @@ const byId = (id: string): Call | undefined => CALLS.find(c => c.id === id)
 const HOME = '/fixture/home'
 const TREE = '/fixture/tree'
 const PARKS = '/fixture/parks'
-const POLICY = '# Parity policy\n\nSynthetic policy: no deployment, no publication, and no credential read without the operator.'
+// The policy file carries leading and trailing whitespace on purpose: both adapters read this one
+// file through their own reader, and the judge prompt must be byte-equal. The Claude Code reader
+// is register.tsx:93 (`(await readText(...))?.trim() || undefined`); the OMP adapter's is its own
+// `policyText()`. bun cannot load register.tsx (it value-imports the host kit), so the CC side of
+// this test is the shared plan fed the file after that exact expression; the OMP side is the real
+// adapter reading the fixture file in `fixture()`.
+const POLICY_FILE = '\n# Parity policy\n\nSynthetic policy: no deployment, no publication, and no credential read without the operator.\n\n'
+const POLICY = POLICY_FILE.trim()
 const WHERE: Where = { cwd: TREE, root: TREE, home: HOME, branch: 'feat/x', defaultBranch: 'main' }
 const CTX: DecideContext = { policy: POLICY, recent: '', role: null, grants: null, parks: [], now: '2026-10-19T00:00:00.000Z', enabled: [...NEVER_RULES] }
 
@@ -114,7 +121,7 @@ type Fixture = {
 // decision service and no lease: route() sends every judged call to judgeDirect.
 function fixture(): Fixture {
   const files = new Map<string, string>()
-  files.set(join(HOME, '.claude/autonomic/policy.md'), POLICY)
+  files.set(join(HOME, '.claude/autonomic/policy.md'), POLICY_FILE)
   const generations: Array<{ promptText?: string }> = []
   let verdict = ALLOW
   const env: Record<string, string | undefined> = {
@@ -138,6 +145,7 @@ function fixture(): Fixture {
         .map(k => k.slice(prefix.length))
     },
     writePark: async (path: string, text: string) => { files.set(path, text) },
+    claimPark: async (path: string) => { if (files.has(path)) return false; files.set(path, ''); return true },
     exists: async (path: string) => files.has(path),
     writeText: async (path: string, text: string) => { files.set(path, text) },
     appendLine: async (path: string, line: string) => { files.set(path, `${files.get(path) ?? ''}${line}\n`); return true },
@@ -179,6 +187,14 @@ function expectKind(call: Call, cc: Plan): void {
 }
 
 describe('the parity corpus (Plan Task 7 Step 1)', () => {
+  test('the one policy file goes through each adapter\'s reader before the prompt is built', () => {
+    // The fixture exists to make the reader matter: the file has leading and trailing whitespace
+    // and both readers trim it. The judge prompts below are byte-equal through the real OMP
+    // adapter and the Claude Code plan step, so a reader that stopped trimming on either side
+    // fails there.
+    expect(POLICY_FILE).not.toBe(POLICY)
+    expect(POLICY_FILE.trim()).toBe(POLICY)
+  })
   test('splits exactly as the plan says, with the part-a shapes present', () => {
     expect(CALLS).toHaveLength(40)
     const ids = CALLS.map(c => c.id)

@@ -2,7 +2,7 @@ import { describe, test, expect } from 'claude-code/testing'
 import type { On } from 'claude-code'
 import { judge, register, statusReport } from '../hooks/register'
 import { parsePermission } from '../hooks/verdict'
-import { parsePark } from '../hooks/parks'
+import { parsePark, serializePark } from '../hooks/parks'
 import { engine$, ledgerLines, world } from './world'
 import type { World } from './world'
 
@@ -114,13 +114,67 @@ describe('/autopilot and the park store (0.10.0 Task 5)', () => {
     expect(listed).toContain('***')
     expect(listed).not.toContain('ghp_abcdefghijklmnopqrst')
   })
-  test('a park file is written, chmodded 600, its directory 700 (Task 3 step 3)', async ($, on) => {
+  test('the park file and store are created 0700/0600 by the one umask-077 write (Task 3 step 3; fix B4)', async ($, on) => {
     const w = world(on, { env: AP })
     await $.tool.check(BASH('git push origin main'))
     const file = parkFiles(w)[0]!
-    const chmod = w.runs.find(r => r[0] === 'sh' && typeof r[2] === 'string' && r[2].includes('chmod 600') && r[2].includes('chmod 700'))
-    expect(chmod).toBeDefined()
-    expect(chmod![4]).toBe(file)
+    const at = w.runs.findIndex(r => r[0] === 'sh' && typeof r[2] === 'string' && r[2].includes('umask 077') && r[2].includes('cat > "$1"') && r[4] === file)
+    expect(at).toBeGreaterThanOrEqual(0)
+    // The content reaches that one run on stdin, and no wider-mode $.fs.write created the file first.
+    expect(w.runInits[at]?.stdin).toContain(`"id": "${thePark(w).id}"`)
+    expect(w.writes).not.toContain(file)
+  })
+  test('a release whose consume write fails does not allow (fix B1)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    await $.tool.check(BASH('git push origin main'))
+    const park = thePark(w)
+    await $.command.run(RUN(`approve ${park.id}`))
+    w.failWrite = new RegExp(`${park.id}\\.json$`)
+    const r = await $.tool.check(BASH('git push origin main'))
+    expect(r.decision).toBe('ask')
+    expect(String(r.reason)).toContain('could not be marked used')
+    expect(thePark(w).approval?.usedAt).toBe(null)
+  })
+  test('two overlapping releases of one approval: the lost claim parks the second (fix B2)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.tool.check(BASH('git push origin main'))
+    const park = thePark(w)
+    await $.command.run(RUN(`approve ${park.id}`))
+    const path = parkFiles(w)[0]!
+    const approved = parsePark(w.files.get(path)!)
+    expect((await $.tool.check(BASH('git push origin main'))).decision).toBe('allow')
+    // The overlapping call read the store before the winner consumed it: the file still says unused.
+    w.files.set(path, serializePark({ ...approved, approval: { ...approved.approval!, usedAt: null } }))
+    const second = await $.tool.check(BASH('git push origin main'))
+    expect(second.decision).toBe('deny')
+    expect(String(second.reason)).toContain('parked for the operator')
+    expect(parkFiles(w)).toHaveLength(2)
+    expect(parsePark(w.files.get(path)!).approval?.usedAt).toBe(null)
+  })
+  test('approve reports a failed store write as not approved (fix B3)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.tool.check(BASH('git push origin main'))
+    const park = thePark(w)
+    w.failWrite = new RegExp(`${park.id}\\.json$`)
+    const text = (await $.command.run(RUN(`approve ${park.id}`))).text
+    expect(text).toBe(`park ${park.id} was not approved: the store could not be written`)
+    expect(thePark(w).approval).toBe(null)
+  })
+  test('parks lists only open parks, the same line as OMP, approved marked (fix B5)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.tool.check(BASH('git push origin main'))
+    const park = thePark(w)
+    const line = `${park.id} · red line 1 · Bash: git push origin main · /repo`
+    expect((await $.command.run(RUN('parks'))).text).toBe(`parks (1):\n${line}`)
+    await $.command.run(RUN(`approve ${park.id}`))
+    expect((await $.command.run(RUN('parks'))).text).toBe(`parks (1):\n${line} · approved`)
+    expect((await $.tool.check(BASH('git push origin main'))).decision).toBe('allow')
+    expect((await $.command.run(RUN('parks'))).text).toBe('no parks')
+    // The open filter stands on its own: a used park whose claim marker is gone (a pre-fix park,
+    // or a deleted marker) is still not open.
+    w.files.delete(`/parks/${park.id}.used`)
+    expect((await $.command.run(RUN('parks'))).text).toBe('no parks')
   })
   test('the usage names the park commands', async ($, on) => {
     world(on, { env: AP })

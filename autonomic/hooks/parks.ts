@@ -16,6 +16,7 @@
 // exactObject, which would drag node:path into this graph.
 
 import { parseUniqueJSON } from './strict-json'
+import { oneLine } from './ledger'
 
 export type Park = {
   id: string
@@ -198,4 +199,28 @@ export function parksDir(env: Record<string, string | undefined>, home: string):
 export function parkText(p: Park): string {
   const what = p.redLine !== null ? `red line ${p.redLine}` : p.source === 'integrity' ? 'operator-only state' : 'the judge asked'
   return `autonomic: parked for the operator (park ${p.id}; ${what}): ${p.reason}. Do not retry this call or an equivalent one. Record it as parked and continue the work that does not depend on it.`
+}
+
+// The operator's listing (0.10.0 fix B5), one definition for both hosts: only an open park is
+// listed, an approved-unused one says so, and the fields are always id, what stopped it, the
+// call's tool and redacted shape, cwd, then approved. Q2: our own state files, an exact
+// approval timestamp, and oneLine's redaction (no value is printed).
+const PARK_TOOL: Readonly<Record<string, string>> = { bash: 'Bash', read: 'Read', write: 'Write', edit: 'Edit', github: 'github pr_push' }
+
+// An approval spent or expired is no open park; a park the operator has not answered is open.
+export function parkOpen(p: Park, now: string): boolean {
+  const a = p.approval
+  return a === null || (a.usedAt === null && Date.parse(a.expiresAt) > Date.parse(now))
+}
+
+// Oldest first, then id, so both hosts list the same store in the same order.
+export function parkOrder(a: Park, b: Park): number {
+  return a.parkedAt === b.parkedAt ? (a.id < b.id ? -1 : a.id > b.id ? 1 : 0) : a.parkedAt < b.parkedAt ? -1 : 1
+}
+
+export function parkLine(p: Park): string {
+  const what = p.redLine !== null ? `red line ${p.redLine}` : p.source === 'integrity' ? 'operator-only state' : 'the judge asked'
+  const command = p.command === '' ? '(no command)' : oneLine(p.command, 160)
+  const known = PARK_TOOL[p.tool.toLowerCase()]
+  return `${p.id} · ${what} · ${typeof known === 'string' ? known : p.tool}: ${command} · ${p.cwd}${p.approval === null ? '' : ' · approved'}`
 }

@@ -3,7 +3,7 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Pain, PainOption } from '../types'
 import { DEFAULTS, parseConfig, retiredNote } from './config'
 import type { AutonomicConfig } from './config'
-import { APPEND, CHMOD, TOUCH } from './io'
+import { APPEND, CLAIM, PARK_WRITE, TOUCH } from './io'
 import { ledgerLine, ledgerPathFor, oneLine } from './ledger'
 import type { LedgerCase, LedgerSource, Usage } from './ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from './mode'
@@ -15,7 +15,7 @@ import { DEFAULT_READERS, namesParkStore, routes } from './never'
 import { inputShape } from './shape'
 import { invokesParkCommand, planPermission, settlePermission } from './decide'
 import type { DecideContext, PermissionInput } from './decide'
-import { PARK_ID, approve, callKey, consume, parkId, parkText, parksDir, parsePark, serializePark } from './parks'
+import { PARK_ID, approve, callKey, consume, parkId, parkLine, parkOpen, parkOrder, parkText, parksDir, parsePark, serializePark } from './parks'
 import type { Park } from './parks'
 import { parsePermission } from './verdict'
 import { MAX_INPUT, askPrompt, shownInput } from './prompts'
@@ -349,7 +349,7 @@ export async function statusReport($: Engine, id: string): Promise<string> {
 // and skipped: never a throw, and never an approval.
 
 const parkPathOf = (dir: string, id: string): string => `${dir.replace(/\/+$/, '')}/${id}.json`
-const parkWhat = (p: Park): string => (p.redLine !== null ? `red line ${p.redLine}` : p.source === 'integrity' ? 'operator-only state' : 'the judge asked')
+const claimPathOf = (dir: string, id: string): string => `${dir.replace(/\/+$/, '')}/${id}.used`
 
 async function parksDirOf($: Engine): Promise<string> {
   return parksDir({ AUTONOMIC_PARKS_DIR: await $.env.get('AUTONOMIC_PARKS_DIR') }, await home($))
@@ -371,14 +371,27 @@ async function readParks($: Engine, dir: string): Promise<Park[]> {
   return out
 }
 
-// The one park write: the file at 0600, its directory at 0700 (Task 3 step 3). A failure is
-// logged and the call stays parked; the operator not being able to approve it is not an allow.
-async function writeParkFile($: Engine, path: string, park: Park): Promise<void> {
+// The one park write: one umask-077 sh run creates the directory 0700 and the file 0600, then
+// writes the serialized park from stdin (0.10.0 fix B4: the file is never created at the host's
+// default mode first; the exact call never appears in argv). It returns whether the write landed:
+// a release whose consume write fails must not allow (fix B1), and an approve must not claim
+// success (fix B3).
+async function writeParkFile($: Engine, path: string, park: Park): Promise<boolean> {
   try {
-    await $.fs.write(path, serializePark(park))
-    await $.process.run(['sh', '-c', CHMOD, 'sh', path])
+    return (await $.process.run(['sh', '-c', PARK_WRITE, 'sh', path], { stdin: serializePark(park) })).exitCode === 0
   } catch (err) {
     await log($, `park write failed ${path} ${String(err)}`)
+    return false
+  }
+}
+
+// The one-use claim (fix B2): noclobber creates <id>.used beside the park or fails, so exactly
+// one overlapping release wins. A false return is a lost claim, never an allow.
+async function claimParkUse($: Engine, path: string): Promise<boolean> {
+  try {
+    return (await $.process.run(['sh', '-c', CLAIM, 'sh', path])).exitCode === 0
+  } catch {
+    return false
   }
 }
 
@@ -388,11 +401,16 @@ async function writeParkFile($: Engine, path: string, park: Park): Promise<void>
 async function parksText($: Engine): Promise<string> {
   const dir = await parksDirOf($)
   const parks = await readParks($, dir)
-  if (parks.length === 0) return 'no parks'
-  const lines = [...parks]
-    .sort((a, b) => (a.parkedAt === b.parkedAt ? (a.id < b.id ? -1 : 1) : a.parkedAt < b.parkedAt ? -1 : 1))
-    .map(p => `${p.id} · ${parkWhat(p)} · ${p.command === '' ? '(no command)' : oneLine(p.command, 160)} · ${p.cwd}${p.approval === null ? '' : ' · approved'}`)
-  return `parks (${lines.length}):\n${lines.join('\n')}`
+  const now = new Date().toISOString()
+  const lines: string[] = []
+  for (const p of parks.sort(parkOrder)) {
+    if (!parkOpen(p, now)) continue
+    // A claimed park's one use was already taken (fix B2), even when its consume write failed:
+    // it is not open and its approval can no longer release anything.
+    if (await $.fs.exists(claimPathOf(dir, p.id)).catch(() => false)) continue
+    lines.push(parkLine(p))
+  }
+  return lines.length === 0 ? 'no parks' : `parks (${lines.length}):\n${lines.join('\n')}`
 }
 
 // `/autopilot approve <id>`: the operator's yes, written onto the park file the store holds.
@@ -405,7 +423,8 @@ async function approvePark($: Engine, word: string): Promise<string> {
   const park = (await readParks($, dir)).find(p => p.id === word)
   if (park === undefined) return `no park ${word}`
   if (park.approval !== null) return `park ${park.id} is already approved`
-  await writeParkFile($, parkPathOf(dir, park.id), approve(park, new Date().toISOString()))
+  if (!(await writeParkFile($, parkPathOf(dir, park.id), approve(park, new Date().toISOString()))))
+    return `park ${park.id} was not approved: the store could not be written`
   return `park ${park.id} is approved for one use in the next 72 hours: the exact call it names releases once, and only it.`
 }
 
@@ -715,7 +734,15 @@ export const register: Register = (on, options) => {
       const now = new Date().toISOString()
       const input: PermissionInput = { tool: e.tool, input: e.input, command, cwd: w.cwd, where: w }
       const ctx: DecideContext = { policy: (await policyText($)) ?? '', recent: digestOf(id), role: null, grants: null, parks, now, enabled: cfg.neverApprove }
-      const plan = planPermission(input, ctx)
+      // A release must first win the park's one use (fix B2). A lost claim means an overlapping
+      // call took it; that park is dropped and the call re-plans without it, so it parks again
+      // (floor, integrity, or judge) instead of releasing from an approval it did not win.
+      let available = parks
+      let plan = planPermission(input, ctx)
+      while (plan.kind === 'release' && !(await claimParkUse($, claimPathOf(dir, plan.park.id)))) {
+        available = available.filter(p => p.id !== plan.park.id)
+        plan = planPermission(input, { ...ctx, parks: available })
+      }
       if (plan.kind === 'pass') return r
       // A dialog is never judged: only the integrity park may act on it (ruling 2).
       if (dialog && !(plan.kind === 'park' && plan.source === 'integrity')) return r
@@ -739,7 +766,10 @@ export const register: Register = (on, options) => {
         // The operator's yes, used once: the row goes in first, then the park is consumed.
         if (!(await record($, id, 'permission', q, 'allow', `the operator's approval of park ${plan.park.id}`, undefined, 'operator')))
           return r.decision === 'allow' ? { ...r, decision: 'ask', reason: 'autonomic: the release could not be recorded; this call stays with you' } : r
-        await writeParkFile($, parkPathOf(dir, plan.park.id), consume(plan.park, now))
+        // The consume write reports whether it landed (fix B1): a release whose used-mark cannot
+        // be written does not allow, so the same approval cannot release the call again.
+        if (!(await writeParkFile($, parkPathOf(dir, plan.park.id), consume(plan.park, now))))
+          return r.decision === 'allow' ? { ...r, decision: 'ask', reason: `autonomic: approved park ${plan.park.id} could not be marked used; this call stays with you` } : r
         return r.decision === 'allow' ? r : { ...r, decision: 'allow', reason: `autonomic: the operator's approval of park ${plan.park.id}` }
       }
       // No call is allowed with a part the judge did not see (PR #763; the prompt cuts at MAX_INPUT).

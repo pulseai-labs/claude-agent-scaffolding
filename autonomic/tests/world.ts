@@ -1,6 +1,6 @@
 import type { On } from 'claude-code'
 import { mock } from 'claude-code/testing'
-import { APPEND, TOUCH } from '../hooks/io'
+import { APPEND, CLAIM, PARK_WRITE, TOUCH } from '../hooks/io'
 
 // The engine beneath autonomic, from memory. Each noun autonomic calls is answered here;
 // a call with no answer throws at the bottom of the chain and fails the test loudly. A
@@ -9,9 +9,10 @@ import { APPEND, TOUCH } from '../hooks/io'
 export type Fork = { isAnswered: true; text: string } | { isAnswered: false; reason: 'nothing-to-fork' | 'aborted' | 'empty-reply' | 'api-error' }
 export type World = {
   files: Map<string, string>
+  writes: string[]                 // every $.fs.write path, in order (0.10.0 fix B4: no park via fs.write)
   env: Record<string, string>       // the mocked environment: what env.get answers
   runs: string[][]
-  runInits: Array<{ timeoutMs?: number } | undefined>  // what each run was given, in step with runs
+  runInits: Array<{ timeoutMs?: number; stdin?: string } | undefined>  // what each run was given, in step with runs
   bellRuns: string[][]         // every autopilot bell's argv, in order
   bellDelayMs?: number         // a bell answers after this long instead of at once
   failBell?: boolean           // the bell process rejects
@@ -63,6 +64,7 @@ export const POLICY = '/home/u/.claude/autonomic/policy.md'
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean } = {}): World {
   const w: World = {
     files: new Map([...(opts.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(opts.files ?? {})]),
+    writes: [],
     env: { HOME: '/home/u', ...(opts.env ?? {}) },
     runs: [], runInits: [], bellRuns: [], bellFinished: false, toasts: [], statuses: [], notices: [], lists: [], fills: [], envSets: [], submits: [], hasBox: true,
     session: { id: 's1', cwd: '/repo' },
@@ -90,6 +92,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   })
   on('fs.write', (_$, e) => {
     if (w.failWrite?.test(e.path)) return { deny: `EACCES: ${e.path}` } as never
+    w.writes.push(e.path)
     w.files.set(e.path, e.text)
     return { value: undefined } as never
   })
@@ -144,7 +147,7 @@ function nextFork(w: World): never {
 // process.run's answer, from memory: the dispatch handler and the engine double share it.
 export type Exec = { exitCode: number; stdout: string; stderr: string; isStdoutTruncated: boolean }
 type RunAnswer = { value: Exec } | { deny: string }
-async function exec(w: World, argv: string[], init: { timeoutMs?: number } | undefined): Promise<RunAnswer> {
+async function exec(w: World, argv: string[], init: { timeoutMs?: number; stdin?: string } | undefined): Promise<RunAnswer> {
   w.runs.push(argv)
   w.runInits.push(init)
   const ok = (stdout = ''): RunAnswer => ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false } })
@@ -183,6 +186,18 @@ async function exec(w: World, argv: string[], init: { timeoutMs?: number } | und
     w.files.set(path, `${w.files.get(path) ?? ''}${line}\n`)
     return ok()
   }
+  if (argv[0] === 'sh' && argv[2] === PARK_WRITE) {
+    const path = argv[4] ?? ''
+    if (w.failWrite?.test(path)) return fail()
+    w.files.set(path, init?.stdin ?? '')
+    return ok()
+  }
+  if (argv[0] === 'sh' && argv[2] === CLAIM) {
+    const path = argv[4] ?? ''
+    if (w.files.has(path)) return fail()
+    w.files.set(path, '')
+    return ok()
+  }
   if (argv[0] === 'sh' && argv[2] === TOUCH) {
     const path = argv[4] ?? ''
     if (w.failTouch?.test(path)) return fail()
@@ -218,7 +233,7 @@ export function engine$(w: World): EngineDouble {
     },
     fs: {
       read: async (path) => { const text = w.files.get(path); if (text === undefined) throw new Error(`ENOENT: ${path}`); return text },
-      write: async (path, text) => { if (w.failWrite?.test(path)) throw new Error(`EACCES: ${path}`); w.files.set(path, text) },
+      write: async (path, text) => { if (w.failWrite?.test(path)) throw new Error(`EACCES: ${path}`); w.writes.push(path); w.files.set(path, text) },
     },
     ui: { status: async (text) => { w.statuses.push(text) }, toast: async (text) => { w.toasts.push(text) } },
     process: { run: async (argv, init) => { const r = await exec(w, [...argv], init); if ('deny' in r) throw new Error(r.deny); return r.value } },

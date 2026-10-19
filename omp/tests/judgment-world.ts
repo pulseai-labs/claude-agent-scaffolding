@@ -220,6 +220,7 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
     readText: async path => { try { return readFileSync(path, 'utf8') } catch { return undefined } },
     readDir: async path => { try { return readdirSync(path) } catch { return [] } },
     writePark: async (path, text) => { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, text, { mode: 0o600 }) },
+    claimPark: async path => { try { writeFileSync(path, '', { flag: 'wx', mode: 0o600 }); return true } catch { return false } },
     exists: async path => existsSync(path),
     writeText: async (path, text) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text) },
     appendLine: async (path, line) => {

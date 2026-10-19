@@ -137,7 +137,7 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 | `/autopilot on [doc …]` | autopilot from now; the docs become the scope, and their paths go into the prompt box for one Enter |
 | `/autopilot off` | manual from now |
 | `/autopilot status` | mode, source, scope, policy (`default`, `edited`, or missing), `yieldAtPercent`, `loopMax`, `tailChars`, the enabled never-approve rules, molt's stage for this session (or `none`), ledger, bell, pain file, loop count |
-| `/autopilot parks` | every open park: id, what stopped it, the call's shape, its cwd, and whether it is approved |
+| `/autopilot parks` | every open park: id, what stopped it, the call's tool and redacted shape, its cwd, and whether it is approved |
 | `/autopilot approve <id>` | your yes for one use: the exact tool, command text (or file-tool input) and cwd release once within 72 hours |
 | `/autopilot drop <id>` | clears a park; the call it named parks again on its next try |
 | unset, empty, `manual` | manual |
@@ -247,7 +247,7 @@ because that is the only return that does not wait; **that deny is a deferral, n
 the call waits for your yes rather than being rejected. On OMP it blocks with the same text.
 
 `/autopilot parks` lists every open park: its id, what stopped it (red line N, the judge asked,
-or operator-only state), the call's shape and cwd, and whether it is approved.
+or operator-only state), the call's tool and redacted shape, its cwd, and whether it is approved.
 `/autopilot approve <id>` approves one exact call for one use within 72 hours: the tool, the
 command text (or a file tool's whole input) and the cwd must all match exactly, and a second run
 parks again. `/autopilot drop <id>` clears it.

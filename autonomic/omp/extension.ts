@@ -24,7 +24,7 @@ import { DEFAULT_READERS, namesParkStore, routes } from '../hooks/never'
 import type { Where } from '../hooks/never'
 import { operationFacts, permissionEligibility } from '../hooks/operations'
 import type { OperationContext } from '../hooks/operations'
-import { PARK_ID, approve, callKey, consume, parkId, parkText, parksDir, parsePark, serializePark } from '../hooks/parks'
+import { PARK_ID, approve, callKey, consume, parkId, parkLine, parkOpen, parkOrder, parkText, parksDir, parsePark, serializePark } from '../hooks/parks'
 import type { Park } from '../hooks/parks'
 import { DEFAULT_POLICY, expandHome } from '../hooks/policy'
 import { MAX_INPUT, scopeMessage, shownInput } from '../hooks/prompts'
@@ -60,6 +60,7 @@ export type AutonomicIO = {
   readText(path: string): Promise<string | undefined>
   readDir(path: string): Promise<readonly string[]>              // the park store's entries; a missing folder is empty
   writePark(path: string, text: string): Promise<void>          // folder 0700, file 0600
+  claimPark(path: string): Promise<boolean>                     // exclusive create; false when taken (fix B2)
   exists(path: string): Promise<boolean>
   writeText(path: string, text: string): Promise<void>          // creates the folder
   appendLine(path: string, line: string): Promise<boolean>      // creates the folder; false when it did not land
@@ -499,14 +500,18 @@ export function createAutonomic(io: AutonomicIO) {
     return lines.join('\n')
   }
 
-  // The operator's view of the store (call 2): one line per open park, so an id can be typed back
-  // into `/autopilot approve <id>`. A used or expired approval is no open park.
+  // The operator's view of the store (call 2; fix B5): the shared line, only the open parks,
+  // oldest first, with a claimed park's spent use not listed. A used or expired approval is no
+  // open park.
   async function parksReport(): Promise<string> {
     const now = new Date().toISOString()
-    const open = (await readParks())
-      .filter(p => p.approval === null || (p.approval.usedAt === null && Date.parse(p.approval.expiresAt) > Date.parse(now)))
-      .map(p => `${p.id} · ${p.redLine !== null ? `red line ${p.redLine}` : p.source === 'integrity' ? 'operator-only state' : 'the judge asked'} · ${p.tool}: ${oneLine(p.command, 160)} · ${p.cwd}`)
-    return open.length === 0 ? 'parks: none' : `parks:\n${open.join('\n')}`
+    const lines: string[] = []
+    for (const p of (await readParks()).sort(parkOrder)) {
+      if (!parkOpen(p, now)) continue
+      if (await io.exists(claimFile(p.id))) continue
+      lines.push(parkLine(p))
+    }
+    return lines.length === 0 ? 'parks: none' : `parks:\n${lines.join('\n')}`
   }
 
   // One use, 72 hours, exactly this tool, command text and cwd (Task 3's approve/consume). The id
@@ -684,6 +689,7 @@ export function createAutonomic(io: AutonomicIO) {
   // The id grammar is the shared PARK_ID and the park key is the shared callKey (Task 7a): the
   // guards below check the imported grammar before an id becomes a path, as register.tsx does.
   const parkFile = (id: string): string => join(parksDir(io.env, home()), `${id}.json`)
+  const claimFile = (id: string): string => join(parksDir(io.env, home()), `${id}.used`)
 
   // The whole store, read before every decision so an approval the operator just wrote is seen. A
   // file that does not parse is ignored and logged, never matched (Task 3 step 3).
@@ -780,9 +786,17 @@ export function createAutonomic(io: AutonomicIO) {
       const at = await where(dir)
       const parks = await readParks()
       const now = new Date().toISOString()
-      const plan = planPermission({ tool: call.tool, input: call.input, command: call.command, cwd: dir, where: at },
-        { policy: (await policyText()) ?? '', recent: '', role: authorityLease?.snapshot.seat.role ?? null,
-          grants: authorityLease?.snapshot.grants ?? null, parks, now, enabled: cfg.neverApprove })
+      const c: DecideContext = { policy: (await policyText()) ?? '', recent: '', role: authorityLease?.snapshot.seat.role ?? null,
+        grants: authorityLease?.snapshot.grants ?? null, parks, now, enabled: cfg.neverApprove }
+      // A release must first win the park's one use (fix B2). A lost claim means an overlapping
+      // call took it; that park is dropped and the call re-plans without it, so it parks again
+      // (floor, integrity, or judge) instead of releasing from an approval it did not win.
+      let available = parks
+      let plan = planPermission({ tool: call.tool, input: call.input, command: call.command, cwd: dir, where: at }, c)
+      while (plan.kind === 'release' && !(await io.claimPark(claimFile(plan.park.id)))) {
+        available = available.filter(p => p.id !== plan.park.id)
+        plan = planPermission({ tool: call.tool, input: call.input, command: call.command, cwd: dir, where: at }, { ...c, parks: available })
+      }
       if (plan.kind === 'pass') return undefined
       if (plan.kind === 'release') return await releaseApproved(plan.park, call)
       if (plan.kind === 'park') return await parkFor({ source: plan.source, redLine: plan.redLine, reason: plan.reason }, call, dir)
@@ -1134,6 +1148,7 @@ function ioFor(pi: any, cur: () => any): AutonomicIO {
     readText: async path => { try { return readFileSync(path, 'utf8') } catch { return undefined } },
     readDir: async path => { try { return readdirSync(path) } catch { return [] } },
     writePark: async (path, text) => { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, text, { mode: 0o600 }) },
+    claimPark: async path => { try { writeFileSync(path, '', { flag: 'wx', mode: 0o600 }); return true } catch { return false } },
     exists: async path => existsSync(path),
     writeText: async (path, text) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text) },
     appendLine: async (path, line) => {
