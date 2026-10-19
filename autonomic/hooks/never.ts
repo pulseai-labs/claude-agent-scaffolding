@@ -22,6 +22,8 @@
 // `python3 -c 'git push -f'` shows `push` and `-f`. Text that never runs (messages, heredoc
 // bodies, a literal `sh -c` string read as commands) is data.
 
+import { PARKS_DIR_MARK } from './parks'
+
 export type NeverRule = 'default-branch-push' | 'force-push' | 'no-verify' | 'ai-trailer'
 export type Where = { cwd: string; root: string; home: string; branch?: string; defaultBranch?: string }
 // Red line 3's trailer half (spec §3): the commit footer that never belongs in our commits.
@@ -831,16 +833,59 @@ export const ROUTE_WORDS: readonly string[] = [
   'printenv', 'env', 'security', 'op', 'pass', 'ssh', 'ssh-keygen', 'id_rsa', 'id_ed25519', 'credentials', 'auth.json', 'agent.db', 'pem', 'key', 'shadow', 'secret', 'secrets',
   // the merge gate (operator-owned until Task 10)
   'merge',
-  // the park store (Task 3's PARKS_DIR_MARK): a path, matched anywhere in the text
+  // the park store (Task 3's PARKS_DIR_MARK): namesParkStore matches it, normalized and
+  // segment-bounded, in the text and in the call's cwd; listed here as documentation.
   'autonomic/parks',
 ]
+
+// The park store's directory mark, read as the shell joins a literal path: quotes and backslashes
+// removed, repeated slashes collapsed and `.` segments dropped, then matched on the segment, so
+// `autonomic//parks`, `autonomic/./parks` and `par""ks` name the same directory. Variables,
+// globs, substitutions and encodings are not resolved (the README's Known limit). Skill-first Q3:
+// this only adds a stop — a near miss that parks too costs one dialog.
+const SEGMENT_CHAR = /[a-z0-9_.-]/
+export const normalizeCallText = (text: string): string => {
+  const parts = text.toLowerCase().replace(/["'\\]/g, '').split('/')
+  const kept: string[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!
+    if (part === '.') continue
+    if (part === '' && i !== 0) continue
+    kept.push(part)
+  }
+  return kept.join('/')
+}
+// The mark names a directory of its own, never a prefix: `parkside` and `parks-notes.md` stay quiet.
+const hasParkMark = (s: string): boolean => {
+  for (let at = s.indexOf(PARKS_DIR_MARK); at !== -1; at = s.indexOf(PARKS_DIR_MARK, at + 1)) {
+    const before = at === 0 ? undefined : s[at - 1]
+    const after = s[at + PARKS_DIR_MARK.length]
+    if ((before === undefined || !SEGMENT_CHAR.test(before)) && (after === undefined || !SEGMENT_CHAR.test(after))) return true
+  }
+  return false
+}
+// Does the whole input, or the call's cwd, name the park store (plan call 3's integrity guard)?
+// The cwd counts twice: any directory inside the store, and the store's parent with a relative
+// `parks/…` path in the text. The pre-check and the plan call this same function, so neither
+// host can see a different store.
+export const namesParkStore = (input: unknown, cwd?: string): boolean => {
+  const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
+  const normalized = normalizeCallText(text)
+  if (hasParkMark(normalized)) return true
+  if (cwd === undefined) return false
+  const dir = normalizeCallText(cwd)
+  return hasParkMark(dir) || (/(?:^|\/)autonomic$/.test(dir) &&
+    normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === 'parks' || w.startsWith('parks/')))
+}
+
 // The routing check (0.10.0 Task 2): true when a call could name a red line, the park store or a
 // merge, and so is the judge's. The whole input is matched as words — quotes included, so a word
 // inside quoted text still routes — where a dotted file shape matches its stem (env names .env,
-// prod.env and certs/x.key, never environment) and an entry holding / matches as a substring.
+// prod.env and certs/x.key, never environment) and the park-store entry is namesParkStore's
+// normalized, segment-bounded match of the text and cwd.
 // The floor's own reading of a command is matched too, so this stays a strict superset of the old
 // namesDanger pre-check: an escape-route spelling (git pu""sh, --no-verif) still routes.
-export const routes = (call: { tool: string; input: unknown }, readers: Readers = DEFAULT_READERS): boolean => {
+export const routes = (call: { tool: string; input: unknown; cwd?: string }, readers: Readers = DEFAULT_READERS): boolean => {
   const input = call.input
   const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input)
   const lower = text.toLowerCase()
@@ -848,7 +893,7 @@ export const routes = (call: { tool: string; input: unknown }, readers: Readers 
   const words = lower.split(/[^a-z0-9_.-]+/).filter(w => w !== '')
   if (command !== undefined) words.push(...allWords(wordsOf(command, readers)).map(w => w.toLowerCase()))
   return words.some(w => dangerWord(w) || ROUTE_WORDS.some(e => !e.includes('/') && (w === e || w.endsWith(`.${e}`)))) ||
-    ROUTE_WORDS.some(e => e.includes('/') && lower.includes(e))
+    namesParkStore(lower, call.cwd)
 }
 
 // Section 1: a group's words with each literal variable assigned before it read as its value.

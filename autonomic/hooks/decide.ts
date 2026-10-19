@@ -12,7 +12,7 @@
 // "allow" with no red line named: a red-line allow, an "ask", and an unparseable reply all park.
 
 import type { Grant } from './authority'
-import { floorFindings, redLineOf, routes } from './never'
+import { floorFindings, namesParkStore, redLineOf, routes } from './never'
 import type { NeverRule, Where } from './never'
 import { PARKS_DIR_MARK, callKey, matches } from './parks'
 import type { Park } from './parks'
@@ -38,13 +38,10 @@ export type Plan =
   | { kind: 'pass' }
   | { kind: 'judge'; prompt: string; notes: FloorNote[] }
 
-// The whole input as text, the way routes() reads it: quotes included, case folded. The mark names
-// the park store, so any call carrying it is parked by the integrity guard (call 3): only the
-// operator clears a park, and a seat that writes its own approval file finds this in the way.
-function namesParkStore(input: unknown): boolean {
-  const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
-  return text.toLowerCase().includes(PARKS_DIR_MARK)
-}
+// The whole input and the call's cwd are read by never.ts's namesParkStore (normalized and
+// segment-bounded): the mark names the park store, so any call carrying it is parked by the
+// integrity guard (call 3). Only the operator clears a park, and a seat that writes its own
+// approval file finds this in the way.
 
 // The operator's own approval route invoked from a tool call (Task 7a). A model's Skill call to a
 // mod command is refused by the Claude Code host, but the attempt still reaches tool.check first
@@ -84,11 +81,11 @@ export function planPermission(i: PermissionInput, c: DecideContext): Plan {
     const rules = [...new Set(asks.map(f => f.rule))]
     return { kind: 'park', source: 'floor', redLine: redLineOf(rules[0]!), reason: `never-approve: ${rules.join(', ')}` }
   }
-  if (namesParkStore(i.input)) return { kind: 'park', source: 'integrity', redLine: null, reason: `the call names the park store (${PARKS_DIR_MARK}): only the operator clears a park` }
+  if (namesParkStore(i.input, i.cwd)) return { kind: 'park', source: 'integrity', redLine: null, reason: `the call names the park store (${PARKS_DIR_MARK}): only the operator clears a park` }
   const invocation = invokesParkCommand(i)
   if (invocation !== null) return { kind: 'park', source: 'integrity', redLine: null, reason: `the call invokes /autopilot ${invocation}: only the operator ${invocation === 'approve' ? 'approves' : 'clears'} a park` }
   const notes = findings.filter(f => f.level === 'fork')
-  if (!routes({ tool: i.tool, input: i.input }) && notes.length === 0) return { kind: 'pass' }
+  if (!routes({ tool: i.tool, input: i.input, cwd: i.cwd }) && notes.length === 0) return { kind: 'pass' }
   return { kind: 'judge', prompt: permissionPrompt(i.tool, i.input, c.policy, c.recent, notes, { role: c.role, grants: c.grants }), notes }
 }
 

@@ -45,6 +45,17 @@ describe('planPermission (0.10.0 Task 4)', () => {
     for (const c of [bash(`cat ${PARK_STORE}`), write(PARK_STORE)])
       expect(planPermission(c, ctx())).toMatchObject({ kind: 'park', source: 'integrity', redLine: null })
   })
+  test('equivalent spellings and the cwd forms park as integrity; near misses pass (R1/R2)', () => {
+    for (const c of [
+      bash('cat > deadbeef0001.json', { cwd: '/home/u/.local/state/autonomic/parks' }),
+      bash('cat > parks/deadbeef0001.json', { cwd: '/home/u/.local/state/autonomic' }),
+      write('/x/autonomic//parks/a.json'),
+      write('/x/autonomic/./parks/a.json'),
+      write('/x/autonomic/par""ks/a.json'),
+    ]) expect(planPermission(c, ctx())).toMatchObject({ kind: 'park', source: 'integrity', redLine: null })
+    for (const c of [write('/repo/parkside'), write('/repo/autonomic/parks-notes.md')])
+      expect(planPermission(c, ctx())).toEqual({ kind: 'pass' })
+  })
   test('a call neither the floor names nor the router routes passes', () => {
     expect(planPermission(bash('ls -la'), ctx())).toEqual({ kind: 'pass' })
   })

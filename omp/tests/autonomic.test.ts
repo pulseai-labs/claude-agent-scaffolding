@@ -527,6 +527,67 @@ describe('the never-approve floor', () => {
     expect(await a.onCommand('off')).toContain('autopilot is off')
     expect(await a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
   })
+
+  test('a bash call whose cwd is the park store parks: the pre-check reads the cwd (R1)', async () => {
+    const { w, a } = world({ files: autopilot() })
+    const r = await a.onToolCall({ toolName: 'bash', input: { command: 'cat > deadbeef0001.json', cwd: PARKS } })
+    expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('operator-only state')
+    expect(parksIn(w)).toHaveLength(1)
+  })
+
+  test("a relative parks/… call from the store's parent parks (R1)", async () => {
+    const { w, a } = world({ files: autopilot() })
+    const r = await a.onToolCall({ toolName: 'bash', input: { command: 'cat > parks/deadbeef0001.json', cwd: `${HOME}/.local/state/autonomic` } })
+    expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('operator-only state')
+    expect(parksIn(w)).toHaveLength(1)
+  })
+
+  test('equivalent spellings of the park store park: //, /./ and quote splitting (R2)', async () => {
+    const { w, a } = world({ files: autopilot() })
+    for (const path of [
+      `${PARKS.replace('/parks', '//parks')}/ab12cd34ef56.json`,
+      `${PARKS.replace('/parks', '/./parks')}/ab12cd34ef56.json`,
+      `${PARKS.replace('/parks', '/par""ks')}/ab12cd34ef56.json`,
+    ]) {
+      const r = await a.onToolCall({ toolName: 'write', input: { path, content: '{}' } })
+      expect([path, r?.block]).toEqual([path, true])
+      expect(r?.reason).toContain('operator-only state')
+    }
+    expect(parksIn(w)).toHaveLength(3)
+  })
+
+  test('near misses do not park: parkside and autonomic/parks-notes.md (R2 controls)', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    expect(await a.onToolCall({ toolName: 'write', input: { path: '/repo/parkside', content: '{}' } })).toBeUndefined()
+    expect(await a.onToolCall({ toolName: 'write', input: { path: '/repo/autonomic/parks-notes.md', content: '{}' } })).toBeUndefined()
+    expect(parksIn(w)).toHaveLength(0)
+    expect(w.prompts).toEqual([])
+  })
+
+  test('a non-lane tool naming the store parks as integrity, and nothing else is routed (R3)', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    const r = await a.onToolCall({ toolName: 'apply_patch', input: { patch: '*** Begin Patch\n*** Update File: /home/u/.local/state/autonomic/parks/ab12cd34ef56.json\n@@\n-x\n+y\n*** End Patch' } })
+    expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('operator-only state')
+    expect(w.prompts).toEqual([])                 // integrity only: no side turn
+    expect(parksIn(w)).toHaveLength(1)
+  })
+
+  test('an unrouted tool whose input says git push but names no store stays untouched (R3 control)', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    expect(await a.onToolCall({ toolName: 'apply_patch', input: { patch: '*** Begin Patch\n*** Update File: /repo/x\n@@\n-git push origin main\n+git status\n*** End Patch' } })).toBeUndefined()
+    expect(w.prompts).toEqual([])
+    expect(parksIn(w)).toHaveLength(0)
+  })
+
+  test('manual: the same store-naming calls are untouched (autopilot off)', async () => {
+    const { w, a } = world()
+    expect(await a.onToolCall({ toolName: 'bash', input: { command: 'cat > deadbeef0001.json', cwd: PARKS } })).toBeUndefined()
+    expect(await a.onToolCall({ toolName: 'apply_patch', input: { patch: '/home/u/.local/state/autonomic/parks/ab12cd34ef56.json' } })).toBeUndefined()
+    expect(parksIn(w)).toHaveLength(0)
+  })
 })
 
 describe('the park store, the approval and the command surface (calls 2-3, #815)', () => {

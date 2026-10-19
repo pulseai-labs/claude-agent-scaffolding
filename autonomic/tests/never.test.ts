@@ -1255,6 +1255,14 @@ describe('0.10.0 routing', () => {
     expect(routes({ tool: 'bash', input: { command: 'cat /home/u/.local/state/autonomic/parks/ab12.json' } })).toBe(true)
     expect(routes({ tool: 'Write', input: { file_path: '/home/u/.local/state/autonomic/parks/ab12.json' } })).toBe(true)
   })
+  test('equivalent spellings and cwds name the park store; near misses do not (R1/R2)', () => {
+    for (const file_path of ['/x/autonomic//parks/a.json', '/x/autonomic/./parks/a.json', '/x/autonomic/par""ks/a.json'])
+      expect([file_path, routes({ tool: 'Write', input: { file_path } })]).toEqual([file_path, true])
+    expect(routes({ tool: 'bash', input: { command: 'cat > x.json' }, cwd: '/home/u/.local/state/autonomic/parks' })).toBe(true)
+    expect(routes({ tool: 'bash', input: { command: 'cat > parks/x.json' }, cwd: '/home/u/.local/state/autonomic' })).toBe(true)
+    expect(routes({ tool: 'Write', input: { file_path: '/repo/parkside' } })).toBe(false)
+    expect(routes({ tool: 'Write', input: { file_path: '/repo/autonomic/parks-notes.md' } })).toBe(false)
+  })
   test('text-only red-line words still route: the floor decides what parks, routing decides what is judged', () => {
     expect(routes({ tool: 'bash', input: { command: 'grep -n "push -f" x.ts' } })).toBe(true)
     expect(routes({ tool: 'bash', input: { command: "cat <<'EOF' | sh\ngit push origin main\nEOF" } })).toBe(true)

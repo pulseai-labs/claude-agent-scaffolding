@@ -20,7 +20,7 @@ import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields
 import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
 import type { LedgerCase, LedgerSource } from '../hooks/ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from '../hooks/mode'
-import { DEFAULT_READERS, routes } from '../hooks/never'
+import { DEFAULT_READERS, namesParkStore, routes } from '../hooks/never'
 import type { Where } from '../hooks/never'
 import { operationFacts, permissionEligibility } from '../hooks/operations'
 import type { OperationContext } from '../hooks/operations'
@@ -763,9 +763,14 @@ export function createAutonomic(io: AutonomicIO) {
    */
   async function route(call: RouteCall): Promise<{ block: true; reason: string } | undefined> {
     // The operator's own route needs no routing word to reach its guard (Task 7a): the pre-check
-    // proceeds for it too, so the shared integrity park is what stops it.
+    // proceeds for it too, so the shared integrity park is what stops it. The whole input is
+    // passed (a bash cwd in the park store is read here, R1), and a synthesized command rides
+    // beside its own fields rather than replacing them.
+    const routed = call.command === null ? call.input
+      : call.input !== null && typeof call.input === 'object' ? { ...call.input, command: call.command }
+      : { command: call.command }
     if (invokesParkCommand({ tool: call.tool, input: call.input, command: call.command }) === null &&
-        !routes({ tool: call.tool, input: call.command === null ? call.input : { command: call.command } }, cfg.readers)) return undefined
+        !routes({ tool: call.tool, input: routed, cwd: typeof call.cwd === 'string' ? call.cwd : undefined }, cfg.readers)) return undefined
     try {
       const m = await modeOf()
       if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
@@ -854,6 +859,13 @@ export function createAutonomic(io: AutonomicIO) {
     lastEntryMs = performance.now()
     await load()
     if (e?.toolName === 'ask') {
+      // The integrity guard covers every tool call's whole input (ruling 2), the ask reflex
+      // included: a dialog that names the park store is parked first; everything else reaches the
+      // reflex exactly as today.
+      if (namesParkStore(e.input, io.cwd)) {
+        const blocked = await route({ tool: 'ask', command: null, input: e.input })
+        if (blocked !== undefined) return blocked
+      }
       try { return await askReflex(e.input) } catch (err) { await log(`ask reflex error ${String(err)}`); return undefined }
     }
     if (e?.toolName === 'bash') {
@@ -875,6 +887,11 @@ export function createAutonomic(io: AutonomicIO) {
     // integrity rule's lane, whatever tool carries the shape.
     const invoking = { tool: String(e?.toolName ?? ''), input: e?.input, command: null }
     if (invokesParkCommand(invoking) !== null) return route(invoking)
+    // Every other tool (notebook, apply_patch, ast_edit, eval, js, python, debug, an MCP tool) is
+    // outside today's permission lanes: the integrity check only (ruling 2). A call whose whole
+    // input names the park store parks; every other call returns exactly what 0.9.1 returned, so
+    // routing words in its input never send it to the judge.
+    if (typeof e?.toolName === 'string' && namesParkStore(e.input, io.cwd)) return route({ tool: e.toolName, command: null, input: e.input })
     return undefined
   }
 

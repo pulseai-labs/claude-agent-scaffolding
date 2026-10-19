@@ -11,7 +11,7 @@ import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
-import { DEFAULT_READERS, routes } from './never'
+import { DEFAULT_READERS, namesParkStore, routes } from './never'
 import { inputShape } from './shape'
 import { invokesParkCommand, planPermission, settlePermission } from './decide'
 import type { DecideContext, PermissionInput } from './decide'
@@ -694,16 +694,20 @@ export const register: Register = (on, options) => {
         }
         return r
       }
-      // A tool whose permission prompt is the operator's own dialog is never judged (final review C1).
-      if (USER_DIALOG.has(e.tool)) return r
+      // A tool whose permission prompt is the operator's own dialog is never judged (final review
+      // C1). Its whole input still takes the integrity check (ruling 2): only a call that names the
+      // park store parks; everything else keeps the host verdict.
+      const dialog = USER_DIALOG.has(e.tool)
       const raw = (e.input as { command?: unknown } | undefined)?.command
       const command = typeof raw === 'string' ? raw : null
+      const cwd = await $.session.cwd()
+      if (dialog && !namesParkStore(e.input, cwd)) return r
       // The cheap pre-check (0.10.0 Tasks 5 and 7a): an empty park store, a call the routing does
-      // not name and no invocation of the operator's approval route are exactly planPermission's
-      // pass — no git run, no judge, no store read.
+      // not name (its whole input or its cwd) and no invocation of the operator's approval route
+      // are exactly planPermission's pass — no git run, no judge, no store read.
       const dir = await parksDirOf($)
       const parks = await readParks($, dir)
-      if (parks.length === 0 && !routes({ tool: e.tool, input: e.input }, cfg.readers) &&
+      if (parks.length === 0 && !routes({ tool: e.tool, input: e.input, cwd }, cfg.readers) &&
           invokesParkCommand({ tool: e.tool, input: e.input, command }) === null) return r
       // From here every failure keeps the call with the operator (final review I1): an
       // unneeded ask costs one dialog, a missed one a force push.
@@ -713,6 +717,8 @@ export const register: Register = (on, options) => {
       const ctx: DecideContext = { policy: (await policyText($)) ?? '', recent: digestOf(id), role: null, grants: null, parks, now, enabled: cfg.neverApprove }
       const plan = planPermission(input, ctx)
       if (plan.kind === 'pass') return r
+      // A dialog is never judged: only the integrity park may act on it (ruling 2).
+      if (dialog && !(plan.kind === 'park' && plan.source === 'integrity')) return r
       const q = `${e.tool}: ${inputShape(e.input)}`
       // The parked call is denied on both hosts (Global Constraints): "deny" is the only return
       // that does not wait, and the reason carries the park text verbatim (Review Focus 1).

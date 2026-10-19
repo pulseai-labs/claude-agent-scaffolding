@@ -4,6 +4,8 @@ import { POLICY, ledgerLines, world } from './world'
 import type { World } from './world'
 
 const AP = { AUTONOMIC_MODE: 'autopilot', AUTONOMIC_PARKS_DIR: '/parks' }
+const STORE = '/home/u/.local/state/autonomic/parks'
+const STORE_FILE = `${STORE}/ab12cd34ef56.json`
 const BASH = (command: string) => ({ tool: 'Bash', input: { command } }) as never
 const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o) })
 // Every park file this world holds, parsed (0.10.0 Task 5): the suite's own store, ids we mint.
@@ -71,6 +73,72 @@ describe('the permission reflex (spec §3.3)', () => {
     const written = parks(w)
     expect(written).toHaveLength(1)
     expect(written[0]!.tool).toBe('Write')
+  })
+  test('a bash call run in the park store parks: the pre-check and the guard read the cwd (R1)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    w.session.cwd = STORE
+    const r = await $.tool.check(BASH('cat > deadbeef0001.json'))
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('operator-only state')
+    expect(parks(w)).toHaveLength(1)
+    expect(parks(w)[0]!.source).toBe('integrity')
+  })
+  test("a relative parks/… call from the store's parent parks (R1)", async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    w.session.cwd = '/home/u/.local/state/autonomic'
+    const r = await $.tool.check(BASH('cat > parks/deadbeef0001.json'))
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('operator-only state')
+    expect(parks(w)).toHaveLength(1)
+  })
+  test('equivalent spellings of the park store park: //, /./ and quote splitting (R2)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    for (const file_path of [
+      '/home/u/.local/state/autonomic//parks/ab12cd34ef56.json',
+      '/home/u/.local/state/autonomic/./parks/ab12cd34ef56.json',
+      '/home/u/.local/state/autonomic/par""ks/ab12cd34ef56.json',
+    ]) {
+      const r = await $.tool.check({ tool: 'Write', input: { file_path, content: '{}' } } as never)
+      expect([file_path, r.decision]).toEqual([file_path, 'deny'])
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(3)
+    expect(parks(w).every(p => p.source === 'integrity')).toBe(true)
+  })
+  test('near misses do not park: parkside and autonomic/parks-notes.md (R2 controls)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    for (const file_path of ['/repo/parkside', '/repo/autonomic/parks-notes.md']) {
+      const r = await $.tool.check({ tool: 'Write', input: { file_path, content: '{}' } } as never)
+      expect([file_path, r.decision]).toEqual([file_path, 'ask'])
+    }
+    expect(parks(w)).toHaveLength(0)
+    expect(w.forkPrompts).toEqual([])
+  })
+  test('a non-lane tool naming the store parks by its whole input, whatever its name (R3)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    for (const call of [
+      { tool: 'NotebookEdit', input: { notebook_path: STORE_FILE, new_source: 'x' } },
+      { tool: 'mcp__fs__write', input: { path: STORE_FILE, content: '{}' } },
+    ]) {
+      const r = await $.tool.check(call as never)
+      expect(r.decision).toBe('deny')
+      expect(String(r.reason)).toContain('operator-only state')
+    }
+    expect(parks(w)).toHaveLength(2)
+  })
+  test('a dialog whose input says git push but names no store gets the host verdict, never the judge (R3 control)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    const r = await $.tool.check({ tool: 'AskUserQuestion', input: { questions: [{ question: 'git push origin main?' }] } } as never)
+    expect(r.decision).toBe('ask')
+    expect(w.forkPrompts).toEqual([])
+    expect(parks(w)).toHaveLength(0)
+  })
+  test('autopilot off: a call whose cwd or input names the store is untouched', async ($, on) => {
+    const w = world(on)
+    w.session.cwd = STORE
+    expect((await $.tool.check(BASH('cat > deadbeef0001.json'))).decision).toBe('ask')
+    expect((await $.tool.check({ tool: 'NotebookEdit', input: { notebook_path: STORE_FILE } } as never)).decision).toBe('ask')
+    expect(parks(w)).toHaveLength(0)
   })
   test('a Read whose path names a red-line-6 shape goes to the judge (0.10.0: the file tools route)', async ($, on) => {
     const w = world(on, { env: AP })
