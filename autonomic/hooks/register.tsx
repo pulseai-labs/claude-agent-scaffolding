@@ -13,9 +13,9 @@ import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, ser
 import type { SessionRecord } from './records'
 import { DEFAULT_READERS, routes } from './never'
 import { inputShape } from './shape'
-import { planPermission, settlePermission } from './decide'
+import { invokesParkCommand, planPermission, settlePermission } from './decide'
 import type { DecideContext, PermissionInput } from './decide'
-import { approve, consume, parkId, parkText, parksDir, parsePark, serializePark } from './parks'
+import { PARK_ID, approve, callKey, consume, parkId, parkText, parksDir, parsePark, serializePark } from './parks'
 import type { Park } from './parks'
 import { parsePermission } from './verdict'
 import { MAX_INPUT, askPrompt, shownInput } from './prompts'
@@ -35,6 +35,9 @@ import type { Where } from './never'
 // store's IO and the /autopilot parks, approve and drop flows are Q2 (closed input — files this
 // plugin wrote, ids we mint, exact string equality, paths built from a parsed park's own id).
 // A parked call's deny carries the park text verbatim and decides nothing itself.
+// 0.10.0 Task 7a: a park and its release are keyed on the call's exact input (parks.ts callKey),
+// and a word of operator text must match the shared park-id grammar before the store is read;
+// both are the shared module's, so neither host carries a rule the other lacks.
 
 type Engine = EngineInterface
 type Live = SessionRecord & { problem?: string; invalid?: string }
@@ -380,21 +383,24 @@ async function writeParkFile($: Engine, path: string, park: Park): Promise<void>
 }
 
 // `/autopilot parks`: each open park's id, what stopped it, its command and cwd, oldest first;
-// an approved one says so.
+// an approved one says so. The call's key is listed the way OMP lists it — one redacted, bounded
+// line (Task 7a: a file tool's key is its whole input JSON, so it must not print raw).
 async function parksText($: Engine): Promise<string> {
   const dir = await parksDirOf($)
   const parks = await readParks($, dir)
   if (parks.length === 0) return 'no parks'
   const lines = [...parks]
     .sort((a, b) => (a.parkedAt === b.parkedAt ? (a.id < b.id ? -1 : 1) : a.parkedAt < b.parkedAt ? -1 : 1))
-    .map(p => `${p.id} · ${parkWhat(p)} · ${p.command === '' ? '(no command)' : p.command} · ${p.cwd}${p.approval === null ? '' : ' · approved'}`)
+    .map(p => `${p.id} · ${parkWhat(p)} · ${p.command === '' ? '(no command)' : oneLine(p.command, 160)} · ${p.cwd}${p.approval === null ? '' : ' · approved'}`)
   return `parks (${lines.length}):\n${lines.join('\n')}`
 }
 
 // `/autopilot approve <id>`: the operator's yes, written onto the park file the store holds.
-// The id is matched exactly against the parsed parks and the path is built from the park's own
+// The word must match the shared park-id grammar before the store is read (Task 7a); the id is
+// then matched exactly against the parsed parks and the path is built from the park's own
 // id, never from the operator's word, so a second word has no path to reach.
 async function approvePark($: Engine, word: string): Promise<string> {
+  if (!PARK_ID.test(word)) return `no park ${word}`
   const dir = await parksDirOf($)
   const park = (await readParks($, dir)).find(p => p.id === word)
   if (park === undefined) return `no park ${word}`
@@ -404,8 +410,9 @@ async function approvePark($: Engine, word: string): Promise<string> {
 }
 
 // `/autopilot drop <id>`: the operator clears the park; the file goes, so the same call parks
-// again on its next try.
+// again on its next try. The grammar gate comes first, as in approvePark (Task 7a).
 async function dropPark($: Engine, word: string): Promise<string> {
+  if (!PARK_ID.test(word)) return `no park ${word}`
   const dir = await parksDirOf($)
   const park = (await readParks($, dir)).find(p => p.id === word)
   if (park === undefined) return `no park ${word}`
@@ -541,7 +548,6 @@ export const register: Register = (on, options) => {
         return { text: `autopilot is off for this session, but its record could not be saved: a molt successor may still start in autopilot. Check that ${sessionPath(await home($), id)} can be written.` }
       return { text: 'autopilot is off for this session: every ask reaches you.' }
     }
-    if (c.kind !== 'on') return { text: USAGE_TEXT }
     const cwd = await $.session.cwd()
     const h = await home($)
     const scope = c.scope.map(p => resolveDoc(p, cwd, h))
@@ -690,17 +696,20 @@ export const register: Register = (on, options) => {
       }
       // A tool whose permission prompt is the operator's own dialog is never judged (final review C1).
       if (USER_DIALOG.has(e.tool)) return r
-      // The cheap pre-check (0.10.0 Task 5): an empty park store and a call the routing does not
-      // name are exactly planPermission's pass — no git run, no judge, no store read.
+      const raw = (e.input as { command?: unknown } | undefined)?.command
+      const command = typeof raw === 'string' ? raw : null
+      // The cheap pre-check (0.10.0 Tasks 5 and 7a): an empty park store, a call the routing does
+      // not name and no invocation of the operator's approval route are exactly planPermission's
+      // pass — no git run, no judge, no store read.
       const dir = await parksDirOf($)
       const parks = await readParks($, dir)
-      if (parks.length === 0 && !routes({ tool: e.tool, input: e.input }, cfg.readers)) return r
+      if (parks.length === 0 && !routes({ tool: e.tool, input: e.input }, cfg.readers) &&
+          invokesParkCommand({ tool: e.tool, input: e.input, command }) === null) return r
       // From here every failure keeps the call with the operator (final review I1): an
       // unneeded ask costs one dialog, a missed one a force push.
       const w = await where($)
       const now = new Date().toISOString()
-      const raw = (e.input as { command?: unknown } | undefined)?.command
-      const input: PermissionInput = { tool: e.tool, input: e.input, command: typeof raw === 'string' ? raw : null, cwd: w.cwd, where: w }
+      const input: PermissionInput = { tool: e.tool, input: e.input, command, cwd: w.cwd, where: w }
       const ctx: DecideContext = { policy: (await policyText($)) ?? '', recent: digestOf(id), role: null, grants: null, parks, now, enabled: cfg.neverApprove }
       const plan = planPermission(input, ctx)
       if (plan.kind === 'pass') return r
@@ -708,9 +717,10 @@ export const register: Register = (on, options) => {
       // The parked call is denied on both hosts (Global Constraints): "deny" is the only return
       // that does not wait, and the reason carries the park text verbatim (Review Focus 1).
       const parkIt = async (source: Park['source'], redLine: Park['redLine'], reason: string): Promise<typeof r> => {
+        const key = callKey(input)
         const park: Park = {
-          id: parkId({ session: id, tool: e.tool, command: input.command ?? '', cwd: input.cwd, parkedAt: now }),
-          session: id, host: 'claude-code', tool: e.tool, command: input.command ?? '', cwd: input.cwd,
+          id: parkId({ session: id, tool: e.tool, command: key, cwd: input.cwd, parkedAt: now }),
+          session: id, host: 'claude-code', tool: e.tool, command: key, cwd: input.cwd,
           source, redLine, reason, parkedAt: now, approval: null,
         }
         await writeParkFile($, parkPathOf(dir, park.id), park)

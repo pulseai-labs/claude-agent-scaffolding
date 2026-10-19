@@ -20,6 +20,7 @@ export type World = {
   toasts: string[]
   statuses: Array<string | undefined>
   notices: unknown[]
+  lists: string[]              // every $.fs.list path, in order (Task 7a: proves a stored word was never read)
   fills: string[]
   envSets: Array<[string, string | undefined]>   // each $.env.set, in order
   submits: Array<{ text: string; origin: unknown }>   // prompts that reached the bottom
@@ -63,7 +64,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   const w: World = {
     files: new Map([...(opts.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(opts.files ?? {})]),
     env: { HOME: '/home/u', ...(opts.env ?? {}) },
-    runs: [], runInits: [], bellRuns: [], bellFinished: false, toasts: [], statuses: [], notices: [], fills: [], envSets: [], submits: [], hasBox: true,
+    runs: [], runInits: [], bellRuns: [], bellFinished: false, toasts: [], statuses: [], notices: [], lists: [], fills: [], envSets: [], submits: [], hasBox: true,
     session: { id: 's1', cwd: '/repo' },
     git: { top: '/repo', branch: 'feat/x', originHead: 'origin/main' },
     forks: [], forkPrompts: [], completes: [],
@@ -96,6 +97,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   // The park store's listing (0.10.0 Task 5): the host answers {name, kind, size, mtimeMs,
   // isLink} per direct child, sorted by name. A file is any w.files key directly under the dir.
   on('fs.list', (_$, e) => {
+    w.lists.push(e.path)
     const dir = e.path.replace(/\/+$/, '')
     const names: string[] = []
     for (const path of w.files.keys()) {

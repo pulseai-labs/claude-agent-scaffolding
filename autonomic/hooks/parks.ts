@@ -1,7 +1,8 @@
 // The park store and the operator's approval (slice 2 plan, Task 3; design §3, §9).
 //
 // Skill-first Q2: every function here reads closed input — park files we write, ids we mint
-// from a fixed tuple, exact string equality — and the one deterministic approval this slice
+// from a fixed tuple, exact string equality (callKey, the exact string a park and its release
+// are keyed on) — and the one deterministic approval this slice
 // allows is exactly this store's match (design §9). The IO around it (a park written to
 // <parksDir>/<id>.json at mode 0600, the directory 0700, a file that does not parse ignored
 // and logged) is the adapters' (Tasks 5 and 6). Nothing here normalizes a path or a command
@@ -36,7 +37,9 @@ const APPROVED_FOR_MS = 72 * 60 * 60 * 1000
 // parks it as the integrity guard (call 3): only the operator clears a park.
 export const PARKS_DIR_MARK = 'autonomic/parks'
 
-const ID = /^[a-f0-9]{12}$/
+// The id grammar: the twelve hex a park id is minted in. Both adapters check a word of operator
+// text against it before the word is compared or becomes a path (Task 7a: one copy, never two).
+export const PARK_ID = /^[a-f0-9]{12}$/
 const UTC = /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?Z$/
 
 function str(v: unknown): string {
@@ -131,12 +134,19 @@ export function parkId(p: { session: string; tool: string; command: string; cwd:
   return sha256Hex(canonical).slice(0, 12)
 }
 
+// The exact string a park is keyed on: a command's own text, or a tool's whole input as JSON
+// (Task 7a: one copy — the id minted at the park and the match at the release both read it, on
+// both hosts). Q2: exact string equality on our own state; nothing is normalized.
+export function callKey(call: { command: string | null; input: unknown }): string {
+  return call.command ?? JSON.stringify(call.input ?? {})
+}
+
 // Exact keys at both levels; a park that does not parse is the adapters' to ignore and log,
 // never to match (Task 3 step 3).
 export function parsePark(text: string): Park {
   const o = exactKeys(parseUniqueJSON(text), ['id', 'session', 'host', 'tool', 'command', 'cwd', 'source', 'redLine', 'reason', 'parkedAt', 'approval'])
   const id = str(o.id)
-  if (!ID.test(id)) throw new Error('invalid park id')
+  if (!PARK_ID.test(id)) throw new Error('invalid park id')
   return {
     id,
     session: str(o.session),

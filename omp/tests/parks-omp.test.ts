@@ -127,6 +127,34 @@ describe('the park file the OMP adapter writes (Q2: our own state files)', () =>
     expect(await w.invoke('write', write)).toBeUndefined()
   })
 
+  test('a Read park releases only its exact input; a second Read of another path parks (Task 7a; verify-T5 3b)', async () => {
+    w = world()
+    const first = await w.invoke('read', { file_path: '/home/u/.ssh/id_rsa' })
+    expect(first?.block).toBe(true)
+    const id = parkIdOf(first?.reason)
+    expect(JSON.parse(readFileSync(join(w.parksRoot, `${id}.json`), 'utf8')).command).toBe(JSON.stringify({ file_path: '/home/u/.ssh/id_rsa' }))
+    expect(await w.onCommand(`approve ${id}`)).toBe(`park ${id} approved for one use.`)
+    const second = await w.invoke('read', { file_path: '/home/u/.aws/credentials' })
+    expect(second?.block).toBe(true)
+    expect(parkIdOf(second?.reason)).not.toBe(id)
+    expect(parks(w)).toHaveLength(2)
+  })
+
+  test('a word outside the twelve-hex grammar is no park: no read, no removal (Task 7a)', async () => {
+    w = world()
+    const outside = join(w.root, 'outside.json')
+    const seeded = JSON.stringify({ id: 'aabbccddeeff', session: 'fixture', host: 'omp', tool: 'bash',
+      command: 'git push origin main', cwd: w.tree, source: 'floor', redLine: 1,
+      reason: 'seeded outside the store', parkedAt: '2026-10-19T00:00:00Z', approval: null }, null, 2) + '\n'
+    writeFileSync(outside, seeded, { mode: 0o600 })
+    expect(await w.onCommand('approve ../../x')).toBe('no park ../../x')
+    expect(await w.onCommand('drop ../../x')).toBe('no park ../../x')
+    // A single `..` would reach this file if the word were ever built into a path: it stays untouched.
+    expect(await w.onCommand('approve ../outside')).toBe('no park ../outside')
+    expect(await w.onCommand('drop ../outside')).toBe('no park ../outside')
+    expect(readFileSync(outside, 'utf8')).toBe(seeded)
+  })
+
   test('with autopilot off the call is untouched and no park is written (byte-for-byte 0.9.1)', async () => {
     w = world('manual')
     expect(await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })).toBeUndefined()

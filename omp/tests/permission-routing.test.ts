@@ -6,7 +6,7 @@
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { JudgmentRequest } from '@oh-my-pi/pi-ai'
@@ -1218,5 +1218,51 @@ describe('the OMP adapter carries no policy of its own', () => {
         grants: frame.lease.snapshot.grants, parks: [], now: new Date().toISOString(), enabled: [] })
     expect(plan.kind).toBe('judge')
     expect(sent).toBe(plan.kind === 'judge' ? plan.prompt : '')
+  })
+})
+
+describe('the operator route invoked from a call (Task 7a)', () => {
+  let w: RoutingWorld
+  afterEach(() => { if (w) w.close() })
+
+  const parkNames = (): string[] => existsSync(w.parksRoot) ? readdirSync(w.parksRoot) : []
+
+  test('a Skill call invoking /autopilot approve parks as integrity, with no side turn', async () => {
+    w = pushWorld()
+    setGeneration(w)                                    // an allow stub: the guard never asks it
+    const r = await w.invoke('Skill', { skill: 'autopilot', args: 'approve abc123abc123' })
+    expect(r?.block).toBe(true)
+    expect(String(r?.reason)).toContain('parked for the operator')
+    expect(String(r?.reason)).toContain('operator-only state')
+    expect(String(r?.reason)).toContain('/autopilot approve')
+    expect(parkNames()).toHaveLength(1)
+    expect(JSON.parse(readFileSync(join(w.parksRoot, parkNames()[0]!), 'utf8')).source).toBe('integrity')
+    expect(w.generationRequests).toEqual([])
+  })
+
+  test('the leading-slash spelling, and drop, park the same way', async () => {
+    w = pushWorld()
+    setGeneration(w)
+    const r = await w.invoke('Skill', { skill: '/autopilot', args: 'drop abc123abc123' })
+    expect(r?.block).toBe(true)
+    expect(String(r?.reason)).toContain('/autopilot drop')
+    expect(w.generationRequests).toEqual([])
+  })
+
+  test('a command line carrying the invocation parks too: the text route', async () => {
+    w = pushWorld()
+    setGeneration(w)
+    const r = await w.invoke('bash', { command: 'claude -p "/autopilot drop abc123abc123"', cwd: w.tree })
+    expect(r?.block).toBe(true)
+    expect(String(r?.reason)).toContain('/autopilot drop')
+    expect(w.generationRequests).toEqual([])
+  })
+
+  test('the control: /autopilot parks is read-only, not an invocation', async () => {
+    w = pushWorld()
+    setGeneration(w)
+    expect(await w.invoke('Skill', { skill: 'autopilot', args: 'parks' })).toBeUndefined()
+    expect(parkNames()).toEqual([])
+    expect(w.generationRequests).toEqual([])
   })
 })

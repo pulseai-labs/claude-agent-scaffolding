@@ -79,6 +79,41 @@ describe('/autopilot and the park store (0.10.0 Task 5)', () => {
     expect(parkFiles(w)).toHaveLength(1)
     expect((await $.command.run(RUN(`drop ${park.id}`))).text).toContain('no park')
   })
+  test('a word outside the twelve-hex grammar is no park, and the store is not read (Task 7a)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.tool.check(BASH('git push origin main'))
+    const before = parkFiles(w)
+    expect(before).toHaveLength(1)
+    w.lists.length = 0
+    expect((await $.command.run(RUN('approve ../../x'))).text).toBe('no park ../../x')
+    expect((await $.command.run(RUN('drop ../../x'))).text).toBe('no park ../../x')
+    expect(w.lists).toEqual([])
+    expect(parkFiles(w)).toEqual(before)
+  })
+  test('an approved file-tool park releases only its exact input; another path parks (Task 7a; verify-T5 3b)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(fork({ decision: 'ask', reason: 'a credential path' }))
+    const first = await $.tool.check({ tool: 'Read', input: { file_path: '/home/u/.ssh/id_rsa' } } as never)
+    expect(first.decision).toBe('deny')
+    const park = thePark(w)
+    expect(park.command).toBe(JSON.stringify({ file_path: '/home/u/.ssh/id_rsa' }))
+    expect((await $.command.run(RUN(`approve ${park.id}`))).text).toContain(park.id)
+    w.forks.push(fork({ decision: 'ask', reason: 'a credential path' }))
+    const second = await $.tool.check({ tool: 'Read', input: { file_path: '/home/u/.aws/credentials' } } as never)
+    expect(second.decision).toBe('deny')
+    expect(parkFiles(w)).toHaveLength(2)
+    expect(thePark(w).approval?.usedAt).toBe(null)
+  })
+  test('a file-tool park is listed redacted and bounded, as OMP lists it (Task 7a)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.forks.push(fork({ decision: 'ask', reason: 'a credential path' }))
+    const write = { file_path: '/home/u/.aws/credentials', content: 'token = ghp_abcdefghijklmnopqrst' }
+    expect((await $.tool.check({ tool: 'Write', input: write } as never)).decision).toBe('deny')
+    const listed = (await $.command.run(RUN('parks'))).text
+    expect(listed).toContain('/home/u/.aws/credentials')
+    expect(listed).toContain('***')
+    expect(listed).not.toContain('ghp_abcdefghijklmnopqrst')
+  })
   test('a park file is written, chmodded 600, its directory 700 (Task 3 step 3)', async ($, on) => {
     const w = world(on, { env: AP })
     await $.tool.check(BASH('git push origin main'))

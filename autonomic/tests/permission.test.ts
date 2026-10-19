@@ -79,6 +79,42 @@ describe('the permission reflex (spec §3.3)', () => {
     expect(r.decision).toBe('allow')
     expect(w.forkPrompts).toHaveLength(1)
   })
+  test('a Skill call invoking /autopilot approve parks as integrity, with no judge (Task 7a)', async ($, on) => {
+    const w = world(on, { env: AP })
+    const r = await $.tool.check({ tool: 'Skill', input: { skill: 'autopilot', args: 'approve abc123abc123' } } as never)
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('parked for the operator')
+    expect(String(r.reason)).toContain('operator-only state')
+    expect(String(r.reason)).toContain('/autopilot approve')
+    const written = parks(w)
+    expect(written).toHaveLength(1)
+    expect(written[0]!.source).toBe('integrity')
+    expect(w.forkPrompts).toEqual([])
+  })
+  test('the leading-slash spelling, and drop, park the same way (Task 7a)', async ($, on) => {
+    const w = world(on, { env: AP })
+    const r = await $.tool.check({ tool: 'Skill', input: { skill: '/autopilot', args: 'drop abc123abc123' } } as never)
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('/autopilot drop')
+    expect(parks(w)[0]!.source).toBe('integrity')
+    expect(w.forkPrompts).toEqual([])
+  })
+  test('a command line carrying the invocation parks too: the text route (Task 7a)', async ($, on) => {
+    const w = world(on, { env: AP })
+    const r = await $.tool.check(BASH('claude -p "/autopilot drop abc123abc123"'))
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('/autopilot drop')
+    expect(parks(w)[0]!.source).toBe('integrity')
+    expect(w.forkPrompts).toEqual([])
+  })
+  test('the control: /autopilot parks is read-only, not an invocation (Task 7a)', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow', reason: 'host allow' }
+    const r = await $.tool.check({ tool: 'Skill', input: { skill: 'autopilot', args: 'parks' } } as never)
+    expect(r.decision).toBe('allow')
+    expect(parks(w)).toHaveLength(0)
+    expect(w.forkPrompts).toEqual([])
+  })
   test('allow from beneath is untouched; no fork', async ($, on) => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }

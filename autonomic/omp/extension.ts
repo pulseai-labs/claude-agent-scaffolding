@@ -2,6 +2,7 @@
 // coordinator in autopilot gets the ask reflex, the turn-end reflex and the never-approve floor. Loaded only by
 // omp-seat with -e (never ambient). It imports autonomic's own pure modules and node: builtins only; omp's host
 // types are `any`, so this file imports in plain bun. Every rule, threshold, text and pain list is in ../hooks.
+// 0.10.0 Task 7a: the operator-route integrity guard and the park/release key are shared there too.
 //
 // What does not port from hooks/register.tsx, and why: the pain band and its option buttons (no band on OMP: the
 // options are listed in the notice and the pain file), the permission fork (OMP seats run --approval-mode yolo,
@@ -13,7 +14,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DEFAULTS, parseConfig, retiredNote } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
-import { planPermission, settlePermission } from '../hooks/decide'
+import { invokesParkCommand, planPermission, settlePermission } from '../hooks/decide'
 import type { DecideContext, PermissionVerdict, Plan } from '../hooks/decide'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from '../hooks/floor'
 import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
@@ -23,7 +24,7 @@ import { DEFAULT_READERS, routes } from '../hooks/never'
 import type { Where } from '../hooks/never'
 import { operationFacts, permissionEligibility } from '../hooks/operations'
 import type { OperationContext } from '../hooks/operations'
-import { approve, consume, matches, parkId, parkText, parksDir, parsePark, serializePark } from '../hooks/parks'
+import { PARK_ID, approve, callKey, consume, parkId, parkText, parksDir, parsePark, serializePark } from '../hooks/parks'
 import type { Park } from '../hooks/parks'
 import { DEFAULT_POLICY, expandHome } from '../hooks/policy'
 import { MAX_INPUT, scopeMessage, shownInput } from '../hooks/prompts'
@@ -680,12 +681,9 @@ export function createAutonomic(io: AutonomicIO) {
   // OMP ships no notebook tool, so the routed file-tool set is read/write/edit (ruling 5: the
   // narrower set is a known limit, recorded in the report).
   const FILE_TOOLS: Record<string, true> = { read: true, write: true, edit: true }
-  // The id grammar parks.ts mints. Checked before an id becomes a path: a mistyped operator id is
-  // no park, never a read, write or removal outside the store.
-  const PARK_ID = /^[a-f0-9]{12}$/
+  // The id grammar is the shared PARK_ID and the park key is the shared callKey (Task 7a): the
+  // guards below check the imported grammar before an id becomes a path, as register.tsx does.
   const parkFile = (id: string): string => join(parksDir(io.env, home()), `${id}.json`)
-  // The exact string a park is keyed on: a command's own text, or a tool's whole input as JSON.
-  const keyOf = (call: RouteCall): string => call.command ?? JSON.stringify(call.input ?? {})
 
   // The whole store, read before every decision so an approval the operator just wrote is seen. A
   // file that does not parse is ignored and logged, never matched (Task 3 step 3).
@@ -704,7 +702,7 @@ export function createAutonomic(io: AutonomicIO) {
   // The operator-facing name of a call in a row or a listing: a command's shape, or another tool's
   // key set — never a value, so no credential can reach notice, ledger or pain.
   function parkQuery(call: RouteCall): string {
-    if (call.command === null) return `${call.tool}: ${oneLine(shape(keyOf(call)), 160)}`
+    if (call.command === null) return `${call.tool}: ${oneLine(shape(callKey(call)), 160)}`
     return `${call.tool === 'github' ? 'github pr_push' : 'Bash'}: ${shape(call.command)}`
   }
 
@@ -714,7 +712,7 @@ export function createAutonomic(io: AutonomicIO) {
   async function parkFor(req: { source: Park['source']; redLine: Park['redLine']; reason: string }, call: RouteCall, dir: string): Promise<{ block: true; reason: string }> {
     const session = io.sessionId()
     const parkedAt = new Date().toISOString()
-    const command = keyOf(call)
+    const command = callKey(call)
     const park: Park = { id: parkId({ session, tool: call.tool, command, cwd: dir, parkedAt }), session,
       host: 'omp', tool: call.tool, command, cwd: dir, source: req.source, redLine: req.redLine,
       reason: req.reason, parkedAt, approval: null }
@@ -762,7 +760,10 @@ export function createAutonomic(io: AutonomicIO) {
    * falls through unanswered: from the mode gate on, every failure keeps it with the operator.
    */
   async function route(call: RouteCall): Promise<{ block: true; reason: string } | undefined> {
-    if (!routes({ tool: call.tool, input: call.command === null ? call.input : { command: call.command } }, cfg.readers)) return undefined
+    // The operator's own route needs no routing word to reach its guard (Task 7a): the pre-check
+    // proceeds for it too, so the shared integrity park is what stops it.
+    if (invokesParkCommand({ tool: call.tool, input: call.input, command: call.command }) === null &&
+        !routes({ tool: call.tool, input: call.command === null ? call.input : { command: call.command } }, cfg.readers)) return undefined
     try {
       const m = await modeOf()
       if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
@@ -772,12 +773,6 @@ export function createAutonomic(io: AutonomicIO) {
       const at = await where(dir)
       const parks = await readParks()
       const now = new Date().toISOString()
-      // A non-command call has no command text, and decide.ts's release branch matches a command
-      // text only: its approved park is matched here, on the exact input JSON key.
-      if (call.command === null) {
-        const approved = parks.find(p => matches(p, { tool: call.tool, command: keyOf(call), cwd: dir }, now))
-        if (approved !== undefined) return await releaseApproved(approved, call)
-      }
       const plan = planPermission({ tool: call.tool, input: call.input, command: call.command, cwd: dir, where: at },
         { policy: (await policyText()) ?? '', recent: '', role: authorityLease?.snapshot.seat.role ?? null,
           grants: authorityLease?.snapshot.grants ?? null, parks, now, enabled: cfg.neverApprove })
@@ -872,6 +867,10 @@ export function createAutonomic(io: AutonomicIO) {
     // The routed file tools (ruling 5): no command text, so their plan is the integrity guard or
     // the judge, and their park is keyed on the call's exact input JSON.
     if (typeof e?.toolName === 'string' && FILE_TOOLS[e.toolName] === true) return route({ tool: e.toolName, command: null, input: e.input })
+    // A call that invokes the operator's /autopilot approve|drop route (Task 7a): the shared
+    // integrity rule's lane, whatever tool carries the shape.
+    const invoking = { tool: String(e?.toolName ?? ''), input: e?.input, command: null }
+    if (invokesParkCommand(invoking) !== null) return route(invoking)
     return undefined
   }
 
