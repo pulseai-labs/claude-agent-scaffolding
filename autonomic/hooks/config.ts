@@ -25,6 +25,9 @@ export type AutonomicConfig = {
   retired: RetiredRule[]
   // Absent: never.ts's DEFAULT_READERS. Set only when the readers key is given (0.4.3 §3.5).
   readers?: string[][]
+  // The Claude Code deciding model (0.10.0 call 8). OMP's isolated side turn always runs the
+  // session model, so on OMP a set value is a status line, never a problem and never policy.
+  decidingModel?: string
   problems: string[]
 }
 
@@ -67,7 +70,8 @@ export function parseConfig(options: Readonly<Record<string, unknown>> | undefin
     }
   }
   const bell = str(o.bell)
-  const base: AutonomicConfig = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, neverApprove, retired, problems }
+  const decidingModel = str(o.decidingModel)
+  const base: AutonomicConfig = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, neverApprove, retired, problems, ...(decidingModel === undefined ? {} : { decidingModel }) }
   // readers: command prefixes separated by ;. An empty string is none.
   const withReaders = typeof o.readers === 'string' ? { ...base, readers: parseReaders(o.readers) } : base
   return bell === undefined ? withReaders : { ...withReaders, bell }

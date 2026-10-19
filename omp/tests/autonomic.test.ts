@@ -17,11 +17,12 @@ const turn = (v: object) => JSON.stringify(v)
 const STALLED = turn({ case: 'stalled', next_step: 'run the tests', reason: 'plan step 3' })
 const COVERED = turn({ case: 'covered', question: 'Shall I proceed?', answer: 'Proceed with the plan.', reason: 'the plan decides' })
 
-// A fake AutonomicIO: an in-memory file system, scripted side-turn replies, and a record of every side effect.
-// A reply that is an Error is thrown; undefined means the host has no ephemeral turn; HANG never settles (a host that
-// ignores the abort signal).
-const HANG: Promise<never> = new Promise(() => {})
-function world(over: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean; budgetMs?: number; replies?: Array<string | Error | undefined | Promise<never>>; failAppend?: RegExp; failTouch?: boolean; failWrite?: RegExp; failRename?: boolean; failRemove?: boolean } = {}) {
+// A fake AutonomicIO: an in-memory file system, a scripted isolated side turn, and a record of every side effect.
+// `sideTurn` receives the exact `{ tools: false, isolated: true, … promptText }` options the adapter passes; its
+// replyText is parsed by the shared parser. No `sideTurn` means the host exposes no turn and every judged call parks.
+const HANG: Promise<never> = Promise.withResolvers<never>().promise
+type SideTurn = (opts: { promptText?: string }) => { replyText?: string } | undefined | Promise<{ replyText?: string } | undefined>
+function world(over: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean; budgetMs?: number; sideTurn?: SideTurn; failAppend?: RegExp; failTouch?: boolean; failWrite?: RegExp; failRename?: boolean; failRemove?: boolean } = {}) {
   const files = new Map<string, string>([...(over.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(over.files ?? {})])
   const w = {
     id: 'S1',
@@ -50,6 +51,21 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     env,
     setEnv: (n, v) => { w.envSets.push([n, v]); if (v === undefined) delete env[n]; else env[n] = v },
     readText: async p => files.get(p),
+    // Task 6: the park store lists directory entries and writes files (0700/0600 on the real io).
+    readDir: async p => {
+      const prefix = `${p.replace(/\/+$/, '')}/`
+      return [...files.keys()].filter(k => k.startsWith(prefix) && !k.slice(prefix.length).includes('/')).map(k => k.slice(prefix.length))
+    },
+    writePark: async (p, t) => { if (over.failWrite?.test(p)) throw new Error('read-only'); files.set(p, t) },
+    captureHost: () => ({
+      sessionId: w.id, cwd: '/repo', sessionFile: undefined, judge: undefined,
+      generate: over.sideTurn === undefined ? undefined : async (opts: unknown) => {
+        const o = opts as { promptText?: string }
+        w.prompts.push(o.promptText ?? '')
+        return await over.sideTurn!(o)
+      },
+      asyncJobs: () => null,
+    }) as never,
     exists: async p => files.has(p),
     writeText: async (p, t) => { if (over.failWrite?.test(p)) throw new Error('read-only'); files.set(p, t) },
     appendLine: async (p, l) => {
@@ -115,7 +131,7 @@ describe('OMP live mode file', () => {
 
   for (const reason of ['no policy', 'ledger not writable', 'record not writable']) {
     test(`a fall to manual publishes manual: ${reason}`, async () => {
-      const { a, files, io } = world({ replies: [STALLED] })
+      const { a, files, io } = world()
       await a.onCommand('on')
       expect(files.get(MODE_FILE)).toBe('autopilot')
       if (reason === 'no policy') files.delete(POLICY)
@@ -191,7 +207,7 @@ describe('OMP live mode file', () => {
 
 describe('manual mode', () => {
   test('ask and session_stop pass, no ledger line, no fork, no pain', async () => {
-    const { w, a, files } = world({ replies: [COVERED] })
+    const { w, a, files } = world()
     expect(await a.onToolCall(ask(Q))).toBeUndefined()
     expect(await a.onSessionStop({ last_assistant_message: 'Shall I proceed?' })).toBeUndefined()
     expect(w.prompts).toEqual([])
@@ -249,7 +265,7 @@ describe('the turn-end reflex', () => {
 
 describe('yielding to molt', () => {
   test('a stage file at command passes without a fork, with a molt ledger line', async () => {
-    const { w, a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'command', command: 65 }) }, replies: [STALLED] })
+    const { w, a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'command', command: 65 }) } })
     expect(await a.onSessionStop({ last_assistant_message: 'working' })).toBeUndefined()
     expect(ledger(w)[0]).toContain(' · molt · ')
   })
@@ -300,16 +316,35 @@ describe('yielding to molt', () => {
 
 describe('the never-approve floor', () => {
   const bash = (command: string) => ({ toolName: 'bash', input: { command } })
+  const PARKS = `${HOME}/.local/state/autonomic/parks`
+  const allow = JSON.stringify({ decision: 'allow', red_line: null, reason: 'within the task' })
+  const sideAllow: SideTurn = () => ({ replyText: allow })
+  const parksIn = (w: { files: Map<string, string> }) => [...w.files.keys()].filter(p => p.startsWith(`${PARKS}/`)).sort()
+  const parkOf = (w: { files: Map<string, string> }) => JSON.parse(w.files.get(parksIn(w)[0]!)!) as Record<string, unknown>
+  const idOf = (reason: string | undefined): string => {
+    const m = /\(park ([a-f0-9]{12});/.exec(reason ?? '')
+    if (m === null) throw new Error(`no park id in ${String(reason)}`)
+    return m[1]!
+  }
 
-  test('autopilot: a force push to main is blocked with never-approve, a ledger line and a pain signal', async () => {
+  test('autopilot: a force push to main parks with the park text, one row and a pain signal', async () => {
     const { w, a } = world({ files: autopilot() })
     const r = await a.onToolCall(bash('git push --force origin main'))
     expect(r?.block).toBe(true)
-    expect(r?.reason).toMatch(/^autonomic: never-approve — .*force-push.*; the operator decides$/)
+    expect(r?.reason).toMatch(/^autonomic: parked for the operator \(park [a-f0-9]{12}; red line 2\): never-approve: force-push, default-branch-push\. Do not retry this call or an equivalent one\./)
     expect(ledger(w)[0]).toContain(' · permission · Q: Bash: ')
-    expect(ledger(w)[0]).toContain('never-approve: ')
-    expect(w.notes[0]).toContain('autopilot: never-approve')
-    expect(w.prompts).toEqual([])
+    expect(ledger(w)[0]).toContain(' · A: parked for the operator · why: never-approve: force-push, default-branch-push · src: floor')
+    expect(w.notes[0]).toContain('autopilot: parked')
+    expect(w.prompts).toEqual([])                       // a floor park never reaches the judge
+    expect(parksIn(w)).toHaveLength(1)                  // and it lands in the park store
+  })
+
+  test('the park file is the call itself: the exact tool, command and cwd, no approval yet', async () => {
+    const { w, a } = world({ files: autopilot() })
+    await a.onToolCall(bash('git push --force origin main'))
+    expect(parkOf(w)).toMatchObject({ session: 'S1', host: 'omp', tool: 'bash',
+      command: 'git push --force origin main', cwd: '/repo', source: 'floor', redLine: 2,
+      reason: 'never-approve: force-push, default-branch-push', approval: null })
   })
 
   test('the pain text and the ledger carry the shape, never the value', async () => {
@@ -318,13 +353,57 @@ describe('the never-approve floor', () => {
     expect(w.notes.join('\n') + ledger(w).join('\n')).not.toContain('hunter2')
   })
 
-  test('a safe command, a push of the session\'s own branch and a non-bash tool pass', async () => {
-    const { w, a } = world({ files: autopilot() })
+  test('a safe command and a non-bash tool pass untouched', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
     expect(await a.onToolCall(bash('ls -la'))).toBeUndefined()
-    expect(await a.onToolCall(bash('git push origin feat/x'))).toBeUndefined()
-    expect(await a.onToolCall({ toolName: 'write', input: { path: '/x', content: 'git push --force' } })).toBeUndefined()
     expect(await a.onToolCall({ toolName: 'bash', input: {} })).toBeUndefined()
+    expect(await a.onToolCall({ toolName: 'write', input: { path: '/x', content: 'hello' } })).toBeUndefined()
+    expect(w.prompts).toEqual([])                        // nothing routed, so no judge ran
     expect(w.notes).toEqual([])
+    expect(parksIn(w)).toEqual([])
+  })
+
+  test('a routed call the floor does not hold reaches the isolated side turn, and its allow runs it', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    // A push of the session's own non-default branch: not a floor case (0.10.0), so it is judged.
+    expect(await a.onToolCall(bash('git push origin feat/x'))).toBeUndefined()
+    expect(w.prompts).toHaveLength(1)
+    expect(parksIn(w)).toEqual([])
+  })
+
+  test('the judge\'s ask parks the call, and no reply parks it too (fail closed)', async () => {
+    const ask: SideTurn = () => ({ replyText: JSON.stringify({ decision: 'ask', red_line: null, reason: 'not my call' }) })
+    const { w, a } = world({ files: autopilot(), sideTurn: ask })
+    const r = await a.onToolCall(bash('git push origin feat/x'))
+    expect(r?.reason).toContain('the judge asked): not my call')
+    expect(parkOf(w)).toMatchObject({ source: 'judge', redLine: null, reason: 'not my call' })
+    // No side turn at all: the host cannot decide, so the call stays with the operator, parked.
+    const { w: w2, a: a2 } = world({ files: autopilot() })
+    expect((await a2.onToolCall(bash('git push origin feat/x')))?.reason).toContain('the judge did not answer')
+    expect(parkOf(w2)).toMatchObject({ source: 'judge', reason: 'the judge did not answer' })
+  })
+
+  test('a judge reply that names a red line and says allow still parks (Review Focus 4)', async () => {
+    const bad: SideTurn = () => ({ replyText: JSON.stringify({ decision: 'allow', red_line: 5, reason: 'it is cheap' }) })
+    const { a } = world({ files: autopilot(), sideTurn: bad })
+    const r = await a.onToolCall(bash('git push origin feat/x'))
+    expect(r?.block).toBe(true)
+    expect(r?.reason).toContain('red line 5')
+  })
+
+  test('a call whose input names the park store parks without a side turn (call 3)', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    const r = await a.onToolCall(bash(`echo '{"approval": "x"}' > ${PARKS}/abc.json`))
+    expect(r?.reason).toContain('operator-only state): the call names the park store')
+    expect(w.prompts).toEqual([])
+    expect(parkOf(w)).toMatchObject({ source: 'integrity', redLine: null })
+  })
+
+  test('a routed write with no command text is judged through the same side turn', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    const write = { toolName: 'write', input: { path: '/repo/x', content: 'git push --force' } }
+    expect(await a.onToolCall(write)).toBeUndefined()
+    expect(w.prompts).toHaveLength(1)                    // the file tool was judged, not floored
   })
 
   // omp's bash tool takes its own `cwd`; the floor judges the command where it will run (final review I2).
@@ -332,27 +411,29 @@ describe('the never-approve floor', () => {
     const at = (command: string, cwd: string) => ({ toolName: 'bash', input: { command, cwd } })
     const MAIN = { top: '/other', branch: 'main', originHead: 'origin/main' }
 
-    test('git push with a cwd on main is flagged; with no cwd (the session is on feat/x) and with a cwd on a feature branch it is not', async () => {
-      const { w, a } = world({ files: autopilot() })
+    test('git push with a cwd on main parks on red line 1; the session branch and a feature cwd are judged', async () => {
+      const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
       w.gitBy['/other'] = MAIN
       w.gitBy['/feat'] = { top: '/feat', branch: 'feat/y', originHead: 'origin/main' }
       const r = await a.onToolCall(at('git push', '/other'))
-      expect(r?.reason).toMatch(/^autonomic: never-approve — .*default-branch-push/)
+      expect(r?.reason).toMatch(/^autonomic: parked for the operator \(park [a-f0-9]{12}; red line 1\): never-approve: default-branch-push\./)
       expect(ledger(w)[0]).toContain(' · permission · ')
       expect(await a.onToolCall(bash('git push'))).toBeUndefined()
       expect(await a.onToolCall(at('git push', '/feat'))).toBeUndefined()
     })
 
-    test('rm leaves the floor (0.10.0: 1-3 only); its cwd no longer matters', async () => {
-      const { w, a } = world({ files: autopilot() })
+    test('rm is judged now (0.10.0: the floor holds 1-3 only); its cwd no longer matters', async () => {
+      const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
       w.gitBy['/elsewhere'] = { top: '/elsewhere', branch: 'feat/z', originHead: 'origin/main' }
       expect(await a.onToolCall(at('rm -rf /repo/x', '/elsewhere'))).toBeUndefined()
       expect(await a.onToolCall(bash('rm -rf /repo/x'))).toBeUndefined()
       expect(await a.onToolCall(at('rm -rf /elsewhere/x', '/elsewhere'))).toBeUndefined()
+      expect(w.prompts).toHaveLength(3)      // every one reached the judge, none the floor
+      expect(w.notes).toEqual([])
     })
 
     test('a relative cwd is read against the session folder, ~ against HOME, and an empty one is no cwd', async () => {
-      const { w, a } = world({ files: autopilot() })
+      const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
       w.gitBy['/repo/sub'] = MAIN
       w.gitBy[`${HOME}/co`] = MAIN
       expect((await a.onToolCall(at('git push', 'sub')))?.block).toBe(true)
@@ -373,12 +454,12 @@ describe('the never-approve floor', () => {
   describe('github pr_push', () => {
     const push = (input: Record<string, unknown>) => ({ toolName: 'github', input: { op: 'pr_push', ...input } })
 
-    test('forceWithLease off the session branch is blocked, with a permission ledger line and a pain signal; the own-branch force passes (0.10.0)', async () => {
-      const { w, a } = world({ files: autopilot() })
+    test('forceWithLease off the session branch parks on red line 2; the own-branch force is judged (0.10.0)', async () => {
+      const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
       const r = await a.onToolCall(push({ branch: 'feat/y', forceWithLease: true }))
-      expect(r?.reason).toMatch(/^autonomic: never-approve — .*force-push.*; the operator decides$/)
+      expect(r?.reason).toMatch(/^autonomic: parked for the operator \(park [a-f0-9]{12}; red line 2\): never-approve: force-push\./)
       expect(ledger(w)[0]).toContain(' · permission · Q: github pr_push: ')
-      expect(w.notes[0]).toContain('autopilot: never-approve')
+      expect(w.notes[0]).toContain('autopilot: parked')
       expect(await a.onToolCall(push({ branch: 'feat/x', forceWithLease: true }))).toBeUndefined()
       expect((await a.onToolCall(push({ forceWithLease: 'true' })))?.block).toBe(true)
     })
@@ -404,12 +485,32 @@ describe('the never-approve floor', () => {
   })
 
   test('a retired name in autonomic.json enables nothing, with no problem, and the status names it (0.10.0; call 7)', async () => {
-    const { a } = world({ files: { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ neverApprove: 'branch-delete' }) } })
-    expect(await a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
-    expect(await a.onToolCall(bash('git push origin --delete old-branch'))).toBeUndefined()
-    const s = await a.onCommand('status')
+    const files = { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ neverApprove: 'branch-delete' }) }
+    const judged = world({ files, sideTurn: sideAllow })
+    expect(await judged.a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
+    expect(judged.w.prompts).toHaveLength(1)      // judged by the side turn, never floored
+    expect(await judged.a.onToolCall(bash('git push origin --delete old-branch'))).toBeUndefined()
+    const s = await judged.a.onCommand('status')
     expect(s).toContain('retired in 0.10.0, now judged: branch-delete')
     expect(s).not.toContain('settings:')
+    // Adjacent control: the same call under the default list parks on the floor.
+    const floored = world({ files: autopilot() })
+    expect((await floored.a.onToolCall(bash('git push --force origin main')))?.reason).toContain('parked for the operator')
+  })
+
+  test('a 0.9.x neverApprove value loads end to end: the live rule parks, the retired name is judged (Review Focus 2)', async () => {
+    const files = { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ neverApprove: 'force-push branch-delete rm-outside' }) }
+    const { w, a } = world({ files, sideTurn: sideAllow })
+    const r = await a.onToolCall(bash('git push --force origin main'))
+    expect(r?.reason).toContain('(park ')
+    expect(r?.reason).toContain('never-approve: force-push')     // the enabled live rule still holds
+    // branch-delete is retired: the same delete reaches the judge instead of parking on its name.
+    await a.onToolCall(bash('git push origin --delete old-branch'))
+    expect(w.prompts).toHaveLength(1)
+    const s = await a.onCommand('status')
+    expect(s).toContain('retired in 0.10.0, now judged: branch-delete rm-outside')
+    expect(s).not.toContain('settings:')
+    expect(s.split('\n')[0]).toContain('autopilot')
   })
 
   test('a session that left autopilot through a failure keeps the floor', async () => {
@@ -425,6 +526,99 @@ describe('the never-approve floor', () => {
     expect((await a.onToolCall(bash('git push --force origin main')))?.block).toBe(true)
     expect(await a.onCommand('off')).toContain('autopilot is off')
     expect(await a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
+  })
+})
+
+describe('the park store, the approval and the command surface (calls 2-3, #815)', () => {
+  const bash = (command: string) => ({ toolName: 'bash', input: { command } })
+  const PARKS = `${HOME}/.local/state/autonomic/parks`
+  const allow = JSON.stringify({ decision: 'allow', red_line: null, reason: 'within the task' })
+  const sideAllow: SideTurn = () => ({ replyText: allow })
+  const parksIn = (w: { files: Map<string, string> }) => [...w.files.keys()].filter(p => p.startsWith(`${PARKS}/`)).sort()
+  const parkIdOf = (reason: string | undefined): string => {
+    const m = /\(park ([a-f0-9]{12});/.exec(reason ?? '')
+    if (m === null) throw new Error(`no park id in ${String(reason)}`)
+    return m[1]!
+  }
+
+  test('approve releases the exact call once; the second run parks again (#815)', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    const first = await a.onToolCall(bash('git push --force origin main'))
+    const id = parkIdOf(first?.reason)
+    expect(parksIn(w)).toEqual([`${PARKS}/${id}.json`])
+    expect(await a.onCommand(`approve ${id}`)).toBe(`park ${id} approved for one use.`)
+    expect(JSON.parse(w.files.get(`${PARKS}/${id}.json`)!).approval).toMatchObject({ by: 'operator', usedAt: null })
+    expect(await a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
+    expect(JSON.parse(w.files.get(`${PARKS}/${id}.json`)!).approval.usedAt).not.toBeNull()
+    expect(ledger(w)[1]).toContain(`· Q: park ${id} · A: approved for one use · why: `)
+    expect(ledger(w)[1]).toContain('· src: operator')
+    expect(ledger(w)[2]).toContain("· A: released by the operator's approved park · why: ")
+    expect(ledger(w)[2]).toContain('· src: operator')
+    const again = await a.onToolCall(bash('git push --force origin main'))
+    expect(again?.block).toBe(true)
+    // A fresh park, never the released one: an id that repeats in the same millisecond still
+    // holds an unapproved park (the used file is replaced, and the call stays with the operator).
+    expect(JSON.parse(w.files.get(`${PARKS}/${parkIdOf(again?.reason)}.json`)!).approval).toBeNull()
+  })
+
+  test('a park almost matching another cwd stays parked (Review Focus 3)', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    const first = await a.onToolCall(bash('git push --force origin main'))
+    const id = parkIdOf(first?.reason)
+    await a.onCommand(`approve ${id}`)
+    // A different cwd is not the approved call: it parks again, and the approval stays unused.
+    const other = await a.onToolCall({ toolName: 'bash', input: { command: 'git push --force origin main', cwd: '/feat' } })
+    expect(other?.block).toBe(true)
+    expect(JSON.parse(w.files.get(`${PARKS}/${id}.json`)!).approval.usedAt).toBeNull()
+  })
+
+  test('drop removes a park; an unknown or malformed id is no park', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    const first = await a.onToolCall(bash('git push --force origin main'))
+    const id = parkIdOf(first?.reason)
+    expect(await a.onCommand('drop deadbeef0000')).toBe('no park deadbeef0000')
+    // A malformed id never becomes a path: the store's own id grammar is the gate.
+    expect(await a.onCommand('drop ../../whatever')).toBe('no park ../../whatever')
+    expect(await a.onCommand(`drop ${id}`)).toBe(`park ${id} dropped.`)
+    expect(w.files.has(`${PARKS}/${id}.json`)).toBe(false)
+    expect(ledger(w).at(-1)).toContain(`· Q: park ${id} · A: dropped · why: `)
+  })
+
+  test('/autopilot parks lists the open parks and says none when the store is empty', async () => {
+    const { a } = world({ files: autopilot(), sideTurn: sideAllow })
+    expect(await a.onCommand('parks')).toBe('parks: none')
+    const first = await a.onToolCall(bash('git push --force origin main'))
+    const id = parkIdOf(first?.reason)
+    expect(await a.onCommand('parks')).toBe(`parks:\n${id} · red line 2 · bash: git push --force origin main · /repo`)
+    await a.onCommand(`approve ${id}`)
+    expect(await a.onCommand('parks')).toContain(`${id} · red line 2`)   // approved, not yet used: still open
+    expect(await a.onToolCall(bash('git push --force origin main'))).toBeUndefined()
+    expect(await a.onCommand('parks')).toBe('parks: none')
+  })
+
+  test('an unparseable park file is ignored and logged, never matched', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: sideAllow })
+    w.files.set(`${PARKS}/aabbccddeeff.json`, '{not json')
+    expect(await a.onCommand('parks')).toBe('parks: none')
+    expect(w.files.get(`${HOME}/.claude/state/autonomic/autonomic.log`)).toContain('park aabbccddeeff.json ignored:')
+    expect(await a.onToolCall(bash('git push --force origin main'))).toHaveProperty('block', true)
+    expect(w.notes[0]).toContain('autopilot: parked')
+  })
+
+  test('decidingModel is a Claude Code setting on OMP: a status line when set, never a config problem, and the mode does not change (ruling 2)', async () => {
+    const files = { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ decidingModel: 'claude-opus-4-1' }) }
+    const { w, a } = world({ files })
+    const s = await a.onCommand('status')
+    expect(s.split('\n')[0]).toContain('autopilot')
+    expect(s).toContain('decidingModel applies on Claude Code only; OMP decides on the session model')
+    expect(s).not.toContain('settings:')
+    expect((await a.onToolCall(bash('git push --force origin main')))?.block).toBe(true)
+    expect(w.prompts).toEqual([])
+  })
+
+  test('the usage text names the parks and approval surface', async () => {
+    const { a } = world()
+    expect(await a.onCommand('nonsense')).toBe('usage: /autopilot on [scope doc …] | off | status | parks | approve <park> | drop <park>')
   })
 })
 
@@ -529,7 +723,7 @@ describe('mode, record and command', () => {
 
   test('/autopilot on, status, off, usage', async () => {
     const { w, a, files } = world()
-    expect(await a.onCommand('')).toBe('usage: /autopilot on [scope doc …] | off | status')
+    expect(await a.onCommand('')).toBe('usage: /autopilot on [scope doc …] | off | status | parks | approve <park> | drop <park>')
     expect(await a.onCommand('on')).toBe('autopilot is on. The scope is what this session has already read.')
     expect(JSON.parse(files.get(REC())!)).toMatchObject({ mode: 'autopilot', source: 'command' })
     expect(w.envSets.at(-1)).toEqual(['AUTONOMIC_EFFECTIVE_MODE', 'autopilot'])
@@ -594,7 +788,7 @@ describe('the omp wiring', () => {
     const home = mkdtempSync(join(tmp, 'h-'))
     const ledgerFile = join(home, 'ledger.md')
     const saved: Record<string, string | undefined> = {}
-    for (const [k, v] of Object.entries({ HOME: home, AUTONOMIC_MODE: opts.mode, AUTONOMIC_LEDGER: ledgerFile, AUTONOMIC_BELL: undefined, AUTONOMIC_PAIN_PATH: undefined, AUTONOMIC_EFFECTIVE_MODE: undefined, AUTONOMIC_MODE_FILE: undefined, MOLT_STATUS_PATH: undefined, ...opts.env })) {
+    for (const [k, v] of Object.entries({ HOME: home, AUTONOMIC_MODE: opts.mode, AUTONOMIC_LEDGER: ledgerFile, AUTONOMIC_BELL: undefined, AUTONOMIC_PAIN_PATH: undefined, AUTONOMIC_EFFECTIVE_MODE: undefined, AUTONOMIC_MODE_FILE: undefined, AUTONOMIC_PARKS_DIR: undefined, MOLT_STATUS_PATH: undefined, ...opts.env })) {
       saved[k] = process.env[k]
       if (v === undefined) delete process.env[k]
       else process.env[k] = v
