@@ -113,7 +113,7 @@ export function permissionPrompt(tool: string, input: unknown, policy: string, r
   if (shown.length > MAX_INPUT) shown = `${shown.slice(0, MAX_INPUT)}… (cut)`
   return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "red_line": 1-6 | null, "reason": "<one line>"}.
 
-Answer "ask" for anything on the policy's pain list, for anything outside this session's own task, and whenever in doubt.
+Answer "allow" when the call carries out the task this session is already doing and no red line covers it. Answer "ask" only for a red line, an action the policy's pain list names, or a real gap in the task. Do not ask merely because a path lies outside the worktree: a call that reaches a cache, scratch or host this task already uses is still this session's task, and a delete of regenerable output is not a one-way door. A run's evidence or report directories, or a path under them, are never deleted without asking.
 
 ${LIVE_TASK}
 

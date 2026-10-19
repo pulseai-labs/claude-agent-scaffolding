@@ -109,6 +109,11 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
   integrity on both hosts and both of Bash and Write, while
   `autonomic/x/../parks-notes.md` stays a near miss. Variables, globs, substitutions and
   encodings remain the README's Known limit.
+- **The judge's permission guidance is tuned** (Task 13 Step 5): the prompt now says to allow
+  when the call carries out the session's own task and no red line covers it, to ask only for a
+  red line, a pain-list action or a real gap in the task, and that a path outside the worktree
+  is not by itself a reason to ask — a cache, scratch or host this task already uses is still
+  the task, and deleting regenerable output is not a one-way door. `<red-lines>` is unchanged.
 
 ## 0.9.1 — 2026-10-18
 

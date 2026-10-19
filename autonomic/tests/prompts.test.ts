@@ -34,7 +34,9 @@ describe('fork prompts', () => {
     // 0.5.1: the cap is MAX_INPUT (64k); register.tsx never judges a longer input.
     const p = permissionPrompt('Bash', { command: 'x'.repeat(100_000) }, 'POL')
     expect(p).toContain('<tool>Bash</tool>')
-    expect(p.length).toBeLessThan(MAX_INPUT + 2000)
+    // The fixed template (red lines, binding, the tuned judge guidance) is ~2005 characters;
+    // the bound holds it to 2100, so the input is the part that was cut.
+    expect(p.length).toBeLessThan(MAX_INPUT + 2100)
   })
   test('the scope message lists each doc', () => {
     expect(scopeMessage(['/a.md', '/b.md'])).toContain('- /a.md\n- /b.md')
