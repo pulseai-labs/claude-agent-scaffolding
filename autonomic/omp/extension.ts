@@ -535,7 +535,10 @@ export function createAutonomic(io: AutonomicIO) {
   async function dropCommand(id: string): Promise<string> {
     if (!PARK_ID.test(id)) return `no park ${id}`
     if (!(await io.exists(parkFile(id)))) return `no park ${id}`
-    io.remove(parkFile(id))
+    try { io.remove(parkFile(id)) } catch (err) {
+      await log(`park drop failed ${id} ${String(err)}`)
+      return `could not drop ${id}: the store could not be changed`
+    }
     await record(io.sessionId(), 'operator', `park ${id}`, 'dropped', 'the operator dropped the park', 'operator')
     return `park ${id} dropped.`
   }

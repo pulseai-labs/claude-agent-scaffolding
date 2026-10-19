@@ -436,3 +436,16 @@ describe('a judge-bound input redaction would change parks (F2/C4)', () => {
     expect(parks(w)[0]!.source).toBe('integrity')
   })
 })
+
+describe('a tag push is the judge\'s, not a floor park (F3)', () => {
+  test('an autopilot tag push is judged and allowed, with no park', async ($, on) => {
+    const w = world(on, { env: AP })
+    w.verdict = { decision: 'allow' }
+    w.git.branch = 'main'
+    w.forks.push(fork({ decision: 'allow', reason: 'a tag push' }))
+    const r = await $.tool.check(BASH('git tag -a v1 HEAD && git push origin v1'))
+    expect(r.decision).toBe('allow')
+    expect(w.forkPrompts).toHaveLength(1)
+    expect(parks(w)).toHaveLength(0)
+  })
+})

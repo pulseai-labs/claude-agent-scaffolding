@@ -435,7 +435,18 @@ async function dropPark($: Engine, word: string): Promise<string> {
   const dir = await parksDirOf($)
   const park = (await readParks($, dir)).find(p => p.id === word)
   if (park === undefined) return `no park ${word}`
-  try { await $.process.run(['rm', '-f', parkPathOf(dir, park.id)]) } catch (err) { await log($, `park drop failed ${park.id} ${String(err)}`) }
+  // The remove must land: a drop that reports success over a failed rm leaves the park in the
+  // store and tells the operator otherwise (review 882c P3).
+  try {
+    const r = await $.process.run(['rm', '-f', parkPathOf(dir, park.id)])
+    if (r.exitCode !== 0) {
+      await log($, `park drop failed ${park.id} exit ${r.exitCode}`)
+      return `could not drop ${park.id}: the store could not be changed`
+    }
+  } catch (err) {
+    await log($, `park drop failed ${park.id} ${String(err)}`)
+    return `could not drop ${park.id}: the store could not be changed`
+  }
   return `park ${park.id} is dropped: the call it named parks again.`
 }
 

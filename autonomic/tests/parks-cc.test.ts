@@ -79,6 +79,14 @@ describe('/autopilot and the park store (0.10.0 Task 5)', () => {
     expect(parkFiles(w)).toHaveLength(1)
     expect((await $.command.run(RUN(`drop ${park.id}`))).text).toContain('no park')
   })
+  test('a drop whose rm fails answers could not drop and keeps the park (review 882c P3)', async ($, on) => {
+    const w = world(on, { env: AP })
+    await $.tool.check(BASH('git push origin main'))
+    const park = thePark(w)
+    w.failRm = true
+    expect((await $.command.run(RUN(`drop ${park.id}`))).text).toBe(`could not drop ${park.id}: the store could not be changed`)
+    expect(parkFiles(w)).toHaveLength(1)
+  })
   test('a word outside the twelve-hex grammar is no park, and the store is not read (Task 7a)', async ($, on) => {
     const w = world(on, { env: AP })
     await $.tool.check(BASH('git push origin main'))

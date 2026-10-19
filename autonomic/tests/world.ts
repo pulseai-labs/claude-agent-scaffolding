@@ -43,6 +43,7 @@ export type World = {
   failAppend?: RegExp          // an append to a matching path fails
   appendsLeft?: number         // appends that still succeed; the next ones fail
   failTouch?: RegExp           // a touch of a matching path fails
+  failRm?: boolean             // an rm -f fails with a non-zero exit (a drop that cannot land)
   failWrite?: RegExp           // a write to a matching path fails
   stopBlock?: string           // a block a plugin beneath autonomic returns at Stop
   usage: { tokens?: number; window: number; percent?: number }   // the context figure
@@ -170,7 +171,10 @@ async function exec(w: World, argv: string[], init: { timeoutMs?: number; stdin?
     w.bellFinished = true
     return { value: { exitCode: w.bellExit ?? 0, stdout: '', stderr: '', isStdoutTruncated: false } }
   }
-  if (argv[0] === 'rm' && argv[1] === '-f' && argv[2] !== undefined) { w.files.delete(argv[2]); return ok() }
+  if (argv[0] === 'rm' && argv[1] === '-f' && argv[2] !== undefined) {
+    if (w.failRm) return fail()
+    w.files.delete(argv[2]); return ok()
+  }
   if (argv[0] === 'git') {
     const a = argv.join(' ')
     if (a.includes('--show-toplevel')) return w.git.top === undefined ? fail() : ok(`${w.git.top}\n`)

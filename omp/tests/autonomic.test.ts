@@ -1139,3 +1139,26 @@ describe('a judge-bound input redaction would change parks (F2/C4)', () => {
     expect(w.prompts).toEqual([])
   })
 })
+
+describe('a tag push is the judge\'s, not a floor park (F3)', () => {
+  const allow: SideTurn = () => ({ replyText: JSON.stringify({ decision: 'allow', red_line: null, reason: 'a tag push' }) })
+  test('an autopilot tag push reaches the side turn and runs', async () => {
+    const { w, a } = world({ files: autopilot(), sideTurn: allow })
+    w.git.branch = 'main'
+    expect(await a.onToolCall({ toolName: 'bash', input: { command: 'git tag -a v1 HEAD && git push origin v1' } })).toBeUndefined()
+    expect(w.prompts).toHaveLength(1)
+    expect([...w.files.keys()].filter(p => p.startsWith(`${HOME}/.local/state/autonomic/parks/`))).toHaveLength(0)
+  })
+})
+
+describe('a drop whose remove fails answers without a raw exception (review 882c P3)', () => {
+  test('the park stays and the operator sees could not drop', async () => {
+    const { w, a } = world({ files: autopilot(), failRemove: true })
+    const parked = await a.onToolCall({ toolName: 'bash', input: { command: 'git push --force origin main' } })
+    const m = /\(park ([a-f0-9]{12});/.exec(parked?.reason ?? '')
+    expect(m).not.toBeNull()
+    const id = m![1]!
+    expect(await a.onCommand(`drop ${id}`)).toBe(`could not drop ${id}: the store could not be changed`)
+    expect(w.files.has(`${HOME}/.local/state/autonomic/parks/${id}.json`)).toBe(true)
+  })
+})

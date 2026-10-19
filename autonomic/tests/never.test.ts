@@ -1214,6 +1214,48 @@ describe('0.10.0 red lines', () => {
   })
 })
 
+// 0.10.0 fix round 3 (Task 13 replay): a tag is not a branch, and an explicit destination is
+// read on its own. Skill-first Q3 either way: a call the floor does not stop reaches the judge.
+describe('0.10.0 fix round 3: tags and explicit destinations', () => {
+  const M = { ...W, branch: 'main' }
+  const R = { ...W, branch: 'record/x' }
+  test('a tag push is neither red line 1 nor red line 2', () => {
+    const tagPushes = [
+      'git push origin refs/tags/v1.2.3',
+      'git tag -a v1.2.3 HEAD && git push origin v1.2.3',
+      'git tag -a v1 HEAD && git tag -a v2 HEAD && git push origin v1 v2',
+      'git tag -a v1 HEAD && git push -q origin v1 && gh release create v1',
+      'git tag -a -f v1 HEAD && git push origin v1',
+    ]
+    for (const c of tagPushes) expect([c, rules(c, M), rules(c, R)]).toEqual([c, [], []])
+    // the operator's 59c4 audit: a tag force-push is not red line 2
+    expect(rules('git push --force origin refs/tags/v1', R)).toEqual([])
+  })
+  test('an explicit non-default destination does not fire on the default checkout', () => {
+    for (const c of ['git -C /repo push -u origin spine/x',
+      'git push origin 3283d11d1cbe02dd3fdf90f83fc09250714cde5f:refs/heads/macproof/x'])
+      expect([c, rules(c, M)]).toEqual([c, []])
+    // A `-C` value is not a force flag: the force read starts at the push verb (F3 fix).
+    expect(rules('git -C $C push -q origin spine/x', W)).toEqual([])
+  })
+  test("a deletion of a non-default branch is the judge's; deleting the default still parks", () => {
+    for (const c of ['git push origin --delete feat/y', 'git -C /other push -q origin --delete feat/y'])
+      expect([c, rules(c, W)]).toEqual([c, []])
+    for (const c of ['git push origin --delete main', 'git push origin --delete master'])
+      expect([c, rules(c, { ...W, defaultBranch: undefined })]).toEqual([c, ['default-branch-push']])
+  })
+  test('the red-line controls still fire', () => {
+    for (const c of ['git push origin main', 'git push origin HEAD:main', 'git push --all origin', 'git push origin feat/x:main'])
+      expect([c, rules(c, W)]).toEqual([c, ['default-branch-push']])
+    for (const c of ['git push -f origin feat/other', 'git push -f', 'git push -f origin "$B"'])
+      expect([c, rules(c, W).includes('force-push')]).toEqual([c, true])
+  })
+  test('the move arm stays fail-closed for a bare push (round-3 ruling)', () => {
+    for (const c of ['cd /other; git push', 'git -C /other push -q'])
+      expect([c, rules(c, W)]).toEqual([c, ['default-branch-push']])
+  })
+})
+
 // ---- autonomic 0.10.0: the routing check (Task 2) ----
 // routes decides which calls reach the judge at all: a call it does not see runs unjudged, as
 // before 0.10.0. It only adds a judgment, never approves, so a word that routes too much is the

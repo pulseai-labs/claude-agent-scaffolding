@@ -91,6 +91,16 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
   lives in `planPermission` with the reason `the input holds content that redaction would hide`,
   so Claude Code no longer writes a secret-shaped value into the judge prompt and both hosts
   decide the call the same way. OMP's `inputRefusal` keeps only its own `MAX_INPUT` bound.
+- **A push is read from its destinations** (fix round 3, Task 13 replay): the floor parses one
+  push command from its verb — remote, refspecs, flags — and decides red lines 1–2 from those
+  destinations, never from the whole group's words. A tag push (`refs/tags/<T>`, or a name an
+  executable `git tag` binds in the same text) is neither red line 1 nor 2, a tag force-push is
+  not red line 2 (the 59c4 audit), an explicit readable non-default destination does not fire
+  while the checkout is on the default branch, and deleting a non-default branch is the judge's.
+  A bare push after a move or switch stays fail-closed, and the whole-bag reading is unchanged.
+- **A failed drop says so** (review 882c): OMP's `dropCommand` catches a remove failure and
+  Claude Code's `dropPark` checks the `rm` exit status, both answering
+  `could not drop <id>: the store could not be changed` and leaving the park in place.
 
 ## 0.9.1 — 2026-10-18
 

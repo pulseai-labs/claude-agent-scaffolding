@@ -1185,15 +1185,19 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
   const add = (found: ReadonlySet<NeverRule>, level: Finding['level'], focus: string) => { for (const rule of found) out.push({ rule, level, focus }) }
   if ('whole' in r) {
     const found = new Set<NeverRule>()
-    rulesOf(r.whole, where, moves(r.whole, where), false, found)
+    rulesOf(r.whole, where, moves(r.whole, where), false, found, new Set())
     add(found, 'fork', wholeFocus(command))
     return settle(out)
   }
   const all = [...r.groups.flatMap(g => g.words), ...r.values]
   const names = [...new Set([...(where.defaultBranch !== undefined ? [where.defaultBranch] : []), 'main', 'master'])]
+  // The tag tokens this text binds with an executable `git tag` (fix round 3): a push of one is a
+  // tag push, so the destination reading can tell a tag from a branch.
+  const tags = new Set<string>()
   // What a command changes for every later one: a move, a git config write, a branch switch.
   const effects = r.groups.map(g => {
     const ws = substitute(g.words, r.vars, g.at)
+    addTagTokens(ws, tags)
     const git = isGit(ws)
     return { ws, git, move: ws.some(w => w === 'cd' || w === 'pushd' || w === 'popd') && moves(ws, where), config: (git && writesConfig(ws)) || ws.some(gitConfigFile),
       switches: (git && switchesTo(ws, names)) || ws.some(w => /(?:^|\/)\.git\/HEAD$/.test(clean(w))) }
@@ -1222,9 +1226,15 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
       ws.some(w => [...w.matchAll(/\$\{?([A-Za-z_]\w*)/g)].some(m => bound(m[1]!)))
     const away = moved || moves(ws, where)
     const own = new Set<NeverRule>()
-    rulesOf(substitute(g.own, r.vars, g.at), where, away, true, own, switched)
+    rulesOf(substitute(g.own, r.vars, g.at), where, away, true, own, tags, switched, true)
     const text = new Set<NeverRule>()
-    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
+    const escalated = (config && git) || verbOpaque(ws) || loose
+    // The text reading stays the broad one except for an executable git push: there the parsed
+    // destinations are what the text says, and a tag or an explicit destination is not a branch
+    // push. A config injection or an escalated bag keeps the conservative reading.
+    const configInjected = ws.some(w => w.includes('.push=') || w === '-c' || w.startsWith('--config-env') || /^GIT_CONFIG/.test(w))
+    const parsedText = !escalated && isGit(ws) && !configInjected
+    rulesOf(escalated ? all : ws, where, away, !escalated, text, tags, switched, parsedText)
     add(own, 'ask', g.text)
     add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
     if (move) moved = true
@@ -1271,8 +1281,101 @@ function switchesTo(ws: readonly string[], names: readonly string[]): boolean {
   return rest.some(w => opaque(w) || names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))))
 }
 
-// Cause 3: a push that names a remote and only literal destinations other than the default
-// branch, main or master (never HEAD, @, empty or opaque) needs no default-branch ask after a move.
+// One push command read from its verb onward (0.10.0 fix round 3): the remote, the destinations,
+// and the flags that may change them. Skill-first Q3 — this is a safety rail. Every reading here
+// can only add a stop; a call it does not stop reaches the judge, whose prompt holds all six red
+// lines. `tags` is the set of tag tokens an executable `git tag` in the same text binds, so a tag
+// push is neither red line 1 nor 2 (a tag is not a branch).
+type PushRead = { refs: string[]; bare: boolean; all: boolean; force: boolean; flagUnreadable: boolean; exemptBlocked: boolean; ambiguous: boolean; repo: boolean; afterEnd: boolean }
+const pushDestination = (ref: string): string => {
+  const r = ref.replace(/^\+/, '')
+  return r.includes(':') ? r.slice(r.lastIndexOf(':') + 1) : r
+}
+// A tag ref is unambiguous; a bare name is a tag only when the text bound it with `git tag`. A
+// token that names a default branch is never exempt: `git tag main` then `git push origin main`
+// still names the branch.
+const isTagDestination = (ref: string, tags: ReadonlySet<string>, names: readonly string[]): boolean => {
+  const dst = pushDestination(ref)
+  return dst.startsWith('refs/tags/') || (tags.has(dst) && !names.some(n => dst === n || dst.endsWith(`/${n}`)))
+}
+// The push flags whose words never name a destination. A force flag is read before this test:
+// its attached value is a lease or a ref.
+const NO_VALUE_PUSH = /^(?:-[uqvnfd]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin|delete))$/
+const FORCE_LONG = /^--(?:force|force-with-lease|force-if-includes)(?:=.*)?$/
+function pushRead(words: readonly string[]): PushRead | undefined {
+  const at = words.findIndex(w => PUSH.some(v => isVerb(w, v)))
+  if (at < 0) return undefined
+  const r: PushRead = { refs: [], bare: true, all: false, force: false, flagUnreadable: false,
+    exemptBlocked: false, ambiguous: false, repo: false, afterEnd: false }
+  let remote = false
+  for (let i = at + 1; i < words.length; i++) {
+    const w = words[i]!
+    if (w.startsWith('-')) {
+      if (w === '--') { r.ambiguous = true; r.exemptBlocked = true; r.afterEnd = true; continue }
+      if (w === '--delete' || w === '-d') continue
+      if (w === '-o' || w === '--push-option') { r.exemptBlocked = true; i++; continue }
+      if (w.startsWith('--push-option=')) continue
+      if (abbrev(w, '--mirror', 3)) { r.all = true; r.force = true; continue }
+      if (abbrev(w, '--all', 3) || abbrev(w, '--branches', 3)) { r.all = true; continue }
+      const abbrForce = abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3)
+      if (letters(w).includes('f') || FORCE_LONG.test(w) || abbrForce) r.force = true
+      if (NO_VALUE_PUSH.test(w) || FORCE_LONG.test(w)) continue
+      // An abbreviation of a force option is ambiguous with the lease forms: the own-branch
+      // exemption is not available (call 4), though the force itself is read.
+      if (abbrForce) { r.exemptBlocked = true; continue }
+      if (w === '--repo') { r.repo = true; r.ambiguous = true; r.exemptBlocked = true; i++; continue }
+      if (w.startsWith('--repo=')) { r.repo = true; r.ambiguous = true; r.exemptBlocked = true; continue }
+      // A variable or glob flag, and an unknown flag, may change the destination set: the push
+      // stays on the floor. An unknown long option may take a value, so the positionals are
+      // ambiguous; an unknown short cluster only blocks the exemptions.
+      if (flagLike(w)) { r.flagUnreadable = true; r.force = true }
+      else if (w.startsWith('--')) r.ambiguous = true
+      else r.exemptBlocked = true
+      continue
+    }
+    if (!remote && !r.repo && !r.afterEnd) {
+      if (opaque(w)) { r.flagUnreadable = true; r.force = true; continue }
+      remote = true
+      continue
+    }
+    if (w.startsWith('+') || opaque(w)) r.force = true
+    r.refs.push(w)
+  }
+  r.bare = r.refs.length === 0
+  return r
+}
+// Red line 2 (0.10.0) leaves the floor for a force whose destinations all name the session's own
+// non-default branch: at least one refspec, every one readable. No refspec or an unreadable one
+// answers false and the force stays on the floor (call 4: fail closed).
+function ownPushDestination(refs: readonly string[], branch: string | undefined, names: readonly string[]): boolean {
+  if (branch === undefined || names.includes(branch) || refs.length === 0) return false
+  return refs.every(ref => !opaque(ref.replace(/^\+/, '')) && pushDestination(ref) === branch)
+}
+// Red line 1: read the push's destinations, never the whole word bag. A bare push is the
+// session's own branch; after a move or a switch the repository is another one, so it stays
+// fail-closed (round-3 ruling), and a force or unreadable flag there blocks the explicit-
+// destination exemption. A tag destination is not a branch push. After `--` the positionals
+// are ambiguous (the first may still be the remote), so the branch reading applies.
+function defaultPush(r: PushRead, branch: string | undefined, names: readonly string[], away: boolean, tags: ReadonlySet<string>, plumbing: boolean): boolean {
+  if (plumbing || r.all || r.flagUnreadable) return true
+  const ownBranch = (branch !== undefined && names.includes(branch)) || away
+  if (r.refs.length > 0 && r.refs.every(ref => isTagDestination(ref, tags, names))) return false
+  if (r.bare) return ownBranch
+  if (r.ambiguous && ownBranch) return true
+  if (away && (r.force || r.exemptBlocked)) return true
+  return r.refs.some(ref => {
+    if (isTagDestination(ref, tags, names)) return false
+    if (opaque(ref.replace(/^\+/, ''))) return true
+    const dst = pushDestination(ref)
+    if (dst === '') return true
+    if (dst === 'HEAD' || dst === '@') return ownBranch
+    if (away && (dst === 'main' || dst === 'master')) return true
+    return names.some(n => dst === n || dst.endsWith(`/${n}`))
+  })
+}
+// The conservative reading of a whole bag, or of a combined word list (`single` false): every
+// word may be a flag or a destination, so a finding here is only an extra stop (skill-first Q3).
+// A push that names a remote and only literal non-default destinations needs no default ask.
 const NO_VALUE = /^(?:-[uqvn]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin))$/
 function namedRefs(words: readonly string[], names: readonly string[]): boolean {
   const at = words.findIndex(w => isVerb(w, 'push'))
@@ -1292,17 +1395,6 @@ function namedRefs(words: readonly string[], names: readonly string[]): boolean 
     return !all.some(n => dst === n || dst.endsWith(`/${n}`) || r === n)
   })
 }
-
-// The push flags whose words never name a destination: one that consumes no value, or a force
-// flag (an attached value names a lease or a ref, never the destination word). Anything else may
-// change the destination set the force arm is about to read.
-const NO_VALUE_PUSH = /^(?:-[uqvnf]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin))$/
-const FORCE_LONG = /^--(?:force|force-with-lease|force-if-includes)(?:=.*)?$/
-// Red line 2 (0.10.0) leaves the floor for a force whose destinations all name the session's own
-// non-default branch and nothing else: at least one refspec word, every one readable, and each
-// destination literally that branch. No refspec, an unreadable word, or a flag that may change the
-// destination set (--all, --branches, --mirror, an opaque or value-taking flag) answers false and
-// the force stays on the floor (call 4: fail closed).
 function ownForceDestination(words: readonly string[], branch: string | undefined, names: readonly string[]): boolean {
   if (branch === undefined || names.includes(branch)) return false
   const at = words.findIndex(w => PUSH.some(v => isVerb(w, v)))
@@ -1324,6 +1416,26 @@ function ownForceDestination(words: readonly string[], branch: string | undefine
     return (dst.includes(':') ? dst.slice(dst.lastIndexOf(':') + 1) : dst) === branch
   })
 }
+// The tag tokens an executable `git tag NAME` / `git tag -a NAME` binds: a literal name or the
+// `$VAR` spelling. Listing, verifying and deleting bind none (they only add stops). A token the
+// floor misses parks too much, never too little (skill-first Q3).
+function addTagTokens(ws: readonly string[], out: Set<string>): void {
+  const at = ws.findIndex(w => isVerb(w, 'tag'))
+  if (at < 0) return
+  const rest = ws.slice(at + 1)
+  const creation = /^(?:-[asf]+|-[asf]*[mFu].*|--(?:annotate|sign|force)|--(?:message|file|local-user)(?:=.*)?)$/
+  const flags = rest.filter(w => w.startsWith('-'))
+  if (flags.length > 0 && !flags.every(w => creation.test(w))) return
+  for (let i = 0; i < rest.length; i++) {
+    const w = rest[i]!
+    if (w.startsWith('-')) {
+      if (w === '--message' || w === '--file' || w === '--local-user' || /^-[A-Za-z0-9]*[mFu]$/.test(w)) i++
+      continue
+    }
+    out.add(w)
+    return
+  }
+}
 // Red line 3's trailer half (0.10.0): the AI trailer in a commit message the floor can read. The
 // values of `-m`/`--message` (`-m x`, `-mx`, `-am x`, `--message=x`), unmasked for the separators
 // a quoted value hides. A message the floor cannot read — `-F`/`--file`, a heredoc body, the
@@ -1344,29 +1456,38 @@ function trailerIn(words: readonly string[]): boolean {
   return false
 }
 
-function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>, switched = false): void {
-  const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
+function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>, tags: ReadonlySet<string>, switched = false, parsed = false): void {
   const anyNamed = (f: (w: string) => boolean) => words.some(w => f(w) || flagLike(w))
   const short = (c: string) => (w: string) => letters(w).includes(c)
 
   if (words.some(isPush)) {
     const names = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
-    // A leading + forces the update; the ref after it is still the destination (+main).
-    const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
-    // 0.5.0 cause 3: only when the floor reads this one command, never the whole bag.
-    // A branch switch earlier in the text (final review C1) is read the same way as a move.
-    const away = (moved || switched) && !(single && namedRefs(words, names))
-    // Red line 2 (0.10.0): the force arm fires unless every destination is the session's own
-    // non-default branch; ownForceDestination carries the fail-closed cases (call 4).
-    if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
-      abbrev(w, '--mirror', 3) || w.startsWith('+'))) {
-      if (!ownForceDestination(words, where.branch, names)) found.add('force-push')
+    // A move or a branch switch leaves the repository unknown for a bare push (final review C1,
+    // round-3 ruling: it stays fail-closed).
+    const away = moved || switched
+    const read = parsed ? pushRead(words) : undefined
+    if (read !== undefined) {
+      // Red line 2: a tag force-push is not red line 2, and neither is the session's own branch.
+      // An unreadable flag or `--` blocks both exemptions (call 4).
+      const allTags = read.refs.length > 0 && read.refs.every(ref => isTagDestination(ref, tags, names))
+      if (read.force && (read.flagUnreadable || read.exemptBlocked || (!allTags && !ownPushDestination(read.refs, where.branch, names)))) found.add('force-push')
+      if (defaultPush(read, where.branch, names, away, tags, plumbing)) found.add('default-branch-push')
+    } else {
+      // The whole bag, or a list that joins several commands: every word may be a flag or a
+      // destination, so the conservative reading stays.
+      const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
+      const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
+      const awayBag = away && !(single && namedRefs(words, names))
+      if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
+        abbrev(w, '--mirror', 3) || w.startsWith('+'))) {
+        if (!ownForceDestination(words, where.branch, names)) found.add('force-push')
+      }
+      if (plumbing || (where.branch !== undefined && names.includes(where.branch)) || awayBag ||
+        any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
+        found.add('default-branch-push')
     }
-    if (plumbing || (where.branch !== undefined && names.includes(where.branch)) || away ||
-      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
-      found.add('default-branch-push')
   }
   const commit = words.some(w => isVerb(w, 'commit'))
   if (words.some(w => abbrev(w, '--no-verify', 6)) || (commit && anyNamed(short('n')))) found.add('no-verify')
