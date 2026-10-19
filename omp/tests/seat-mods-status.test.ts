@@ -68,6 +68,20 @@ describe('the stop check', () => {
     c.onInput('stop and look at X', false)
     expect(c.onSessionStop({ last_assistant_message: BAD })).toEqual(NOTHING)
   })
+  test('an operator follow-up queued mid-turn and run as its own turn is not checked', () => {
+    c.onInput('[crew report reviewer] done', true)
+    c.onInput('then look at X', false)                     // typed while the turn runs; OMP queues it
+    expect(c.onSessionStop({ last_assistant_message: GOOD })).toEqual(NOTHING) // the running turn ends
+    c.onBeforeAgentStart('then look at X')                 // the queued prompt starts its own run, no new input
+    expect(c.onSessionStop({ last_assistant_message: BAD })).toEqual(NOTHING)
+  })
+  test('a tagged report queued mid-turn and run as its own turn is checked', () => {
+    c.onInput('fix the bug', true)
+    c.onInput('[crew report reviewer] done', false)
+    expect(c.onSessionStop({ last_assistant_message: BAD })).toEqual(NOTHING)
+    c.onBeforeAgentStart('[crew report reviewer] done')
+    expect(c.onSessionStop({ last_assistant_message: BAD }).block).toBeDefined()
+  })
   test('a tagged input mid-turn leaves the turn status', () => {
     c.onInput('[crew report reviewer] done', true)
     c.onInput('[crew report verifier] done', false)

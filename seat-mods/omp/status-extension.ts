@@ -31,6 +31,8 @@ export function createStatusCheck(roleEnv: () => string | undefined) {
   // The next before_agent_start is a status prompt's: its prompt arrives expanded for a slash
   // command, so the input's classification is carried here, not re-read from the prompt.
   let context = false
+  // Prompts typed while a turn runs, by kind, in order: OMP may run a queued one as its own turn with no new input.
+  let queued: boolean[] = []
   const on = (): boolean => { const s = parseRole(roleEnv()); return s.kind === 'free' && s.role === 'orchestrator' }
 
   return {
@@ -38,12 +40,15 @@ export function createStatusCheck(roleEnv: () => string | undefined) {
       if (!on()) return
       // molt loads first and rewrites a new process's first prompt to `/molt-arm <text>` (its fixed prefix).
       const status = isCrewTagged(text.startsWith(MOLT_ARM) ? text.slice(MOLT_ARM.length) : text)
-      if (idle || turn === undefined) turn = { status, blocked: false, warning: undefined }
-      else if (!status) turn.status = false
+      if (idle || turn === undefined) { turn = { status, blocked: false, warning: undefined }; queued = [] }
+      else { queued.push(status); if (!status) turn.status = false }
       context = status && turn.status
     },
     onBeforeAgentStart(_prompt: string): { message: { customType: 'seat-mods-status'; content: string; display: false } } | undefined {
-      if (!on() || !context) return undefined
+      if (!on()) return undefined
+      // A queued prompt starting its own run takes its kind from its input, not the no-input default.
+      if (turn === undefined && queued.length > 0) turn = { status: queued.shift() as boolean, blocked: false, warning: undefined }
+      if (!context) return undefined
       context = false
       return { message: { customType: 'seat-mods-status', content: STATUS_CONTEXT, display: false } }
     },
