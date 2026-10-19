@@ -2,6 +2,9 @@
 // the operator. autonomic only appends; the session's own commits carry the file.
 
 export type LedgerCase = 'covered' | 'stalled' | 'done' | 'pain' | 'molt' | 'ask' | 'permission' | 'operator'
+// Who decided (spec §9, ledger completeness): the floor, the judge, a grant, the operator's
+// approval of a park, or the integrity guard. A row without it is the 0.9.1 line.
+export type LedgerSource = 'floor' | 'judge' | 'grant' | 'operator' | 'integrity'
 export type Usage = {
   input_tokens?: number
   output_tokens?: number
@@ -41,8 +44,9 @@ export function oneLine(s: string, max = 300): string {
 
 // `answerMax` lets one row type carry content longer than the default 300-character bound (the pain
 // row holds up to three complete validated option texts); every other row keeps the default clamp.
-export function ledgerLine(e: { time: string; session: string; kase: LedgerCase; q: string; a: string; why: string; usage?: Usage; answerMax?: number }): string {
-  const base = `- ${e.time} · ${e.session} · ${e.kase} · Q: ${oneLine(e.q)} · A: ${oneLine(e.a, e.answerMax ?? 300)} · why: ${oneLine(e.why)}`
+export function ledgerLine(e: { time: string; session: string; kase: LedgerCase; q: string; a: string; why: string; usage?: Usage; answerMax?: number; src?: LedgerSource }): string {
+  const src = e.src === undefined ? '' : ` · src: ${e.src}`
+  const base = `- ${e.time} · ${e.session} · ${e.kase} · Q: ${oneLine(e.q)} · A: ${oneLine(e.a, e.answerMax ?? 300)} · why: ${oneLine(e.why)}${src}`
   const u = e.usage
   if (u === undefined) return base
   const input = (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0)

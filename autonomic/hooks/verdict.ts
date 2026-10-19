@@ -8,7 +8,7 @@ export type TurnVerdict = { case: TurnCase; question?: string; answer?: string; 
 
 export type Question = { question: string; header?: string; options?: ReadonlyArray<{ label: string }>; multiSelect?: boolean }
 export type AskVerdict = { covered: true; answers: Record<string, string>; reason: string } | { covered: false; reason: string }
-export type PermissionVerdict = { decision: 'allow' | 'ask'; reason: string }
+export type PermissionVerdict = { decision: 'allow' | 'ask'; red_line: 1 | 2 | 3 | 4 | 5 | 6 | null; reason: string }
 
 type Obj = Record<string, unknown>
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -92,12 +92,23 @@ export function parseAsk(text: string, questions: readonly Question[]): AskVerdi
 }
 
 // autonomic never denies: a fork's "deny" leaves the ask in place.
+// 0.10.0: the judge names the red line it saw (design §3). A missing or null field means none —
+// 0.9.1-shaped replies still parse — and any other shape is unparseable, so decide.ts settles it
+// into a park; only an "allow" with no red line ever allows (Review Focus 4).
+function redLineIn(v: unknown): PermissionVerdict['red_line'] | undefined {
+  if (v === undefined || v === null) return null
+  if (typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 6) return v as 1 | 2 | 3 | 4 | 5 | 6
+  return undefined
+}
+
 export function parsePermission(text: string): PermissionVerdict | undefined {
   const v = jsonOf(text)
   if (!isObj(v)) return undefined
   const reason = str(v.reason)
   if (reason === undefined) return undefined
-  if (v.decision === 'allow') return { decision: 'allow', reason }
-  if (v.decision === 'ask' || v.decision === 'deny') return { decision: 'ask', reason }
-  return undefined
+  const decision = v.decision === 'allow' ? 'allow' : v.decision === 'ask' || v.decision === 'deny' ? 'ask' : undefined
+  if (decision === undefined) return undefined
+  const redLine = redLineIn(v.red_line)
+  if (redLine === undefined) return undefined
+  return { decision, red_line: redLine, reason }
 }

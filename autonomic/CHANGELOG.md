@@ -2,6 +2,131 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.10.0 — 2026-10-19
+
+Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared decision.
+
+- **One shared permission decision on both hosts** (`hooks/decide.ts`, spec §4): `planPermission`
+  settles a call in a fixed order — an approved park releases, an enabled `ask` finding parks
+  (the floor), the park store or an invocation of `/autopilot approve|drop` parks (the integrity
+  guard), no route and no finding passes, otherwise the judge. `settlePermission` allows only an
+  unambiguous `allow` with no red line named: an `ask`, a red-line `allow` and an unparseable
+  reply all park. The judge's prompt carries all six red lines (spec §3, verbatim), the policy,
+  the live turn, the floor's text-only findings and, when a host binds them, the seat's role and
+  grants. `DEFAULT_POLICY` gains the spec's seeded run-evidence order.
+- **The floor holds red lines 1–3 only** (`hooks/never.ts`): `force-push` (red line 2: `-f`,
+  `--force-with-lease`, `--force-if-includes`, `--mirror`, a `+` destination, unless every
+  destination is the seat's own non-default branch; an unreadable destination stays on the
+  floor), `default-branch-push` (red line 1), and `no-verify`/`ai-trailer` (red line 3). The
+  `branch-delete`, `rm-outside` and `unreadable` rules leave the floor and are judged; a 0.9.x
+  `neverApprove` value that names them still loads, the status line says they are judged, and an
+  unknown name is still a settings problem. The trailer rule reads a commit's own
+  `-m`/`--message` values; a `-F` message is the judge's.
+- **The routing check** (`routes`/`ROUTE_WORDS` in `hooks/never.ts`) sends a call naming any
+  red-line-1–6 word, a merge or the park store to the judge. Routing only adds a judgment: a
+  call that names none of its words runs unjudged, as before.
+- **The park store** (`hooks/parks.ts`): one file per park (`<parksDir>/<id>.json`, mode 0600 in
+  a 0700 store), keyed on the call's exact input (its command text, or a file tool's whole input
+  JSON). `/autopilot parks` lists the open ones; `/autopilot approve <id>` approves one exact
+  call for one use within 72 hours; `/autopilot drop <id>` clears it; an almost-match (another
+  cwd, one extra space, a second use) parks again. The listing prints the call's key (the command
+  text, or a file tool's whole input JSON), secret-redacted and cut to 160 characters, the same
+  line on both hosts.
+- **The Claude Code adapter** (`hooks/register.tsx`) is a thin wrapper over the shared decision:
+  a park returns `deny` with the park text verbatim — a deferral, not a refusal, because `deny`
+  is the only return that does not wait. A release writes its ledger row before consuming the
+  park, and a judge `allow` the ledger cannot record is not taken. `decidingModel` uses
+  `$.model.complete` when set, else `$.model.fork`.
+- **The OMP adapter** (`omp/extension.ts`) takes the same plan for a routed `bash` call, a
+  `github pr_push` with `forceWithLease`, a `read`/`write`/`edit` call naming a route word, and a
+  call invoking the operator route. An unenrolled judge plan runs one isolated, tool-free side
+  turn with the shared prompt; an enrolled command takes the grant-bounded transaction. Jev
+  leaves the deciding path. A release or judge allow whose ledger row cannot be written is not
+  taken, and the release does not consume the park (verify-T7a 5).
+- **The ledger** gains `src: floor|judge|grant|operator|integrity` after `why:` and before
+  `usage:`; a row without it is the 0.9.1 line, byte for byte.
+- **Parity** (`omp/tests/permission-parity.test.ts`, `autonomic/tests/fixtures/parity-corpus.json`):
+  40 synthetic calls, none from a private ledger (10 floor parks across red lines 1–3, 10
+  retired-rule shapes now judged, 10 routed red-line-4–6 shapes, 5 text-only matches, 5 that do
+  not route), replayed through the Claude Code plan step and the real OMP adapter under one
+  `DecideContext` and one stub verdict table: equal Plan kinds, byte-equal prompts, equal
+  settled outcomes. The corpus carries the part-a shapes: the Skill `/autopilot approve` shape,
+  a command line invoking `/autopilot drop`, and a file-tool credential read.
+- **The integrity guard holds on every call's whole input** (part a, R1–R3): the OMP pre-routing
+  check carries the call's full input and its bash `cwd`, and `namesParkStore`/`routes` normalize
+  quotes, backslashes, repeated slashes and `.` segments before matching the park-store mark, so
+  `autonomic//parks`, `autonomic/./parks` and quote-split spellings park; a tool outside the
+  routed lanes takes only that check and is never judged. Non-force `github pr_push` is unchanged.
+- **The OMP pre-check resolves a bash call's own `cwd` before matching the store** (fix D1):
+  `parks` and `./parks` from the store's parent now park as integrity, because the pre-check
+  reads the cwd through the same `bashCwd` the plan uses. A cwd `bashCwd` cannot place skips the
+  early return instead of falling back to the raw string, so the plan's own failure keeps the
+  call with the operator rather than passing it unjudged.
+- **A release whose park consume write fails does not allow** on Claude Code (fix B1):
+  `writeParkFile` reports whether the write landed, and a release that cannot mark the park used
+  asks instead of allowing, as OMP already did.
+- **A release wins an exclusive claim on the park's one use** (fix B2, both hosts): it creates
+  `<id>.used` beside the park (`O_EXCL` on OMP, `set -C` on Claude Code) before the ledger row;
+  an overlapping call that loses the claim re-plans without that park and parks again, so one
+  operator yes releases one run. A claimed park is not listed as open.
+- **`/autopilot approve` reports a failed store write** as `was not approved: the store could not
+  be written` instead of claiming success (fix B3), matching OMP.
+- **The park file and its store are created 0600/0700 from the first byte** on Claude Code (fix
+  B4): one `umask 077` run creates the directory and file, writes the serialized park from stdin
+  (never argv), and re-asserts both modes; no window exists at the host's default mode.
+- **`/autopilot parks` is the same line on both hosts** (fix B5): only open parks (not used or
+  expired, not claimed) are listed, an approved-unused one ends `· approved`, and both print the
+  id, what stopped it, the call's tool, its key (the command text, or a file tool's whole input
+  JSON), secret-redacted and cut to 160 characters, and its cwd, oldest first.
+- **The store guard joins shell line continuations** (fix round 2, C1): `normalizeCallText`
+  removes a backslash-newline pair — a raw LF or CRLF, and the JSON-encoded form it takes inside
+  a tool's whole input — as one unit before the quote and slash normalization, so
+  `autonomic/\<newline>parks/<id>.json` names the store and parks as integrity, as the literal
+  spelling does.
+- **The configured park store is matched by its own path** (fix round 2, C2): both adapters pass
+  the directory they read and write (`AUTONOMIC_PARKS_DIR`, else the state dir) into
+  `namesParkStore`/`routes`, which match it normalized and segment-bounded, plus the cwd forms,
+  so a store outside the `autonomic/parks` mark (e.g. `/tmp/parks`) parks and `/tmp/parks-old`
+  does not.
+- **The operator's `readers` setting reaches the shared decision** (fix round 2, C3):
+  `planPermission` reads the floor and routes with the `readers` on `DecideContext`, and both
+  adapters supply `cfg.readers`, so a call the setting exempts no longer carries a `<floor>` note
+  and the judge's prompt matches 0.9.1.
+- **A judge-bound input redaction would change parks on both hosts** (fix round 2, C4): the park
+  lives in `planPermission` with the reason `the input holds content that redaction would hide`,
+  so Claude Code no longer writes a secret-shaped value into the judge prompt and both hosts
+  decide the call the same way. OMP's `inputRefusal` keeps only its own `MAX_INPUT` bound.
+- **A push is read from its destinations** (fix round 3, Task 13 replay): the floor parses one
+  push command from its verb — remote, refspecs, flags — and decides red lines 1–2 from those
+  destinations, never from the whole group's words. A tag push (`refs/tags/<T>`, or a name an
+  executable `git tag` binds in the same text) is neither red line 1 nor 2, a tag force-push is
+  not red line 2 (the 59c4 audit), an explicit readable non-default destination does not fire
+  while the checkout is on the default branch, and deleting a non-default branch is the judge's.
+  A bare push after a move or switch stays fail-closed, and the whole-bag reading is unchanged.
+- **A failed drop says so** (review 882c): OMP's `dropCommand` catches a remove failure and
+  Claude Code's `dropPark` checks the `rm` exit status, both answering
+  `could not drop <id>: the store could not be changed` and leaving the park in place.
+- **The store guard reads `..` and `./` in both the whole text and each path word** (review
+  882c round 3 P0; 882d round 4 P0; 882e round 5 P1): `namesParkStore` parks when either
+  resolution names the store. The per-word reading resolves `.` and `..` inside each path-like
+  word — a `.` segment is dropped, so a leading `./` names the same path, repeated slashes
+  collapse, and a `..` removes only a segment of the same word, never above the root — while the
+  whole-text reading resolves a `..` across any character a shell word can hold (space, `+`,
+  `=`, `@`), which the per-word reading cannot. A leading `..` is left for `namesParkStore` to
+  resolve against the normalized cwd (which is likewise read both ways).
+  `autonomic/x/../parks/<id>.json`, `./autonomic/parks/<id>.json`, `./parks/<id>.json` and
+  `./../parks/<id>.json` from the store's parent, `../../parks/<id>.json` from two levels down,
+  `autonomic/x+y/../parks/<id>.json` (and the `x y`, `x=y`, `x@y` spellings), a cwd
+  `<storeParent>/x/../parks`, and `../parks/<id>.json` from cwd `<storeParent>/x` now park as
+  integrity on both hosts and both of Bash and Write, while `autonomic/x/../parks-notes.md`,
+  `./parks-notes.md` and `./../parkside/a.json` stay near misses. Variables, globs,
+  substitutions and encodings remain the README's Known limit.
+- **The judge's permission guidance is tuned** (Task 13 Step 5): the prompt now says to allow
+  when the call carries out the session's own task and no red line covers it, to ask only for a
+  red line, a pain-list action or a real gap in the task, and that a path outside the worktree
+  is not by itself a reason to ask — a cache, scratch or host this task already uses is still
+  the task, and deleting regenerable output is not a one-way door. `<red-lines>` is unchanged.
+
 ## 0.9.1 — 2026-10-18
 
 - **Naming: the per-seat launcher patch names `crew`** (crew 0.3.0's rename, spec §4.6). One

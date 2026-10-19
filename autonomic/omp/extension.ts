@@ -2,29 +2,36 @@
 // coordinator in autopilot gets the ask reflex, the turn-end reflex and the never-approve floor. Loaded only by
 // omp-seat with -e (never ambient). It imports autonomic's own pure modules and node: builtins only; omp's host
 // types are `any`, so this file imports in plain bun. Every rule, threshold, text and pain list is in ../hooks.
+// 0.10.0 Task 7a: the operator-route integrity guard and the park/release key are shared there too.
 //
 // What does not port from hooks/register.tsx, and why: the pain band and its option buttons (no band on OMP: the
 // options are listed in the notice and the pain file), the permission fork (OMP seats run --approval-mode yolo,
 // so no permission prompt exists; the floor is a tool_call block instead), and the hard-deny ring (a call that a
 // seat guard blocks emits no tool_result, so there is nothing to observe).
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
-import { dirname, resolve } from 'node:path'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, parseConfig } from '../hooks/config'
+import { DEFAULTS, parseConfig, retiredNote } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
+import { invokesParkCommand, planPermission, settlePermission } from '../hooks/decide'
+import type { DecideContext, PermissionVerdict, Plan } from '../hooks/decide'
 import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from '../hooks/floor'
-import { ledgerLine, ledgerPathFor, oneLine, redact } from '../hooks/ledger'
-import type { LedgerCase } from '../hooks/ledger'
+import { ledgerLine, ledgerPathFor, oneLine } from '../hooks/ledger'
+import type { LedgerCase, LedgerSource } from '../hooks/ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from '../hooks/mode'
-import { DEFAULT_READERS, floorFindings, namesDanger } from '../hooks/never'
-import type { Finding, Where } from '../hooks/never'
+import { DEFAULT_READERS, namesParkStore, routes } from '../hooks/never'
+import type { Where } from '../hooks/never'
 import { operationFacts, permissionEligibility } from '../hooks/operations'
+import type { OperationContext } from '../hooks/operations'
+import { PARK_ID, approve, callKey, consume, parkId, parkLine, parkOpen, parkOrder, parkText, parksDir, parsePark, serializePark } from '../hooks/parks'
+import type { Park } from '../hooks/parks'
 import { DEFAULT_POLICY, expandHome } from '../hooks/policy'
-import { scopeMessage, shownInput } from '../hooks/prompts'
+import { MAX_INPUT, scopeMessage, shownInput } from '../hooks/prompts'
 import { lineagePath, logPath, modeFilePath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from '../hooks/records'
 import type { SessionRecord } from '../hooks/records'
 import { shape } from '../hooks/shape'
+import { parsePermission } from '../hooks/verdict'
 import type { TurnCase, TurnVerdict } from '../hooks/verdict'
 import { captureLaunchBinding } from '../hooks/authority'
 import { launchWorkerRoots } from '../bin/authority'
@@ -51,6 +58,9 @@ export type AutonomicIO = {
   sessionFile?(): string | undefined
   setEnv(name: string, value: string | undefined): void
   readText(path: string): Promise<string | undefined>
+  readDir(path: string): Promise<readonly string[]>              // the park store's entries; a missing folder is empty
+  writePark(path: string, text: string): Promise<void>          // folder 0700, file 0600
+  claimPark(path: string): Promise<boolean>                     // exclusive create; false when taken (fix B2)
   exists(path: string): Promise<boolean>
   writeText(path: string, text: string): Promise<void>          // creates the folder
   appendLine(path: string, line: string): Promise<boolean>      // creates the folder; false when it did not land
@@ -70,7 +80,7 @@ export type AutonomicIO = {
 }
 
 const CONFIG_PATH = '.omp/agent/autonomic.json'
-const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status'
+const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status | parks | approve <park> | drop <park>'
 // omp 18.8.9's built-in tools (the binary's tool registry, the same enumeration molt/omp/core.ts records), each
 // decided once. Read-only, so a turn of these alone is no progress for the loop guard:
 //   read, grep, glob, find, ast_grep, web_search, fetch, ls, ask, todo, wait, think, recall, reflect
@@ -150,6 +160,11 @@ export function bashCwd(raw: string, session: string, home: string): string | un
 const claimedModeFiles = new Set<string>()
 
 type Judged<T> = { v: T } | { skip: true } | { fail: string }
+
+// One call the permission route judges (Task 6). `command` is the text a shell would run, or null
+// for a tool with no command text (the routed file tools); `input` is the whole call.
+export type RouteCall = { tool: string; command: string | null; cwd?: unknown; input: unknown }
+type JudgePlan = Extract<Plan, { kind: 'judge' }>
 
 export function createAutonomic(io: AutonomicIO) {
   // Capture before worker execution; mode records, later env and briefs never rebind this store.
@@ -346,9 +361,10 @@ export function createAutonomic(io: AutonomicIO) {
   }
 
   // One ledger line. A ledger that cannot be written ends autopilot (spec §4); the caller must not act on a
-  // decision that was not recorded.
-  const record = (id: string, kase: LedgerCase, q: string, a: string, why: string): Promise<boolean> =>
-    recordAll(id, [ledgerLine({ time: new Date().toISOString(), session: id, kase, q, a, why })])
+  // decision that was not recorded. `src` names who decided the call (spec §9); it is absent on every row
+  // whose decision predates the field, so those stay byte-identical.
+  const record = (id: string, kase: LedgerCase, q: string, a: string, why: string, src?: LedgerSource): Promise<boolean> =>
+    recordAll(id, [ledgerLine({ time: new Date().toISOString(), session: id, kase, q, a, why, ...(src === undefined ? {} : { src }) })])
 
   async function recordAll(id: string, lines: readonly string[]): Promise<boolean> {
     if (await io.appendLine(await ledgerPath(), lines.join('\n'))) return true
@@ -457,20 +473,13 @@ export function createAutonomic(io: AutonomicIO) {
     return w
   }
 
-  // The pain text leads with the line that names a danger, so the notice shows what tripped.
-  function painFocus(rules: readonly string[], command: string): string {
-    const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
-    const hit = lines.find(l => namesDanger(l)) ?? lines[0] ?? command
-    // The shape, never the text: no credential reaches a pain signal.
-    return `${rules.join(', ')} — ${shape(hit)}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
-  }
-
   async function statusReport(id: string): Promise<string> {
     const rec = await modeOf()
     const policyPath = expandHome(cfg.policyPath, home())
     const painPath = (io.env.AUTONOMIC_PAIN_PATH ?? '').trim()
     const pol = await policyText()
     const stageNow = safeSessionId(id) ? parseStage(await io.readText(stagePath(home(), id))) : undefined
+    const retired = retiredNote(cfg.retired)
     const lines = [
       `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
       ...(enrolled ? [`authority: ${authority.signal.aborted ? 'suspended; fresh trusted launch required' : authorityState}`] : []),
@@ -478,6 +487,8 @@ export function createAutonomic(io: AutonomicIO) {
       `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
       `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
       `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
+      ...(cfg.decidingModel === undefined ? [] : ['decidingModel applies on Claude Code only; OMP decides on the session model']),
+      ...(retired === undefined ? [] : [retired]),
       `readers: ${(cfg.readers ?? DEFAULT_READERS).map(r => r.join(' ')).join('; ') || 'none'}`,
       `molt stage: ${stageNow ?? 'none'}`,
       `ledger: ${await ledgerPath()}`,
@@ -487,6 +498,49 @@ export function createAutonomic(io: AutonomicIO) {
     if (rec.invalid !== undefined) lines.push(`AUTONOMIC_MODE="${rec.invalid}" is not a mode`)
     if (cfg.problems.length > 0) lines.push(`settings: ${cfg.problems.join('; ')}`)
     return lines.join('\n')
+  }
+
+  // The operator's view of the store (call 2; fix B5): the shared line, only the open parks,
+  // oldest first, with a claimed park's spent use not listed. A used or expired approval is no
+  // open park.
+  async function parksReport(): Promise<string> {
+    const now = new Date().toISOString()
+    const lines: string[] = []
+    for (const p of (await readParks()).sort(parkOrder)) {
+      if (!parkOpen(p, now)) continue
+      if (await io.exists(claimFile(p.id))) continue
+      lines.push(parkLine(p))
+    }
+    return lines.length === 0 ? 'parks: none' : `parks:\n${lines.join('\n')}`
+  }
+
+  // One use, 72 hours, exactly this tool, command text and cwd (Task 3's approve/consume). The id
+  // grammar is checked before it becomes a path: a mistyped id is no park, never a file elsewhere.
+  async function approveCommand(id: string): Promise<string> {
+    if (!PARK_ID.test(id)) return `no park ${id}`
+    const text = await io.readText(parkFile(id))
+    if (text === undefined) return `no park ${id}`
+    let park: Park
+    try { park = parsePark(text) } catch { return `no park ${id}` }
+    let approved: Park
+    try { approved = approve(park, new Date().toISOString()) } catch { return `park ${id} is already approved` }
+    try { await io.writePark(parkFile(id), serializePark(approved)) } catch (err) {
+      await log(`park approve failed ${String(err)}`)
+      return `park ${id} was not approved: the store could not be written`
+    }
+    await record(io.sessionId(), 'operator', `park ${id}`, 'approved for one use', 'the operator approved the park', 'operator')
+    return `park ${id} approved for one use.`
+  }
+
+  async function dropCommand(id: string): Promise<string> {
+    if (!PARK_ID.test(id)) return `no park ${id}`
+    if (!(await io.exists(parkFile(id)))) return `no park ${id}`
+    try { io.remove(parkFile(id)) } catch (err) {
+      await log(`park drop failed ${id} ${String(err)}`)
+      return `could not drop ${id}: the store could not be changed`
+    }
+    await record(io.sessionId(), 'operator', `park ${id}`, 'dropped', 'the operator dropped the park', 'operator')
+    return `park ${id} dropped.`
   }
 
   // session_start: the default policy (never overwritten), the live mode for launchers, and any config problem.
@@ -631,143 +685,203 @@ export function createAutonomic(io: AutonomicIO) {
     }
   }
 
-  // The one independent choice question of Step 4: statement and criteria exactly as planned.
-  const PERMISSION_QUESTIONS = { permission: {
-    type: 'choice' as const,
-    instructions: 'Within the supplied positive task grants and bounded effects, is this routine operation covered? Never expand authority.',
-    criteria: { allow: 'All effects are within supplied approved task evidence; no operator gate or red line applies.',
-      ask: 'Task coverage is unclear or operator handling is required.' },
-  } }
+  // ---- the park store (Task 3's module, this host's IO) ----------------------------------------
+  // The routed lane is bash, a force `github pr_push` and read/write/edit; every other tool
+  // (notebook, apply_patch, ast_edit, eval, js, python, debug, an MCP tool) is outside it and
+  // gets the integrity check only (ruling 2: the narrower set is a known limit, recorded in the
+  // report). Claude Code judges every tool's call, so this is a coverage difference, not policy.
+  const FILE_TOOLS: Record<string, true> = { read: true, write: true, edit: true }
+  // The id grammar is the shared PARK_ID and the park key is the shared callKey (Task 7a): the
+  // guards below check the imported grammar before an id becomes a path, as register.tsx does.
+  const parkFile = (id: string): string => join(parksDir(io.env, home()), `${id}.json`)
+  const claimFile = (id: string): string => join(parksDir(io.env, home()), `${id}.used`)
 
-  // The never-approve floor (planner decision 7): in autopilot a match blocks the bash call and rings. A session that
-  // left autopilot through a failure (ledger, record, policy) keeps the floor: under yolo, manual means no asks at all.
-  // `cwd` is the bash call's own folder (omp's bash tool takes one); the command is judged where it will run. Task 5
-  // adds one branch: a matched call whose effects are fully bounded by positive authority is decided (and recorded)
-  // through the native judgment route, and only then does the original tool proceed.
-  async function floor(command: string, from?: { tool?: 'bash' | 'github'; cwd?: unknown; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
-    if (!namesDanger(command, cfg.readers)) return undefined
-    const tool = from?.tool ?? 'bash'
-    // From here every failure keeps the call blocked: an unneeded block costs one operator decision, a missed one a force push.
-    let findings: Finding[]
-    try {
-      const m = await modeOf()
-      if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
-      const raw = typeof from?.cwd === 'string' && from.cwd.trim() !== '' ? from.cwd : undefined
-      const dir = raw === undefined ? io.cwd : bashCwd(raw, io.cwd, home())
-      if (dir === undefined) throw new Error(`cwd ${raw} is not a folder the floor can read`)
-      findings = floorFindings(command, await where(dir), cfg.readers).findings.filter(f => cfg.neverApprove.includes(f.rule))
-    } catch (err) {
-      await log(`floor error ${String(err)}`)
-      return { block: true, reason: 'autonomic: the never-approve check failed; this call stays with the operator' }
+  // The whole store, read before every decision so an approval the operator just wrote is seen. A
+  // file that does not parse is ignored and logged, never matched (Task 3 step 3).
+  async function readParks(): Promise<Park[]> {
+    const dir = parksDir(io.env, home())
+    const out: Park[] = []
+    for (const name of await io.readDir(dir)) {
+      if (!name.endsWith('.json')) continue
+      const text = await io.readText(join(dir, name))
+      if (text === undefined) continue
+      try { out.push(parsePark(text)) } catch (err) { await log(`park ${name} ignored: ${String(err)}`) }
     }
-    if (findings.length === 0) return undefined
-    const rules = [...new Set(findings.map(f => f.rule))]
-    // An enrolled session owns a decision service; without one the call keeps the plain operator block.
-    const decisions = io.decisions
-    if (decisions !== undefined) {
-      const signal = frameAbort.signal
-      try {
-        return await decisionFor(decisions, { tool, command, input: from?.input, findings }, signal)
-      } catch (err) {
-        await log(`permission decision error ${String(err)}`)
-        // A frame cancelled with its session neither writes nor releases: the call still stays with
-        // the operator, but no row is attributed to a session that has moved on.
-        if (signal.aborted) return { block: true, reason: 'autonomic: the decision frame was cancelled with the session; this call stays with the operator' }
-        // The decision route failed, so this call stays with the operator — and it is recorded and
-        // rings exactly as the plain never-approve path does, rather than blocking in silence.
-        await ringDecline(tool, command, [...new Set(findings.map(f => f.rule))], 'the decision route failed')
-        return { block: true, reason: 'autonomic: decision unavailable or stale; this call stays with the operator' }
-      }
-    }
-    return signalOperator(tool, command, rules)
+    return out
   }
-  // The operator-visible outcome for a call this route will not release: the human ledger row plus
-  // the pain signal a launcher watching AUTONOMIC_PAIN_PATH sees. Every decline goes through here —
-  // the plain never-approve path, the operator block of an incomplete effect bound, the native
-  // judgment's own `ask`, and the decision route's failure — so a stopped force push is never a
-  // silent block. `why` is the deciding reason, omitted where the reason is the rules themselves.
-  async function ringDecline(tool: 'bash' | 'github', command: string, rules: readonly string[], why?: string): Promise<void> {
-    try {
-      const id = io.sessionId()
-      await record(id, 'permission', tool === 'github' ? `github pr_push: ${shape(command)}` : `Bash: ${shape(command)}`, 'ask the operator', `never-approve: ${rules.join(', ')}${why === undefined ? '' : ` (${why})`}`)
-      await pain(id, 'never-approve', painFocus(rules, command))
-    } catch (err) {
-      await log(`floor signal error ${String(err)}`)
-    }
+
+  // The operator-facing name of a call in a row or a listing: a command's shape, or another tool's
+  // key set — never a value, so no credential can reach notice, ledger or pain.
+  function parkQuery(call: RouteCall): string {
+    if (call.command === null) return `${call.tool}: ${oneLine(shape(callKey(call)), 160)}`
+    return `${call.tool === 'github' ? 'github pr_push' : 'Bash'}: ${shape(call.command)}`
   }
-  // The plain never-approve operator path, unchanged (Plan Task 5 §7 Step 4).
-  async function signalOperator(tool: 'bash' | 'github', command: string, rules: readonly string[]): Promise<{ block: true; reason: string }> {
-    await ringDecline(tool, command, rules)
-    return { block: true, reason: `autonomic: never-approve — ${rules.join(', ')}; the operator decides` }
+
+  // A stop that is recorded and rings, with the park file the operator approves. The reason and the
+  // pain carry the shape, never the command text; the park file itself must hold the exact call, or
+  // the approval could not match it.
+  async function parkFor(req: { source: Park['source']; redLine: Park['redLine']; reason: string }, call: RouteCall, dir: string): Promise<{ block: true; reason: string }> {
+    const session = io.sessionId()
+    const parkedAt = new Date().toISOString()
+    const command = callKey(call)
+    const park: Park = { id: parkId({ session, tool: call.tool, command, cwd: dir, parkedAt }), session,
+      host: 'omp', tool: call.tool, command, cwd: dir, source: req.source, redLine: req.redLine,
+      reason: req.reason, parkedAt, approval: null }
+    let stored = true
+    try { await io.writePark(parkFile(park.id), serializePark(park)) } catch (err) { stored = false; await log(`park write failed ${String(err)}`) }
+    await record(session, 'permission', parkQuery(call), 'parked for the operator', req.reason, req.source)
+    await pain(session, 'parked', `${shape(command)} — ${oneLine(req.reason, 120)}`)
+    return { block: true, reason: stored ? parkText(park) : 'autonomic: parked for the operator, but the park store could not be written; this call stays with the operator' }
+  }
+
+  // The operator's approval, spent before the call runs: the row goes in first, then the write-back
+  // marks it used, so a second run of the same call parks again. A row the ledger cannot record is
+  // not a release, and the park stays unused (spec §4, "no ledger, no autopilot"), as on Claude Code.
+  async function releaseApproved(p: Park, call: RouteCall): Promise<{ block: true; reason: string } | undefined> {
+    if (!(await record(io.sessionId(), 'permission', parkQuery(call), "released by the operator's approved park", `park ${p.id} approved for one use`, 'operator')))
+      return { block: true, reason: 'autonomic: the release could not be recorded; this call stays with the operator' }
+    try { await io.writePark(parkFile(p.id), serializePark(consume(p, new Date().toISOString()))) } catch (err) {
+      await log(`park consume failed ${String(err)}`)
+      return { block: true, reason: `autonomic: approved park ${p.id} could not be marked used; this call stays with the operator` }
+    }
+    return undefined
+  }
+
+  // The shown-input bound is this host's own (each host keeps MAX_INPUT as it does it). A
+  // judge-bound input that redaction would change is the shared decision's park (fix round 2,
+  // C4, in `planPermission`): the same rule and reason on both hosts, before any judge.
+  function inputRefusal(input: unknown): string | null {
+    const shown = shownInput(input)
+    if (shown.length > MAX_INPUT) return 'the input exceeds the 64,000-code-unit shown-input bound'
+    return null
+  }
+
+  // One isolated, tool-free side turn (call 5): no transcript, no tools, the session's own model.
+  // An unreachable host or an unparseable reply settles into a park, never into a release.
+  async function oneSideTurn(promptText: string, signal: AbortSignal): Promise<PermissionVerdict | undefined> {
+    const host = io.captureHost?.()
+    if (host?.generate === undefined) throw new Error('the host exposes no isolated side turn')
+    const r = await host.generate({ tools: false, isolated: true, dedupeReply: false, signal, promptText })
+    return parsePermission(typeof r?.replyText === 'string' ? r.replyText : '')
   }
 
   /**
-   * The Step 4 intercepted path: capture the whole original input, bound its effects, and either
-   * decide it deterministically/through one native judgment and record it before returning the
-   * host's nonblocking result, or keep it with the operator. Every failure returns an explicit
-   * block; a catch returning undefined here would release a yolo-blocked call.
+   * The one permission route every routed call takes (Plan Task 6 §3): the mode gate first, so a
+   * manual session is byte-for-byte 0.9.1; then the shared plan (an approved park releases, an
+   * enabled floor finding parks, the integrity guard parks, no route passes); else the judged lane
+   * — the grant-bounded one for an enrolled command, the side turn otherwise. A routed call never
+   * falls through unanswered: from the mode gate on, every failure keeps it with the operator.
    */
-  async function decisionFor(io2: DecisionIO, call: { tool: 'bash' | 'github'; command: string; input: unknown; findings: Finding[] }, signal: AbortSignal): Promise<{ block: true; reason: string } | undefined> {
-    const { tool, command } = call
-    const captured = call.input !== undefined ? call.input : { command }
-    // Never judge an input in part: if redaction would hide material text, this call stays with the operator.
-    const shown = shownInput(captured)
-    if (redact(shown) !== shown) return operatorBlock(tool, command, call.findings, 'the input holds content that redaction would hide')
+  async function route(call: RouteCall): Promise<{ block: true; reason: string } | undefined> {
+    // The operator's own route needs no routing word to reach its guard (Task 7a): the pre-check
+    // proceeds for it too, so the shared integrity park is what stops it. The whole input is
+    // passed (a bash cwd in the park store is read here, R1), and a synthesized command rides
+    // beside its own fields rather than replacing them.
+    const routed = call.command === null ? call.input
+      : call.input !== null && typeof call.input === 'object' ? { ...call.input, command: call.command }
+      : { command: call.command }
+    const store = parksDir(io.env, home())
+    // The pre-check resolves a bash call's own cwd exactly as the plan does, so a relative cwd
+    // (`parks`, `./parks`) is read against the session folder before it is matched; a file tool
+    // carries no cwd and reads the session's. A cwd bashCwd cannot place (undefined or a throw)
+    // skips the pre-check rather than falling back to the raw string, so the plan's own
+    // `cwd … is not a folder the floor can read` keeps the call with the operator.
+    const rawCwd = typeof call.cwd === 'string' && call.cwd.trim() !== '' ? call.cwd : undefined
+    let checkCwd: string | undefined = io.cwd
+    if (rawCwd !== undefined) {
+      try { checkCwd = bashCwd(rawCwd, io.cwd, home()) } catch { checkCwd = undefined }
+    }
+    if (checkCwd !== undefined &&
+        invokesParkCommand({ tool: call.tool, input: call.input, command: call.command }) === null &&
+        !routes({ tool: call.tool, input: routed, cwd: checkCwd }, cfg.readers, store)) return undefined
+    try {
+      const m = await modeOf()
+      if (m.mode !== 'autopilot' && m.problem === undefined) return undefined
+      const dir = rawCwd === undefined ? io.cwd : bashCwd(rawCwd, io.cwd, home())
+      if (dir === undefined) throw new Error(`cwd ${rawCwd} is not a folder the floor can read`)
+      const at = await where(dir)
+      const parks = await readParks()
+      const now = new Date().toISOString()
+      const c: DecideContext = { policy: (await policyText()) ?? '', recent: '', role: authorityLease?.snapshot.seat.role ?? null,
+        grants: authorityLease?.snapshot.grants ?? null, parks, now, enabled: cfg.neverApprove, readers: cfg.readers, store }
+      // A release must first win the park's one use (fix B2). A lost claim means an overlapping
+      // call took it; that park is dropped and the call re-plans without it, so it parks again
+      // (floor, integrity, or judge) instead of releasing from an approval it did not win.
+      let available = parks
+      let plan = planPermission({ tool: call.tool, input: call.input, command: call.command, cwd: dir, where: at }, c)
+      while (plan.kind === 'release' && !(await io.claimPark(claimFile(plan.park.id)))) {
+        available = available.filter(p => p.id !== plan.park.id)
+        plan = planPermission({ tool: call.tool, input: call.input, command: call.command, cwd: dir, where: at }, { ...c, parks: available })
+      }
+      if (plan.kind === 'pass') return undefined
+      if (plan.kind === 'release') return await releaseApproved(plan.park, call)
+      if (plan.kind === 'park') return await parkFor({ source: plan.source, redLine: plan.redLine, reason: plan.reason }, call, dir)
+      // A judge plan for a command in an enrolled session is the grant-bounded lane; every other
+      // judge plan (an unenrolled session, or a file tool) is one side turn.
+      return io.decisions !== undefined && call.command !== null
+        ? await decisionFor(io.decisions, call, plan, dir, frameAbort.signal)
+        : await judgeDirect(call, plan, dir, frameAbort.signal)
+    } catch (err) {
+      await log(`permission route error ${String(err)}`)
+      return { block: true, reason: 'autonomic: the never-approve check failed; this call stays with the operator' }
+    }
+  }
+
+  // Unenrolled sessions, and every non-command (file-tool) call: the judge's plan is answered by
+  // one side turn, settled by the shared rule, and either released (recorded) or parked.
+  async function judgeDirect(call: RouteCall, plan: JudgePlan, dir: string, signal: AbortSignal): Promise<{ block: true; reason: string } | undefined> {
+    const refusal = inputRefusal(call.input)
+    if (refusal !== null) return await parkFor({ source: 'judge', redLine: null, reason: refusal }, call, dir)
+    let verdict: PermissionVerdict | undefined
+    try { verdict = await oneSideTurn(plan.prompt, signal) }
+    catch (err) { await log(`permission judge error ${String(err)}`) }
+    const settled = settlePermission(verdict)
+    if (settled.kind !== 'allow') return await parkFor({ source: 'judge', redLine: settled.redLine, reason: settled.reason }, call, dir)
+    // A judgment the ledger cannot record is not taken (spec §4), as on Claude Code.
+    if (!(await record(io.sessionId(), 'permission', parkQuery(call), 'allow', settled.reason, 'judge')))
+      return { block: true, reason: 'autonomic: the allow could not be recorded; this call stays with the operator' }
+    return undefined
+  }
+
+  /**
+   * The enrolled, command lane: capture the whole input, bound its effects, and either decide it
+   * deterministically (an exact approved decision), through the one side turn inside the matched
+   * grant bound, or keep it with the operator. Every failure parks or throws to the route's catch;
+   * a return of undefined is a release, and the host then runs the original tool once.
+   */
+  async function decisionFor(io2: DecisionIO, call: RouteCall, plan: JudgePlan, dir: string, signal: AbortSignal): Promise<{ block: true; reason: string } | undefined> {
+    const refusal = inputRefusal(call.input)
+    if (refusal !== null) return await parkFor({ source: 'judge', redLine: null, reason: refusal }, call, dir)
+    const captured = call.input !== undefined ? call.input : { command: call.command }
     const frame = await captureFrame(io2, lastEntryMs, 'permission', captured, signal)
     const ctx: OperationContext = { inputSha256: frame.inputSha256, facts: frame.facts, snapshot: frame.lease.snapshot,
       approved: frame.policy.approved.permissions as ApprovedPermission[], evidence: frame.lease.evidence,
       commands: frame.policy.approved.commands as ApprovedCommand[] }
-    const facts = operationFacts(tool, captured, ctx, cfg.readers ?? DEFAULT_READERS)
-    const merged: Finding[] = [...new Map([...facts.findings, ...call.findings].map(f => [`${f.rule}|${f.level}|${f.focus}`, f])).values()]
-    const eligibility = permissionEligibility({ ...facts, findings: merged }, ctx)
-    if (eligibility.kind === 'ask') return operatorBlock(tool, command, merged, eligibility.reason)
-    let decision: 'allow' | 'ask'
+    const facts = operationFacts(call.tool, captured, ctx, cfg.readers ?? DEFAULT_READERS)
+    const eligibility = permissionEligibility(facts, ctx)
+    if (eligibility.kind === 'ask') return await parkFor({ source: 'judge', redLine: null, reason: eligibility.reason }, call, dir)
     let draft: DecisionDraft
+    let src: LedgerSource = 'grant'
     if (eligibility.kind === 'covered') {
-      decision = eligibility.decision
-      draft = { outcome: decision, grantIds: eligibility.grantIds, evidenceIds: eligibility.evidenceIds, answers: {},
+      draft = { outcome: eligibility.decision, grantIds: eligibility.grantIds, evidenceIds: eligibility.evidenceIds, answers: {},
         route: null, response: null, payloadSource: { kind: 'deterministic', id: null }, reason: eligibility.reason }
     } else {
-      const result = await judgeNative(frame, { state: nativeState(frame, facts), questions: PERMISSION_QUESTIONS })
-      const answer = (result.judgment.answers as Record<string, unknown>).permission
-      const choice = acceptedChoice(answer as never, frame.policy.acceptance.permission)
-      decision = choice === 'allow' ? 'allow' : 'ask'
-      draft = { outcome: decision, grantIds: eligibility.grantIds, evidenceIds: eligibility.evidenceIds,
-        answers: { permission: answer as never }, route: result.route, response: result.judgment,
-        payloadSource: { kind: 'candidate', id: null },
-        reason: decision === 'allow'
-          ? `native judgment and the matched grants ${eligibility.grantIds.join(', ')} agree within their evidence`
-          : 'native judgment did not accept the call as covered' }
+      let verdict: PermissionVerdict | undefined
+      try { verdict = await frame.budget.run('generation', s => oneSideTurn(plan.prompt, s)) }
+      catch (err) { await log(`permission judge error ${String(err)}`) }
+      const settled = settlePermission(verdict)
+      if (settled.kind !== 'allow') return await parkFor({ source: 'judge', redLine: settled.redLine, reason: settled.reason }, call, dir)
+      src = 'judge'
+      draft = { outcome: 'allow', grantIds: eligibility.grantIds, evidenceIds: eligibility.evidenceIds, answers: {},
+        route: null, response: null, payloadSource: { kind: 'generation', id: null }, reason: settled.reason }
     }
-    if (decision !== 'allow') {
-      // A native `ask` is an operator-owned stop like any other: it is recorded and rings, so a
-      // declined force-push attempt is visible to a launcher watching the pain file.
-      await ringDecline(tool, command, [...new Set(merged.map(f => f.rule))], 'the native judgment declined the call')
-      return { block: true, reason: 'autonomic: the operator decides' }
-    }
-    await commitDecision(io2, frame, draft, [{ kase: 'permission', q: `${tool}: ${shape(command)}`, a: 'allow original call' }])
+    // A deterministic approved decision may itself be an ask: that is an operator stop like any
+    // other, and it parks with the reason the covered rule gives.
+    if (draft.outcome !== 'allow') return await parkFor({ source: 'judge', redLine: null, reason: eligibility.kind === 'covered' ? eligibility.reason : '' }, call, dir)
+    await commitDecision(io2, frame, draft, [{ kase: 'permission', q: parkQuery(call), a: 'allow original call', src }])
     frame.budget.check()
     if (!frame.lease.fresh()) throw new Error('stale permission')
-    return undefined // nonblocking result only; normal host executes the original tool once
-  }
-
-  // The operator-visible outcome for a call the decision route will not release: the same
-  // never-approve record/pain plus the deciding reason.
-  async function operatorBlock(tool: 'bash' | 'github', command: string, findings: readonly Finding[], reason: string): Promise<{ block: true; reason: string }> {
-    const rules = [...new Set(findings.map(f => f.rule))]
-    await ringDecline(tool, command, rules, reason)
-    return { block: true, reason: `autonomic: never-approve — ${rules.join(', ')}; the operator decides` }
-  }
-
-  // The bounded native state: sanitized full input, authority identity and the normalized facts.
-  function nativeState(frame: DecisionFrame, facts: ReturnType<typeof operationFacts>) {
-    return { tool: facts.tool, cwd: facts.cwd, inputSha256: frame.inputSha256, inputShape: frame.inputShape,
-      assignmentId: frame.lease.snapshot.assignmentId, generation: frame.lease.snapshot.generation,
-      authoritySha256: frame.lease.binding.sha256, policySha256: frame.lease.policyDigest,
-      effects: facts.effects.map(e => ({ operation: e.operation, argv: e.argv, cwd: e.cwd,
-        force: e.force, deletion: e.deletion, noVerify: e.noVerify, merge: e.merge, trailer: e.trailer,
-        targets: e.targets, unresolved: e.unresolved })),
-      findings: facts.findings.map(f => ({ rule: f.rule, level: f.level })) }
+    return undefined
   }
 
   async function onToolCall(e: { toolName?: string; input?: unknown }): Promise<{ block: true; reason: string } | undefined> {
@@ -775,11 +889,18 @@ export function createAutonomic(io: AutonomicIO) {
     lastEntryMs = performance.now()
     await load()
     if (e?.toolName === 'ask') {
+      // The integrity guard covers every tool call's whole input (ruling 2), the ask reflex
+      // included: a dialog that names the park store is parked first; everything else reaches the
+      // reflex exactly as today.
+      if (namesParkStore(e.input, io.cwd, parksDir(io.env, home()))) {
+        const blocked = await route({ tool: 'ask', command: null, input: e.input })
+        if (blocked !== undefined) return blocked
+      }
       try { return await askReflex(e.input) } catch (err) { await log(`ask reflex error ${String(err)}`); return undefined }
     }
     if (e?.toolName === 'bash') {
       const input = e.input as { command?: unknown; cwd?: unknown } | undefined
-      return typeof input?.command === 'string' ? floor(input.command, { cwd: input.cwd, input: e.input }) : undefined
+      return typeof input?.command === 'string' ? route({ tool: 'bash', command: input.command, cwd: input.cwd, input: e.input }) : undefined
     }
     // omp's own push tool: github pr_push with forceWithLease is a force push of the branch the call names (default: HEAD).
     if (e?.toolName === 'github') {
@@ -787,8 +908,20 @@ export function createAutonomic(io: AutonomicIO) {
       if (input?.op !== 'pr_push' || (input.forceWithLease !== true && input.forceWithLease !== 'true')) return undefined
       // Never the raw name in a command line: only a plain ref name is passed on.
       const ref = typeof input.branch === 'string' && /^[\w./-]+$/.test(input.branch) ? input.branch : 'HEAD'
-      return floor(`git push --force-with-lease origin ${ref}`, { tool: 'github', input: e.input })
+      return route({ tool: 'github', command: `git push --force-with-lease origin ${ref}`, input: e.input })
     }
+    // The routed file tools (ruling 5): no command text, so their plan is the integrity guard or
+    // the judge, and their park is keyed on the call's exact input JSON.
+    if (typeof e?.toolName === 'string' && FILE_TOOLS[e.toolName] === true) return route({ tool: e.toolName, command: null, input: e.input })
+    // A call that invokes the operator's /autopilot approve|drop route (Task 7a): the shared
+    // integrity rule's lane, whatever tool carries the shape.
+    const invoking = { tool: String(e?.toolName ?? ''), input: e?.input, command: null }
+    if (invokesParkCommand(invoking) !== null) return route(invoking)
+    // Every other tool (notebook, apply_patch, ast_edit, eval, js, python, debug, an MCP tool) is
+    // outside today's permission lanes: the integrity check only (ruling 2). A call whose whole
+    // input names the park store parks; every other call returns exactly what 0.9.1 returned, so
+    // routing words in its input never send it to the judge.
+    if (typeof e?.toolName === 'string' && namesParkStore(e.input, io.cwd, parksDir(io.env, home()))) return route({ tool: e.toolName, command: null, input: e.input })
     return undefined
   }
 
@@ -959,6 +1092,9 @@ export function createAutonomic(io: AutonomicIO) {
     const c = parseCommand(args ?? '')
     if (c.kind === 'usage') return USAGE_TEXT
     if (c.kind === 'status') return statusReport(id)
+    if (c.kind === 'parks') return await parksReport()
+    if (c.kind === 'approve') return await approveCommand(c.id)
+    if (c.kind === 'drop') return await dropCommand(c.id)
     const prev = await modeOf()
     if (c.kind === 'off') {
       suspendAuthority()
@@ -969,6 +1105,7 @@ export function createAutonomic(io: AutonomicIO) {
         return `autopilot is off for this session, but its record could not be saved: a molt successor may still start in autopilot. Check that ${sessionPath(home(), id)} can be written.`
       return 'autopilot is off for this session: every ask reaches you.'
     }
+    if (c.kind !== 'on') return USAGE_TEXT
     const h = home()
     const scope = c.scope.map(p => resolveDoc(p, io.cwd, h))
     const missing: string[] = []
@@ -1025,6 +1162,9 @@ function ioFor(pi: any, cur: () => any): AutonomicIO {
     env: process.env,
     setEnv: (name, value) => { if (value === undefined) delete process.env[name]; else process.env[name] = value },
     readText: async path => { try { return readFileSync(path, 'utf8') } catch { return undefined } },
+    readDir: async path => { try { return readdirSync(path) } catch { return [] } },
+    writePark: async (path, text) => { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, text, { mode: 0o600 }) },
+    claimPark: async path => { try { writeFileSync(path, '', { flag: 'wx', mode: 0o600 }); return true } catch { return false } },
     exists: async path => existsSync(path),
     writeText: async (path, text) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text) },
     appendLine: async (path, line) => {

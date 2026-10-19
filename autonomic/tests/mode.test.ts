@@ -20,6 +20,16 @@ describe('mode (spec §1)', () => {
     expect(parseCommand('onn')).toEqual({ kind: 'usage' })
     expect(parseCommand(`on "docs/release plan.md" 'a b.md' c\\ d.md e.md`)).toEqual({ kind: 'on', scope: ['docs/release plan.md', 'a b.md', 'c d.md', 'e.md'] })
   })
+  test('the park commands (0.10.0 Task 3)', () => {
+    expect(parseCommand('parks')).toEqual({ kind: 'parks' })
+    expect(parseCommand('  parks ')).toEqual({ kind: 'parks' })
+    expect(parseCommand('approve ab12cd34ef56')).toEqual({ kind: 'approve', id: 'ab12cd34ef56' })
+    expect(parseCommand('drop ab12cd34ef56')).toEqual({ kind: 'drop', id: 'ab12cd34ef56' })
+    expect(parseCommand('approve')).toEqual({ kind: 'usage' })
+    expect(parseCommand('drop')).toEqual({ kind: 'usage' })
+    expect(parseCommand('approve a b')).toEqual({ kind: 'usage' })
+    expect(parseCommand('parks x')).toEqual({ kind: 'usage' })
+  })
   test('scope docs resolve', () => {
     expect(resolveDoc('a.md', '/repo', '/h')).toBe('/repo/a.md')
     expect(resolveDoc('~/b.md', '/repo', '/h')).toBe('/h/b.md')

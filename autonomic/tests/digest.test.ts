@@ -80,7 +80,7 @@ describe('the digest reaches the forks, and nothing else (0.4.0 spec §3.2)', ()
     w.toolResultText = '[pilot/greeting 9847ccd] Add greeting.txt'
     await $.tool.call({ tool: 'Bash', command: 'git commit -m x' } as never)
     w.forks.push(allow({ decision: 'allow', reason: 'own branch' }))
-    await $.tool.check({ tool: 'Bash', input: { command: 'touch report.md' } } as never)
+    await $.tool.check({ tool: 'Bash', input: { command: 'git push' } } as never)
     const p = w.forkPrompts.at(-1) ?? ''
     expect(p).toContain('<recent>')
     expect(p).toContain('Gate approved; use the UTC timestamp.')
@@ -122,7 +122,7 @@ describe('the digest reaches the forks, and nothing else (0.4.0 spec §3.2)', ()
     w.toolResultText = 'SUBAGENT-RESULT'
     await $.tool.call({ tool: 'Bash', command: 'ls', agentId: 'a1' } as never)
     w.forks.push(allow({ decision: 'allow', reason: 'r' }))
-    await $.tool.check({ tool: 'Bash', input: { command: 'touch x' } } as never)
+    await $.tool.check({ tool: 'Bash', input: { command: 'git push' } } as never)
     const p = w.forkPrompts.at(-1) ?? ''
     expect(p).not.toContain('DROPPED-PROMPT')
     expect(p).not.toContain('prompt (')
@@ -133,7 +133,7 @@ describe('the digest reaches the forks, and nothing else (0.4.0 spec §3.2)', ()
     await $.prompt.submit(SUBMIT('OLD-SESSION-PROMPT'))
     w.session.id = 's2'
     w.forks.push(allow({ decision: 'allow', reason: 'r' }))
-    await $.tool.check({ tool: 'Bash', input: { command: 'touch x' } } as never)
+    await $.tool.check({ tool: 'Bash', input: { command: 'git push' } } as never)
     expect(w.forkPrompts.at(-1) ?? '').not.toContain('OLD-SESSION-PROMPT')
   })
   test('nothing from the digest reaches disk', async ($, on) => {
@@ -142,7 +142,7 @@ describe('the digest reaches the forks, and nothing else (0.4.0 spec §3.2)', ()
     w.toolResultText = 'PLANTED-RESULT-8842'
     await $.tool.call({ tool: 'Bash', command: 'ls' } as never)
     w.forks.push(allow({ decision: 'ask', reason: 'not covered' }))
-    await $.tool.check({ tool: 'Bash', input: { command: 'touch x' } } as never)
+    await $.tool.check({ tool: 'Bash', input: { command: 'git push' } } as never)
     const disk = JSON.stringify([...w.files.values()]) + JSON.stringify(w.runs)
     expect(w.forkPrompts.at(-1) ?? '').toContain('PLANTED-RESULT-8842')
     expect(disk).not.toContain('PLANTED-PROMPT-7731')

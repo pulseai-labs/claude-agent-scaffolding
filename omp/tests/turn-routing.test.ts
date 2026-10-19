@@ -1294,6 +1294,12 @@ function unenrolledWorld(): UnenrolledWorld {
     rename: (from, to) => { files.set(to, files.get(from) ?? ''); files.delete(from) },
     setEnv: () => {},
     readText: async p => files.get(p),
+    readDir: async p => {
+      const prefix = `${p.replace(/\/+$/, '')}/`
+      return [...files.keys()].filter(k => k.startsWith(prefix) && !k.slice(prefix.length).includes('/')).map(k => k.slice(prefix.length))
+    },
+    writePark: async (p, t) => { files.set(p, t) },
+    claimPark: async p => { if (files.has(p)) return false; files.set(p, ''); return true },
     exists: async p => files.has(p),
     writeText: async (p, t) => { files.set(p, t) },
     appendLine: async (p, l) => { records.push(`${p}\n${l}`); files.set(p, `${files.get(p) ?? ''}${l}\n`); return true },

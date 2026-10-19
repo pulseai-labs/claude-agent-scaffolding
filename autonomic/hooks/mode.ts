@@ -10,7 +10,8 @@ export function parseEnvMode(v: string | undefined): { mode: Mode; invalid?: str
   return { mode: 'manual', invalid: t }
 }
 
-export type Command = { kind: 'on'; scope: string[] } | { kind: 'off' } | { kind: 'status' } | { kind: 'usage' }
+export type Command = { kind: 'on'; scope: string[] } | { kind: 'off' } | { kind: 'status' }
+  | { kind: 'parks' } | { kind: 'approve'; id: string } | { kind: 'drop'; id: string } | { kind: 'usage' }
 
 // Words as a shell splits them: quotes and a backslash keep a space inside a path.
 function words(args: string): string[] {
@@ -26,6 +27,9 @@ export function parseCommand(args: string): Command {
   if (word === 'on') return { kind: 'on', scope: rest }
   if (word === 'off' && rest.length === 0) return { kind: 'off' }
   if (word === 'status' && rest.length === 0) return { kind: 'status' }
+  if (word === 'parks' && rest.length === 0) return { kind: 'parks' }
+  if (word === 'approve' && rest.length === 1) return { kind: 'approve', id: rest[0]! }
+  if (word === 'drop' && rest.length === 1) return { kind: 'drop', id: rest[0]! }
   return { kind: 'usage' }
 }
 

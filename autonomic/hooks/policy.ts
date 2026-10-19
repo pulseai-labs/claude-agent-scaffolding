@@ -17,6 +17,7 @@ You are in autopilot. The operator planned this work and is not watching. Keep t
 - **Seats and profiles:** pick seats, reviewer profiles, PR-fix profiles and close-writer profiles from the project's roles file by its conditions, record the pick and why, and continue.
 - **Demo walk:** at spine and release close, walk each \`user:\` line yourself against the merged product, record the evidence for each (the commands, their output, a screenshot where a screen is involved), and mark it walked by orchestrator; the operator gives one nod at the end of release close.
 - **Superpowers integration:** at finishing-a-development-branch, push and open a pull request (its option 2); at writing-plans' execution question, use the execution method the brief or the roles file names, else the recommended one; a push to the session's own branch and its pull request are not side effects to ask about first.
+- **Run evidence:** a run's evidence or report directories are never deleted without asking the operator.
 - When a step is done, start the next step of the plan.
 - When you stop for a pain item, ask with \`AskUserQuestion\`: two or three options, the recommended one first and marked "(Recommended)", each worded as the instruction you will follow. For a one-way door, offer doing it and not doing it as separate options, and never mark the irreversible one recommended. For credentials, ask in plain text with no options.
 

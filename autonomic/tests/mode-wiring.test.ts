@@ -163,7 +163,8 @@ describe('/autopilot (spec §1)', () => {
     await $.session.start(START)
     let t = (await $.command.run(RUN('status'))).text
     expect(t.startsWith('autopilot (source: env)')).toBe(true)
-    for (const s of ['policy: default', 'yieldAtPercent: 65', 'loopMax: 3', 'tailChars: 4000', 'never-approve: force-push default-branch-push', 'molt stage: none']) expect(t).toContain(s)
+    for (const s of ['policy: default', 'yieldAtPercent: 65', 'loopMax: 3', 'tailChars: 4000', 'never-approve: force-push default-branch-push no-verify ai-trailer', 'molt stage: none']) expect(t).toContain(s)
+    expect(t).not.toContain('retired in 0.10.0')
     w.files.set(POLICY, 'mine')
     w.files.set('/home/u/.claude/state/molt/stage/s1', '{"stage":"warn","command":65}')
     t = (await $.command.run(RUN('status'))).text

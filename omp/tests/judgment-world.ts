@@ -10,7 +10,7 @@ import type { ExtensionContext, ExtensionJudge } from '@oh-my-pi/pi-coding-agent
 import type { AsyncJobSnapshot } from '@oh-my-pi/pi-coding-agent/session/agent-session-types'
 import type { JudgmentRequest, Usage } from '@oh-my-pi/pi-ai'
 import { createHash } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -62,6 +62,10 @@ export function fixturePolicy(): PolicyBundle {
 
 export type RoutingWorld = {
   root: string; tree: string; authorityPath: string; ledgerPath: string; painPath: string
+  // Task 6: the fixture's own park store (AUTONOMIC_PARKS_DIR, under the temp root) and the
+  // command entrypoint, so an operator approval can be typed against the real handler.
+  parksRoot: string
+  onCommand: (args: string) => Promise<string>
   // Task 7: each pinned material's real ref (exact id/source/sha256), keyed by ID.
   materials: Record<string, EvidenceMaterial['ref']>
   readonly decisions: DecisionIO
@@ -183,12 +187,15 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   // the launcher derives a worker root from its dirname, and `root` itself would overlap the
   // authority directory.
   const painPath = join(out, 'pain.log')
+  // Task 6: the park store lives inside the temp root, so a park write in a test never touches
+  // the operator's own state directory.
+  const parksRoot = join(root, 'parks')
   const savedEnv: Record<string, string | undefined> = {}
   // E1 (Plan Task 5 Step 1): the requested mode is real. Without AUTONOMIC_MODE the session
   // record resolves `manual` and the intercepted floor returns before any decision.
   for (const [k, v] of Object.entries({ AUTONOMIC_MODE: options.mode ?? 'manual', AUTONOMIC_AUTHORITY_PATH: binding.path, AUTONOMIC_AUTHORITY_SHA256: binding.sha256,
     AUTONOMIC_ASSIGNMENT_ID: binding.assignmentId, AUTONOMIC_ASSIGNMENT_GENERATION: String(binding.generation),
-    AUTONOMIC_LAUNCH_ID: binding.launchId, AUTONOMIC_LEDGER: ledgerPath, AUTONOMIC_PAIN_PATH: painPath, HOME: home })) { savedEnv[k] = process.env[k]; process.env[k] = v }
+    AUTONOMIC_LAUNCH_ID: binding.launchId, AUTONOMIC_LEDGER: ledgerPath, AUTONOMIC_PAIN_PATH: painPath, AUTONOMIC_PARKS_DIR: parksRoot, HOME: home })) { savedEnv[k] = process.env[k]; process.env[k] = v }
 
   const host = (): ConsumerHost => ({
     sessionId: currentId, cwd: tree, sessionFile: join(out, `${currentId}.jsonl`),
@@ -211,6 +218,9 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
     rename: (from, to) => { renameSync(from, to) },
     setEnv: (name, value) => { if (value === undefined) delete process.env[name]; else process.env[name] = value },
     readText: async path => { try { return readFileSync(path, 'utf8') } catch { return undefined } },
+    readDir: async path => { try { return readdirSync(path) } catch { return [] } },
+    writePark: async (path, text) => { mkdirSync(dirname(path), { recursive: true, mode: 0o700 }); writeFileSync(path, text, { mode: 0o600 }) },
+    claimPark: async path => { try { writeFileSync(path, '', { flag: 'wx', mode: 0o600 }); return true } catch { return false } },
     exists: async path => existsSync(path),
     writeText: async (path, text) => { mkdirSync(dirname(path), { recursive: true }); writeFileSync(path, text) },
     appendLine: async (path, line) => {
@@ -275,9 +285,10 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
     return { block: false, receipt, order: [...order] }
   }
   return {
-    root, tree, authorityPath: binding.path, ledgerPath, painPath, decisions, handlers, ctx, notices, nativeRequests, generationRequests, materials,
+    root, tree, authorityPath: binding.path, ledgerPath, painPath, parksRoot, decisions, handlers, ctx, notices, nativeRequests, generationRequests, materials,
     entryMs: autonomic.entryMs,
     invoke,
+    onCommand: (args: string) => autonomic.onCommand(args),
     stop: async (reply: string) => handlers.get('session_stop')?.({ last_assistant_message: reply, session_id: currentId }, ctx) as Promise<{ decision: 'block'; reason: string } | undefined>,
     setNative: run => { nativeRun = run },
     setGeneration: run => { generationRun = run },

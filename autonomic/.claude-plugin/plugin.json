@@ -1,6 +1,6 @@
 {
   "name": "autonomic",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Autopilot as a Claude Code mod. In autopilot (AUTONOMIC_MODE=autopilot per spawn, or /autopilot on) a global policy joins the system prompt; at each turn end, each AskUserQuestion and each permission ask a cached fork judges the stop against the policy and the session's scope; covered asks and stalls continue, every decision is appended to a ledger, and the closed pain list reaches you by toast, band and an optional bell. A turn-end pain offers up to three options on the band: one press records the choice in the ledger and submits it as your prompt. Fails toward manual. Requires Claude Code 2.1.289 or later.",
   "author": { "name": "Pras" },
   "types": "./types/index.d.ts",
@@ -15,6 +15,11 @@
       "type": "string",
       "title": "Bell command",
       "description": "A shell command run on each pain signal, with AUTONOMIC_MESSAGE set to one line, for example: curl -d \"$AUTONOMIC_MESSAGE\" ntfy.sh/<topic>. AUTONOMIC_BELL on a spawn overrides it. Unset: toast and band only."
+    },
+    "decidingModel": {
+      "type": "string",
+      "title": "Deciding model",
+      "description": "When set (for example claude-sonnet-5-5), every judgment is a plain completion on this model: it sees the prompt alone, no transcript. Unset: the judge forks the session's own model, as before."
     },
     "loopMax": {
       "type": "number",
@@ -40,8 +45,8 @@
     "neverApprove": {
       "type": "string",
       "title": "Never-approve rules",
-      "description": "In autopilot, a command whose own words match one of these always reaches you, even under bypass permissions; a match found only in text (a message, a quoted argument, an interpreter's script) goes to the fork with the finding. Remove a name to let the fork judge it. Known: force-push default-branch-push branch-delete rm-outside no-verify unreadable (unreadable matches nothing since 0.2.0). Empty: none.",
-      "default": "force-push default-branch-push branch-delete rm-outside no-verify unreadable"
+      "description": "In autopilot, a command whose own words match one of these always reaches you, even under bypass permissions; a match found only in text (a message, a quoted argument, an interpreter's script) goes to the fork with the finding. Remove a name to let the fork judge it. Known: force-push default-branch-push no-verify ai-trailer. Retired in 0.10.0, now judged: branch-delete rm-outside unreadable — a setting that names them still loads. Empty: none.",
+      "default": "force-push default-branch-push no-verify ai-trailer"
     },
     "readers": {
       "type": "string",

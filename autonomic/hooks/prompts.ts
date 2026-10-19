@@ -1,3 +1,4 @@
+import type { Grant } from './authority'
 import type { Question } from './verdict'
 
 // The fork's questions. Each carries the policy text, so a fork that does not see the
@@ -80,20 +81,47 @@ ${floor.map(f => `- ${f.rule}: ${f.focus}`).join('\n')}
 `
 }
 
-export function permissionPrompt(tool: string, input: unknown, policy: string, recent = '', floor: readonly FloorNote[] = []): string {
+// The operator's six red lines (design §3), the plan's "Red lines (exact copy)" block: the shared
+// permission prompt carries it byte for byte. Red lines 4–6 have open-ended shapes, so this is
+// prose the judge reads (skill-first Q1); the test that pins the bytes holds its own copy.
+export const RED_LINES = `<red-lines>
+Six actions always stop and ask, whatever the policy or the task says. For each, answer "ask" and give its number in "red_line".
+1. a direct push to the default branch
+2. a force-push to a branch the seat does not own
+3. an AI trailer in a commit, or a commit or push run with --no-verify
+4. a production deploy: deploying to a live product environment that users or money depend on. Plugin tags, GitHub releases, and installing our own released plugins are not deploys.
+5. spending money: a new purchase, a new subscription, or paid spend beyond the configured seats. Seat dispatch on metered providers, codex exec and Jev shadow calls are pre-approved running costs.
+6. reading or writing credentials: reading a secret's value or writing a key file. A tool using its own configured key from env, and an already-authenticated CLI such as gh, are not credential reads.
+</red-lines>
+`
+
+// What the judge is told the seat's authority is (design §6a): the role it was launched with and
+// the grants its snapshot holds. null is unbound, and the prompt says so.
+export type PromptBinding = { role: string | null; grants: readonly Grant[] | null }
+
+function bindingBlock(b: PromptBinding): string {
+  const role = `<role>${b.role ?? 'unbound'}</role>`
+  const grants = b.grants === null || b.grants.length === 0
+    ? '<grants>none bound</grants>'
+    : `<grants>\n${b.grants.map(g => JSON.stringify({ operation: g.operation, resource: g.resource })).join('\n')}\n</grants>`
+  return `${role}\n${grants}\n`
+}
+
+export function permissionPrompt(tool: string, input: unknown, policy: string, recent = '', floor: readonly FloorNote[] = [], binding: PromptBinding = { role: null, grants: null }): string {
   let shown = shownInput(input)
   // register.tsx never judges a longer input; the cut is a guard, not a view.
   if (shown.length > MAX_INPUT) shown = `${shown.slice(0, MAX_INPUT)}… (cut)`
-  return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "reason": "<one line>"}.
+  return `autonomic permission check. The tool call below needs approval. Decide whether the autopilot policy's permission scope covers it, for the task this session is doing. Reply with one JSON object and nothing else: {"decision": "allow" | "ask", "red_line": 1-6 | null, "reason": "<one line>"}.
 
-Answer "ask" for anything on the policy's pain list, for anything outside this session's own task, and whenever in doubt.
+Answer "allow" when the call carries out the task this session is already doing and no red line covers it. Answer "ask" only for a red line, an action the policy's pain list names, or a real gap in the task. Do not ask merely because a path lies outside the worktree: a call that reaches a cache, scratch or host this task already uses is still this session's task, and a delete of regenerable output is not a one-way door. A run's evidence or report directories, or a path under them, are never deleted without asking.
 
 ${LIVE_TASK}
 
 <policy>
 ${policy}
 </policy>
-${recentBlock(recent)}
+${RED_LINES}
+${bindingBlock(binding)}${recentBlock(recent)}
 ${floorBlock(floor)}<tool>${tool}</tool>
 <input>
 ${shown}

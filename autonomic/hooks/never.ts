@@ -1,6 +1,19 @@
 // The never-approve list (spec §3.3; autonomic 0.2.0, #684 direction 2′): checked in code
 // before any fork. A match leaves the ask in place.
 //
+// 0.10.0 holds red lines 1–3 only: a direct push to the default branch, a force-push to a branch
+// the seat does not own, and --no-verify or an AI trailer in a commit. Everything else (branch
+// deletes, rm outside the worktree, an undetermined current branch) leaves the floor and reaches
+// the judge with the red lines, the grants and the role attached (slice 2 plan, Task 1).
+//
+// Skill-first Q3: the floor reads open shell text and only adds stops. A match parks the call for
+// the operator and never approves one, so a call the floor misses goes on to the judge exactly as
+// if the check were absent.
+//
+// Skill-first Q3: routes (0.10.0 Task 2, ROUTE_WORDS below) likewise only adds a judgment — a call
+// whose text meets the word list is judged, never approved or stopped by the routing itself, and a
+// call the list misses runs unjudged exactly as it did before 0.10.0.
+//
 // Since 0.5.0 the floor judges each simple command on its own words when the text parses, with
 // context from the whole text (moves, branch switches, variables assigned once to a literal, git
 // config writes).
@@ -9,9 +22,18 @@
 // `python3 -c 'git push -f'` shows `push` and `-f`. Text that never runs (messages, heredoc
 // bodies, a literal `sh -c` string read as commands) is data.
 
-// 'unreadable' matches nothing since 0.2.0; the name stays valid so an existing setting parses.
-export type NeverRule = 'force-push' | 'default-branch-push' | 'branch-delete' | 'rm-outside' | 'no-verify' | 'unreadable'
+import { PARKS_DIR_MARK } from './parks'
+
+export type NeverRule = 'default-branch-push' | 'force-push' | 'no-verify' | 'ai-trailer'
 export type Where = { cwd: string; root: string; home: string; branch?: string; defaultBranch?: string }
+// Red line 3's trailer half (spec §3): the commit footer that never belongs in our commits.
+// operations.ts reads the same shape for an effect's `trailer` fact, so it is defined here and
+// imported there — that module already imports this one, one definition and no cycle.
+export const TRAILER = /(?:^|\n)\s*(?:Co-Authored-By:|🤖\s*Generated with)/i
+// Which of the operator's six red lines each floor rule belongs to (spec §3): the floor holds
+// 1–3, the judge's prompt holds all six.
+const RED_LINE: Record<NeverRule, 1 | 2 | 3> = { 'default-branch-push': 1, 'force-push': 2, 'no-verify': 3, 'ai-trailer': 3 }
+export const redLineOf = (rule: NeverRule): 1 | 2 | 3 => RED_LINE[rule]
 
 // Bash joins a backslash-newline, drops a backslash and joins quoted pieces, so `pu\sh`,
 // `pu""sh` and `'git' push` are push. A substitution or a backtick opens new words; `${`
@@ -239,7 +261,7 @@ const targets = (text: string) => [...text.matchAll(REDIRECT)].map(m => m[1]!).f
 // `readers` setting replaces the default.
 export const DEFAULT_READERS: readonly (readonly string[])[] = [['gh', 'pr', 'create'], ['gh', 'pr', 'edit'], ['gh', 'issue', 'create'], ['gh', 'issue', 'comment']]
 export const parseReaders = (s: string): string[][] => s.split(';').map(r => r.trim().split(/\s+/).filter(Boolean)).filter(r => r.length > 0)
-type Readers = readonly (readonly string[])[]
+export type Readers = readonly (readonly string[])[]
 // Namers (0.5.0): commands that name a file to read, remove or change its mode, and never run it. A file they
 // name passes on as an inert command's would (a pipe or a redirect from them still counts).
 const NAMER = new Set(['rm', 'unlink', 'chmod', 'chown', 'wc', 'diff', 'cmp', 'sha1sum', 'sha256sum', 'sha512sum', 'md5sum', 'b2sum', 'file', 'du', 'readlink', 'realpath', 'basename', 'dirname'])
@@ -597,7 +619,7 @@ function splice(text: string): string {
 type Vars = Map<string, { value: string; at: number }>
 type Judged = { words: string[]; own: string[]; text: string; at: number }
 type Reading = { whole: string[] } | { groups: Judged[]; vars: Vars; bag: string[]; values: string[]; loops: [number, number][] }
-// namesDanger and neverRules read the same command back to back (register.tsx): keep the last
+// routes and neverRules read the same command back to back (register.tsx): keep the last
 // reading, keyed by the text and the readers, so a large script is read once, not twice.
 let last: { command: string; readers: string; r: Reading } | undefined
 function wordsOf(command: string, readers: Readers): Reading {
@@ -797,9 +819,166 @@ function moves(words: readonly string[], where: Where): boolean {
 // the values of assignment-only commands (an opaque verb reads them).
 const allWords = (r: Reading) => ('whole' in r ? r.whole : [...r.groups.flatMap(g => [...g.words, ...substitute(g.words, r.vars, g.at)]), ...r.values])
 const dangerWord = (w: string) => isPush(w) || isVerb(w, 'branch') || isVerb(w, 'commit') || isVerb(w, 'rm') || abbrev(w, '--no-verify', 6)
-// The cheap pre-check: every rule needs one of these words, so a command without one runs no git.
-export const namesDanger = (command: string, readers: Readers = DEFAULT_READERS): boolean =>
-  allWords(wordsOf(command, readers)).some(dangerWord)
+// The routing word list (0.10.0 Task 2): the words that send a call to the judge. Routing only
+// adds a judgment, never approves (skill-first Q3): a word that routes too much costs one
+// judgment, a word that routes too little leaves the call unjudged — the README's known limit.
+export const ROUTE_WORDS: readonly string[] = [
+  // red lines 1–3: the floor's own words. A match here is judged, and the floor may park it.
+  'push', 'branch', 'commit', 'rm', 'no-verify',
+  // red line 4: a production deploy
+  'deploy', 'publish', 'apply', 'upgrade', 'rollout', 'destroy',
+  // red line 5: spending money
+  'stripe', 'subscribe', 'purchase', 'billing', 'payment', 'invoice',
+  // red line 6: credentials — the commands that read them and the file shapes that hold them
+  'printenv', 'env', 'security', 'op', 'pass', 'ssh', 'ssh-keygen', 'id_rsa', 'id_ed25519', 'credentials', 'auth.json', 'agent.db', 'pem', 'key', 'shadow', 'secret', 'secrets',
+  // the merge gate (operator-owned until Task 10)
+  'merge',
+  // the park store (Task 3's PARKS_DIR_MARK): namesParkStore matches it, normalized and
+  // segment-bounded, in the text and in the call's cwd; listed here as documentation.
+  'autonomic/parks',
+]
+
+// The park store's directory mark, read as the shell joins a literal path: a backslash-newline
+// pair is removed as one unit first (the shell's line continuation, so `autonomic/\<newline>parks`
+// is one path), then quotes and backslashes, repeated slashes collapsed, `.` segments dropped and
+// `..` segments resolved against the segment before them inside the same path word, and matched
+// on the segment, so `autonomic//parks`, `autonomic/./parks`, `./autonomic/parks`,
+// `autonomic/x/../parks`, `par""ks` and the line-split spelling name the same directory.
+// Variables, globs, substitutions and encodings are not resolved (the README's Known limit).
+// Skill-first Q3: this only adds a stop — a near miss that parks too costs one dialog.
+const SEGMENT_CHAR = /[a-z0-9_.-]/
+const PATH_RUN = /[a-z0-9_.\/-]+/g
+// A shell line continuation is removed as one unit before anything else: a raw backslash-LF
+// (or backslash-CRLF) in a command string, and the same pair as JSON encodes it in a tool's
+// whole input (`\\` for the backslash, `\n` for the newline: three backslashes and an n).
+const shellText = (text: string): string => text.toLowerCase()
+  .replace(/\\\r?\n/g, '')
+  .replace(/\\\\\\(?:n|r\\n)/g, '')
+  .replace(/["'\\]/g, '')
+// One path-like run (a path word; writeJSON's quoted `file_path` value is one). A `.` segment
+// drops — so a leading `./` names the same path — repeated slashes collapse, and a `..` removes
+// only a segment of this same run, never the text before the word. At the root (a leading `/`)
+// it cannot climb, so it is dropped; a leading `..` is kept as the marker relativePaths resolves
+// against the call's cwd before the store match.
+const normalizeRun = (run: string): string => {
+  const parts = run.split('/')
+  const kept: string[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!
+    if (part === '.') continue
+    if (part === '' && i !== 0) continue
+    if (part === '..') {
+      const prev = kept[kept.length - 1]
+      if (prev === undefined || prev === '..') kept.push('..')
+      else if (prev !== '') kept.pop()
+      continue
+    }
+    kept.push(part)
+  }
+  return kept.join('/')
+}
+// The text as the shell joins it: continuations, quotes and backslashes removed, then dots
+// resolved inside each path-like word; the separators between words are left untouched.
+export const normalizeCallText = (text: string): string => shellText(text).replace(PATH_RUN, normalizeRun)
+// A single path (the call's cwd, the configured store): one run, however it is spelled.
+const normalizePathText = (text: string): string => normalizeRun(shellText(text))
+// The whole text resolved as one path, as the guard read it before the per-word split (review
+// 882e round 5 P1): a `..` after any character a shell word can hold — space, `+`, `=`, `@` —
+// removes the segment before it, where the per-word reading ends its run at that character and
+// misses. The two readings each catch spellings the other does not; the guard takes their union.
+const normalizeWholeText = (text: string): string => {
+  const parts = shellText(text).split('/')
+  const kept: string[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!
+    if (part === '.') continue
+    if (part === '' && i !== 0) continue
+    if (part === '..') {
+      const prev = kept[kept.length - 1]
+      if (prev === undefined || prev === '..') kept.push('..')
+      else if (prev !== '') kept.pop()
+      continue
+    }
+    kept.push(part)
+  }
+  return kept.join('/')
+}
+// A relative path in the normalized text that leads with `..` names nothing until it is read
+// against the call's cwd: `../parks/<id>.json` from a sibling of the store is the store. The
+// normalizer keeps a leading `..` (it cannot climb past a root it does not have), so each such
+// path-like word is resolved lexically and matched as its absolute path too.
+const relativePaths = (normalized: string, dir: string): string[] =>
+  normalized.split(/[^a-z0-9_.\/-]+/).filter(w => w.startsWith('../')).map(w => collapseDots(`${dir}/${w}`.split('/')))
+// The mark names a directory of its own, never a prefix: `parkside` and `parks-notes.md` stay quiet.
+const hasMark = (s: string, mark: string): boolean => {
+  if (mark === '') return false
+  for (let at = s.indexOf(mark); at !== -1; at = s.indexOf(mark, at + 1)) {
+    const before = at === 0 ? undefined : s[at - 1]
+    const after = s[at + mark.length]
+    if ((before === undefined || !SEGMENT_CHAR.test(before)) && (after === undefined || !SEGMENT_CHAR.test(after))) return true
+  }
+  return false
+}
+// The configured store (AUTONOMIC_PARKS_DIR) may not carry the fixed mark at all (`/tmp/parks`):
+// its own resolved path is matched the same normalized, segment-bounded way, plus the cwd forms —
+// any directory inside the store, and the store's parent with the store's name as a relative
+// `parks/…` path in the text. One definition for both hosts: each adapter passes the exact path it
+// reads and writes the store at.
+const namesStore = (normalized: string, dir: string | undefined, store: string): boolean => {
+  const mark = normalizePathText(store)
+  if (mark === '') return false
+  if (hasMark(normalized, mark)) return true
+  const at = mark.lastIndexOf('/')
+  const base = mark.slice(at + 1)
+  if (at === -1 || base === '' || dir === undefined) return false
+  if (dir === mark || dir.startsWith(`${mark}/`)) return true
+  if (relativePaths(normalized, dir).some(p => hasMark(p, mark))) return true
+  return dir === mark.slice(0, at) && normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === base || w.startsWith(`${base}/`))
+}
+// One reading's checks, unchanged: the fixed mark, the configured store, and the cwd forms (a
+// directory inside the store, and the store's parent with the store's name relative in the text).
+const namesParkStoreIn = (normalized: string, dir: string | undefined, store: string | undefined): boolean => {
+  const relative = dir === undefined ? [] : relativePaths(normalized, dir)
+  if (hasMark(normalized, PARKS_DIR_MARK) || relative.some(p => hasMark(p, PARKS_DIR_MARK))) return true
+  if (store !== undefined && (namesStore(normalized, dir, store) || relative.some(p => namesStore(p, undefined, store)))) return true
+  if (dir === undefined) return false
+  return hasMark(dir, PARKS_DIR_MARK) || (/(?:^|\/)autonomic$/.test(dir) &&
+    normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === 'parks' || w.startsWith('parks/')))
+}
+// Does the whole input, or the call's cwd, name the park store (plan call 3's integrity guard)?
+// The text is read both as one path (the whole-text resolution) and as path words (the per-word
+// resolution), and the cwd the same way: either reading naming the store parks. Each catches
+// spellings the other misses, and the union only adds stops (skill-first Q3). The cwd counts
+// twice: any directory inside the store, and the store's parent with a relative `parks/…` path in
+// the text. The pre-check and the plan call this same function, so neither host can see a
+// different store; `store` is the configured store directory when the caller has it, and the
+// fixed mark still holds when it does not.
+export const namesParkStore = (input: unknown, cwd?: string, store?: string): boolean => {
+  const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
+  const texts = [normalizeWholeText(text), normalizeCallText(text)]
+  const dirs = cwd === undefined ? [undefined] : [normalizeWholeText(cwd), normalizeCallText(cwd)]
+  return texts.some(normalized => dirs.some(dir => namesParkStoreIn(normalized, dir, store)))
+}
+
+// The routing check (0.10.0 Task 2): true when a call could name a red line, the park store or a
+// merge, and so is the judge's. The whole input is matched as words — quotes included, so a word
+// inside quoted text still routes — where a dotted file shape matches its stem (env names .env,
+// prod.env and certs/x.key, never environment) and the park-store entry is namesParkStore's
+// normalized, segment-bounded match of the text and cwd.
+// The floor's own reading of a command is matched too, so this stays a strict superset of the old
+// namesDanger pre-check: an escape-route spelling (git pu""sh, --no-verif) still routes. `store`
+// is the configured park store directory when the caller has it (a store outside the fixed mark
+// routes too, or the pre-check would return the call before the plan runs).
+export const routes = (call: { tool: string; input: unknown; cwd?: string }, readers: Readers = DEFAULT_READERS, store?: string): boolean => {
+  const input = call.input
+  const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input)
+  const lower = text.toLowerCase()
+  const command = input !== null && typeof input === 'object' && 'command' in input && typeof input.command === 'string' ? input.command : undefined
+  const words = lower.split(/[^a-z0-9_.-]+/).filter(w => w !== '')
+  if (command !== undefined) words.push(...allWords(wordsOf(command, readers)).map(w => w.toLowerCase()))
+  return words.some(w => dangerWord(w) || ROUTE_WORDS.some(e => !e.includes('/') && (w === e || w.endsWith(`.${e}`)))) ||
+    namesParkStore(lower, call.cwd, store)
+}
 
 // Section 1: a group's words with each literal variable assigned before it read as its value.
 function substitute(words: readonly string[], vars: Vars, at: number): string[] {
@@ -1061,15 +1240,19 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
   const add = (found: ReadonlySet<NeverRule>, level: Finding['level'], focus: string) => { for (const rule of found) out.push({ rule, level, focus }) }
   if ('whole' in r) {
     const found = new Set<NeverRule>()
-    rulesOf(r.whole, where, moves(r.whole, where), false, found)
+    rulesOf(r.whole, where, moves(r.whole, where), false, found, new Set())
     add(found, 'fork', wholeFocus(command))
     return settle(out)
   }
   const all = [...r.groups.flatMap(g => g.words), ...r.values]
   const names = [...new Set([...(where.defaultBranch !== undefined ? [where.defaultBranch] : []), 'main', 'master'])]
+  // The tag tokens this text binds with an executable `git tag` (fix round 3): a push of one is a
+  // tag push, so the destination reading can tell a tag from a branch.
+  const tags = new Set<string>()
   // What a command changes for every later one: a move, a git config write, a branch switch.
   const effects = r.groups.map(g => {
     const ws = substitute(g.words, r.vars, g.at)
+    addTagTokens(ws, tags)
     const git = isGit(ws)
     return { ws, git, move: ws.some(w => w === 'cd' || w === 'pushd' || w === 'popd') && moves(ws, where), config: (git && writesConfig(ws)) || ws.some(gitConfigFile),
       switches: (git && switchesTo(ws, names)) || ws.some(w => /(?:^|\/)\.git\/HEAD$/.test(clean(w))) }
@@ -1098,9 +1281,15 @@ export function floorFindings(command: string, where: Where, readers: Readers = 
       ws.some(w => [...w.matchAll(/\$\{?([A-Za-z_]\w*)/g)].some(m => bound(m[1]!)))
     const away = moved || moves(ws, where)
     const own = new Set<NeverRule>()
-    rulesOf(substitute(g.own, r.vars, g.at), where, away, true, own, switched)
+    rulesOf(substitute(g.own, r.vars, g.at), where, away, true, own, tags, switched, true)
     const text = new Set<NeverRule>()
-    rulesOf((config && git) || verbOpaque(ws) || loose ? all : ws, where, away, true, text, switched)
+    const escalated = (config && git) || verbOpaque(ws) || loose
+    // The text reading stays the broad one except for an executable git push: there the parsed
+    // destinations are what the text says, and a tag or an explicit destination is not a branch
+    // push. A config injection or an escalated bag keeps the conservative reading.
+    const configInjected = ws.some(w => w.includes('.push=') || w === '-c' || w.startsWith('--config-env') || /^GIT_CONFIG/.test(w))
+    const parsedText = !escalated && isGit(ws) && !configInjected
+    rulesOf(escalated ? all : ws, where, away, !escalated, text, tags, switched, parsedText)
     add(own, 'ask', g.text)
     add(new Set([...text].filter(x => !own.has(x))), 'fork', g.text)
     if (move) moved = true
@@ -1147,8 +1336,101 @@ function switchesTo(ws: readonly string[], names: readonly string[]): boolean {
   return rest.some(w => opaque(w) || names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))))
 }
 
-// Cause 3: a push that names a remote and only literal destinations other than the default
-// branch, main or master (never HEAD, @, empty or opaque) needs no default-branch ask after a move.
+// One push command read from its verb onward (0.10.0 fix round 3): the remote, the destinations,
+// and the flags that may change them. Skill-first Q3 — this is a safety rail. Every reading here
+// can only add a stop; a call it does not stop reaches the judge, whose prompt holds all six red
+// lines. `tags` is the set of tag tokens an executable `git tag` in the same text binds, so a tag
+// push is neither red line 1 nor 2 (a tag is not a branch).
+type PushRead = { refs: string[]; bare: boolean; all: boolean; force: boolean; flagUnreadable: boolean; exemptBlocked: boolean; ambiguous: boolean; repo: boolean; afterEnd: boolean }
+const pushDestination = (ref: string): string => {
+  const r = ref.replace(/^\+/, '')
+  return r.includes(':') ? r.slice(r.lastIndexOf(':') + 1) : r
+}
+// A tag ref is unambiguous; a bare name is a tag only when the text bound it with `git tag`. A
+// token that names a default branch is never exempt: `git tag main` then `git push origin main`
+// still names the branch.
+const isTagDestination = (ref: string, tags: ReadonlySet<string>, names: readonly string[]): boolean => {
+  const dst = pushDestination(ref)
+  return dst.startsWith('refs/tags/') || (tags.has(dst) && !names.some(n => dst === n || dst.endsWith(`/${n}`)))
+}
+// The push flags whose words never name a destination. A force flag is read before this test:
+// its attached value is a lease or a ref.
+const NO_VALUE_PUSH = /^(?:-[uqvnfd]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin|delete))$/
+const FORCE_LONG = /^--(?:force|force-with-lease|force-if-includes)(?:=.*)?$/
+function pushRead(words: readonly string[]): PushRead | undefined {
+  const at = words.findIndex(w => PUSH.some(v => isVerb(w, v)))
+  if (at < 0) return undefined
+  const r: PushRead = { refs: [], bare: true, all: false, force: false, flagUnreadable: false,
+    exemptBlocked: false, ambiguous: false, repo: false, afterEnd: false }
+  let remote = false
+  for (let i = at + 1; i < words.length; i++) {
+    const w = words[i]!
+    if (w.startsWith('-')) {
+      if (w === '--') { r.ambiguous = true; r.exemptBlocked = true; r.afterEnd = true; continue }
+      if (w === '--delete' || w === '-d') continue
+      if (w === '-o' || w === '--push-option') { r.exemptBlocked = true; i++; continue }
+      if (w.startsWith('--push-option=')) continue
+      if (abbrev(w, '--mirror', 3)) { r.all = true; r.force = true; continue }
+      if (abbrev(w, '--all', 3) || abbrev(w, '--branches', 3)) { r.all = true; continue }
+      const abbrForce = abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3)
+      if (letters(w).includes('f') || FORCE_LONG.test(w) || abbrForce) r.force = true
+      if (NO_VALUE_PUSH.test(w) || FORCE_LONG.test(w)) continue
+      // An abbreviation of a force option is ambiguous with the lease forms: the own-branch
+      // exemption is not available (call 4), though the force itself is read.
+      if (abbrForce) { r.exemptBlocked = true; continue }
+      if (w === '--repo') { r.repo = true; r.ambiguous = true; r.exemptBlocked = true; i++; continue }
+      if (w.startsWith('--repo=')) { r.repo = true; r.ambiguous = true; r.exemptBlocked = true; continue }
+      // A variable or glob flag, and an unknown flag, may change the destination set: the push
+      // stays on the floor. An unknown long option may take a value, so the positionals are
+      // ambiguous; an unknown short cluster only blocks the exemptions.
+      if (flagLike(w)) { r.flagUnreadable = true; r.force = true }
+      else if (w.startsWith('--')) r.ambiguous = true
+      else r.exemptBlocked = true
+      continue
+    }
+    if (!remote && !r.repo && !r.afterEnd) {
+      if (opaque(w)) { r.flagUnreadable = true; r.force = true; continue }
+      remote = true
+      continue
+    }
+    if (w.startsWith('+') || opaque(w)) r.force = true
+    r.refs.push(w)
+  }
+  r.bare = r.refs.length === 0
+  return r
+}
+// Red line 2 (0.10.0) leaves the floor for a force whose destinations all name the session's own
+// non-default branch: at least one refspec, every one readable. No refspec or an unreadable one
+// answers false and the force stays on the floor (call 4: fail closed).
+function ownPushDestination(refs: readonly string[], branch: string | undefined, names: readonly string[]): boolean {
+  if (branch === undefined || names.includes(branch) || refs.length === 0) return false
+  return refs.every(ref => !opaque(ref.replace(/^\+/, '')) && pushDestination(ref) === branch)
+}
+// Red line 1: read the push's destinations, never the whole word bag. A bare push is the
+// session's own branch; after a move or a switch the repository is another one, so it stays
+// fail-closed (round-3 ruling), and a force or unreadable flag there blocks the explicit-
+// destination exemption. A tag destination is not a branch push. After `--` the positionals
+// are ambiguous (the first may still be the remote), so the branch reading applies.
+function defaultPush(r: PushRead, branch: string | undefined, names: readonly string[], away: boolean, tags: ReadonlySet<string>, plumbing: boolean): boolean {
+  if (plumbing || r.all || r.flagUnreadable) return true
+  const ownBranch = (branch !== undefined && names.includes(branch)) || away
+  if (r.refs.length > 0 && r.refs.every(ref => isTagDestination(ref, tags, names))) return false
+  if (r.bare) return ownBranch
+  if (r.ambiguous && ownBranch) return true
+  if (away && (r.force || r.exemptBlocked)) return true
+  return r.refs.some(ref => {
+    if (isTagDestination(ref, tags, names)) return false
+    if (opaque(ref.replace(/^\+/, ''))) return true
+    const dst = pushDestination(ref)
+    if (dst === '') return true
+    if (dst === 'HEAD' || dst === '@') return ownBranch
+    if (away && (dst === 'main' || dst === 'master')) return true
+    return names.some(n => dst === n || dst.endsWith(`/${n}`))
+  })
+}
+// The conservative reading of a whole bag, or of a combined word list (`single` false): every
+// word may be a flag or a destination, so a finding here is only an extra stop (skill-first Q3).
+// A push that names a remote and only literal non-default destinations needs no default ask.
 const NO_VALUE = /^(?:-[uqvn]+|--(?:set-upstream|quiet|verbose|tags|follow-tags|atomic|porcelain|progress|no-progress|dry-run|thin|no-thin))$/
 function namedRefs(words: readonly string[], names: readonly string[]): boolean {
   const at = words.findIndex(w => isVerb(w, 'push'))
@@ -1168,47 +1450,101 @@ function namedRefs(words: readonly string[], names: readonly string[]): boolean 
     return !all.some(n => dst === n || dst.endsWith(`/${n}`) || r === n)
   })
 }
+function ownForceDestination(words: readonly string[], branch: string | undefined, names: readonly string[]): boolean {
+  if (branch === undefined || names.includes(branch)) return false
+  const at = words.findIndex(w => PUSH.some(v => isVerb(w, v)))
+  if (at < 0) return false
+  const refs: string[] = []
+  let remote = false
+  for (let i = at + 1; i < words.length; i++) {
+    const w = words[i]!
+    if (w.startsWith('-') || w.startsWith('$')) {
+      if (anyFlag(w) || !(NO_VALUE_PUSH.test(w) || FORCE_LONG.test(w))) return false
+      continue
+    }
+    if (!remote) { if (opaque(w)) return false; remote = true; continue }
+    refs.push(w)
+  }
+  return refs.length > 0 && refs.every(ref => {
+    const dst = ref.replace(/^\+/, '')
+    if (opaque(dst)) return false
+    return (dst.includes(':') ? dst.slice(dst.lastIndexOf(':') + 1) : dst) === branch
+  })
+}
+// The tag tokens an executable `git tag NAME` / `git tag -a NAME` binds: a literal name or the
+// `$VAR` spelling. Listing, verifying and deleting bind none (they only add stops). A token the
+// floor misses parks too much, never too little (skill-first Q3).
+function addTagTokens(ws: readonly string[], out: Set<string>): void {
+  const at = ws.findIndex(w => isVerb(w, 'tag'))
+  if (at < 0) return
+  const rest = ws.slice(at + 1)
+  const creation = /^(?:-[asf]+|-[asf]*[mFu].*|--(?:annotate|sign|force)|--(?:message|file|local-user)(?:=.*)?)$/
+  const flags = rest.filter(w => w.startsWith('-'))
+  if (flags.length > 0 && !flags.every(w => creation.test(w))) return
+  for (let i = 0; i < rest.length; i++) {
+    const w = rest[i]!
+    if (w.startsWith('-')) {
+      if (w === '--message' || w === '--file' || w === '--local-user' || /^-[A-Za-z0-9]*[mFu]$/.test(w)) i++
+      continue
+    }
+    out.add(w)
+    return
+  }
+}
+// Red line 3's trailer half (0.10.0): the AI trailer in a commit message the floor can read. The
+// values of `-m`/`--message` (`-m x`, `-mx`, `-am x`, `--message=x`), unmasked for the separators
+// a quoted value hides. A message the floor cannot read — `-F`/`--file`, a heredoc body, the
+// substitution the reading() step drops — is the judge's: red line 3 is in its prompt.
+function trailerIn(words: readonly string[]): boolean {
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i]!
+    if (w === '-m' || w === '--message') { const v = words[i + 1]; if (v !== undefined && TRAILER.test(unmask(v))) return true; continue }
+    if (w.startsWith('--message=')) { if (TRAILER.test(unmask(w.slice(10)))) return true; continue }
+    if (!/^-[A-Za-z0-9]/.test(w)) continue
+    const m = letters(w).indexOf('m')
+    if (m < 0) continue
+    // The cluster's value is what follows its 'm', or the next word when the cluster ends there.
+    const tail = w.slice(2 + m)
+    const v = tail === '' ? words[i + 1] : tail
+    if (v !== undefined && TRAILER.test(unmask(v))) return true
+  }
+  return false
+}
 
-function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>, switched = false): void {
-  const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
+function rulesOf(words: readonly string[], where: Where, moved: boolean, single: boolean, found: Set<NeverRule>, tags: ReadonlySet<string>, switched = false, parsed = false): void {
   const anyNamed = (f: (w: string) => boolean) => words.some(w => f(w) || flagLike(w))
   const short = (c: string) => (w: string) => letters(w).includes(c)
 
   if (words.some(isPush)) {
-    if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
-      abbrev(w, '--mirror', 3) || w.startsWith('+'))) found.add('force-push')
-    if (any(w => short('d')(w) || abbrev(w, '--delete', 3) || abbrev(w, '--prune', 3) || abbrev(w, '--mirror', 3) ||
-      w.startsWith(':') || w.startsWith('+:'))) found.add('branch-delete')
     const names = where.defaultBranch !== undefined ? [where.defaultBranch] : ['main', 'master']
-    // A leading + forces the update; the ref after it is still the destination (+main).
-    const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
     // send-pack and http-push with no refspec update the matching refs, the default one included.
     const plumbing = words.some(w => isVerb(w, 'send-pack') || isVerb(w, 'http-push'))
-    // 0.5.0 cause 3: only when the floor reads this one command, never the whole bag.
-    // A branch switch earlier in the text (final review C1) is read the same way as a move.
-    const away = (moved || switched) && !(single && namedRefs(words, names))
-    if (plumbing || where.branch === undefined || names.includes(where.branch) || away ||
-      any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
-      found.add('default-branch-push')
+    // A move or a branch switch leaves the repository unknown for a bare push (final review C1,
+    // round-3 ruling: it stays fail-closed).
+    const away = moved || switched
+    const read = parsed ? pushRead(words) : undefined
+    if (read !== undefined) {
+      // Red line 2: a tag force-push is not red line 2, and neither is the session's own branch.
+      // An unreadable flag or `--` blocks both exemptions (call 4).
+      const allTags = read.refs.length > 0 && read.refs.every(ref => isTagDestination(ref, tags, names))
+      if (read.force && (read.flagUnreadable || read.exemptBlocked || (!allTags && !ownPushDestination(read.refs, where.branch, names)))) found.add('force-push')
+      if (defaultPush(read, where.branch, names, away, tags, plumbing)) found.add('default-branch-push')
+    } else {
+      // The whole bag, or a list that joins several commands: every word may be a flag or a
+      // destination, so the conservative reading stays.
+      const any = (f: (w: string) => boolean) => words.some(w => f(w) || anyFlag(w))
+      const isDefault = (r: string) => { const w = r.replace(/^\+/, ''); return names.some(n => w === n || [':', '/', '='].some(s => w.endsWith(`${s}${n}`))) }
+      const awayBag = away && !(single && namedRefs(words, names))
+      if (any(w => short('f')(w) || abbrev(w, '--force-with-lease', 3) || abbrev(w, '--force-if-includes', 3) ||
+        abbrev(w, '--mirror', 3) || w.startsWith('+'))) {
+        if (!ownForceDestination(words, where.branch, names)) found.add('force-push')
+      }
+      if (plumbing || (where.branch !== undefined && names.includes(where.branch)) || awayBag ||
+        any(w => isDefault(w) || w === ':' || w === '+:' || opaque(w) || abbrev(w, '--all', 3) || abbrev(w, '--branches', 3) || abbrev(w, '--mirror', 3)))
+        found.add('default-branch-push')
+    }
   }
-  // -D, or -d with a force flag; a plain -d refuses an unmerged branch (as seat-mods reads it).
-  if (words.some(w => isVerb(w, 'branch'))) {
-    const del = anyNamed(w => short('d')(w) || abbrev(w, '--delete', 3))
-    if (anyNamed(short('D')) || (del && anyNamed(w => short('f')(w) || abbrev(w, '--force', 3)))) found.add('branch-delete')
-  }
-  if (words.some(w => abbrev(w, '--no-verify', 6)) || (words.some(w => isVerb(w, 'commit')) && anyNamed(short('n')))) found.add('no-verify')
-
-  const rm = words.findIndex(w => isVerb(w, 'rm'))
-  if (rm >= 0) {
-    const after = words.slice(rm + 1)
-    const recursive = after.some(w => /[rR]/.test(letters(w)) || abbrev(w, '--recursive', 3) || anyFlag(w))
-    // Strictly below the root: nothing is below a worktree at /.
-    const root = where.root.replace(/\/+$/, '')
-    const below = (w: string) => root !== '' && w.startsWith(`${root}/`)
-    // A variable, a brace or a glob on a dot name may reach `..`; a plain glob stays where it is.
-    const unknown = (w: string) => /[${]/.test(w) || /(?:^|\/)\.[^/]*[*?[]/.test(w)
-    const outside = (w: string) => (!w.startsWith('-') || w.includes('/')) &&
-      (w.startsWith('~') || w.split('/').includes('..') || unknown(w) || (w.startsWith('/') && !below(w)))
-    if (recursive && (moved || words.includes('xargs') || after.some(outside))) found.add('rm-outside')
-  }
+  const commit = words.some(w => isVerb(w, 'commit'))
+  if (words.some(w => abbrev(w, '--no-verify', 6)) || (commit && anyNamed(short('n')))) found.add('no-verify')
+  if (commit && trailerIn(words)) found.add('ai-trailer')
 }
