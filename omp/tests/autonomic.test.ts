@@ -603,6 +603,60 @@ describe('the never-approve floor', () => {
     expect(parksIn(w)).toHaveLength(2)
   })
 
+  test('a leading ./ store path parks on Bash and Write (review 882d round 4 P0)', async () => {
+    const { w, a, io } = world({ files: autopilot() })
+    const parent = `${HOME}/.local/state/autonomic`
+    for (const [path, cwd] of [
+      ['./parks/ab12cd34ef56.json', parent],
+      ['./../parks/ab12cd34ef56.json', `${parent}/x`],
+      ['../../parks/ab12cd34ef56.json', `${parent}/a/x`],
+      ['parks/ab12cd34ef56.json', parent],
+      ['../parks/ab12cd34ef56.json', `${parent}/x`],
+    ] as const) {
+      io.cwd = cwd
+      for (const call of [
+        { toolName: 'bash', input: { command: `cat > ${path}`, cwd } },
+        { toolName: 'write', input: { path, content: '{}' } },
+      ]) {
+        const r = await a.onToolCall(call)
+        expect([path, r?.block]).toEqual([path, true])
+        expect(r?.reason).toContain('operator-only state')
+      }
+    }
+    expect(parksIn(w)).toHaveLength(10)
+  })
+
+  test('a leading ./ before the mark parks with an unrelated cwd (review 882d round 4 P0)', async () => {
+    const { w, a, io } = world({ files: autopilot() })
+    io.cwd = '/repo'
+    const path = './autonomic/parks/ab12cd34ef56.json'
+    for (const call of [
+      { toolName: 'bash', input: { command: `cat > ${path}`, cwd: '/repo' } },
+      { toolName: 'write', input: { path, content: '{}' } },
+    ]) {
+      const r = await a.onToolCall(call)
+      expect(r?.block).toBe(true)
+      expect(r?.reason).toContain('operator-only state')
+    }
+    expect(parksIn(w)).toHaveLength(2)
+  })
+
+  test('a leading ./ near miss does not park: ./parks-notes.md and ./../parkside/… (round 4 controls)', async () => {
+    const { w, a, io } = world({ files: autopilot() })
+    const parent = `${HOME}/.local/state/autonomic`
+    for (const [path, cwd] of [
+      ['./parks-notes.md', parent],
+      ['./../parkside/a.json', `${parent}/x`],
+    ] as const) {
+      io.cwd = cwd
+      for (const call of [
+        { toolName: 'bash', input: { command: `cat > ${path}`, cwd } },
+        { toolName: 'write', input: { path, content: '{}' } },
+      ]) expect(await a.onToolCall(call)).toBeUndefined()
+    }
+    expect(parksIn(w)).toHaveLength(0)
+  })
+
   test('a `..` beside the mark does not park: autonomic/x/../parks-notes.md (fix round 3 control)', async () => {
     const { w, a } = world({ files: autopilot() })
     const path = 'autonomic/x/../parks-notes.md'

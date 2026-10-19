@@ -841,30 +841,33 @@ export const ROUTE_WORDS: readonly string[] = [
 // The park store's directory mark, read as the shell joins a literal path: a backslash-newline
 // pair is removed as one unit first (the shell's line continuation, so `autonomic/\<newline>parks`
 // is one path), then quotes and backslashes, repeated slashes collapsed, `.` segments dropped and
-// `..` segments resolved against the segment before them, and matched on the segment, so
-// `autonomic//parks`, `autonomic/./parks`, `autonomic/x/../parks`, `par""ks` and the line-split
-// spelling name the same directory. Variables, globs, substitutions and encodings are not resolved
-// (the README's Known limit). Skill-first Q3: this only adds a stop — a near miss that parks too
-// costs one dialog.
+// `..` segments resolved against the segment before them inside the same path word, and matched
+// on the segment, so `autonomic//parks`, `autonomic/./parks`, `./autonomic/parks`,
+// `autonomic/x/../parks`, `par""ks` and the line-split spelling name the same directory.
+// Variables, globs, substitutions and encodings are not resolved (the README's Known limit).
+// Skill-first Q3: this only adds a stop — a near miss that parks too costs one dialog.
 const SEGMENT_CHAR = /[a-z0-9_.-]/
-export const normalizeCallText = (text: string): string => {
-  // A shell line continuation is removed as one unit before anything else: a raw backslash-LF
-  // (or backslash-CRLF) in a command string, and the same pair as JSON encodes it in a tool's
-  // whole input (`\\` for the backslash, `\n` for the newline: three backslashes and an n).
-  const parts = text.toLowerCase()
-    .replace(/\\\r?\n/g, '')
-    .replace(/\\\\\\(?:n|r\\n)/g, '')
-    .replace(/["'\\]/g, '')
-    .split('/')
+const PATH_RUN = /[a-z0-9_.\/-]+/g
+// A shell line continuation is removed as one unit before anything else: a raw backslash-LF
+// (or backslash-CRLF) in a command string, and the same pair as JSON encodes it in a tool's
+// whole input (`\\` for the backslash, `\n` for the newline: three backslashes and an n).
+const shellText = (text: string): string => text.toLowerCase()
+  .replace(/\\\r?\n/g, '')
+  .replace(/\\\\\\(?:n|r\\n)/g, '')
+  .replace(/["'\\]/g, '')
+// One path-like run (a path word; writeJSON's quoted `file_path` value is one). A `.` segment
+// drops — so a leading `./` names the same path — repeated slashes collapse, and a `..` removes
+// only a segment of this same run, never the text before the word. At the root (a leading `/`)
+// it cannot climb, so it is dropped; a leading `..` is kept as the marker relativePaths resolves
+// against the call's cwd before the store match.
+const normalizeRun = (run: string): string => {
+  const parts = run.split('/')
   const kept: string[] = []
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i]!
     if (part === '.') continue
     if (part === '' && i !== 0) continue
     if (part === '..') {
-      // Resolve lexically: `..` removes the segment before it. At the root (a leading `/`) it
-      // cannot climb, so it is dropped. Leading `..` on relative text is kept as the marker the
-      // caller resolves against the call's cwd before the store match.
       const prev = kept[kept.length - 1]
       if (prev === undefined || prev === '..') kept.push('..')
       else if (prev !== '') kept.pop()
@@ -874,6 +877,11 @@ export const normalizeCallText = (text: string): string => {
   }
   return kept.join('/')
 }
+// The text as the shell joins it: continuations, quotes and backslashes removed, then dots
+// resolved inside each path-like word; the separators between words are left untouched.
+export const normalizeCallText = (text: string): string => shellText(text).replace(PATH_RUN, normalizeRun)
+// A single path (the call's cwd, the configured store): one run, however it is spelled.
+const normalizePathText = (text: string): string => normalizeRun(shellText(text))
 // A relative path in the normalized text that leads with `..` names nothing until it is read
 // against the call's cwd: `../parks/<id>.json` from a sibling of the store is the store. The
 // normalizer keeps a leading `..` (it cannot climb past a root it does not have), so each such
@@ -896,7 +904,7 @@ const hasMark = (s: string, mark: string): boolean => {
 // `parks/…` path in the text. One definition for both hosts: each adapter passes the exact path it
 // reads and writes the store at.
 const namesStore = (normalized: string, dir: string | undefined, store: string): boolean => {
-  const mark = normalizeCallText(store)
+  const mark = normalizePathText(store)
   if (mark === '') return false
   if (hasMark(normalized, mark)) return true
   const at = mark.lastIndexOf('/')
@@ -914,7 +922,7 @@ const namesStore = (normalized: string, dir: string | undefined, store: string):
 export const namesParkStore = (input: unknown, cwd?: string, store?: string): boolean => {
   const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
   const normalized = normalizeCallText(text)
-  const dir = cwd === undefined ? undefined : normalizeCallText(cwd)
+  const dir = cwd === undefined ? undefined : normalizePathText(cwd)
   const relative = dir === undefined ? [] : relativePaths(normalized, dir)
   if (hasMark(normalized, PARKS_DIR_MARK) || relative.some(p => hasMark(p, PARKS_DIR_MARK))) return true
   if (store !== undefined && (namesStore(normalized, dir, store) || relative.some(p => namesStore(p, undefined, store)))) return true
