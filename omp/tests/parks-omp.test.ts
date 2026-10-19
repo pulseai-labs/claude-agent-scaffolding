@@ -6,7 +6,7 @@
 // Autopilot off must behave byte for byte as 0.9.1: the mode gate sits before every new step, so
 // a manual session writes no park, no row and no notice.
 import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Grant } from '../../autonomic/hooks/authority'
 import { fixturePolicy, neutralizeSeatRole, restoreSeatRole, routingWorld } from './judgment-world'
@@ -170,5 +170,34 @@ describe('the park file the OMP adapter writes (Q2: our own state files)', () =>
     expect(existsSync(w.parksRoot)).toBe(false)
     expect(human(w)).toContain(' · src: judge')
     expect(human(w)).toContain(' · A: allow original call · why: ')
+  })
+
+  // verify-T7a claim 5 (spec §4, "no ledger, no autopilot"): OMP ignored record()'s false
+  // return, so a release consumed the park and ran, and a judge allow ran, with no row. The
+  // fixture makes a real false return: a directory at the ledger path makes appendFileSync fail.
+  test('a release whose ledger row cannot be written does not release and does not consume the park (fail-open fix)', async () => {
+    w = world()
+    const first = await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })
+    const id = parkIdOf(first?.reason)
+    expect(await w.onCommand(`approve ${id}`)).toBe(`park ${id} approved for one use.`)
+    rmSync(w.ledgerPath, { force: true })
+    mkdirSync(w.ledgerPath, { recursive: true })
+    const blocked = await w.invoke('bash', { command: FORCE_MAIN, cwd: w.tree })
+    expect(blocked?.block).toBe(true)
+    expect(blocked?.reason).toContain('the release could not be recorded')
+    const park = JSON.parse(readFileSync(join(w.parksRoot, `${id}.json`), 'utf8'))
+    expect(park.approval).toMatchObject({ by: 'operator', usedAt: null })
+  })
+
+  test('a judge allow whose ledger row cannot be written does not allow (fail-open fix)', async () => {
+    w = world()
+    setGeneration(w, 'allow')
+    expect(await w.onCommand('status')).toContain('autopilot')   // the mode and its ledger are live first
+    rmSync(w.ledgerPath, { force: true })
+    mkdirSync(w.ledgerPath, { recursive: true })
+    const blocked = await w.invoke('read', { file_path: '/home/u/.ssh/id_rsa' })
+    expect(blocked?.block).toBe(true)
+    expect(blocked?.reason).toContain('the allow could not be recorded')
+    expect(parks(w)).toEqual([])
   })
 })

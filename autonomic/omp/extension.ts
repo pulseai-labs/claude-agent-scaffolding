@@ -723,14 +723,16 @@ export function createAutonomic(io: AutonomicIO) {
     return { block: true, reason: stored ? parkText(park) : 'autonomic: parked for the operator, but the park store could not be written; this call stays with the operator' }
   }
 
-  // The operator's approval, spent before the call runs: the write-back marks it used, so a second
-  // run of the same call parks again. A park whose consume cannot be written stays blocked.
+  // The operator's approval, spent before the call runs: the row goes in first, then the write-back
+  // marks it used, so a second run of the same call parks again. A row the ledger cannot record is
+  // not a release, and the park stays unused (spec §4, "no ledger, no autopilot"), as on Claude Code.
   async function releaseApproved(p: Park, call: RouteCall): Promise<{ block: true; reason: string } | undefined> {
+    if (!(await record(io.sessionId(), 'permission', parkQuery(call), "released by the operator's approved park", `park ${p.id} approved for one use`, 'operator')))
+      return { block: true, reason: 'autonomic: the release could not be recorded; this call stays with the operator' }
     try { await io.writePark(parkFile(p.id), serializePark(consume(p, new Date().toISOString()))) } catch (err) {
       await log(`park consume failed ${String(err)}`)
       return { block: true, reason: `autonomic: approved park ${p.id} could not be marked used; this call stays with the operator` }
     }
-    await record(io.sessionId(), 'permission', parkQuery(call), "released by the operator's approved park", `park ${p.id} approved for one use`, 'operator')
     return undefined
   }
 
@@ -800,7 +802,9 @@ export function createAutonomic(io: AutonomicIO) {
     catch (err) { await log(`permission judge error ${String(err)}`) }
     const settled = settlePermission(verdict)
     if (settled.kind !== 'allow') return await parkFor({ source: 'judge', redLine: settled.redLine, reason: settled.reason }, call, dir)
-    await record(io.sessionId(), 'permission', parkQuery(call), 'allow', settled.reason, 'judge')
+    // A judgment the ledger cannot record is not taken (spec §4), as on Claude Code.
+    if (!(await record(io.sessionId(), 'permission', parkQuery(call), 'allow', settled.reason, 'judge')))
+      return { block: true, reason: 'autonomic: the allow could not be recorded; this call stays with the operator' }
     return undefined
   }
 
