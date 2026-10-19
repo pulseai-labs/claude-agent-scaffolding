@@ -1,17 +1,19 @@
 import { describe, test, expect } from 'claude-code/testing'
 import { ledgerLines, world } from './world'
 
-const AP = { AUTONOMIC_MODE: 'autopilot' }
+const AP = { AUTONOMIC_MODE: 'autopilot', AUTONOMIC_PARKS_DIR: '/parks' }
 const BASH = (command: string) => ({ tool: 'Bash', input: { command } }) as never
 const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o) })
 const REPLY = "gh api repos/o/r/pulls/1/comments/2/replies -f body='we do not push here'"
 
 describe('0.5.1 routing: an ask (spec §6)', () => {
-  test('an own-words match asks the operator; no fork', async ($, on) => {
+  test('an own-words match parks the operator; no fork', async ($, on) => {
     const w = world(on, { env: AP })
-    expect((await $.tool.check(BASH('git push -f origin feat/y'))).decision).toBe('ask')
+    const r = await $.tool.check(BASH('git push -f origin feat/y'))
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('parked for the operator')
     expect(w.forkPrompts).toEqual([])
-    expect(JSON.stringify(w.notices.at(-1))).toContain('never-approve')
+    expect(JSON.stringify(w.notices.at(-1))).toContain('parked')
   })
   test('a text-only match goes to the fork, with the floor block', async ($, on) => {
     const w = world(on, { env: AP })
@@ -20,11 +22,13 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
     expect(w.forkPrompts[0]).toContain('<floor>')
     expect(w.forkPrompts[0]).toContain('- force-push:')
   })
-  test('the fork asks: the ask stands and pain rings', async ($, on) => {
+  test('the fork asks: the call parks (call 1: a judge\'s ask parks under autopilot)', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'ask', reason: 'unclear' }))
-    expect((await $.tool.check(BASH(REPLY))).decision).toBe('ask')
-    expect(JSON.stringify(w.notices.at(-1))).toContain('permission for you')
+    const r = await $.tool.check(BASH(REPLY))
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('parked for the operator')
+    expect(JSON.stringify(w.notices.at(-1))).toContain('parked')
   })
   test("detached HEAD: a push to a named branch is the fork's now (#766; 0.10.0 leaves the floor)", async ($, on) => {
     const w = world(on, { env: AP })
@@ -44,14 +48,14 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
   test('a 30k Write is judged whole', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'allow', reason: 'report write' }))
-    const r = await $.tool.check({ tool: 'Write', input: { file_path: '/repo/r.md', content: 'x'.repeat(30000) } } as never)
+    const r = await $.tool.check({ tool: 'Write', input: { file_path: '/repo/.env', content: 'x'.repeat(30000) } } as never)
     expect(r.decision).toBe('allow')
     expect(w.forkPrompts[0]).toContain('x'.repeat(30000))
   })
   test('an input over 64k asks: no call is allowed with an unseen part (PR #763)', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'allow', reason: 'r' }))
-    expect((await $.tool.check({ tool: 'Write', input: { file_path: '/repo/r.md', content: 'x'.repeat(70000) } } as never)).decision).toBe('ask')
+    expect((await $.tool.check({ tool: 'Write', input: { file_path: '/repo/.env', content: 'x'.repeat(70000) } } as never)).decision).toBe('ask')
     expect(w.forkPrompts).toEqual([])
     expect(JSON.stringify(w.notices.at(-1))).toContain('input too long to judge')
   })
@@ -66,7 +70,7 @@ describe('0.5.1 routing: an ask (spec §6)', () => {
   test('a long SubagentHandback is judged', async ($, on) => {
     const w = world(on, { env: AP })
     w.forks.push(fork({ decision: 'allow', reason: 'report' }))
-    expect((await $.tool.check({ tool: 'SubagentHandback', input: { message: 'r'.repeat(12000) } } as never)).decision).toBe('allow')
+    expect((await $.tool.check({ tool: 'SubagentHandback', input: { message: `deploy ${'r'.repeat(12000)}` } } as never)).decision).toBe('allow')
     expect(w.forkPrompts).toHaveLength(1)
   })
 })
@@ -75,7 +79,7 @@ describe('0.5.1 routing: the bypass floor (spec §6)', () => {
   test('an own-words match turns the allow into an ask; no fork', async ($, on) => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
-    expect((await $.tool.check(BASH('git push -f origin feat/y'))).decision).toBe('ask')
+    expect((await $.tool.check(BASH('git push -f origin feat/y'))).decision).toBe('deny')
     expect(w.forkPrompts).toEqual([])
   })
   test('a text-only match the fork allows keeps the allow, recorded', async ($, on) => {
@@ -85,25 +89,29 @@ describe('0.5.1 routing: the bypass floor (spec §6)', () => {
     expect((await $.tool.check(BASH(REPLY))).decision).toBe('allow')
     expect(ledgerLines(w).at(-1)).toContain(' · permission · ')
     expect(ledgerLines(w).at(-1)).toContain('allow')
+    expect(ledgerLines(w).at(-1)).toContain(' · src: judge')
   })
   test('a text-only match the fork does not allow becomes an ask with a ring', async ($, on) => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
     w.forks.push(fork({ decision: 'ask', reason: 'unclear' }))
     const r = await $.tool.check(BASH(REPLY))
-    expect(r.decision).toBe('ask')
-    expect(r.reason).toContain('force-push')
-    expect(JSON.stringify(w.notices.at(-1))).toContain('permission for you')
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('parked for the operator')
+    expect(JSON.stringify(w.notices.at(-1))).toContain('parked')
   })
-  test('a fork that fails twice becomes an ask', async ($, on) => {
+  test('a fork that never answers parks (the judge did not answer)', async ($, on) => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
-    expect((await $.tool.check(BASH(REPLY))).decision).toBe('ask')
+    expect((await $.tool.check(BASH(REPLY))).decision).toBe('deny')
   })
-  test('a command with no finding keeps the allow; no fork', async ($, on) => {
+  test('a routed call with no finding is judged; an unrouted call keeps the allow with no judgment', async ($, on) => {
     const w = world(on, { env: AP })
     w.verdict = { decision: 'allow' }
+    w.forks.push(fork({ decision: 'allow', reason: 'an own-branch push' }))
     expect((await $.tool.check(BASH('git push -u origin record/x'))).decision).toBe('allow')
-    expect(w.forkPrompts).toEqual([])
+    expect(w.forkPrompts).toHaveLength(1)
+    expect((await $.tool.check(BASH('ls -la'))).decision).toBe('allow')
+    expect(w.forkPrompts).toHaveLength(1)
   })
 })

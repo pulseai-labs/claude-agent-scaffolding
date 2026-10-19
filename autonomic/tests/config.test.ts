@@ -19,11 +19,16 @@ describe('settings', () => {
     expect(retiredNote(c.retired)).toBe('retired in 0.10.0, now judged: branch-delete rm-outside')
     expect(retiredNote([])).toBeUndefined()
   })
-  test("a 0.9.x value loads with no problem and the retired names stay readable (Review Focus 2)", () => {
+  test('a 0.9.x value loads with no problem and the retired names stay readable (Review Focus 2)', () => {
     const c = parseConfig({ neverApprove: 'force-push default-branch-push branch-delete rm-outside no-verify unreadable' })
     expect(c.neverApprove).toEqual(['force-push', 'default-branch-push', 'no-verify'])
     expect(c.retired).toEqual(['branch-delete', 'rm-outside', 'unreadable'])
     expect(c.problems).toEqual([])
+  })
+  test('decidingModel is read when set; blank and absent stay undefined (0.10.0; call 8)', () => {
+    expect(parseConfig({}).decidingModel).toBeUndefined()
+    expect(parseConfig({ decidingModel: 'claude-sonnet-5-5' }).decidingModel).toBe('claude-sonnet-5-5')
+    expect(parseConfig({ decidingModel: '  ' }).decidingModel).toBeUndefined()
   })
   test('enforced keeps only enabled rules', () => {
     expect(enforced(['force-push', 'default-branch-push'], ['force-push'])).toEqual(['force-push'])

@@ -3,19 +3,20 @@ import type { EngineInterface, Register } from 'claude-code'
 import type { Pain, PainOption } from '../types'
 import { DEFAULTS, parseConfig, retiredNote } from './config'
 import type { AutonomicConfig } from './config'
-import { APPEND, TOUCH } from './io'
+import { APPEND, CHMOD, TOUCH } from './io'
 import { ledgerLine, ledgerPathFor, oneLine } from './ledger'
-import type { LedgerCase, Usage } from './ledger'
+import type { LedgerCase, LedgerSource, Usage } from './ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from './mode'
 import { DEFAULT_POLICY, POLICY_ID, expandHome } from './policy'
 import { scopeMessage } from './prompts'
 import { lineagePath, logPath, parseLineageFrom, parseRecord, safeSessionId, serializeRecord, sessionPath, stagePath } from './records'
 import type { SessionRecord } from './records'
-import { DEFAULT_READERS, floorFindings, routes } from './never'
-import { enforced } from './enforce'
-import { inputShape, shape } from './shape'
-import type { Finding, Where } from './never'
-import { permissionPrompt } from './prompts'
+import { DEFAULT_READERS, routes } from './never'
+import { inputShape } from './shape'
+import { planPermission, settlePermission } from './decide'
+import type { DecideContext, PermissionInput } from './decide'
+import { approve, consume, parkId, parkText, parksDir, parsePark, serializePark } from './parks'
+import type { Park } from './parks'
 import { parsePermission } from './verdict'
 import { MAX_INPUT, askPrompt, shownInput } from './prompts'
 import { parseAsk } from './verdict'
@@ -24,9 +25,16 @@ import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields
 import { turnEndPrompt } from './prompts'
 import { parseTurn } from './verdict'
 import { promptEntry, pushEntry, renderDigest, toolEntry } from './digest'
+import type { Where } from './never'
 
 // autonomic: autopilot reflexes (spec §3). Module variables survive /clear; the session
 // record file carries the mode across a molt by way of molt's lineage file.
+//
+// 0.10.0 Task 5: the permission reflex is the Claude Code adapter over the shared decision
+// (decide.ts): planPermission, then the judge, then settlePermission. Skill-first: the park
+// store's IO and the /autopilot parks, approve and drop flows are Q2 (closed input — files this
+// plugin wrote, ids we mint, exact string equality, paths built from a parsed park's own id).
+// A parked call's deny carries the park text verbatim and decides nothing itself.
 
 type Engine = EngineInterface
 type Live = SessionRecord & { problem?: string; invalid?: string }
@@ -41,7 +49,7 @@ const announced = new Set<string>()        // sessions whose carried scope has b
 const digests = new Map<string, string[]>()   // each session's turn digest (0.4.0 spec §3.2), memory only
 function note(id: string, entry: string): void { digests.set(id, pushEntry(digests.get(id) ?? [], entry)) }
 function digestOf(id: string): string { return renderDigest(digests.get(id) ?? []) }
-const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status'
+const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status | parks | approve <id> | drop <id>'
 
 async function home($: Engine): Promise<string> {
   return (await $.env.get('HOME')) ?? ''
@@ -175,9 +183,10 @@ async function modeOf($: Engine): Promise<Live> {
 }
 
 // One ledger line. A ledger that cannot be written ends autopilot (spec §4: no ledger,
-// no autopilot); the caller must not act on a decision that was not recorded.
-async function record($: Engine, id: string, kase: LedgerCase, q: string, a: string, why: string, usage?: Usage): Promise<boolean> {
-  return recordAll($, id, [ledgerLine({ time: new Date().toISOString(), session: id, kase, q, a, why, usage })])
+// no autopilot); the caller must not act on a decision that was not recorded. `src` names who
+// decided (0.10.0: the floor, the judge, or the operator's approval of a park).
+async function record($: Engine, id: string, kase: LedgerCase, q: string, a: string, why: string, usage?: Usage, src?: LedgerSource): Promise<boolean> {
+  return recordAll($, id, [ledgerLine({ time: new Date().toISOString(), session: id, kase, q, a, why, usage, src })])
 }
 
 // Several ledger lines in one append: all are recorded, or none.
@@ -274,9 +283,13 @@ async function choose($: Engine, value: NonNullable<Pain>, o: PainOption): Promi
 type Judged<T> = { v: T; usage?: Usage } | { skip: true } | { fail: string }
 
 // One fork, one retry (spec §4). Nothing to fork, or an aborted turn, lets the event pass.
-async function judge<T>($: Engine, kind: 'turn-end' | 'ask' | 'permission', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
+// With decidingModel set (0.10.0 call 8) a judgment is a plain completion on that model, which
+// sees the prompt alone; unset keeps the session fork. Exported for parks-cc.test.ts: the test
+// kit cannot inject register options, so that suite drives the seams with the test's own $.
+export async function judge<T>($: Engine, kind: 'turn-end' | 'ask' | 'permission', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
   for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await $.model.fork({ prompt })
+    const deciding = cfg.decidingModel
+    const r = deciding === undefined ? await $.model.fork({ prompt }) : await $.model.complete({ model: deciding, prompt })
     if (r.isAnswered) {
       await log($, `fork ${kind} session=${await $.session.id()}`)
       const v = parse(r.text)
@@ -299,7 +312,8 @@ async function writeDefaultPolicy($: Engine): Promise<void> {
   }
 }
 
-async function statusReport($: Engine, id: string): Promise<string> {
+// Exported for parks-cc.test.ts's seam, as `judge` is: the status line is a contract there.
+export async function statusReport($: Engine, id: string): Promise<string> {
   const rec = await modeOf($)
   const policyPath = expandHome(cfg.policyPath, await home($))
   const painPath = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
@@ -324,21 +338,79 @@ async function statusReport($: Engine, id: string): Promise<string> {
   return lines.join('\n')
 }
 
-// 0.5.1 (§6): the floor's findings for a command, only the operator's enabled rules.
-type FloorRead = { ask: Finding[]; fork: Finding[] }
-async function floorOf($: Engine, command: string): Promise<FloorRead> {
-  const { findings } = floorFindings(command, await where($), cfg.readers)
-  const on = new Set(enforced([...new Set(findings.map(f => f.rule))], cfg.neverApprove))
-  const live = findings.filter(f => on.has(f.rule))
-  return { ask: live.filter(f => f.level === 'ask'), fork: live.filter(f => f.level === 'fork') }
+// The park store's IO and the operator's flows (0.10.0 Task 5). Skill-first Q2: everything
+// here reads closed input — files this plugin wrote under a directory it names, ids we mint,
+// exact string equality, paths built from a parsed park's own id — and the one deterministic
+// approval this slice allows is the store's exact match (design §9, call 2). A store that
+// cannot be listed, a file that cannot be read or parsed, and a write that fails are logged
+// and skipped: never a throw, and never an approval.
+
+const parkPathOf = (dir: string, id: string): string => `${dir.replace(/\/+$/, '')}/${id}.json`
+const parkWhat = (p: Park): string => (p.redLine !== null ? `red line ${p.redLine}` : p.source === 'integrity' ? 'operator-only state' : 'the judge asked')
+
+async function parksDirOf($: Engine): Promise<string> {
+  return parksDir({ AUTONOMIC_PARKS_DIR: await $.env.get('AUTONOMIC_PARKS_DIR') }, await home($))
 }
-const rulesIn = (found: readonly Finding[]) => [...new Set(found.map(f => f.rule))]
-// The fork sees each finding's shape, never its text (PR #681 round 8).
-const notesOf = (f: FloorRead) => f.fork.map(x => ({ rule: x.rule, focus: shape(x.focus) }))
-// The pain text leads with the command that matched, so the band shows what tripped (#677 F9; 0.5.1 cause 8).
-function painFocus(found: readonly Finding[], command: string): string {
-  const lines = command.split('\n').map(l => l.trim()).filter(Boolean)
-  return `${rulesIn(found).join(', ')} — ${shape(found[0]!.focus)}${lines.length > 1 ? ` (+${lines.length - 1} more lines)` : ''}`
+
+// Every park the store holds, parsed. A listing that throws is no store at all; a file that
+// does not parse is ignored and logged (Task 3 step 3), never matched.
+async function readParks($: Engine, dir: string): Promise<Park[]> {
+  const listed = await $.fs.list(dir).catch(() => undefined)
+  if (listed === undefined) return []
+  const out: Park[] = []
+  for (const entry of listed) {
+    if (entry.kind !== 'file' || !entry.name.endsWith('.json')) continue
+    const path = `${dir.replace(/\/+$/, '')}/${entry.name}`
+    const text = await readText($, path)
+    if (text === undefined) { await log($, `park read failed ${path}`); continue }
+    try { out.push(parsePark(text)) } catch (err) { await log($, `park parse failed ${path} ${String(err)}`) }
+  }
+  return out
+}
+
+// The one park write: the file at 0600, its directory at 0700 (Task 3 step 3). A failure is
+// logged and the call stays parked; the operator not being able to approve it is not an allow.
+async function writeParkFile($: Engine, path: string, park: Park): Promise<void> {
+  try {
+    await $.fs.write(path, serializePark(park))
+    await $.process.run(['sh', '-c', CHMOD, 'sh', path])
+  } catch (err) {
+    await log($, `park write failed ${path} ${String(err)}`)
+  }
+}
+
+// `/autopilot parks`: each open park's id, what stopped it, its command and cwd, oldest first;
+// an approved one says so.
+async function parksText($: Engine): Promise<string> {
+  const dir = await parksDirOf($)
+  const parks = await readParks($, dir)
+  if (parks.length === 0) return 'no parks'
+  const lines = [...parks]
+    .sort((a, b) => (a.parkedAt === b.parkedAt ? (a.id < b.id ? -1 : 1) : a.parkedAt < b.parkedAt ? -1 : 1))
+    .map(p => `${p.id} · ${parkWhat(p)} · ${p.command === '' ? '(no command)' : p.command} · ${p.cwd}${p.approval === null ? '' : ' · approved'}`)
+  return `parks (${lines.length}):\n${lines.join('\n')}`
+}
+
+// `/autopilot approve <id>`: the operator's yes, written onto the park file the store holds.
+// The id is matched exactly against the parsed parks and the path is built from the park's own
+// id, never from the operator's word, so a second word has no path to reach.
+async function approvePark($: Engine, word: string): Promise<string> {
+  const dir = await parksDirOf($)
+  const park = (await readParks($, dir)).find(p => p.id === word)
+  if (park === undefined) return `no park ${word}`
+  if (park.approval !== null) return `park ${park.id} is already approved`
+  await writeParkFile($, parkPathOf(dir, park.id), approve(park, new Date().toISOString()))
+  return `park ${park.id} is approved for one use in the next 72 hours: the exact call it names releases once, and only it.`
+}
+
+// `/autopilot drop <id>`: the operator clears the park; the file goes, so the same call parks
+// again on its next try.
+async function dropPark($: Engine, word: string): Promise<string> {
+  const dir = await parksDirOf($)
+  const park = (await readParks($, dir)).find(p => p.id === word)
+  if (park === undefined) return `no park ${word}`
+  try { await $.process.run(['rm', '-f', parkPathOf(dir, park.id)]) } catch (err) { await log($, `park drop failed ${park.id} ${String(err)}`) }
+  return `park ${park.id} is dropped: the call it named parks again.`
 }
 
 // Tools that change nothing: a turn of these alone is no progress for the loop guard.
@@ -408,7 +480,7 @@ export const register: Register = (on, options) => {
     // A resumed session id comes back from the cache without a save: publish its mode (PR #694 F1).
     try { await publish($, (await modeOf($)).mode) } catch (err) { await log($, `session.start mode error ${String(err)}`) }
     try {
-      await $.command.register({ name: 'autopilot', description: 'autonomic: on [scope docs] | off | status' })
+      await $.command.register({ name: 'autopilot', description: 'autonomic: on [scope docs] | off | status | parks | approve <id> | drop <id>' })
       if (cfg.problems.length > 0) $.ui.toast(`autonomic: ${cfg.problems.join('; ')}`)
     } catch (err) {
       await log($, `session.start error ${String(err)}`)
@@ -458,6 +530,9 @@ export const register: Register = (on, options) => {
     const c = parseCommand(e.args ?? '')
     if (c.kind === 'usage') return { text: USAGE_TEXT }
     if (c.kind === 'status') return { text: await statusReport($, id) }
+    if (c.kind === 'parks') return { text: await parksText($) }
+    if (c.kind === 'approve') return { text: await approvePark($, c.id) }
+    if (c.kind === 'drop') return { text: await dropPark($, c.id) }
     const prev = await modeOf($)
     if (c.kind === 'off') {
       const off = await save($, id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
@@ -597,59 +672,15 @@ export const register: Register = (on, options) => {
   on('tool.check', async ($, e, next) => {
     const r = await next(e)
     try {
-      if (r.decision === 'allow') {
-        // The bypass floor (0.1.1 §3.1): in autopilot a never-approve match in a command's own
-        // words reaches the operator whatever allowed it. Manual mode never touches an allow.
-        const raw = (e.input as { command?: unknown } | undefined)?.command
-        if (typeof raw !== 'string' || !routes({ tool: e.tool, input: e.input }, cfg.readers)) return r
-        // From here every failure keeps the call with the operator (final review I1): an
-        // unneeded ask costs one dialog, a missed one a force push.
-        let f: FloorRead
-        let auto: boolean
-        try {
-          // A session that left autopilot through a failure (ledger, record, policy) keeps the
-          // floor: under bypass, manual means no asks at all (PR #681). /autopilot off clears it.
-          const m = await modeOf($)
-          if (m.mode !== 'autopilot' && m.problem === undefined) return r
-          auto = m.mode === 'autopilot'
-          f = await floorOf($, raw)
-        } catch (err) {
-          await log($, `floor error ${String(err)}`)
-          return { ...r, decision: 'ask', reason: 'autonomic: the never-approve check failed; this call stays with you' }
-        }
-        if (f.ask.length === 0 && f.fork.length === 0) return r
-        // Outside autopilot there is no fork: a text-only finding asks too.
-        const stop = f.ask.length > 0 ? f.ask : auto ? [] : f.fork
-        if (stop.length > 0) {
-          try {
-            const id = await $.session.id()
-            await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'ask the operator', `never-approve: ${rulesIn(stop).join(', ')}`)
-            await pain($, id, 'never-approve', painFocus(stop, raw))
-          } catch (err) {
-            await log($, `floor signal error ${String(err)}`)
-          }
-          return { ...r, decision: 'ask', reason: `autonomic: never-approve — ${rulesIn(stop).join(', ')}` }
-        }
-        // 0.5.1 (D4): only findings the fork judges. Its allow keeps the allow; anything else asks.
-        try {
-          const id = await $.session.id()
-          // No call is allowed with a part the fork did not see (PR #763).
-          if (shownInput(e.input).length > MAX_INPUT) {
-            await pain($, id, 'permission for you', `${e.tool} (input too long to judge; floor: ${rulesIn(f.fork).join(', ')})`)
-            return { ...r, decision: 'ask', reason: `autonomic: too long for the fork to judge — ${rulesIn(f.fork).join(', ')}` }
-          }
-          const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notesOf(f)), parsePermission)
-          if ('v' in j && j.v.decision === 'allow' && (await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'allow', j.v.reason, j.usage))) return r
-          const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
-          await pain($, id, 'permission for you', `${e.tool} (${why}; floor: ${rulesIn(f.fork).join(', ')})`)
-        } catch (err) {
-          await log($, `floor fork error ${String(err)}`)
-        }
-        return { ...r, decision: 'ask', reason: `autonomic: the fork did not allow — ${rulesIn(f.fork).join(', ')}` }
-      }
-      if ((await modeOf($)).mode !== 'autopilot') return r
+      // The mode gate first: manual with no problem is untouched (byte for byte as 0.9.1), and
+      // a session that left autopilot through a failure keeps the floor (PR #681).
+      const m = await modeOf($)
+      const auto = m.mode === 'autopilot'
+      if (r.decision === 'allow') { if (!auto && m.problem === undefined) return r }
+      else if (!auto) return r
       const id = await $.session.id()
       if (r.decision === 'deny') {
+        // A host deny is never changed; under autopilot it rings once per tool and reason (0.9.1).
         const key = `${id}\u0000${e.tool}\u0000${r.reason ?? ''}`
         if (!painedDeny.has(key)) {
           painedDeny.add(key)
@@ -657,37 +688,64 @@ export const register: Register = (on, options) => {
         }
         return r
       }
-      // A tool whose permission prompt is the operator's own dialog is never approved (final review C1).
+      // A tool whose permission prompt is the operator's own dialog is never judged (final review C1).
       if (USER_DIALOG.has(e.tool)) return r
+      // The cheap pre-check (0.10.0 Task 5): an empty park store and a call the routing does not
+      // name are exactly planPermission's pass — no git run, no judge, no store read.
+      const dir = await parksDirOf($)
+      const parks = await readParks($, dir)
+      if (parks.length === 0 && !routes({ tool: e.tool, input: e.input }, cfg.readers)) return r
+      // From here every failure keeps the call with the operator (final review I1): an
+      // unneeded ask costs one dialog, a missed one a force push.
+      const w = await where($)
+      const now = new Date().toISOString()
       const raw = (e.input as { command?: unknown } | undefined)?.command
-      let notes: { rule: string; focus: string }[] = []
-      if (typeof raw === 'string') {
-        const f = await floorOf($, raw)
-        if (f.ask.length > 0) {
-          await record($, id, 'permission', `${e.tool}: ${shape(raw)}`, 'ask the operator', `never-approve: ${rulesIn(f.ask).join(', ')}`)
-          await pain($, id, 'never-approve', painFocus(f.ask, raw))
-          return r
+      const input: PermissionInput = { tool: e.tool, input: e.input, command: typeof raw === 'string' ? raw : null, cwd: w.cwd, where: w }
+      const ctx: DecideContext = { policy: (await policyText($)) ?? '', recent: digestOf(id), role: null, grants: null, parks, now, enabled: cfg.neverApprove }
+      const plan = planPermission(input, ctx)
+      if (plan.kind === 'pass') return r
+      const q = `${e.tool}: ${inputShape(e.input)}`
+      // The parked call is denied on both hosts (Global Constraints): "deny" is the only return
+      // that does not wait, and the reason carries the park text verbatim (Review Focus 1).
+      const parkIt = async (source: Park['source'], redLine: Park['redLine'], reason: string): Promise<typeof r> => {
+        const park: Park = {
+          id: parkId({ session: id, tool: e.tool, command: input.command ?? '', cwd: input.cwd, parkedAt: now }),
+          session: id, host: 'claude-code', tool: e.tool, command: input.command ?? '', cwd: input.cwd,
+          source, redLine, reason, parkedAt: now, approval: null,
         }
-        notes = notesOf(f)
+        await writeParkFile($, parkPathOf(dir, park.id), park)
+        await record($, id, 'permission', q, 'parked for the operator', reason, undefined, source)
+        await pain($, id, 'parked', `${park.id}: ${reason}`)
+        return { ...r, decision: 'deny', reason: parkText(park) }
       }
-      // The fork sees at most MAX_INPUT characters, whole: a longer call stays with the operator
-      // (final review I6; 64k since 0.5.1, PR #763 — no call is allowed with an unseen part).
+      if (plan.kind === 'park') return await parkIt(plan.source, plan.redLine, plan.reason)
+      if (plan.kind === 'release') {
+        // The operator's yes, used once: the row goes in first, then the park is consumed.
+        if (!(await record($, id, 'permission', q, 'allow', `the operator's approval of park ${plan.park.id}`, undefined, 'operator')))
+          return r.decision === 'allow' ? { ...r, decision: 'ask', reason: 'autonomic: the release could not be recorded; this call stays with you' } : r
+        await writeParkFile($, parkPathOf(dir, plan.park.id), consume(plan.park, now))
+        return r.decision === 'allow' ? r : { ...r, decision: 'allow', reason: `autonomic: the operator's approval of park ${plan.park.id}` }
+      }
+      // No call is allowed with a part the judge did not see (PR #763; the prompt cuts at MAX_INPUT).
       if (shownInput(e.input).length > MAX_INPUT) {
-        await pain($, id, 'permission for you', `${e.tool} (input too long to judge)`)
-        return r
+        const floors = [...new Set(plan.notes.map(n => n.rule))]
+        await pain($, id, 'permission for you', `${e.tool} (input too long to judge${floors.length === 0 ? '' : `; floor: ${floors.join(', ')}`})`)
+        return r.decision === 'allow' ? { ...r, decision: 'ask', reason: 'autonomic: too long for the judge to see; this call stays with you' } : r
       }
-      const j = await judge($, 'permission', permissionPrompt(e.tool, e.input, (await policyText($)) ?? '', digestOf(id), notes), parsePermission)
-      if ('v' in j && j.v.decision === 'allow') {
-        if (await record($, id, 'permission', `${e.tool}: ${inputShape(e.input)}`, 'allow', j.v.reason, j.usage))
-          return { ...r, decision: 'allow', reason: `autonomic: ${j.v.reason}` }
-        return r
+      const j = await judge($, 'permission', plan.prompt, parsePermission)
+      const settled = settlePermission('v' in j ? j.v : undefined)
+      if (settled.kind === 'allow') {
+        // A judgment that cannot be recorded is not taken: the allow is not.
+        if (!(await record($, id, 'permission', q, 'allow', settled.reason, 'v' in j ? j.usage : undefined, 'judge')))
+          return r.decision === 'allow' ? { ...r, decision: 'ask', reason: 'autonomic: the allow could not be recorded; this call stays with you' } : r
+        return r.decision === 'allow' ? r : { ...r, decision: 'allow', reason: `autonomic: ${settled.reason}` }
       }
-      const why = 'v' in j ? j.v.reason : 'fail' in j ? j.fail : 'nothing to judge yet'
-      await pain($, id, 'permission for you', `${e.tool} (${why})`)
-      return r
+      return await parkIt('judge', settled.redLine, settled.reason)
     } catch (err) {
       await log($, `tool.check error ${String(err)}`)
-      return r
+      return r.decision === 'allow'
+        ? { ...r, decision: 'ask', reason: 'autonomic: the never-approve check failed; this call stays with you' }
+        : r
     }
   })
 

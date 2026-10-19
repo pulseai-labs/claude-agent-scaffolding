@@ -70,9 +70,11 @@ describe('I6 (0.5.1 D3): a long command up to 64k characters is judged whole', (
 })
 
 describe('I7: any tool input with a command string meets the never-approve list', () => {
-  test('Monitor with a force push', async ($, on) => {
+  test('Monitor with a force push parks (0.10.0: a floor match denies)', async ($, on) => {
     const w = world(on, { env: AP })
-    expect((await $.tool.check({ tool: 'Monitor', input: { command: 'git push -f' } } as never)).decision).toBe('ask')
+    const r = await $.tool.check({ tool: 'Monitor', input: { command: 'git push -f' } } as never)
+    expect(r.decision).toBe('deny')
+    expect(String(r.reason)).toContain('parked for the operator')
     expect(w.forkPrompts).toEqual([])
     expect(JSON.stringify(w.notices.at(-1))).toContain('never-approve')
   })

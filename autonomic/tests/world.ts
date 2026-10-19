@@ -9,6 +9,7 @@ import { APPEND, TOUCH } from '../hooks/io'
 export type Fork = { isAnswered: true; text: string } | { isAnswered: false; reason: 'nothing-to-fork' | 'aborted' | 'empty-reply' | 'api-error' }
 export type World = {
   files: Map<string, string>
+  env: Record<string, string>       // the mocked environment: what env.get answers
   runs: string[][]
   runInits: Array<{ timeoutMs?: number } | undefined>  // what each run was given, in step with runs
   bellRuns: string[][]         // every autopilot bell's argv, in order
@@ -26,7 +27,8 @@ export type World = {
   session: { id: string; cwd: string }
   git: { top?: string; branch?: string; originHead?: string }
   forks: Fork[]                // the fork's replies, in order; none left means empty-reply
-  forkPrompts: string[]
+  forkPrompts: string[]        // every $.model.fork, in order
+  completes: Array<{ model: string; prompt: string }>   // every $.model.complete, in order (0.10.0 decidingModel)
   verdict: { decision: 'allow' | 'ask' | 'deny'; reason?: string }
   sections: Array<{ id: string; text: string; scope: 'shared' | 'session' }>
   asked: number                // AskUserQuestion calls that reached the bottom: the operator
@@ -60,18 +62,18 @@ export const POLICY = '/home/u/.claude/autonomic/policy.md'
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string>; noPolicy?: boolean } = {}): World {
   const w: World = {
     files: new Map([...(opts.noPolicy ? [] : [[POLICY, 'TEST POLICY\n'] as [string, string]]), ...Object.entries(opts.files ?? {})]),
+    env: { HOME: '/home/u', ...(opts.env ?? {}) },
     runs: [], runInits: [], bellRuns: [], bellFinished: false, toasts: [], statuses: [], notices: [], fills: [], envSets: [], submits: [], hasBox: true,
     session: { id: 's1', cwd: '/repo' },
     git: { top: '/repo', branch: 'feat/x', originHead: 'origin/main' },
-    forks: [], forkPrompts: [],
+    forks: [], forkPrompts: [], completes: [],
     verdict: { decision: 'ask', reason: 'needs approval' },
     sections: [{ id: 'intro', text: 'engine intro', scope: 'shared' }],
     asked: 0,
     usage: { tokens: 100_000, window: 1_000_000 },
   }
   on('env.set', (_$, e) => { if (w.failEnvSet?.(e.value)) throw new Error('env refused'); w.envSets.push([e.name, e.value]); return { value: undefined } as never })
-  const env: Record<string, string> = { HOME: '/home/u', ...(opts.env ?? {}) }
-  on('env.get', (_$, e) => { if (w.failHome && e.name === 'HOME') throw new Error('no HOME'); return { value: env[e.name] } as never })
+  on('env.get', (_$, e) => { if (w.failHome && e.name === 'HOME') throw new Error('no HOME'); return { value: w.env[e.name] } as never })
   mock.store(on)
   on('state.set', async (_$, e, next) => {
     const s = e as unknown as { key?: string; value?: unknown }
@@ -91,54 +93,24 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     return { value: undefined } as never
   })
   on('fs.exists', (_$, e) => ({ value: w.files.has(e.path) }) as never)
-  on('process.run', async (_$, e) => {
-    const argv = [...e.argv]
-    w.runs.push(argv)
-    w.runInits.push(e.init)
-    const ok = (stdout = '') => ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false } }) as never
-    const fail = () => ({ value: { exitCode: 1, stdout: '', stderr: 'failed', isStdoutTruncated: false } }) as never
-    // The autopilot bell, `sh -c 'AUTONOMIC_MESSAGE="$1"; …'`. It is answered here, never by
-    // the engine, so the bound `ring` passes is observable only through runInits. A delay
-    // stands in for a bell that has not answered yet; a delay past the bound it was given
-    // rejects, as the engine kills it (here at once — waiting the bound out in real time
-    // would only slow the suite). bellExit answers with a non-zero exit instead.
-    if (typeof argv[2] === 'string' && argv[2].includes('AUTONOMIC_MESSAGE')) {
-      w.bellRuns.push(argv)
-      if (w.failBell) return { deny: 'bell refused' } as never
-      const bound = e.init?.timeoutMs ?? 30_000
-      if ((w.bellDelayMs ?? 0) > bound) return { deny: `timed out after ${bound}ms` } as never
-      if (w.bellDelayMs !== undefined) await new Promise(resolve => sleep(resolve, w.bellDelayMs))
-      w.bellFinished = true
-      return { value: { exitCode: w.bellExit ?? 0, stdout: '', stderr: '', isStdoutTruncated: false } } as never
+  // The park store's listing (0.10.0 Task 5): the host answers {name, kind, size, mtimeMs,
+  // isLink} per direct child, sorted by name. A file is any w.files key directly under the dir.
+  on('fs.list', (_$, e) => {
+    const dir = e.path.replace(/\/+$/, '')
+    const names: string[] = []
+    for (const path of w.files.keys()) {
+      if (!path.startsWith(`${dir}/`)) continue
+      const name = path.slice(dir.length + 1).split('/')[0]!
+      if (name !== '' && !names.includes(name)) names.push(name)
     }
-    if (argv[0] === 'git') {
-      const a = argv.join(' ')
-      if (a.includes('--show-toplevel')) return w.git.top === undefined ? fail() : ok(`${w.git.top}\n`)
-      if (a.includes('--abbrev-ref')) return w.git.branch === undefined ? fail() : ok(`${w.git.branch}\n`)
-      if (a.includes('symbolic-ref')) return w.git.originHead === undefined ? fail() : ok(`${w.git.originHead}\n`)
-      return fail()
-    }
-    if (argv[0] === 'sh' && argv[2] === APPEND) {
-      const line = argv[4] ?? ''
-      const path = argv[5] ?? ''
-      if (w.failAppend?.test(path)) return fail()
-      if (w.appendsLeft !== undefined) { if (w.appendsLeft <= 0) return fail(); w.appendsLeft -= 1 }
-      w.files.set(path, `${w.files.get(path) ?? ''}${line}\n`)
-      return ok()
-    }
-    if (argv[0] === 'sh' && argv[2] === TOUCH) {
-      const path = argv[4] ?? ''
-      if (w.failTouch?.test(path)) return fail()
-      if (!w.files.has(path)) w.files.set(path, '')
-      return ok()
-    }
-    return ok()
+    const entries = names.sort().map(name => ({ name, kind: w.files.has(`${dir}/${name}`) ? 'file' : 'dir', size: 0, mtimeMs: 0, isLink: false }))
+    return { value: entries } as never
   })
-  on('model.fork', (_$, e) => {
-    w.forkPrompts.push(e.prompt)
-    const f = w.forks.shift() ?? { isAnswered: false, reason: 'empty-reply' }
-    return { value: f.isAnswered ? { ...f, usage: USAGE } : f.reason === 'nothing-to-fork' ? f : { ...f, usage: USAGE } } as never
-  })
+  on('process.run', async (_$, e) => (await exec(w, [...e.argv], e.init)) as never)
+  on('model.fork', (_$, e) => { w.forkPrompts.push(e.prompt); return { value: nextFork(w) } as never })
+  // The deciding model (0.10.0 Task 5, call 8): same reply queue as the fork, and every call is
+  // recorded with its model so a test can see which API answered.
+  on('model.complete', (_$, e) => { w.completes.push({ model: e.model, prompt: e.prompt }); return { value: nextFork(w) } as never })
   on('tool.check', () => ({ ...w.verdict }) as never)
   on('prompt.compose', () => ({ sections: [...w.sections] }) as never)
   on('prompt.fill', (_$, e) => {
@@ -158,6 +130,101 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('classic.Stop', () => (w.stopBlock === undefined ? {} : { block: w.stopBlock }))
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
   return w
+}
+
+// The fork's next reply, in order: one queue for $.model.fork, $.model.complete and the engine
+// double a test drives the exported functions with (0.10.0 Task 5).
+function nextFork(w: World): never {
+  const f = w.forks.shift() ?? { isAnswered: false, reason: 'empty-reply' }
+  return (f.isAnswered ? { ...f, usage: USAGE } : f.reason === 'nothing-to-fork' ? f : { ...f, usage: USAGE }) as never
+}
+
+// process.run's answer, from memory: the dispatch handler and the engine double share it.
+export type Exec = { exitCode: number; stdout: string; stderr: string; isStdoutTruncated: boolean }
+type RunAnswer = { value: Exec } | { deny: string }
+async function exec(w: World, argv: string[], init: { timeoutMs?: number } | undefined): Promise<RunAnswer> {
+  w.runs.push(argv)
+  w.runInits.push(init)
+  const ok = (stdout = ''): RunAnswer => ({ value: { exitCode: 0, stdout, stderr: '', isStdoutTruncated: false } })
+  const fail = (): RunAnswer => ({ value: { exitCode: 1, stdout: '', stderr: 'failed', isStdoutTruncated: false } })
+  // The autopilot bell, `sh -c 'AUTONOMIC_MESSAGE="$1"; …'`. It is answered here, never by
+  // the engine, so the bound `ring` passes is observable only through runInits. A delay
+  // stands in for a bell that has not answered yet; a delay past the bound it was given
+  // rejects, as the engine kills it (here at once — waiting the bound out in real time
+  // would only slow the suite). bellExit answers with a non-zero exit instead.
+  if (typeof argv[2] === 'string' && argv[2].includes('AUTONOMIC_MESSAGE')) {
+    w.bellRuns.push(argv)
+    if (w.failBell) return { deny: 'bell refused' }
+    const bound = init?.timeoutMs ?? 30_000
+    if ((w.bellDelayMs ?? 0) > bound) return { deny: `timed out after ${bound}ms` }
+    if (w.bellDelayMs !== undefined) {
+      const { promise, resolve } = Promise.withResolvers<void>()
+      sleep(resolve, w.bellDelayMs)
+      await promise
+    }
+    w.bellFinished = true
+    return { value: { exitCode: w.bellExit ?? 0, stdout: '', stderr: '', isStdoutTruncated: false } }
+  }
+  if (argv[0] === 'rm' && argv[1] === '-f' && argv[2] !== undefined) { w.files.delete(argv[2]); return ok() }
+  if (argv[0] === 'git') {
+    const a = argv.join(' ')
+    if (a.includes('--show-toplevel')) return w.git.top === undefined ? fail() : ok(`${w.git.top}\n`)
+    if (a.includes('--abbrev-ref')) return w.git.branch === undefined ? fail() : ok(`${w.git.branch}\n`)
+    if (a.includes('symbolic-ref')) return w.git.originHead === undefined ? fail() : ok(`${w.git.originHead}\n`)
+    return fail()
+  }
+  if (argv[0] === 'sh' && argv[2] === APPEND) {
+    const line = argv[4] ?? ''
+    const path = argv[5] ?? ''
+    if (w.failAppend?.test(path)) return fail()
+    if (w.appendsLeft !== undefined) { if (w.appendsLeft <= 0) return fail(); w.appendsLeft -= 1 }
+    w.files.set(path, `${w.files.get(path) ?? ''}${line}\n`)
+    return ok()
+  }
+  if (argv[0] === 'sh' && argv[2] === TOUCH) {
+    const path = argv[4] ?? ''
+    if (w.failTouch?.test(path)) return fail()
+    if (!w.files.has(path)) w.files.set(path, '')
+    return ok()
+  }
+  return ok()
+}
+
+// The engine $ a direct call needs (0.10.0 Task 5). The test kit's own $ exposes dispatch verbs
+// only — no fs, env, model or session.id — and the host refuses an engine-$ noun called from a
+// test file ("its hooks module does not call it"), so a test that drives register.tsx's exported
+// functions passes this instead: the world's same answers in the shape the engine gives them
+// ({ value } unwrapped, { deny } thrown).
+export type EngineDouble = {
+  session: { id: () => Promise<string>; cwd: () => Promise<string> }
+  env: { get: (name: string) => Promise<string | undefined>; set: (name: string, value: string | undefined) => Promise<void> }
+  fs: { read: (path: string) => Promise<string>; write: (path: string, text: string) => Promise<void> }
+  ui: { status: (text: string | undefined) => Promise<void>; toast: (text: string) => Promise<void> }
+  process: { run: (argv: string[], init?: { timeoutMs?: number }) => Promise<Exec> }
+  model: { fork: (r: { prompt: string }) => Promise<unknown>; complete: (r: { model: string; prompt: string }) => Promise<unknown> }
+}
+
+export function engine$(w: World): EngineDouble {
+  return {
+    session: {
+      id: async () => w.session.id,
+      cwd: async () => { if (w.failCwd) throw new Error('no cwd'); return w.session.cwd },
+    },
+    env: {
+      get: async (name) => { if (w.failHome && name === 'HOME') throw new Error('no HOME'); return w.env[name] },
+      set: async (name, value) => { if (w.failEnvSet?.(value)) throw new Error('env refused'); w.envSets.push([name, value]) },
+    },
+    fs: {
+      read: async (path) => { const text = w.files.get(path); if (text === undefined) throw new Error(`ENOENT: ${path}`); return text },
+      write: async (path, text) => { if (w.failWrite?.test(path)) throw new Error(`EACCES: ${path}`); w.files.set(path, text) },
+    },
+    ui: { status: async (text) => { w.statuses.push(text) }, toast: async (text) => { w.toasts.push(text) } },
+    process: { run: async (argv, init) => { const r = await exec(w, [...argv], init); if ('deny' in r) throw new Error(r.deny); return r.value } },
+    model: {
+      fork: async (r) => { w.forkPrompts.push(r.prompt); return nextFork(w) },
+      complete: async (r) => { w.completes.push({ model: r.model, prompt: r.prompt }); return nextFork(w) },
+    },
+  }
 }
 
 // A full prompt.compose input: the engine refuses a next() without promptModel.

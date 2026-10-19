@@ -23,6 +23,9 @@ export type AutonomicConfig = {
   // The retired names the operator's setting named, in the order given: the status line says
   // they are now judged. Empty when none were given.
   retired: RetiredRule[]
+  // The model a judgment asks through `$.model.complete` when set (0.10.0 call 8); that call
+  // sees the prompt alone. Absent: the judge forks the session's own model, as before.
+  decidingModel?: string
   // Absent: never.ts's DEFAULT_READERS. Set only when the readers key is given (0.4.3 §3.5).
   readers?: string[][]
   problems: string[]
@@ -67,8 +70,11 @@ export function parseConfig(options: Readonly<Record<string, unknown>> | undefin
     }
   }
   const bell = str(o.bell)
+  // Like `bell`: absent stays absent, and blank is absent.
+  const decidingModel = str(o.decidingModel)
   const base: AutonomicConfig = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, neverApprove, retired, problems }
   // readers: command prefixes separated by ;. An empty string is none.
   const withReaders = typeof o.readers === 'string' ? { ...base, readers: parseReaders(o.readers) } : base
-  return bell === undefined ? withReaders : { ...withReaders, bell }
+  const withModel = decidingModel === undefined ? withReaders : { ...withReaders, decidingModel }
+  return bell === undefined ? withModel : { ...withModel, bell }
 }

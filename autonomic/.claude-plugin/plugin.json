@@ -16,6 +16,11 @@
       "title": "Bell command",
       "description": "A shell command run on each pain signal, with AUTONOMIC_MESSAGE set to one line, for example: curl -d \"$AUTONOMIC_MESSAGE\" ntfy.sh/<topic>. AUTONOMIC_BELL on a spawn overrides it. Unset: toast and band only."
     },
+    "decidingModel": {
+      "type": "string",
+      "title": "Deciding model",
+      "description": "When set (for example claude-sonnet-5-5), every judgment is a plain completion on this model: it sees the prompt alone, no transcript. Unset: the judge forks the session's own model, as before."
+    },
     "loopMax": {
       "type": "number",
       "title": "Pushes in a row with no change",
