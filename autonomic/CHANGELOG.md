@@ -101,14 +101,17 @@ Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared
 - **A failed drop says so** (review 882c): OMP's `dropCommand` catches a remove failure and
   Claude Code's `dropPark` checks the `rm` exit status, both answering
   `could not drop <id>: the store could not be changed` and leaving the park in place.
-- **The store guard resolves `..` and `./` per path word** (review 882c round 3 P0; 882d
-  round 4 P0): `normalizeCallText` resolves `.` and `..` inside each path-like word, never
-  across a word boundary — a `.` segment is dropped, so a leading `./` names the same path,
-  repeated slashes collapse, and a `..` removes only a segment of the same word, never above
-  the root, with a leading `..` left for `namesParkStore` to resolve against the normalized
-  cwd (which takes the same one-word treatment). `autonomic/x/../parks/<id>.json`,
-  `./autonomic/parks/<id>.json`, `./parks/<id>.json` and `./../parks/<id>.json` from the
-  store's parent, `../../parks/<id>.json` from two levels down, a cwd
+- **The store guard reads `..` and `./` in both the whole text and each path word** (review
+  882c round 3 P0; 882d round 4 P0; 882e round 5 P1): `namesParkStore` parks when either
+  resolution names the store. The per-word reading resolves `.` and `..` inside each path-like
+  word — a `.` segment is dropped, so a leading `./` names the same path, repeated slashes
+  collapse, and a `..` removes only a segment of the same word, never above the root — while the
+  whole-text reading resolves a `..` across any character a shell word can hold (space, `+`,
+  `=`, `@`), which the per-word reading cannot. A leading `..` is left for `namesParkStore` to
+  resolve against the normalized cwd (which is likewise read both ways).
+  `autonomic/x/../parks/<id>.json`, `./autonomic/parks/<id>.json`, `./parks/<id>.json` and
+  `./../parks/<id>.json` from the store's parent, `../../parks/<id>.json` from two levels down,
+  `autonomic/x+y/../parks/<id>.json` (and the `x y`, `x=y`, `x@y` spellings), a cwd
   `<storeParent>/x/../parks`, and `../parks/<id>.json` from cwd `<storeParent>/x` now park as
   integrity on both hosts and both of Bash and Write, while `autonomic/x/../parks-notes.md`,
   `./parks-notes.md` and `./../parkside/a.json` stay near misses. Variables, globs,

@@ -168,7 +168,30 @@ describe('the permission reflex (spec §3.3)', () => {
     }
     expect(parks(w)).toHaveLength(10)
   })
-  test('a leading ./ before the mark parks with an unrelated cwd (review 882d round 4 P0)', async ($, on) => {
+  test('a `..` after a non-path character still parks: +, space, = and @ (review 882e round 5 P1)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    w.session.cwd = '/tmp'
+    const B = '/home/u/.local/state/autonomic'
+    for (const path of [
+      `${B}/x+y/../parks/ab12cd34ef56.json`,
+      `${B}/x y/../parks/ab12cd34ef56.json`,
+      `${B}/x=y/../parks/ab12cd34ef56.json`,
+      `${B}/x@y/../parks/ab12cd34ef56.json`,
+    ]) {
+      const command = path.includes(' ') ? `cat > "${path}"` : `cat > ${path}`
+      for (const call of [
+        BASH(command),
+        { tool: 'Write', input: { file_path: path, content: '{}' } } as never,
+      ]) {
+        const r = await $.tool.check(call)
+        expect([path, r.decision]).toEqual([path, 'deny'])
+        expect(String(r.reason)).toContain('operator-only state')
+        expect(String(r.reason)).toContain('parked for the operator')
+      }
+    }
+    expect(parks(w)).toHaveLength(8)
+  })
+  test('a leading ./ before the mark parks with an unrelated cwd', async ($, on) => {
     const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
     w.session.cwd = '/repo'
     const path = './autonomic/parks/ab12cd34ef56.json'

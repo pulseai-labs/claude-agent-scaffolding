@@ -882,6 +882,27 @@ const normalizeRun = (run: string): string => {
 export const normalizeCallText = (text: string): string => shellText(text).replace(PATH_RUN, normalizeRun)
 // A single path (the call's cwd, the configured store): one run, however it is spelled.
 const normalizePathText = (text: string): string => normalizeRun(shellText(text))
+// The whole text resolved as one path, as the guard read it before the per-word split (review
+// 882e round 5 P1): a `..` after any character a shell word can hold — space, `+`, `=`, `@` —
+// removes the segment before it, where the per-word reading ends its run at that character and
+// misses. The two readings each catch spellings the other does not; the guard takes their union.
+const normalizeWholeText = (text: string): string => {
+  const parts = shellText(text).split('/')
+  const kept: string[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]!
+    if (part === '.') continue
+    if (part === '' && i !== 0) continue
+    if (part === '..') {
+      const prev = kept[kept.length - 1]
+      if (prev === undefined || prev === '..') kept.push('..')
+      else if (prev !== '') kept.pop()
+      continue
+    }
+    kept.push(part)
+  }
+  return kept.join('/')
+}
 // A relative path in the normalized text that leads with `..` names nothing until it is read
 // against the call's cwd: `../parks/<id>.json` from a sibling of the store is the store. The
 // normalizer keeps a leading `..` (it cannot climb past a root it does not have), so each such
@@ -914,21 +935,29 @@ const namesStore = (normalized: string, dir: string | undefined, store: string):
   if (relativePaths(normalized, dir).some(p => hasMark(p, mark))) return true
   return dir === mark.slice(0, at) && normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === base || w.startsWith(`${base}/`))
 }
-// Does the whole input, or the call's cwd, name the park store (plan call 3's integrity guard)?
-// The cwd counts twice: any directory inside the store, and the store's parent with a relative
-// `parks/…` path in the text. The pre-check and the plan call this same function, so neither
-// host can see a different store; `store` is the configured store directory when the caller has
-// it, and the fixed mark still holds when it does not.
-export const namesParkStore = (input: unknown, cwd?: string, store?: string): boolean => {
-  const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
-  const normalized = normalizeCallText(text)
-  const dir = cwd === undefined ? undefined : normalizePathText(cwd)
+// One reading's checks, unchanged: the fixed mark, the configured store, and the cwd forms (a
+// directory inside the store, and the store's parent with the store's name relative in the text).
+const namesParkStoreIn = (normalized: string, dir: string | undefined, store: string | undefined): boolean => {
   const relative = dir === undefined ? [] : relativePaths(normalized, dir)
   if (hasMark(normalized, PARKS_DIR_MARK) || relative.some(p => hasMark(p, PARKS_DIR_MARK))) return true
   if (store !== undefined && (namesStore(normalized, dir, store) || relative.some(p => namesStore(p, undefined, store)))) return true
   if (dir === undefined) return false
   return hasMark(dir, PARKS_DIR_MARK) || (/(?:^|\/)autonomic$/.test(dir) &&
     normalized.split(/[^a-z0-9_.\/-]+/).some(w => w === 'parks' || w.startsWith('parks/')))
+}
+// Does the whole input, or the call's cwd, name the park store (plan call 3's integrity guard)?
+// The text is read both as one path (the whole-text resolution) and as path words (the per-word
+// resolution), and the cwd the same way: either reading naming the store parks. Each catches
+// spellings the other misses, and the union only adds stops (skill-first Q3). The cwd counts
+// twice: any directory inside the store, and the store's parent with a relative `parks/…` path in
+// the text. The pre-check and the plan call this same function, so neither host can see a
+// different store; `store` is the configured store directory when the caller has it, and the
+// fixed mark still holds when it does not.
+export const namesParkStore = (input: unknown, cwd?: string, store?: string): boolean => {
+  const text = typeof input === 'string' ? input : input === undefined || input === null ? '' : JSON.stringify(input) ?? ''
+  const texts = [normalizeWholeText(text), normalizeCallText(text)]
+  const dirs = cwd === undefined ? [undefined] : [normalizeWholeText(cwd), normalizeCallText(cwd)]
+  return texts.some(normalized => dirs.some(dir => namesParkStoreIn(normalized, dir, store)))
 }
 
 // The routing check (0.10.0 Task 2): true when a call could name a red line, the park store or a
