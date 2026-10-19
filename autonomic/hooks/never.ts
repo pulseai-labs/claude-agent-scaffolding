@@ -824,11 +824,11 @@ export const ROUTE_WORDS: readonly string[] = [
   // red lines 1–3: the floor's own words. A match here is judged, and the floor may park it.
   'push', 'branch', 'commit', 'rm', 'no-verify',
   // red line 4: a production deploy
-  'deploy', 'publish', 'apply', 'upgrade',
+  'deploy', 'publish', 'apply', 'upgrade', 'rollout', 'destroy',
   // red line 5: spending money
-  'stripe', 'subscribe', 'purchase', 'billing',
+  'stripe', 'subscribe', 'purchase', 'billing', 'payment', 'invoice',
   // red line 6: credentials — the commands that read them and the file shapes that hold them
-  'printenv', 'env', 'security', 'op', 'pass', 'ssh', 'credentials', 'auth.json', 'agent.db', 'pem', 'key',
+  'printenv', 'env', 'security', 'op', 'pass', 'ssh', 'ssh-keygen', 'id_rsa', 'id_ed25519', 'credentials', 'auth.json', 'agent.db', 'pem', 'key', 'shadow', 'secret', 'secrets',
   // the merge gate (operator-owned until Task 10)
   'merge',
   // the park store (Task 3's PARKS_DIR_MARK): a path, matched anywhere in the text

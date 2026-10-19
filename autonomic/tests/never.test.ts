@@ -1259,6 +1259,28 @@ describe('0.10.0 routing', () => {
     expect(routes({ tool: 'bash', input: { command: 'grep -n "push -f" x.ts' } })).toBe(true)
     expect(routes({ tool: 'bash', input: { command: "cat <<'EOF' | sh\ngit push origin main\nEOF" } })).toBe(true)
   })
+  // 0.10.0 follow-up (operator ruling, 2026-10-19): ten more red-line shapes route — the six
+  // first named, then destroy, shadow, secret and secrets. Each route case routes only through
+  // its own new word, so removing that word fails it; each control is the near-miss that must
+  // stay quiet beside it.
+  test('the added red-line 4–6 words route, each beside a control that must stay quiet', () => {
+    const pairs: Array<[string, string]> = [
+      ['ssh-keygen -t ed25519 -f /tmp/k', 'ssh-copy-id host'],
+      ['cat id_rsa', 'cat id_rsa.pub'],
+      ['cat id_ed25519', 'cat id_ed25519.pub'],
+      ['kubectl rollout restart deployment/web', 'kubectl describe deployment web'],
+      ['make payment', 'cat payments.csv'],
+      ['send invoice', 'ls invoices'],
+      ['terraform destroy -auto-approve', 'terraform plan'],
+      ['cat /etc/shadow', 'cat docs/box-shadow.md'],
+      ['vault read secret/db', 'cat docs/secret-handling.md'],
+      ['cat /run/secrets', 'cat docs/secrets-handling.md'],
+    ]
+    for (const [hit, quiet] of pairs) {
+      expect([hit, routes({ tool: 'bash', input: { command: hit } })]).toEqual([hit, true])
+      expect([quiet, routes({ tool: 'bash', input: { command: quiet } })]).toEqual([quiet, false])
+    }
+  })
   test('a quiet call does not route (the adjacent controls)', () => {
     for (const c of ['git status', 'bun test', 'gh release create v1', 'ls -la', 'cat README.md'])
       expect([c, routes({ tool: 'bash', input: { command: c } })]).toEqual([c, false])
