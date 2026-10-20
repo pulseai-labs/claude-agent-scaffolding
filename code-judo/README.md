@@ -62,13 +62,16 @@ This plugin never runs `oss` verbs and never writes to another plugin's state.
 
 ## Lineage
 
-Adapted, with thanks, from two upstreams:
+Adapted, with thanks, from three upstreams:
 
 - Cursor's `thermo-nuclear-code-quality-review` (`cursor/plugins`) — the review posture, the
   standards, the flags and remedies, the approval bar.
 - Matt Pocock's `improve-codebase-architecture`, `codebase-design`, `domain-modeling`, and
   `grilling` (`mattpocock/skills`) — hot-spot scoping, the deletion test, the HTML report
   format, the grilling loop, and the ADR side effects.
+- Dietrich Gebert's `ponytail` (`DietrichGebert/ponytail`, MIT) — `deep-review`'s
+  counterweights to abstraction: need-to-exist, stdlib first, split by job, never-cut, and
+  the concrete-case rule.
 
 Several things were deliberately changed rather than ported — the stopping discipline above is
 one. `CHANGELOG.md` carries the canonical list of departures; issue #382 carries the full port

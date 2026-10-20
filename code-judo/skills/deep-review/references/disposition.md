@@ -35,6 +35,11 @@ Treat each of these as a blocker unless the author justifies it clearly:
 Where the bar is not met, leave explicit, actionable feedback and push for a cleaner
 decomposition. Vague disapproval is not a finding.
 
+**No concrete case, no finding.** Each finding names the code and what it makes harder to
+read, change, or test. Before reporting, re-read the lines and confirm the premise: the
+canonical helper exists, the code really is unused, the caller really reaches through the
+seam.
+
 ## The verdict is advisory
 
 The bar has two outcomes, and a clean change must be able to reach the good one. If no clause
