@@ -12,17 +12,20 @@ export const NEVER_RULES: readonly NeverRule[] = ['force-push', 'default-branch-
 // says the rule is now judged (0.10.0 call 7).
 export const RETIRED_RULES = ['branch-delete', 'rm-outside', 'unreadable'] as const
 export type RetiredRule = (typeof RETIRED_RULES)[number]
+// Settings that retired with the turn-end judge in 0.11.0 (design #873 §5.1). A stored value
+// loads: it is skipped, never a problem, and the status line names it as retired.
+export const RETIRED_SETTINGS = ['loopMax', 'tailChars', 'yieldAtPercent'] as const
+export type RetiredSetting = (typeof RETIRED_SETTINGS)[number]
 
 export type AutonomicConfig = {
   policyPath: string
   bell?: string
-  loopMax: number
-  tailChars: number
-  yieldAtPercent: number
   neverApprove: NeverRule[]
   // The retired names the operator's setting named, in the order given: the status line says
   // they are now judged. Empty when none were given.
   retired: RetiredRule[]
+  // The retired turn-end settings present in the stored config, in RETIRED_SETTINGS order.
+  retiredSettings: RetiredSetting[]
   // The model a judgment asks through `$.model.complete` when set (0.10.0 call 8); that call
   // sees the prompt alone. Absent: the judge forks the session's own model, as before. OMP's
   // isolated side turn always runs the session model, so on OMP a set value is a status line,
@@ -35,11 +38,9 @@ export type AutonomicConfig = {
 
 export const DEFAULTS: AutonomicConfig = {
   policyPath: '~/.claude/autonomic/policy.md',
-  loopMax: 3,
-  tailChars: 4000,
-  yieldAtPercent: 65,
   neverApprove: [...NEVER_RULES],
   retired: [],
+  retiredSettings: [],
   problems: [],
 }
 
@@ -47,18 +48,17 @@ export const DEFAULTS: AutonomicConfig = {
 export const retiredNote = (retired: readonly RetiredRule[]): string | undefined =>
   retired.length === 0 ? undefined : `retired in 0.10.0, now judged: ${retired.join(' ')}`
 
-const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+// The status line a stored turn-end setting earns: absent when none was stored.
+export const retiredSettingsNote = (retired: readonly string[]): string | undefined =>
+  retired.length === 0 ? undefined : `retired in 0.11.0 (the turn end is no longer judged): ${retired.join(' ')}`
+
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v.trim() : undefined)
 
 export function parseConfig(options: Readonly<Record<string, unknown>> | undefined): AutonomicConfig {
   const o = options ?? {}
   const problems: string[] = []
-  let loopMax = num(o.loopMax) ?? DEFAULTS.loopMax
-  if (loopMax < 1) { problems.push(`loopMax=${loopMax} is below 1; using ${DEFAULTS.loopMax}`); loopMax = DEFAULTS.loopMax }
-  let tailChars = num(o.tailChars) ?? DEFAULTS.tailChars
-  if (tailChars < 500) { problems.push(`tailChars=${tailChars} is below 500; using ${DEFAULTS.tailChars}`); tailChars = DEFAULTS.tailChars }
-  let yieldAtPercent = num(o.yieldAtPercent) ?? DEFAULTS.yieldAtPercent
-  if (yieldAtPercent < 1 || yieldAtPercent > 99) { problems.push(`yieldAtPercent=${yieldAtPercent} is outside 1-99; using ${DEFAULTS.yieldAtPercent}`); yieldAtPercent = DEFAULTS.yieldAtPercent }
+  // A stored turn-end setting is ignored, not rejected; the status line names it once.
+  const retiredSettings: string[] = RETIRED_SETTINGS.filter(name => Object.prototype.hasOwnProperty.call(o, name))
   // An empty string is none; an absent value is all four; a retired name is skipped with no
   // problem; an unknown name is reported.
   let neverApprove: NeverRule[] = [...NEVER_RULES]
@@ -74,7 +74,7 @@ export function parseConfig(options: Readonly<Record<string, unknown>> | undefin
   const bell = str(o.bell)
   // Like `bell`: absent stays absent, and blank is absent.
   const decidingModel = str(o.decidingModel)
-  const base: AutonomicConfig = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, loopMax: Math.floor(loopMax), tailChars: Math.floor(tailChars), yieldAtPercent, neverApprove, retired, problems }
+  const base: AutonomicConfig = { policyPath: str(o.policyPath) ?? DEFAULTS.policyPath, neverApprove, retired, retiredSettings, problems }
   // readers: command prefixes separated by ;. An empty string is none.
   const withReaders = typeof o.readers === 'string' ? { ...base, readers: parseReaders(o.readers) } : base
   const withModel = decidingModel === undefined ? withReaders : { ...withReaders, decidingModel }

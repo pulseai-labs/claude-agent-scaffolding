@@ -163,7 +163,9 @@ describe('/autopilot (spec §1)', () => {
     await $.session.start(START)
     let t = (await $.command.run(RUN('status'))).text
     expect(t.startsWith('autopilot (source: env)')).toBe(true)
-    for (const s of ['policy: default', 'yieldAtPercent: 65', 'loopMax: 3', 'tailChars: 4000', 'never-approve: force-push default-branch-push no-verify ai-trailer', 'molt stage: none']) expect(t).toContain(s)
+    for (const s of ['policy: default', 'never-approve: force-push default-branch-push no-verify ai-trailer', 'molt stage: none']) expect(t).toContain(s)
+    // 0.11.0: the turn-end settings and the loop-guard line are gone, and nothing is retired yet.
+    for (const s of ['yieldAtPercent:', 'loopMax:', 'tailChars:', 'pushes in a row with no change', 'retired in 0.11.0']) expect(t).not.toContain(s)
     expect(t).not.toContain('retired in 0.10.0')
     w.files.set(POLICY, 'mine')
     w.files.set('/home/u/.claude/state/molt/stage/s1', '{"stage":"warn","command":65}')

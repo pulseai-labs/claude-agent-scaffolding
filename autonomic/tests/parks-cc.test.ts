@@ -19,7 +19,7 @@ const RUN = (args: string) => ({ command: 'autopilot', args, origin: { kind: 'co
 const fork = (o: object) => ({ isAnswered: true as const, text: JSON.stringify(o) })
 const noopOn = (() => {}) as unknown as On
 // The host's options for this plugin: every declared key at its manifest default.
-const HOST = { policyPath: '~/.claude/autonomic/policy.md', bell: '', loopMax: 3, tailChars: 4000, yieldAtPercent: 65, neverApprove: 'force-push default-branch-push no-verify ai-trailer', readers: 'gh pr create; gh pr edit; gh issue create; gh issue comment' }
+const HOST = { policyPath: '~/.claude/autonomic/policy.md', bell: '', neverApprove: 'force-push default-branch-push no-verify ai-trailer', readers: 'gh pr create; gh pr edit; gh issue create; gh issue comment' }
 const reconfig = (saved: Record<string, unknown> = {}): void => { register(noopOn, { ...HOST, ...saved }) }
 const parkFiles = (w: World) => [...w.files.keys()].filter(p => /\/parks\/[a-f0-9]{12}\.json$/.test(p))
 const thePark = (w: World) => parsePark(w.files.get(parkFiles(w)[0]!)!)
@@ -202,6 +202,17 @@ describe('options the harness cannot inject: driven through the exported functio
       expect(text.split('\n')[0]).toBe('autopilot (source: env)')
       expect(text).toContain('never-approve: force-push')
       expect(text).toContain('retired in 0.10.0, now judged: branch-delete rm-outside')
+      expect(text).not.toContain('settings:')
+    } finally { reconfig() }
+  })
+  test('a stored loopMax, tailChars and yieldAtPercent load with no problem and are listed as retired once (0.11.0)', async ($, on) => {
+    const w = world(on, { env: { AUTONOMIC_MODE: 'autopilot' } })
+    try {
+      reconfig({ loopMax: 3, tailChars: 4000, yieldAtPercent: 95 })
+      const text = await statusReport(engine$(w), 's1')
+      expect(text.match(/retired in 0\.11\.0/g) ?? []).toHaveLength(1)
+      expect(text).toContain('retired in 0.11.0 (the turn end is no longer judged): loopMax tailChars yieldAtPercent')
+      expect(text).not.toContain('yieldAtPercent:')
       expect(text).not.toContain('settings:')
     } finally { reconfig() }
   })

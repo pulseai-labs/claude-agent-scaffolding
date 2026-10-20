@@ -13,7 +13,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renam
 import { execFile } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { DEFAULTS, parseConfig, retiredNote } from '../hooks/config'
+import { DEFAULTS, parseConfig, retiredNote, retiredSettingsNote } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
 import { invokesParkCommand, planPermission, settlePermission } from '../hooks/decide'
 import type { DecideContext, PermissionVerdict, Plan } from '../hooks/decide'
@@ -401,12 +401,13 @@ export function createAutonomic(io: AutonomicIO) {
     const pol = await policyText()
     const stageNow = safeSessionId(id) ? parseStage(await io.readText(stagePath(home(), id))) : undefined
     const retired = retiredNote(cfg.retired)
+    const retiredSettings = retiredSettingsNote(cfg.retiredSettings)
     const lines = [
       `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
       ...(enrolled ? [`authority: ${authority.signal.aborted ? 'suspended; fresh trusted launch required' : authorityState}`] : []),
       `scope: ${rec.scope.length === 0 ? 'none named (what the session has read)' : rec.scope.join(', ')}`,
       `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
-      `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
+      ...(retiredSettings === undefined ? [] : [retiredSettings]),
       `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
       ...(cfg.decidingModel === undefined ? [] : ['decidingModel applies on Claude Code only; OMP decides on the session model']),
       ...(retired === undefined ? [] : [retired]),

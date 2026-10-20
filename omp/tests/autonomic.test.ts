@@ -929,6 +929,15 @@ describe('mode, record and command', () => {
     expect(s).toContain('never-approve: force-push')
   })
 
+  test('a stored loopMax, tailChars and yieldAtPercent load with no problem and are listed as retired once (0.11.0)', async () => {
+    const { a } = world({ files: { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ loopMax: 3, tailChars: 4000, yieldAtPercent: 95 }) } })
+    const s = await a.onCommand('status')
+    expect(s.match(/retired in 0\.11\.0/g) ?? []).toHaveLength(1)
+    expect(s).toContain('retired in 0.11.0 (the turn end is no longer judged): loopMax tailChars yieldAtPercent')
+    expect(s).not.toContain('yieldAtPercent:')
+    expect(s).not.toContain('settings:')
+  })
+
   test('an invalid autonomic.json means the defaults plus a stated problem', async () => {
     const { w, a } = world({ files: { [`${HOME}/.omp/agent/autonomic.json`]: '{nope' } })
     await a.onSessionStart()
