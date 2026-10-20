@@ -140,11 +140,18 @@ export function isIdleStop(reply: string): boolean {
 
 // The waiting-on-operator line (#873): what field 5 hands the operator, for the signal that
 // rings the bell and shows it. It reads the last line labelled `Waiting on operator:` by
-// shape alone — asterisks removed, any spacing — so a block let through after its rewrite
-// still counts (design §5.2, anti-goal 3). The text is redacted like autonomic's pain texts
-// before it leaves the session, cut to one line and 200 characters. `none`, a missing line
-// and any other value are quiet: the signal only adds a notification.
+// shape alone — asterisks and spaces around the label and between its words — so a block
+// let through after its rewrite still counts (design §5.2, anti-goal 3). Only the label
+// span is consumed: the value keeps every character, `*` included (#883 review). The text
+// is redacted like autonomic's pain texts before it leaves the session, cut to one line
+// and 200 characters. `none`, a missing line and any other value are quiet: the signal
+// only adds a notification.
 const WAITING_LABEL = STATUS_LABELS[STATUS_LABELS.length - 1] ?? ''
+const WAITING_LABEL_AT_START = new RegExp(
+  `^[\\s*]*${WAITING_LABEL.replace(/:$/, '').split(/\s+/)
+    .map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('[\\s*]+')}[\\s*]*:[\\s*]*`,
+)
 const WAITING_PREFIX = /^(decision|action)\s*:\s*(.*)$/i
 
 // The line both hosts show and send to the bell (#873), one wording for both.
@@ -153,9 +160,10 @@ export const WAITING_NOTICE = 'seat-mods: waiting on operator — '
 export function waitingOnOperator(reply: string): string | undefined {
   const lines = reply.split('\n')
   for (let i = lines.length - 1; i >= 0; i--) {
-    const line = (lines[i] ?? '').replace(/\*/g, '').trimStart()
-    if (!line.startsWith(WAITING_LABEL)) continue
-    const content = line.slice(WAITING_LABEL.length).trim()
+    const line = lines[i] ?? ''
+    const label = WAITING_LABEL_AT_START.exec(line)
+    if (label === null) continue
+    const content = line.slice(label[0].length).trim()
     if (NONE_AT_START.test(content)) return undefined
     const match = WAITING_PREFIX.exec(content)
     if (match === null) return undefined

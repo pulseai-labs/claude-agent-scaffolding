@@ -180,6 +180,9 @@ describe('waitingOnOperator (#873)', () => {
     expect(waitingOnOperator('**Waiting on operator:** action: rerun CI')).toBe('action: rerun CI')
     expect(waitingOnOperator('  Waiting on operator:   decision: go?  ')).toBe('decision: go?')
   })
+  test('an asterisk in the value is kept', () => {
+    expect(waitingOnOperator('**Waiting on operator:** action: run rm -rf build/*')).toBe('action: run rm -rf build/*')
+  })
   test('a decision word inside other prose is not the line', () => {
     expect(waitingOnOperator('I made the decision: to wait.\n**Waiting on operator:** none')).toBeUndefined()
   })
