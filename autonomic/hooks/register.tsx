@@ -1,7 +1,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
-import type { Pain, PainOption } from '../types'
-import { DEFAULTS, parseConfig, retiredNote } from './config'
+import type { Pain } from '../types'
+import { DEFAULTS, parseConfig, retiredNote, retiredSettingsNote } from './config'
 import type { AutonomicConfig } from './config'
 import { APPEND, CLAIM, PARK_WRITE, TOUCH } from './io'
 import { ledgerLine, ledgerPathFor, oneLine } from './ledger'
@@ -21,9 +21,7 @@ import { parsePermission } from './verdict'
 import { MAX_INPUT, askPrompt, shownInput } from './prompts'
 import { parseAsk } from './verdict'
 import type { Question } from './verdict'
-import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from './floor'
-import { turnEndPrompt } from './prompts'
-import { parseTurn } from './verdict'
+import { parseStage } from './floor'
 import { promptEntry, pushEntry, renderDigest, toolEntry } from './digest'
 import type { Where } from './never'
 
@@ -46,8 +44,6 @@ const notice = atom({ plugin: 'autonomic', key: 'notice' } as const, null as Pai
 
 let cfg: AutonomicConfig = DEFAULTS
 const live = new Map<string, Live>()       // each session's resolved record
-const pushes = new Map<string, number>()   // covered or stalled turn ends in a row with no change
-const changed = new Set<string>()          // sessions that changed something since their last turn end
 const announced = new Set<string>()        // sessions whose carried scope has been announced
 const digests = new Map<string, string[]>()   // each session's turn digest (0.4.0 spec §3.2), memory only
 function note(id: string, entry: string): void { digests.set(id, pushEntry(digests.get(id) ?? [], entry)) }
@@ -226,61 +222,21 @@ async function ring($: Engine, bell: string, message: string): Promise<void> {
 let painSeq = 0   // each notice's seq: rises across a reload too, as it starts from the clock
 
 // A pain signal (spec §3.4): band, toast, bell, and the pain file a launcher may name.
-// It never resumes the run by itself. Options (0.3.0) come only from a turn-end pain: the
-// band shows them as buttons, the bell and the pain file as a numbered list. A credential
-// request (0.4.1) is its own plain-text line after them, never a button.
-async function pain($: Engine, id: string, reason: string, detail: string, options?: readonly PainOption[], credential?: string): Promise<void> {
+// It never resumes the run by itself. #873: no turn-end pain exists, so no pain carries options
+// or a credential; every remaining call passes a reason and a detail only.
+async function pain($: Engine, id: string, reason: string, detail: string): Promise<void> {
   const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
-  const shown = (options ?? []).map(o => ({ label: oneLine(o.label, 40), text: oneLine(o.text, Number.MAX_SAFE_INTEGER), recommended: o.recommended }))
-  shown.sort((a, b) => Number(b.recommended) - Number(a.recommended))
-  // Never cut, as an option's text is not: the end can name where the credential goes (PR #699).
-  const plain = credential === undefined ? undefined : oneLine(credential, Number.MAX_SAFE_INTEGER)
-  const numbered = shown.length === 0 ? text
-    : `${text} · options: ${shown.map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''}`).join(' ')}`
-  const listed = plain === undefined ? numbered : `${numbered} · in plain text: ${plain}`
   painSeq = Math.max(painSeq + 1, Date.now())
-  const value: Pain = shown.length === 0 ? { text, seq: painSeq } : { text, question: oneLine(detail), options: shown, seq: painSeq }
-  if (plain !== undefined && value !== null) value.credential = plain
+  const value: NonNullable<Pain> = { text, seq: painSeq }
   try { await update($, notice, () => value) } catch {}
   $.ui.toast(text)
   const bell = live.get(id)?.bell
   // Not awaited: the bell never gates the hook that paused the session — a hung bell would
   // stall the turn end for the engine's bound (#718). It still rings, and still logs a failure.
-  if (bell !== undefined) void ring($, bell, listed)
+  if (bell !== undefined) void ring($, bell, text)
   const path = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
-  if (path !== '' && !(await appendLine($, path, `${new Date().toISOString()} pain ${listed}`))) await log($, `pain file append failed ${path}`)
-  await log($, `pain session=${id} ${listed}`)
-}
-
-const claimed = new Set<number>()   // notices whose band took a press
-
-// A press on a pain band's option (0.3.0 spec §3.2.3): the operator's decision. The band
-// clears, the ledger records it, and only then does the option's text enter as the
-// operator's prompt. No ledger line, no prompt. One band takes one press. A prompt that does
-// not enter is a pain signal, so the choice is never lost unseen.
-async function choose($: Engine, value: NonNullable<Pain>, o: PainOption): Promise<void> {
-  const seq = value.seq ?? 0
-  if (claimed.has(seq)) return
-  claimed.add(seq)
-  let id = ''
-  try {
-    id = await $.session.id()
-    // A pending credential request outlives the press: it stays as a band of its own (PR #699).
-    const rest: Pain = value.credential === undefined ? null
-      : { text: 'autopilot: pain — still needed in plain text', credential: value.credential, seq: (painSeq = Math.max(painSeq + 1, Date.now())) }
-    try { await update($, notice, cur => (cur?.seq === seq ? rest : cur)) } catch {}
-    if (!(await record($, id, 'operator', value.question ?? value.text, o.label, 'chosen on the pain band'))) return
-    const r = await $.prompt.submit({ text: o.text, asUser: true })
-    if (r.drop !== undefined) await pain($, id, 'option not sent', `${o.label} (${String(r.drop)}): type the reply instead`)
-  } catch (err) {
-    await log($, `band press error ${String(err)}`)
-    await pain($, id, 'option not sent', `${o.label} (${String(err)}): type the reply instead`)
-  } finally {
-    // A failure pain replaces the band: it carries the pending credential request on (PR #699).
-    if (value.credential !== undefined) {
-      try { await update($, notice, cur => (cur === null || cur.credential !== undefined ? cur : { ...cur, credential: value.credential })) } catch {}
-    }
-  }
+  if (path !== '' && !(await appendLine($, path, `${new Date().toISOString()} pain ${text}`))) await log($, `pain file append failed ${path}`)
+  await log($, `pain session=${id} ${text}`)
 }
 
 type Judged<T> = { v: T; usage?: Usage } | { skip: true } | { fail: string }
@@ -289,7 +245,7 @@ type Judged<T> = { v: T; usage?: Usage } | { skip: true } | { fail: string }
 // With decidingModel set (0.10.0 call 8) a judgment is a plain completion on that model, which
 // sees the prompt alone; unset keeps the session fork. Exported for parks-cc.test.ts: the test
 // kit cannot inject register options, so that suite drives the seams with the test's own $.
-export async function judge<T>($: Engine, kind: 'turn-end' | 'ask' | 'permission', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
+export async function judge<T>($: Engine, kind: 'ask' | 'permission', prompt: string, parse: (text: string) => T | undefined): Promise<Judged<T>> {
   for (let attempt = 0; attempt < 2; attempt++) {
     const deciding = cfg.decidingModel
     const r = deciding === undefined ? await $.model.fork({ prompt }) : await $.model.complete({ model: deciding, prompt })
@@ -323,18 +279,18 @@ export async function statusReport($: Engine, id: string): Promise<string> {
   const pol = await policyText($)
   const stageNow = safeSessionId(id) ? parseStage(await readText($, stagePath(await home($), id))) : undefined
   const retired = retiredNote(cfg.retired)
+  const retiredSettings = retiredSettingsNote(cfg.retiredSettings)
   const lines = [
     `${rec.mode} (source: ${rec.source})${rec.problem === undefined ? '' : ` — autopilot refused: ${rec.problem}`}`,
     `scope: ${rec.scope.length === 0 ? 'none named (what the session has read)' : rec.scope.join(', ')}`,
     `policy: ${pol === undefined ? 'missing or empty' : pol === DEFAULT_POLICY.trim() ? 'default' : 'edited'} (${policyPath})`,
-    `yieldAtPercent: ${cfg.yieldAtPercent} (used only without a molt stage file) · loopMax: ${cfg.loopMax} · tailChars: ${cfg.tailChars}`,
+    ...(retiredSettings === undefined ? [] : [retiredSettings]),
     `never-approve: ${cfg.neverApprove.length === 0 ? "none (every command is the fork's to judge)" : cfg.neverApprove.join(' ')}`,
     ...(retired === undefined ? [] : [retired]),
     `readers: ${(cfg.readers ?? DEFAULT_READERS).map(r => r.join(' ')).join('; ') || 'none'}`,
     `molt stage: ${stageNow ?? 'none'}`,
     `ledger: ${await ledgerPath($)}`,
     `bell: ${rec.bell === undefined ? 'not set' : 'set'}; pain file: ${painPath === '' ? 'not set' : painPath}`,
-    `pushes in a row with no change: ${pushes.get(id) ?? 0} of ${cfg.loopMax}`,
   ]
   if (rec.invalid !== undefined) lines.push(`AUTONOMIC_MODE="${rec.invalid}" is not a mode`)
   if (cfg.problems.length > 0) lines.push(`settings: ${cfg.problems.join('; ')}`)
@@ -450,19 +406,6 @@ async function dropPark($: Engine, word: string): Promise<string> {
   return `park ${park.id} is dropped: the call it named parks again.`
 }
 
-// Tools that change nothing: a turn of these alone is no progress for the loop guard.
-const READ_ONLY = new Set(['Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch', 'ToolSearch', 'AskUserQuestion', 'TaskOutput', 'TodoWrite'])
-
-function fillPercent(c: { tokens?: number; window: number; percent?: number }): number | undefined {
-  if (typeof c.percent === 'number') return c.percent
-  return typeof c.tokens === 'number' && c.window > 0 ? (c.tokens / c.window) * 100 : undefined
-}
-
-async function readStatus($: Engine): Promise<string | undefined> {
-  const path = ((await $.env.get('MOLT_STATUS_PATH')) ?? '').trim()
-  return path === '' ? undefined : readText($, path)
-}
-
 // The ask reflex (spec §3.2): answer from the policy and scope, or let the operator see
 // the question and ring. A decision that cannot be recorded is not taken.
 async function askReflex($: Engine, questions: readonly Question[]): Promise<{ questions: readonly Question[]; answers: Record<string, string>; note: string } | undefined> {
@@ -544,7 +487,6 @@ export const register: Register = (on, options) => {
     try {
       const id = await $.session.id()
       if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
-        pushes.delete(id)
         try { if ((await read($, notice)) !== null) await update($, notice, () => null) } catch {}
       }
       const rec = await modeOf($)
@@ -573,7 +515,6 @@ export const register: Register = (on, options) => {
     const prev = await modeOf($)
     if (c.kind === 'off') {
       const off = await save($, id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
-      pushes.delete(id)
       if (off.problem === 'record not writable')
         return { text: `autopilot is off for this session, but its record could not be saved: a molt successor may still start in autopilot. Check that ${sessionPath(await home($), id)} can be written.` }
       return { text: 'autopilot is off for this session: every ask reaches you.' }
@@ -591,7 +532,6 @@ export const register: Register = (on, options) => {
         : rec.problem === 'record not writable' ? `Check that ${sessionPath(h, id)} can be written.` : `Check that ${await ledgerPath($)} can be written.`
       return { text: `autopilot refused: ${rec.problem}. ${fix}` }
     }
-    pushes.delete(id)
     if (scope.length === 0) return { text: 'autopilot is on. The scope is what this session has already read.' }
     const msg = scopeMessage(scope)
     // The host refuses $.prompt.submit here: it would wait on the turn this hook holds.
@@ -623,9 +563,6 @@ export const register: Register = (on, options) => {
       const { tool, tool_use_id, consent, agentId, agent, ...input } = e as unknown as Record<string, unknown>
       note(await $.session.id(), toolEntry(e.tool, input, r as { text?: string; deny?: string; isError?: true }))
     } catch {}
-    try {
-      if (r.deny === undefined && r.isError === undefined && r.isReadOnly !== true && !READ_ONLY.has(e.tool)) changed.add(await $.session.id())
-    } catch {}
     // A deny from a plugin beneath (a seat guard) rings once, keyed as tool.check's deny ring
     // is (#677 F7). A deny from a plugin above autonomic never reaches this hook.
     try {
@@ -639,70 +576,6 @@ export const register: Register = (on, options) => {
       }
     } catch {}
     return r
-  })
-
-  on('classic.Stop', async ($, e, next) => {
-    const r = await next(e)
-    try {
-      const id = e.session_id
-      if ((await modeOf($)).mode !== 'autopilot') return r
-      // Another plugin continues this turn already (molt's command, plan decision 4).
-      if (r.block !== undefined) { await log($, `stop: a block beneath stands session=${id}`); return r }
-      const answer = e.last_assistant_message ?? ''
-      // The turn end is molt's at its handoff command (spec 0.1.1 §2): molt's stage file when
-      // it exists, else the yieldAtPercent fill fallback (molt absent or older).
-      // molt writes the file after its own Stop hook, so the live fill is checked against the
-      // file's effective command too: hook order cannot hide a handoff that is due (final review I2).
-      const stageText = safeSessionId(id) ? await readText($, stagePath(await home($), id)) : undefined
-      const stage = parseStage(stageText)
-      const at = stage === undefined ? cfg.yieldAtPercent : stage === 'off' ? undefined : parseStageCommand(stageText)
-      const fill = at === undefined ? undefined : fillPercent((await $.session.usage()).context)
-      if (hasMoltMarker(answer) || statusYields(await readStatus($)) || stageYields(stage) || (fill !== undefined && at !== undefined && fill >= at)) {
-        pushes.delete(id)
-        changed.delete(id)
-        await record($, id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end')
-        return r
-      }
-      const n = changed.has(id) ? 0 : (pushes.get(id) ?? 0)
-      changed.delete(id)
-      if (n >= cfg.loopMax) {
-        pushes.delete(id)
-        await record($, id, 'pain', 'turn end', 'ask the operator', `autopilot loop: ${n} pushes with no change`)
-        await pain($, id, 'autopilot loop', `${n} turn ends pushed on with no change made`)
-        return r
-      }
-      const j = await judge($, 'turn-end', turnEndPrompt(answer.slice(-cfg.tailChars), (await policyText($)) ?? ''), parseTurn)
-      if ('skip' in j) return r
-      if ('fail' in j) {
-        pushes.delete(id)
-        await record($, id, 'pain', 'turn end', 'ask the operator', j.fail)
-        await pain($, id, 'fork failed', j.fail)
-        return r
-      }
-      const v = j.v
-      if (v.case === 'covered' || v.case === 'stalled') {
-        const a = v.case === 'covered' ? (v.answer ?? '') : (v.next_step ?? '')
-        if (!(await record($, id, v.case, v.question ?? 'turn end', a, v.reason, j.usage))) return r
-        pushes.set(id, n + 1)
-        const bare = a.replace(/[.!]\s*$/, '')
-        const text = v.case === 'covered' ? `Autopilot: ${bare}. Proceed.` : `Autopilot: continue — ${bare}.`
-        return { ...r, block: text }
-      }
-      pushes.delete(id)
-      if (v.case === 'waiting') return r
-      if (v.case === 'done') {
-        await record($, id, 'done', 'turn end', 'stop', v.reason, j.usage)
-        $.ui.toast(`autopilot: done — ${oneLine(v.reason, 160)}`)
-        return r
-      }
-      const asked = v.credential === undefined ? v.question ?? 'turn end' : `${v.question ?? 'turn end'} · in plain text: ${v.credential}`
-      await record($, id, 'pain', asked, 'ask the operator', v.reason, j.usage)
-      await pain($, id, 'pain', v.question ?? v.reason, v.options, v.credential)
-      return r
-    } catch (err) {
-      await log($, `Stop error ${String(err)}`)
-      return r
-    }
   })
 
   on('tool.check', async ($, e, next) => {
@@ -811,52 +684,10 @@ export const register: Register = (on, options) => {
     const value = await read($, notice)
     if (value === null || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
-    const options = value.options ?? []
-    // 0.4.1: a credential request is its own line, typed in plain text; never a button.
-    const plain = value.credential === undefined ? null : <Text wrap="wrap">{`In plain text: ${value.credential}`}</Text>
-    if (options.length === 0 && plain !== null) {
-      return (
-        <Box flexDirection="column">
-          <Text bold>{value.text}</Text>
-          {plain}
-          <Box flexDirection="row">
-            <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, notice, () => null)} />
-          </Box>
-        </Box>
-      )
-    }
-    if (options.length === 0) {
-      return (
-        <Box>
-          <Text>{value.text} </Text>
-          <Button key="dismiss" label="Dismiss" onPress={() => update($, notice, () => null)} />
-        </Box>
-      )
-    }
-    // 0.3.1: the question on its own line, then one row per option. The buttons share one
-    // column, as wide as the longest (its chrome and a gap included) and at most 40% of the
-    // band, so every text wraps in the space to its right. No hotkeys: a bare digit in an empty
-    // prompt presses a band Button, and a typed reply may start with one (PR #689).
-    const labels = options.map(o => (o.recommended ? `${o.label} (Recommended)` : o.label))
-    const width = Math.min(Math.max(...labels.map(l => l.length)) + 8, Math.floor(e.props.bodyColumns * 0.4))
     return (
-      <Box flexDirection="column">
-        <Text bold>{value.text}</Text>
-        {options.map((o, i) => (
-          <Box key={`option-row-${i}`} flexDirection="row">
-            <Box width={width} flexShrink={0}>
-              <Button key={`option-${i}`} label={labels[i]} {...(o.recommended ? { variant: 'primary' as const } : {})} onPress={() => choose($, value, o)} />
-            </Box>
-            <Box flexGrow={1}>
-              <Text wrap="wrap">{o.text}</Text>
-            </Box>
-          </Box>
-        ))}
-        {plain}
-        <Box flexDirection="row">
-          <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, notice, () => null)} />
-          <Text dimColor> or type your own reply</Text>
-        </Box>
+      <Box>
+        <Text>{value.text} </Text>
+        <Button key="dismiss" label="Dismiss" onPress={() => update($, notice, () => null)} />
       </Box>
     )
   })

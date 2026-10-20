@@ -2,6 +2,33 @@
 
 All notable changes to the `autonomic` plugin.
 
+## 0.11.0 — 2026-10-20
+
+The turn-end judge comes off. Autonomic no longer judges, blocks or continues any turn end on
+either host; `AskUserQuestion` and the permission lane are unchanged.
+
+- **No turn-end model call and no turn-end block** (#873, design §5.1–5.2). The Claude Code
+  `classic.Stop` handler, its fork and `turnEndPrompt` are gone; OMP registers no `session_stop`
+  and `omp/turn-end.ts` is deleted. A turn end in autopilot is the session's own: the status
+  block for an orchestrator, the report file for a worker, the operator's own reading in a
+  hand-started session. The operator-waiting signal moved to seat-mods 0.9.0, which rings the
+  bell and shows the `Waiting on operator:` text.
+- **Molt yield and loop guard retired.** With nothing blocking a stop there is nothing to yield
+  or count: the stage-file turn-end read, `yieldAtPercent`, `loopMax`, the `molt` ledger case and
+  the `pushes in a row with no change` status line are gone. molt keeps its own pause and bell.
+- **Three settings retired.** A stored `loopMax`, `tailChars` or `yieldAtPercent` is ignored, not
+  rejected, and `/autopilot status` names each once: `retired in 0.11.0 (the turn end is no
+  longer judged): <names>`. They leave the manifest's `userConfig`.
+- **Ledger cases.** `covered`, `stalled`, `done`, the turn-end `pain` and `molt` are no longer
+  written; old rows stay readable. `ask`, `permission` and `operator` remain.
+- **The OMP policy bundle stays at version 1.** The parser keeps accepting the `turn-end`
+  acceptance key and the `turns`/`remainingSteps` fields and reads neither, so no bundle
+  migration or re-approval. The replay harness drops the turn-end consumer; REPLAY.md's slice 2
+  results stand as they are.
+- **Docs.** The README's turn-end reflex, turn-end pain options, credential band line and molt
+  yield go; the shipped default policy no longer lists the loop guard. crew's orchestrate
+  completion text says "a pain", not "a turn-end pain" (crew 0.4.3).
+
 ## 0.10.0 — 2026-10-19
 
 Autopilot slice 2, PR 1: the red-line floor, routing, the park store, one shared decision.

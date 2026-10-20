@@ -227,9 +227,9 @@ describe('judgeNative — one host call, lease checked before and after', () => 
     w = routingWorld({ grants: [], policy: fixturePolicy() })
     let seen = ''
     w.setNative(async (req, opts) => { seen = opts.purpose; return result() as never })
-    const frame = await captureFrame(w.decisions, performance.now(), 'turn-end', { lastReply: 'x' })
+    const frame = await captureFrame(w.decisions, performance.now(), 'ask', { lastReply: 'x' })
     await judgeNative(frame, request())
-    expect(seen).toBe('autonomic.turn-end')
+    expect(seen).toBe('autonomic.ask')
   })
   test('a selected tuple absent from the policy routes is rejected', async () => {
     w = routingWorld({ grants: [], policy: fixturePolicy() })

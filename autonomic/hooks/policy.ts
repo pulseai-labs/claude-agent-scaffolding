@@ -39,7 +39,6 @@ Leave everything else to the operator.
 - credentials or secrets;
 - a one-way door: data loss, a production deploy, spending money beyond the configured seats; a merged branch's delete after the merge check, a tag and a release are not one-way doors;
 - a hard deny;
-- the autopilot loop guard;
 - a molt pause.
 `
 

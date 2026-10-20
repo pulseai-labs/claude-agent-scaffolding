@@ -1,11 +1,16 @@
-import { afterAll, describe, expect, test } from 'bun:test'
+import { afterAll, beforeEach, describe, expect, test } from 'bun:test'
+import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import ompExtension, { createAutonomic } from '../../autonomic/omp/extension'
 import type { AutonomicIO } from '../../autonomic/omp/extension'
+import type { Grant } from '../../autonomic/hooks/authority'
 import { DEFAULT_POLICY } from '../../autonomic/hooks/policy'
 import { modeFilePath, sessionPath, stagePath } from '../../autonomic/hooks/records'
+import { snapshotAsk } from '../../autonomic/omp/asks'
+import { parsePolicyBundle } from '../../autonomic/omp/judgment'
+import { fixturePolicy, neutralizeSeatRole, restoreSeatRole, routingWorld } from './judgment-world'
 
 const HOME = '/home/u'
 const POLICY = `${HOME}/.claude/autonomic/policy.md`
@@ -142,7 +147,7 @@ describe('OMP live mode file', () => {
       // `ledger not writable` is a real ledger write: the unenrolled floor still records a
       // permission row, so it exercises the same fall the conversational classifier used to.
       else if (reason === 'ledger not writable') await a.onToolCall({ toolName: 'bash', input: { command: 'git push --force origin main' } })
-      else await a.onSessionStop({ last_assistant_message: 'x' })
+      else await a.onCommand('status')
       expect(files.get(MODE_FILE)).toBe('manual')
     })
   }
@@ -207,10 +212,9 @@ describe('OMP live mode file', () => {
 })
 
 describe('manual mode', () => {
-  test('ask and session_stop pass, no ledger line, no fork, no pain', async () => {
+  test('an ask passes in manual mode, no ledger line, no fork, no pain', async () => {
     const { w, a, files } = world()
     expect(await a.onToolCall(ask(Q))).toBeUndefined()
-    expect(await a.onSessionStop({ last_assistant_message: 'Shall I proceed?' })).toBeUndefined()
     expect(w.prompts).toEqual([])
     expect(w.notes).toEqual([])
     expect(files.has(LEDGER)).toBe(false)
@@ -245,73 +249,6 @@ describe('the ask reflex', () => {
     expect(await a.onToolCall(ask(Q))).toBeUndefined()
     expect(w.notes).toEqual([])
     expect(files.has(LEDGER)).toBe(false)
-  })
-})
-
-describe('the turn-end reflex', () => {
-  test('autopilot with no decision service: the stop passes, no continuation, no ledger row', async () => {
-    const { w, a, files } = world({ files: autopilot() })
-    expect(await a.onSessionStop({ last_assistant_message: 'Step complete.' })).toBeUndefined()
-    expect(w.notes).toEqual([])
-    // The ledger path is touched when the session turns autopilot, but no row is written.
-    expect(ledger(w)).toEqual([])
-  })
-
-  test('the bounded reply is read from a message object too', async () => {
-    const { w, a } = world({ files: autopilot() })
-    expect(await a.onSessionStop({ last_assistant_message: { content: [{ type: 'text', text: 'FROM-BLOCKS' }] } })).toBeUndefined()
-    expect(ledger(w)).toEqual([])
-  })
-})
-
-describe('yielding to molt', () => {
-  test('a stage file at command passes without a fork, with a molt ledger line', async () => {
-    const { w, a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'command', command: 65 }) } })
-    expect(await a.onSessionStop({ last_assistant_message: 'working' })).toBeUndefined()
-    expect(ledger(w)[0]).toContain(' · molt · ')
-  })
-
-  test('the fallback stage and the block stage yield too', async () => {
-    for (const stage of ['block', 'fallback']) {
-      const { w, a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage }) } })
-      expect(await a.onSessionStop({ last_assistant_message: 'working' })).toBeUndefined()
-      expect(ledger(w)[0]).toContain(' · molt · ')
-    }
-  })
-
-  test('a below stage does not yield, but a live fill past the file\'s command does', async () => {
-    const files = { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'below', command: 50 }) }
-    // Below the file's command the turn end is not molt's: without a decision service it is still
-    // operator-owned, but molt writes no row.
-    const low = world({ files })
-    low.w.percent = 49
-    expect(await low.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(ledger(low.w)).toEqual([])
-    const high = world({ files })
-    high.w.percent = 50
-    expect(await high.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(ledger(high.w)[0]).toContain(' · molt · ')
-  })
-
-  test('with no stage file, yieldAtPercent (65) is the fallback; a stage of off never yields on fill', async () => {
-    const none = world({ files: autopilot() })
-    none.w.percent = 66
-    expect(await none.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(ledger(none.w)[0]).toContain(' · molt · ')
-    // A stage of off never yields on fill: no molt row is written.
-    const off = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'off' }) } })
-    off.w.percent = 99
-    expect(await off.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(ledger(off.w)).toEqual([])
-  })
-
-  test('the handoff marker in the reply and a child\'s handoff status line yield', async () => {
-    const marker = world({ files: autopilot() })
-    expect(await marker.a.onSessionStop({ last_assistant_message: 'done\nMOLT-HANDOFF: /tmp/h.md' })).toBeUndefined()
-    expect(ledger(marker.w)[0]).toContain(' · molt · ')
-    const status = world({ files: { ...autopilot(), '/st.log': '2026-10-13T00:00:00Z handoff required\n' }, env: { MOLT_STATUS_PATH: '/st.log' } })
-    expect(await status.a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
-    expect(ledger(status.w)[0]).toContain(' · molt · ')
   })
 })
 
@@ -921,7 +858,7 @@ describe('before_agent_start', () => {
 describe('mode, record and command', () => {
   test('AUTONOMIC_MODE=autopilot starts the session in autopilot and publishes the live mode', async () => {
     const { w, a, files } = world({ env: { AUTONOMIC_MODE: 'autopilot' } })
-    expect(await a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
+    await a.onSessionStart()
     expect(w.envSets.at(-1)).toEqual(['AUTONOMIC_EFFECTIVE_MODE', 'autopilot'])
     expect(JSON.parse(files.get(REC())!)).toMatchObject({ mode: 'autopilot', source: 'env' })
     expect(w.statuses.at(-1)).toBe('autopilot')
@@ -969,21 +906,20 @@ describe('mode, record and command', () => {
 
   test('a record that cannot be written ends autopilot and says so; the floor stays', async () => {
     const { w, a } = world({ env: { AUTONOMIC_MODE: 'autopilot' }, failWrite: /sessions/ })
-    expect(await a.onSessionStop({ last_assistant_message: 'x' })).toBeUndefined()
+    await a.onSessionStart()
     expect(w.notes.join('\n')).toContain('the session record could not be saved')
     expect(w.envSets.at(-1)).toEqual(['AUTONOMIC_EFFECTIVE_MODE', 'manual'])
     expect(w.prompts).toEqual([])
     expect((await a.onToolCall({ toolName: 'bash', input: { command: 'git push --force origin main' } }))?.block).toBe(true)
   })
 
-  test('status reports the policy, never-approve list, molt stage and loop count', async () => {
+  test('status reports the policy, never-approve list and molt stage', async () => {
     const { a } = world({ files: { ...autopilot(), [stagePath(HOME, 'S1')]: JSON.stringify({ stage: 'warn' }) } })
     const s = await a.onCommand('status')
     expect(s).toContain('policy: edited (/home/u/.claude/autonomic/policy.md)')
     expect(s).toContain('never-approve: force-push default-branch-push no-verify ai-trailer')
     expect(s).toContain('molt stage: warn')
     expect(s).toContain(`ledger: ${LEDGER}`)
-    expect(s).toContain('pushes in a row with no change: 0 of 3')
   })
 
   test('a retired name in the stored list is shown as judged, and the live list keeps its rules (0.10.0; call 7)', async () => {
@@ -991,6 +927,15 @@ describe('mode, record and command', () => {
     const s = await a.onCommand('status')
     expect(s).toContain('retired in 0.10.0, now judged: branch-delete')
     expect(s).toContain('never-approve: force-push')
+  })
+
+  test('a stored loopMax, tailChars and yieldAtPercent load with no problem and are listed as retired once (0.11.0)', async () => {
+    const { a } = world({ files: { ...autopilot(), [`${HOME}/.omp/agent/autonomic.json`]: JSON.stringify({ loopMax: 3, tailChars: 4000, yieldAtPercent: 95 }) } })
+    const s = await a.onCommand('status')
+    expect(s.match(/retired in 0\.11\.0/g) ?? []).toHaveLength(1)
+    expect(s).toContain('retired in 0.11.0 (the turn end is no longer judged): loopMax tailChars yieldAtPercent')
+    expect(s).not.toContain('yieldAtPercent:')
+    expect(s).not.toContain('settings:')
   })
 
   test('an invalid autonomic.json means the defaults plus a stated problem', async () => {
@@ -1129,7 +1074,6 @@ describe('the omp wiring', () => {
       const sub = b.ctxFor('sub')
       expect(await b.handlers.get('tool_call')!({ toolName: 'bash', input: { command: 'git push --force origin main' } }, sub)).toBeUndefined()
       expect(await b.handlers.get('tool_call')!(ask(Q), sub)).toBeUndefined()
-      expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, sub)).toBeUndefined()
       expect(await b.handlers.get('before_agent_start')!({ systemPrompt: 'B' }, sub)).toBeUndefined()
       await b.handlers.get('tool_result')!({ toolName: 'bash', input: {}, isError: false }, sub)
       await b.handlers.get('session_start')!({}, sub)
@@ -1140,7 +1084,7 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
-  test('the main session in autopilot: the floor blocks and the turn end is operator-owned', async () => {
+  test('the main session in autopilot: the floor blocks and the policy joins the prompt', async () => {
     const b = boot({ mode: 'autopilot' })
     try {
       await b.handlers.get('session_start')!({}, b.ctxFor())
@@ -1149,24 +1093,16 @@ describe('the omp wiring', () => {
       expect(blocked?.block).toBe(true)
       expect(b.state.notices.at(-1)?.[1]).toBe('warning')
       expect(readFileSync(b.ledgerFile, 'utf8')).toContain(' · permission · ')
-      // No decision service is enrolled here, so the turn end is operator-owned: the stop passes
-      // with no continuation and nothing is written for it.
-      expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'Step 2 done.' }, b.ctxFor())).toBeUndefined()
       expect(await b.handlers.get('before_agent_start')!({ systemPrompt: 'BASE' }, b.ctxFor())).toEqual({ systemPrompt: ['BASE', 'WIRING POLICY'] })
     } finally { b.restore() }
   })
 
-  test('the ask reflex through the wiring leaves the ask with the operator; a molt stage yields the stop', async () => {
+  test('the ask reflex through the wiring leaves the ask with the operator', async () => {
     const b = boot({ mode: 'autopilot' })
     try {
       // No decision service: the whole ask stays with the operator and rings.
       expect(await b.handlers.get('tool_call')!(ask(Q), b.ctxFor())).toBeUndefined()
       expect(b.state.notices.join('\n')).toContain('question for you')
-      // A stage file written by molt's glue yields the stop: molt owns the turn end.
-      mkdirSync(join(b.home, '.claude/state/molt/stage'), { recursive: true })
-      writeFileSync(stagePath(b.home, 'W1'), JSON.stringify({ stage: 'command', command: 65 }))
-      expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, b.ctxFor())).toBeUndefined()
-      expect(readFileSync(b.ledgerFile, 'utf8')).toContain(' · molt · ')
     } finally { b.restore() }
   })
 
@@ -1183,12 +1119,20 @@ describe('the omp wiring', () => {
     } finally { b.restore() }
   })
 
-  test('/autopilot reports through ctx.ui.notify; a turn end is operator-owned', async () => {
+  test('/autopilot reports through ctx.ui.notify', async () => {
     const b = boot({ mode: 'autopilot' })
     try {
       await b.commands.get('autopilot')!.handler('status', b.ctxFor())
       expect(b.state.notices.at(-1)![0]).toContain('autopilot (source: env)')
-      expect(await b.handlers.get('session_stop')!({ last_assistant_message: 'x' }, b.ctxFor())).toBeUndefined()
+    } finally { b.restore() }
+  })
+
+  test('autopilot turn end is not judged', () => {
+    const b = boot({ mode: 'autopilot' })
+    try {
+      // #873: no session_stop listener is registered at all, so no turn end can reach the
+      // decision service, block the stop or record a row.
+      expect(b.handlers.has('session_stop')).toBe(false)
     } finally { b.restore() }
   })
 })
@@ -1320,5 +1264,57 @@ describe('a drop whose remove fails answers without a raw exception (review 882c
     const id = m![1]!
     expect(await a.onCommand(`drop ${id}`)).toBe(`could not drop ${id}: the store could not be changed`)
     expect(w.files.has(`${HOME}/.local/state/autonomic/parks/${id}.json`)).toBe(true)
+  })
+})
+
+// #873 Task 5: the OMP policy bundle stays at version 1. The turn-end key, the turn candidates and
+// the remaining steps are still accepted — an approved bundle keeps loading and the permission and
+// ask lanes stay on — and nothing reads them.
+describe('the v1 policy bundle keeps its turn-end keys (Review Focus 5)', () => {
+  beforeEach(neutralizeSeatRole)
+  afterAll(restoreSeatRole)
+
+  const digest = (text: string): string => createHash('sha256').update(text).digest('hex')
+  const PUSH = 'git push origin refs/heads/fixture:refs/heads/fixture'
+  const askGrant: Grant = { id: 'fixture-ask', operation: 'worktree.read',
+    resource: { kind: 'paths', repository: '/fixture/repo', roots: ['/fixture/tree'] }, authorityRefs: ['fixture-approval'] }
+  const pushGrant: Grant = { id: 'fixture-push', operation: 'git.push-own-branch',
+    resource: { kind: 'push', repository: '/fixture/repo', remote: 'origin',
+      sourceRef: 'refs/heads/fixture', destinationRef: 'refs/heads/fixture' }, authorityRefs: ['fixture-approval'] }
+
+  test('a v1 bundle with turn-end keys keeps the permission and ask lanes on', async () => {
+    const askInput = { questions: [{ id: 'q1', question: 'Which plan?', options: [{ label: 'Plan A' }, { label: 'Plan B' }] }] }
+    const snapshot = snapshotAsk(askInput)
+    const policy = fixturePolicy()
+    const askText = 'Synthetic approved task: the fixture-ask grant and its evidence cover this frozen question.'
+    const pushText = 'Synthetic approved task: the fixture-push grant covers the exact origin feature ref push, without force or deletion.'
+    for (const [id, text] of [['fixture-ask-evidence', askText], ['fixture-push-evidence', pushText]] as const) {
+      policy.evidence.push({ ref: { id, source: join(tmpdir(), id), sha256: digest(text), locator: `fixture:${id}` }, text })
+    }
+    policy.approved.questions = snapshot.questions.map(q => ({
+      fingerprint: q.fingerprint, optionIds: q.options.map(o => o.id), complete: true as const,
+      evidenceIds: ['fixture-brief', 'fixture-ask-evidence'], grantIds: ['fixture-ask'],
+      operatorGate: 'none' as const, membership: null, requires: [], excludes: [] }))
+    // The turn-end-only fields an approved bundle carries today: a candidate and a remaining step.
+    // They must not make the bundle malformed, and nothing may read them.
+    policy.approved.turns = [{ id: 'cand-1', case: 'covered',
+      payload: { case: 'covered', answer: 'Proceed with the plan.', reason: 'the plan decides' },
+      evidenceIds: ['fixture-brief'], grantIds: ['fixture-ask'], irreversibleOptionLabels: [] }]
+    policy.approved.remainingSteps = [{ id: 'step-1', text: 'run the suite', grantIds: ['fixture-ask'], evidenceIds: ['fixture-brief'] }]
+    const parsed = parsePolicyBundle(JSON.stringify(policy))
+    expect(parsed.acceptance['turn-end']).toEqual({ minProbability: 1, minConfidence: 1 })
+    expect(parsed).not.toHaveProperty('approved.turns')
+
+    const w = routingWorld({ grants: [askGrant, pushGrant], policy, branch: 'fixture', mode: 'autopilot' })
+    try {
+      w.addRemote('origin', join(w.root, 'out', 'origin.git'))
+      w.setGeneration(async () => ({ replyText: JSON.stringify({ decision: 'allow', red_line: null, reason: 'within the granted task' }) }) as never)
+      // The permission lane still reaches the decision service and releases the granted call.
+      expect(await w.invoke('bash', { command: PUSH, cwd: w.tree })).toBeUndefined()
+      expect(w.generationRequests).toHaveLength(1)
+      // The ask lane still reaches the decision service for an approved question.
+      expect(await w.invoke('ask', askInput)).toBeUndefined()
+      expect(w.nativeRequests).toHaveLength(1)
+    } finally { w.close() }
   })
 })

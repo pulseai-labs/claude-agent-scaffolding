@@ -1,6 +1,10 @@
 // The decision ledger (spec §1, D6): one line per decision autonomic takes in place of
 // the operator. autonomic only appends; the session's own commits carry the file.
 
+// The cases still written: `ask`, `permission`, `pain` (an OMP ask left with the operator, since
+// 0.11.0) and `operator` (an OMP park approved or dropped). `covered`, `stalled`, `done`, the
+// turn-end `pain` and `molt` retired with the turn-end judge in 0.11.0 (#873) and are no longer
+// written; old rows stay readable, so the type keeps them.
 export type LedgerCase = 'covered' | 'stalled' | 'done' | 'pain' | 'molt' | 'ask' | 'permission' | 'operator'
 // Who decided (spec §9, ledger completeness): the floor, the judge, a grant, the operator's
 // approval of a park, or the integrity guard. A row without it is the 0.9.1 line.

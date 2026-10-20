@@ -2,13 +2,14 @@
 
 Autopilot as a Claude Code mod. Requires Claude Code 2.1.289 or later.
 
-The operator plans and grills a piece of work, and then the session still stops to ask: "Shall I
-proceed?", a choice the plan already made, a permission prompt for an operation the plan already
-authorised. In **autopilot**, autonomic answers those stops from standing orders the operator
-owns and from the session's own scope (its spec, plan, grill record or brief). It lets the
-session stop only for a reason on a closed **pain list**, and tells the operator when it does.
-Every decision it takes in the operator's place is one line in a committed **ledger**. It fails
-toward manual: anything broken gives more asks, never fewer.
+The operator plans and grills a piece of work, and then the session still stops to ask: a choice
+the plan already made, a permission prompt for an operation the plan already authorised. In
+**autopilot**, autonomic answers those asks from standing orders the operator owns and from the
+session's own scope (its spec, plan, grill record or brief). A turn end is the session's own:
+autonomic never judges, blocks or continues it, and the policy's closed **pain list** tells the
+session when to stop for the operator. Every decision it takes in the operator's place is one
+line in a committed **ledger**. It fails toward manual: anything broken gives more asks, never
+fewer.
 
 The legacy adapter reads launcher mode variables and Molt files; OMP's opt-in trusted-assignment contract below has additional startup/provenance inputs. Neither route reads crew or multiplexer state.
 
@@ -136,7 +137,7 @@ Option IDs are request-local ordinals, never label text. Labels sent back to the
 | `AUTONOMIC_MODE=autopilot` on a spawn | autopilot from session start |
 | `/autopilot on [doc …]` | autopilot from now; the docs become the scope, and their paths go into the prompt box for one Enter |
 | `/autopilot off` | manual from now |
-| `/autopilot status` | mode, source, scope, policy (`default`, `edited`, or missing), `yieldAtPercent`, `loopMax`, `tailChars`, the enabled never-approve rules, molt's stage for this session (or `none`), ledger, bell, pain file, loop count |
+| `/autopilot status` | mode, source, scope, policy (`default`, `edited`, or missing), the enabled never-approve rules, molt's stage for this session (or `none`), ledger, bell, pain file; a stored retired setting (`loopMax`, `tailChars`, `yieldAtPercent`) is named once as retired |
 | `/autopilot parks` | every open park: id, what stopped it, the call's tool, its key (the command text, or a file tool's whole input JSON), secret-redacted and cut to 160 characters, its cwd, and whether it is approved |
 | `/autopilot approve <id>` | your yes for one use: the exact tool, command text (or file-tool input) and cwd release once within 72 hours |
 | `/autopilot drop <id>` | clears a park; the call it named parks again on its next try |
@@ -196,26 +197,15 @@ Leave everything else to the operator.
 - credentials or secrets;
 - a one-way door: data loss, a production deploy, spending money beyond the configured seats; a merged branch's delete after the merge check, a tag and a release are not one-way doors;
 - a hard deny;
-- the autopilot loop guard;
 - a molt pause.
 ```
 
 ## The reflexes (autopilot only)
 
-**Turn end.** At each turn end one cached fork of the session classifies how the reply ended:
-
-| Case | Meaning | What autonomic does |
-|---|---|---|
-| `covered` | It ends on an ask the policy or scope answers | blocks the stop with `Autopilot: <answer>. Proceed.`; ledger line |
-| `stalled` | It stopped short with no ask and no reason | blocks with `Autopilot: continue — <next step>.`; ledger line |
-| `waiting` | It waits on a background task, agent, monitor or report | lets it stop |
-| `done` | The scope's objective is met | lets it stop; ledger line, toast |
-| `pain` | A reason on the pain list | lets it stop; pain signal with up to three options, ledger line |
-
-The host shows a block as `Stop hook error: <reason>`; the model reads it as an instruction.
-After `loopMax` (3) blocks in a row with no change made — no tool call other than a read that
-ran, was not denied and was not read-only (`ls`, `git status`) — the next turn end is pain ("autopilot loop"). A prompt from you resets
-the count.
+A turn end has no reflex: autonomic never judges, blocks or continues one, in any autopilot
+session (0.11.0, #873). The status block is the orchestrator's own and the report file is a
+worker's; on an orchestrator's status turn, seat-mods rings the bell and shows the text when the
+block says `Waiting on operator: decision: …` or `action: …`.
 
 **`AskUserQuestion`.** The fork judges the questions. When every one has an answer that is
 exactly one of its option labels, autonomic answers in your place, tells the model it did and why,
@@ -400,7 +390,6 @@ first), at most 4,000 characters, newest kept; angle brackets in it are swapped 
 cannot close the block or open a tag of the prompt. The fork may miss a result from earlier in the
 same turn without it. A later instruction from you or the orchestrator counts as part of the task.
 The digest lives in memory only: it never reaches the ledger, the pain file, the bell or the log.
-The turn-end fork does not get it.
 
 ## Permission modes
 
@@ -452,11 +441,11 @@ allow row with `src: operator`.
 
 Path: `AUTONOMIC_LEDGER` when set (relative to the repo root when relative), else
 `<repo root>/.autonomic/ledger.md`, else `<cwd>/.autonomic/ledger.md` outside git. autonomic only
-appends; the session's own commits carry the file. The cases are `covered`, `stalled`, `done`,
-`pain` (the turn end), `ask` (an `AskUserQuestion` answered), `permission` (an ask allowed, or a
-never-approve match kept with you), `operator` (you pressed an option on the pain band:
-`why: chosen on the pain band`), and `molt` — the turn end is molt's handoff, and autonomic let
-it stop (`why: molt owns this turn end`). In a dual-repo project, point
+appends; the session's own commits carry the file. The cases still written are `ask` (an
+`AskUserQuestion` answered), `permission` (an ask allowed, a park, or a never-approve match kept
+with you), `pain` (an OMP ask left with you) and `operator` (an OMP park approved or
+dropped). `covered`, `stalled`, `done`, the turn-end `pain` and `molt` retired with the
+turn-end judge in 0.11.0; old rows stay readable. In a dual-repo project, point
 `AUTONOMIC_LEDGER` at the AI workspace. A ledger that cannot be written ends autopilot, and the
 decision that could not be recorded is not taken.
 
@@ -464,8 +453,7 @@ decision that could not be recorded is not taken.
 
 The list lives in the policy file (default above). A pain signal is:
 
-- a band above the prompt, with a Dismiss button — and, for a turn-end pain, one button per option
-  (see below);
+- a band above the prompt, with a Dismiss button;
 - a toast;
 - the bell: `bell` in `/config`, or `AUTONOMIC_BELL` on a spawn, run as a shell command with
   `AUTONOMIC_MESSAGE` set to one line — for example `curl -d "$AUTONOMIC_MESSAGE" ntfy.sh/<topic>`;
@@ -474,36 +462,12 @@ The list lives in the policy file (default above). A pain signal is:
 
 A pain signal never resumes the run by itself. Your next prompt does.
 
-**Options (since 0.3.0).** For a turn-end pain the fork also offers up to three answers, each a
-label and the instruction the session will follow: at most one recommended, never the
-irreversible side of a one-way door, and never a credential. The band shows the
-question on its own line, then one row per option, the recommended one first as
-`<label> (Recommended)` in the accent style. The buttons share one column (as wide as the longest,
-at most 40% of the band), and each option's whole text wraps beside its button. A last row holds
-Dismiss. No option has a hotkey, so a reply you type that starts with a digit stays yours (this
-layout since 0.3.1). A
-pain with no options keeps its one line. A press is your decision and nothing runs without it: the band clears, the ledger gets an `operator` line, and
-only then does the option's text enter as your own prompt (`asUser`). A ledger that cannot be
-written submits nothing. A prompt that does not enter (a plugin beneath refused it, or the host
-failed) is a new pain signal, `option not sent`, so you can type the reply. One band takes one press. Typing a reply still works, and clears the
-band as before. An option set the fork got wrong in shape (not a list, more than three, an empty
-label or text, a text over 300 characters, two recommended) is dropped whole, and the pain stands with no buttons. The bell
-and the pain file list the options as text — `… · options: 1) <label> (Recommended) 2) <label>` —
-so a remote operator or a herdr parent sees the choices; answering there stays a typed reply.
-Labels and texts are redacted like every pain text.
+A pain never offers buttons: the permission and ask paths write the signal and leave the decision
+with you. The turn-end band's options, its operator press and the `In plain text:` credential
+line retired with the turn-end judge in 0.11.0.
 
-**A credential (since 0.4.1).** A credential or secret you must supply or issue is never an
-option. The fork asks for it in one plain-text line (where to put it, never its value), and the
-other decisions in the same pain keep their options. The band shows that line after the options,
-as `In plain text: <request>`, whole, and it has no button: you type the answer. A press on an
-option leaves that line as a band of its own until you reply, dismiss it, or a later pain replaces
-it (notices do not stack; the pain file and the bell keep the request). The bell, the pain file
-and the ledger end the pain with `· in plain text: <request>`. A pain whose only decision is a
-credential has no options, only the question, that line and Dismiss.
-
-Every other pain signal (never-approve, hard
-deny, loop guard, ledger failure, fork failure, a question or permission left with you) carries no
-options.
+Every pain signal (never-approve, hard deny, ledger failure, fork failure, a question or
+permission left with you) carries no options.
 
 ## With molt
 
@@ -515,15 +479,9 @@ options.
 - **A child's scope is its brief.** A crew child (`MOLT_HANDOFF=parent`) never molts; its
   replacement is a fresh session that takes its mode from `AUTONOMIC_MODE` and its scope from its
   brief and handoff.
-- **molt keeps the turn end.** autonomic neither blocks nor forks when molt's stage file for this
-  session (`~/.claude/state/molt/stage/<id>`, molt 0.2.1+) says `command`, `block` or `fallback`
-  or the live fill has reached the file's `command` (molt may rewrite the file after this hook),
-  when the reply carries a `MOLT-HANDOFF:` line, when `MOLT_STATUS_PATH`'s last line is
-  `handoff required` or `handed-off …`, or when a plugin beneath it has already blocked the stop
-  (molt's command). autonomic follows molt's stage file, so a seeded session whose ladder moved
-  yields at its own handoff command. `yieldAtPercent` applies only without a stage file (molt
-  absent or older, or a file that does not parse): at or above that fill every turn end is molt's.
-  A stage file that says `off` (`/molt off`) turns that fallback off too.
+- **A turn end is the session's own.** autonomic neither blocks nor continues one, so there is
+  nothing to yield to molt: molt's stage file, `MOLT-HANDOFF:` lines and `MOLT_STATUS_PATH` no
+  longer affect autonomic. molt keeps its own pause and bell.
 - **molt rings its own pause.** molt reads `mode` and `bell` from autonomic's record and rings the
   bell when it pauses an autopilot root; autonomic does not ring again.
 
@@ -560,15 +518,13 @@ every change, and removes it at shutdown. Mark a child for autopilot only when t
 |---|---|---|
 | `policyPath` | `~/.claude/autonomic/policy.md` | the policy file |
 | `bell` | unset | the bell command |
-| `loopMax` | 3 | blocks in a row with no change before the loop guard |
-| `tailChars` | 4000 | how much of the last reply the turn-end fork quotes |
-| `yieldAtPercent` | 65 | used only without a molt stage file: context fill at or above which every turn end is molt's |
+| `decidingModel` | unset | the model a judgment asks through a plain completion (Claude Code); unset forks the session's own model |
 | `neverApprove` | all four rules | the never-approve floor rules enforced, separated by spaces or commas: `force-push default-branch-push no-verify ai-trailer` (red lines 1–3). Empty means none (`/autopilot status` says so). A retired 0.9.x name (`branch-delete`, `rm-outside`, `unreadable`) still loads and is skipped; the status line says it is now judged. An unknown name is a settings problem. |
 | `readers` | `gh pr create; gh pr edit; gh issue create; gh issue comment` | command prefixes, separated by `;`, that name a file but never run it: a reader that names a file the command just wrote does not keep that file's words for the never-approve list. Add your own, for example `herdr agent prompt`. Empty means none. `/autopilot status` lists them. |
 
-No `/plugin configure` step is needed: every setting has a default except the optional `bell`.
-A bad number falls back to its default, and an unknown `neverApprove` name is ignored;
-`/autopilot status` and a toast name either.
+No `/plugin configure` step is needed: every setting has a default except the optional `bell` and
+`decidingModel`. A retired turn-end setting (`loopMax`, `tailChars`, `yieldAtPercent`) in a stored
+config is ignored and named on the status line; an unknown `neverApprove` name is reported.
 
 ## Failure behaviour
 
@@ -581,21 +537,20 @@ A bad number falls back to its default, and an unknown `neverApprove` name is ig
 | nothing to fork yet (a session's first response, just after a clear) | the event passes through; an `AskUserQuestion` goes to you |
 
 Log: `~/.claude/state/autonomic/autonomic.log`. It holds one line per fork
-(`fork <turn-end|ask|permission> session=<id>`), each failure, each pain signal and each block
-beneath that stood.
+(`fork <ask|permission> session=<id>`), each failure and each pain signal.
 
 ## Cost
 
-One cached fork at each autopilot turn end, and one at each `AskUserQuestion` and each `ask`
-verdict not on the never-approve list. A fork re-sends the session's own last request, so its
-prefix is served from the prompt cache; the ledger's `usage` field records what each one cost.
+One cached fork at each autopilot `AskUserQuestion` and each permission ask that reaches the
+judge (not settled by the floor). A fork re-sends the session's own last request, so its prefix
+is served from the prompt cache; the ledger's `usage` field records what each one cost. With
+`decidingModel` set it is a plain completion on that model instead.
 
 ## Limits
 
 - Two notices above the prompt do not stack: when molt and autonomic both have one, one shows; the
   other is still in the toast and the log.
-- A herdr worker ping arrives as a typed prompt, so it resets the loop count, as it resets molt's
-  manual pause count.
+- A herdr worker ping arrives as a typed prompt, so it resets molt's manual pause count.
 - With `AUTONOMIC_LEDGER` unset, the ledger is created at `<repo root>/.autonomic/ledger.md`. In a dual-repo
   project's public canonical, set `AUTONOMIC_LEDGER` to the AI workspace, or ignore `.autonomic/` there; a
   launcher patch (crew) is to set it per seat.
@@ -605,7 +560,7 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   hold fetched text. A `/resume` to an earlier session id brings back that id's digest.
 - A host that refuses every `env.set` leaves `AUTONOMIC_EFFECTIVE_MODE` at its previous value; a toast
   says it may be stale.
-- A deny from a plugin that runs above autonomic is not seen; the turn-end check reports it.
+- A deny from a plugin that runs above autonomic is not seen.
 - The Claude Code mod needs Claude Code; on OMP see the OMP section. Codex has no mod runtime.
 
 ## OMP
@@ -636,26 +591,12 @@ prefix is served from the prompt cache; the ledger's `usage` field records what 
   operator. The role/grants binding is Task 8's and stays deferred.
 - The `github` route's bounded facts read the repository's configured remote URLs locally (read-only `git config`) so a PR/API mutation can resolve
   its exact repository from the pinned facts; no network call is made while deciding.
-- There is no band: a turn-end pain lists its options, numbered, in the notice, the bell, the pain file and the human ledger row,
-  recommended first, each with its 40-character one-line label and its complete validated instruction text — the row's answer bound is the
-  content's own length, so a valid multi-option pain is never cut (every other ledger row keeps the shared 300-character clamp). The ask
-  judge sees what the session has read, so a scope document answers an ask only after the session has read it.
-- **Five-state turn end with grounded payloads (Task 7, unactivated).** An enrolled session's stop is classified once, natively, with one
-  `turn_end` choice question whose labels are exactly `covered`, `stalled`, `waiting`, `done` and `pain`. The classification is never
-  authority: before it, the stale-event check, the Molt handoff and the loop guard decide as they always did, and after it the payload must
-  survive `validateTurnPayload` (`omp/turn-end.ts`). `covered` and `stalled` may only repeat an approved remaining step or an approved
-  candidate — byte for byte, with its grants and evidence still live — so a model can render prose and never extend an action. `waiting`
-  needs a real running host job or the verified Molt fact (prose saying “waiting” is not evidence), `done` needs approved completion
-  evidence, and `pain` grounds its question, options and credential-location request in cited evidence. Every reason is the cited rendering
-  `evidenceId: excerpt[start..end]` joined by `; `, so no invented policy line reaches the ledger. No approved action means no payload —
-  the stop escalates instead.
-- **One isolated generation, never a classifier.** With no prebuilt candidate, one `runEphemeralTurn` at `{tools:false, isolated:true,
-  dedupeReply:false}` renders the required fields inside the frozen, redacted state (Task 2's explicit isolation, not `history:[]`). A
-  provider/native failure never calls it, and it never supplies a step the policy does not approve. Native classification and the render
-  stay separately accounted.
+- There is no band: a pain signal is the notice, the bell, the pain file and the human ledger row.
+  The ask judge sees what the session has read, so a scope document answers an ask only after the
+  session has read it.
 - **The conversational OMP classifier is gone.** The old `judge('ask'|'turn-end')` two-attempt fork, its `MIN_ATTEMPT_MS`, `io.ephemeral`,
-  `questionsOf` and the OMP turn digest are removed: an autopilot ask or turn end with no decision service is now operator-owned (the ask
-  passes and rings; the stop passes with no continuation and no ledger row) rather than answered by chat. The shared Claude Code prompts,
+  `questionsOf` and the OMP turn digest are removed: an autopilot ask with no decision service is now operator-owned (the ask
+  passes and rings) rather than answered by chat, and a turn end is never judged or continued. The shared Claude Code prompts,
   parsers and `$.model.fork` are untouched.
 - A process that dies without `session_shutdown` (SIGKILL, crash, shutdown budget) leaves `mode/<pid>`; nothing sweeps these files; a reused pid clears its own at first load, and only children of the dead process could read it.
 - Main limit: if writing the OMP mode file fails AND removing it fails, a stale file can remain. The notice says

@@ -173,8 +173,8 @@ per tick, per live seat, reads it too, and so does the read before a retained se
 unit. A non-empty file holding a line not yet noted is the seat asking upward: autonomic
 stopped it on its pain list, never resumes it and never pings through `NOTIFY_RUN`, so that
 line is the only signal that reaches you. Its state is `blocked` — an ask left at its dialog,
-which the dialog procedure above takes — or idle or done with no new report, a turn-end pain.
+which the dialog procedure above takes — or idle or done with no new report, a pain.
 Read the line and the seat's last report, then answer the seat or take it to the operator as
 any escalation; it is never a failed task. A seat-mods deny on a guarded seat rings nothing of
 its own: seat-mods refuses the call before autonomic sees it, so it reaches you only as a
-turn-end pain line.
+pain line.

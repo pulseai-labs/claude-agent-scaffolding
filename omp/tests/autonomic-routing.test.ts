@@ -1,5 +1,5 @@
 // Integrated OMP judgment routing (Plan Task 8 §10 Steps 1–2): the ordered real-extension dispatch,
-// the three real consumer entrypoints, the acceptance matrix, and the non-acting replay evaluator
+// the two real consumer entrypoints, the acceptance matrix, and the non-acting replay evaluator
 // regressions. Every case drives the real factories through the shared fixture, so what is asserted
 // is the actual denial/block/answer/stop outcome, the number of original-tool receipts and the real
 // ledger writes — never a mock echo or a source-text grep. Every SDK/host import is `import type`:
@@ -9,8 +9,6 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { JudgmentRequest, Question } from '@oh-my-pi/pi-ai'
-import type { ExtensionJudgment } from '@oh-my-pi/pi-coding-agent/extensibility/extensions/types'
 import type { EvidenceRef, Grant, GuardRole } from '../../autonomic/hooks/authority'
 import { shownInput } from '../../autonomic/hooks/prompts'
 import type { Consumer, PolicyBundle } from '../../autonomic/omp/judgment'
@@ -18,7 +16,7 @@ import { canonicalReplayJSON, evaluateReplay, replayCaseDigest, validateReplayMa
 import type { ReplayCase, ReplayDecision, ReplayLabel } from '../../autonomic/omp/replay'
 import molt from '../../molt/omp/extension'
 import seatMods from '../../seat-mods/omp/extension'
-import { fixturePolicy, fixtureUsage, neutralizeSeatRole, restoreSeatRole, routingWorld } from './judgment-world'
+import { fixturePolicy, neutralizeSeatRole, restoreSeatRole, routingWorld } from './judgment-world'
 import type { RoutingWorld } from './judgment-world'
 
 beforeEach(neutralizeSeatRole)
@@ -58,24 +56,6 @@ function setGeneration(w: RoutingWorld, choice: 'allow' | 'ask' = 'allow'): void
   w.setGeneration(async () => ({
     replyText: JSON.stringify({ decision: choice, red_line: null, reason: choice === 'allow' ? 'within the granted task' : 'outside the task' }),
   }) as never)
-}
-
-/** One native turn-end classification: exactly the frozen five-label question, one chosen label. */
-function setNativeTurn(w: RoutingWorld, label: string): void {
-  w.setNative(async (request: JudgmentRequest) => {
-    const ids = Object.keys(request.questions)
-    if (ids.length !== 1 || ids[0] !== 'turn_end') throw new Error(`unexpected turn-end question ids: ${ids.join(',')}`)
-    const question = request.questions['turn_end'] as Question
-    if (question.type !== 'choice') throw new Error('the turn-end question is not a choice')
-    const probabilities: Record<string, number> = {}
-    for (const key of Object.keys(question.criteria)) probabilities[key] = key === label ? 1 : 0
-    return { judgment: { api: 'openrouter-decisions', provider: 'openrouter', model: 'fixture-response',
-        answers: { turn_end: { type: 'choice' as const, choice: label, probabilities, confidence: 1 } },
-        usage: fixtureUsage(1, 1) },
-      route: { requestId: 'fixture-request', purpose: 'extension:fixture:autonomic.turn-end:fixture-request',
-        selected: { api: 'openrouter-decisions', provider: 'openrouter', model: 'fixture-selected' }, questions: 1, cachedQuestions: 0 },
-    } as unknown as ExtensionJudgment<typeof request.questions>
-  })
 }
 
 /**
@@ -221,10 +201,10 @@ describe('a free role still lacks positive authority', () => {
 })
 
 // =====================================================================================
-// Step 1 — the three real consumer entrypoints in one ordered host
+// Step 1 — the two real consumer entrypoints in one ordered host
 // =====================================================================================
 
-describe('the three real consumer entrypoints', () => {
+describe('the two real consumer entrypoints', () => {
   let w: RoutingWorld
   afterEach(() => { if (w) w.close() })
 
@@ -237,17 +217,6 @@ describe('the three real consumer entrypoints', () => {
     expect(r.order).toEqual(['dispatch', 'sidecar', 'human', 'receipt:bash'])
     expect(w.generationRequests).toHaveLength(1)
     expect(w.nativeRequests).toEqual([])
-  })
-
-  test('the turn-end entrypoint stops for the operator when nothing is approved', async () => {
-    // No approved remaining step and no candidate: the payload can never be grounded, so the stop
-    // escalates as pain and no continuation is returned.
-    w = await orderedHost({ grants: [pushGrant()], policy: fixturePolicy() })
-    setNativeTurn(w, 'pain')
-    const stop = await w.handlers.get('session_stop')?.({ last_assistant_message: 'Step complete.', session_id: 'S1' }, w.ctx)
-    expect(stop).toBeUndefined()                       // no continuation injected
-    expect(w.nativeRequests).toHaveLength(1)           // one classification, exactly
-    expect(w.painLines().join('\n')).toContain('pain') // the operator was told
   })
 
   test('an ask batch with no approved fingerprint leaves the whole dialog with the operator', async () => {
@@ -408,9 +377,9 @@ describe('evaluateReplay — the plan\'s verbatim regressions', () => {
       [replayDecision(second, 'release')])).toThrow('replay context binding mismatch')
   })
 
-  for (const outcome of ['release', 'answer', 'continue'] as const) {
+  for (const outcome of ['release', 'answer'] as const) {
     test(`a negative control forbids ${outcome} even when its expected label agrees`, () => {
-      const consumer: Consumer = outcome === 'answer' ? 'ask' : outcome === 'continue' ? 'turn-end' : 'permission'
+      const consumer: Consumer = outcome === 'answer' ? 'ask' : 'permission'
       const c = replayFixture(`contradictory-${outcome}`, { population: 'control', negativeControl: true, consumer })
       const report = evaluateReplay([c], [replayLabel(c, outcome)], [replayDecision(c, outcome)])
       expect(report.control.unsafeAllows).toBe(1)
