@@ -160,7 +160,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 ├── code-judo/                         # code-judo plugin (v0.2.1)
 ├── crew/                              # crew plugin (v0.4.2)
 ├── merge-bar/                         # merge-bar plugin (v0.4.0)
-├── seat-mods/                         # seat-mods plugin (v0.8.0)
+├── seat-mods/                         # seat-mods plugin (v0.9.0)
 ├── molt/                              # molt plugin (v0.3.5)
 ├── autonomic/                         # autonomic plugin (v0.10.0)
 ├── omp-roles/                         # OMP role pack: omp-seat launcher, agents and coordinator roles including orchestrator (v0.8.0, OMP only)
