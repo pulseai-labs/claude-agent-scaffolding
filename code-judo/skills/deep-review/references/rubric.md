@@ -67,6 +67,8 @@ write it. Applied on top of the baseline in `SKILL.md`.
 - Call out feature logic leaking into shared paths, and implementation details leaking
   through interfaces.
 - Prefer the existing canonical utility or helper over a bespoke one-off.
+- Past the codebase, prefer the standard library, a platform feature, or an installed
+  dependency over new code, and new code over a new dependency added for a few lines.
 - Push code toward the right package, service, or module rather than normalizing
   architectural drift.
 
@@ -83,6 +85,7 @@ write it. Applied on top of the baseline in `SKILL.md`.
 Ask these of every meaningful change:
 
 - Is there a code-judo move that would make this dramatically simpler?
+- Does every part of this need to exist, or did the change build for a need nobody stated?
 - Can this change be reframed so fewer concepts, branches, or helper layers are needed?
 - Does this improve or worsen the local architecture?
 - Did the diff add branching complexity where a better abstraction should exist?
@@ -110,6 +113,8 @@ Escalate when you see:
   split out.
 - New conditionals bolted onto unrelated code paths.
 - One-off booleans, nullable modes, or flags that complicate existing control flow.
+- Speculative code: options, config, modes, or extension points nobody uses yet, and
+  abstractions with a single implementation.
 - Feature-specific logic leaking into general-purpose modules.
 - Generic "magic" handling that hides simple structure and makes the code harder to reason
   about.
@@ -152,6 +157,15 @@ When you identify a problem, prefer recommendations of this shape:
 
 **Do not be satisfied with a merely cleaner version of the same messy idea, when there is a
 plausible path to a much simpler idea.**
+
+**Cut along jobs.** Length may trigger a split, as the 1000-line rule does, but the cut
+follows a job. A helper that exists only to make a function shorter adds a concept and
+removes none. Where a deleting remedy and a structuring one both
+fix the problem, recommend the deletion.
+
+**Simplification never removes** validation at a trust boundary, error handling that prevents
+data loss, a security check, or accessibility. A remedy that deletes one of these is not a
+code-judo move.
 
 ## Tone
 
