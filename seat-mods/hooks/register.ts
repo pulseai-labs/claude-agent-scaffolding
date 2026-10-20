@@ -1,17 +1,79 @@
-import type { Register } from 'claude-code'
+import type { EngineInterface, Register } from 'claude-code'
 import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
-import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, rewriteReason, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING } from './status'
+import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, waitingOnOperator, rewriteReason, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, WAITING_NOTICE } from './status'
+import { autonomicPath, parseAutonomic, seatLogPath } from './records'
+
+type Engine = EngineInterface
 
 // The live turn's status state, one session per process: set at prompt.submit,
 // read at classic.Stop, cleared at the main loop's turn.complete. It is defined
 // only inside an orchestrator's turn, so every check below skips otherwise.
 // `warning` is the line of the failure that stood at the last stop — the shape
-// check's or the idle check's (#876) — or undefined.
-let turn: { status: boolean; blocked: boolean; warning: string | undefined } | undefined
+// check's or the idle check's (#876) — or undefined. `notice` is the
+// waiting-on-operator line the status block handed the operator (#873), shown
+// at turn.complete; it is set only on a stop that ends the turn.
+let turn: { status: boolean; blocked: boolean; warning: string | undefined; notice: string | undefined } | undefined
 
 async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
+}
+
+async function home($: Engine): Promise<string> {
+  return (await $.env.get('HOME')) ?? ''
+}
+
+// seat-mods' own log: the bell's failures only. It is created on the first failure;
+// nothing else writes it, and nothing waits on it.
+async function log($: Engine, line: string): Promise<void> {
+  try {
+    await $.process.run(['sh', '-c', 'mkdir -p "$(dirname "$2")" && printf "%s\\n" "$1" >> "$2"',
+      'sh', `${new Date().toISOString()} ${line}`, seatLogPath(await home($))])
+  } catch {}
+}
+
+// seat-mods' copy of molt's bell (#873): BELL_TIMEOUT_MS and ring are byte-identical to
+// molt's, pinned by tests/test-mod-shell-parity.sh. The comment below is molt's own,
+// kept verbatim so the pin compares it.
+
+// One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
+// The engine kills a `process.run` child at 30 s when no bound is given — the same bound
+// molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
+// a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a
+// hung one stays bounded. Nothing waits on it (see `pause`), so this is only a backstop.
+const BELL_TIMEOUT_MS = 30_000
+
+// Rung once and left to finish: the bell never gates the hook that paused the session. A bell
+// that cannot start, throws, or is killed at BELL_TIMEOUT_MS rejects; one that runs and exits
+// non-zero resolves. Both are failures and both are logged once — `log` never throws, so this
+// promise always resolves and nothing is left unhandled (#665 item 4).
+async function ring($: Engine, bell: string, message: string): Promise<void> {
+  try {
+    const r = await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
+    if (r.exitCode !== 0) await log($, `bell failed exit=${r.exitCode}`)
+  } catch (err) {
+    await log($, `bell failed ${String(err)}`)
+  }
+}
+
+// The waiting-on-operator signal (#873): when a stop that ends a status turn hands the
+// operator a decision or an action, and autonomic's record says autopilot, ring its bell
+// (when set) and return the notice to show at turn.complete. It adds a notification only:
+// a missing record, a manual session, a quiet field or a failing read returns undefined.
+async function noticeFor($: Engine, reply: string): Promise<string | undefined> {
+  const text = waitingOnOperator(reply)
+  if (text === undefined) return undefined
+  try {
+    const [homeDir, id] = await Promise.all([home($), $.session.id()])
+    const saved = await $.fs.read(autonomicPath(homeDir, id)).catch(() => undefined)
+    const record = parseAutonomic(typeof saved === 'string' ? saved : undefined)
+    if (record.mode !== 'autopilot') return undefined
+    const notice = `${WAITING_NOTICE}${text}`
+    if (record.bell !== undefined) void ring($, record.bell, notice)
+    return notice
+  } catch {
+    return undefined
+  }
 }
 
 // Where a path lands: the path itself if it stats, else its nearest existing
@@ -143,7 +205,7 @@ export const register: Register = on => {
     // With the prompt confirmed in: a new turn sets the record from its kind; a
     // non-waiting operator prompt typed into the running turn frees it.
     if (e.turnId === undefined) {
-      turn = { status: kind === 'status', blocked: false, warning: undefined }
+      turn = { status: kind === 'status', blocked: false, warning: undefined, notice: undefined }
     } else if (kind === 'operator' && e.wait !== true && turn !== undefined) {
       turn.status = false
     }
@@ -169,15 +231,19 @@ export const register: Register = on => {
       : isIdleStop(reply) ? { reason: IDLE_REASON, warning: IDLE_WARNING } : undefined
     if (failure === undefined) {
       turn.warning = undefined
-      return r
-    }
-    if (turn.blocked) {
+    } else if (turn.blocked) {
       // The one block stands: let this stop through, and mark it for turn.complete.
       turn.warning = failure.warning
-      return r
+    } else {
+      turn.blocked = true
+      return { ...r, block: failure.reason }
     }
-    turn.blocked = true
-    return { ...r, block: failure.reason }
+    // The turn ends here, whether the block passed or was let through after its
+    // one rewrite: a status block that hands the operator a decision or an action
+    // rings in autopilot (#873, design §5.2 — a malformed block that still waits
+    // on the operator rings too).
+    turn.notice = await noticeFor($, reply)
+    return r
   })
 
   on('turn.complete', async ($, e, next) => {
@@ -187,12 +253,19 @@ export const register: Register = on => {
     const state = await roleOf($)
     if (state.kind !== 'free' || state.role !== 'orchestrator') return r
     const warning = turn?.warning
+    const notice = turn?.notice
     // The main turn is over.
     turn = undefined
     // Core's result text repeats `e.answer`; only a text a mod beneath set is
     // output of its own. The warning replaces core's text (the reply would
     // otherwise show twice) and appends after any other, its own last line
     // (review round 2, PR #874; the idle warning takes the same place, #876).
-    return warning === undefined ? r : { ...r, text: r.text === '' || r.text === e.answer ? warning : `${r.text}\n${warning}` }
+    // The waiting-on-operator notice follows the warning, as its own line (#873). The
+    // warning stands in for core's text (the reply would show twice); a notice on a
+    // block that passed appends to the reply, which is still the turn's own text.
+    const added = [warning, notice].filter((line): line is string => line !== undefined)
+    if (added.length === 0) return r
+    const base = warning !== undefined && (r.text === '' || r.text === e.answer) ? '' : r.text
+    return { ...r, text: base === '' ? added.join('\n') : `${base}\n${added.join('\n')}` }
   })
 }
