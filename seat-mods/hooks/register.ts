@@ -19,16 +19,12 @@ async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
 }
 
-async function home($: Engine): Promise<string> {
-  return (await $.env.get('HOME')) ?? ''
-}
-
 // seat-mods' own log: the bell's failures only. It is created on the first failure;
 // nothing else writes it, and nothing waits on it.
 async function log($: Engine, line: string): Promise<void> {
   try {
     await $.process.run(['sh', '-c', 'mkdir -p "$(dirname "$2")" && printf "%s\\n" "$1" >> "$2"',
-      'sh', `${new Date().toISOString()} ${line}`, seatLogPath(await home($))])
+      'sh', `${new Date().toISOString()} ${line}`, seatLogPath((await $.env.get('HOME')) ?? '')])
   } catch {}
 }
 
@@ -64,8 +60,8 @@ async function noticeFor($: Engine, reply: string): Promise<string | undefined> 
   const text = waitingOnOperator(reply)
   if (text === undefined) return undefined
   try {
-    const [homeDir, id] = await Promise.all([home($), $.session.id()])
-    const saved = await $.fs.read(autonomicPath(homeDir, id)).catch(() => undefined)
+    const [homeDir, id] = await Promise.all([$.env.get('HOME'), $.session.id()])
+    const saved = await $.fs.read(autonomicPath(homeDir ?? '', id)).catch(() => undefined)
     const record = parseAutonomic(typeof saved === 'string' ? saved : undefined)
     if (record.mode !== 'autopilot') return undefined
     const notice = `${WAITING_NOTICE}${text}`
