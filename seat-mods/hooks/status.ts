@@ -4,6 +4,8 @@
 // (AI workspace docs/superpowers/plans/2026-10-18-orchestrator-status-block.md
 // and 2026-10-18-idle-stop-status-block.md).
 
+import { redact } from './redact'
+
 export const STATUS_LABELS: readonly string[] = [
   'What I ruled:',
   'What the PR(s) will carry:',
@@ -134,6 +136,34 @@ export function isIdleStop(reply: string): boolean {
   }
   // Next steps is label 2, Waiting on (seats live) 3, Waiting on operator 4.
   return NONE_AT_START.test(content(3)) && NONE_AT_START.test(content(4)) && !NONE_AT_START.test(content(2))
+}
+
+// The waiting-on-operator line (#873): what field 5 hands the operator, for the signal that
+// rings the bell and shows it. It reads the last line labelled `Waiting on operator:` by
+// shape alone — asterisks removed, any spacing — so a block let through after its rewrite
+// still counts (design §5.2, anti-goal 3). The text is redacted like autonomic's pain texts
+// before it leaves the session, cut to one line and 200 characters. `none`, a missing line
+// and any other value are quiet: the signal only adds a notification.
+const WAITING_LABEL = STATUS_LABELS[STATUS_LABELS.length - 1] ?? ''
+const WAITING_PREFIX = /^(decision|action)\s*:\s*(.*)$/i
+
+// The line both hosts show and send to the bell (#873), one wording for both.
+export const WAITING_NOTICE = 'seat-mods: waiting on operator — '
+
+export function waitingOnOperator(reply: string): string | undefined {
+  const lines = reply.split('\n')
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = (lines[i] ?? '').replace(/\*/g, '').trimStart()
+    if (!line.startsWith(WAITING_LABEL)) continue
+    const content = line.slice(WAITING_LABEL.length).trim()
+    if (NONE_AT_START.test(content)) return undefined
+    const match = WAITING_PREFIX.exec(content)
+    if (match === null) return undefined
+    const text = redact(match[2] ?? '').replace(/\s+/g, ' ').trim()
+    if (text === '') return undefined
+    return `${(match[1] ?? '').toLowerCase()}: ${text}`.slice(0, 200)
+  }
+  return undefined
 }
 
 // True only when the reply's last non-empty line is the handoff line. Unlike
