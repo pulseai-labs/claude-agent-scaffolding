@@ -5,11 +5,14 @@
 // must load first, and this check must load last, after molt and autonomic, so their stop blocks
 // win as they do beneath seat-mods on Claude Code (AI workspace spec
 // 2026-10-19-omp-status-block-port-design.md §6.3). omp-seat loads it for the orchestrator only.
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { parseRole } from '../hooks/rules'
-import { STATUS_CONTEXT, rewriteReason, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, isCrewTagged, checkBlock, isIdleStop, hasMoltHandoff } from '../hooks/status'
+import { STATUS_CONTEXT, rewriteReason, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, isCrewTagged, checkBlock, isIdleStop, hasMoltHandoff, waitingOnOperator, WAITING_NOTICE } from '../hooks/status'
+import { autonomicPath, parseAutonomic } from '../hooks/records'
 
 export type StatusTurn = { status: boolean; blocked: boolean; warning: string | undefined }
-type Stop = { block: { decision: 'block'; reason: string } | undefined; warning: string | undefined }
+type Stop = { block: { decision: 'block'; reason: string } | undefined; warning: string | undefined; notice?: string }
 const NOTHING: Stop = { block: undefined, warning: undefined }
 const MOLT_ARM = '/molt-arm '
 
@@ -62,12 +65,22 @@ export function createStatusCheck(roleEnv: () => string | undefined) {
       if (!live.status) { turn = undefined; return NOTHING }
       const reply = replyText(e.last_assistant_message)
       const check = checkBlock(reply)
+      const handoff = hasMoltHandoff(reply)
       // The shape failure first, else the idle failure (#876): one block per turn for both.
-      const failure = hasMoltHandoff(reply) ? undefined
+      const failure = handoff ? undefined
         : !check.ok ? { reason: rewriteReason(check.failed), warning: STATUS_WARNING }
         : isIdleStop(reply) ? { reason: IDLE_REASON, warning: IDLE_WARNING } : undefined
-      if (failure === undefined) { turn = undefined; return NOTHING }
-      if (live.blocked) { turn = undefined; return { block: undefined, warning: failure.warning } }
+      if (failure === undefined) {
+        turn = undefined
+        const waiting = handoff ? undefined : waitingOnOperator(reply)
+        return { block: undefined, warning: undefined, notice: waiting === undefined ? undefined : `${WAITING_NOTICE}${waiting}` }
+      }
+      if (live.blocked) {
+        turn = undefined
+        // A reply let through after its one rewrite may still wait on the operator (#873).
+        const waiting = waitingOnOperator(reply)
+        return { block: undefined, warning: failure.warning, notice: waiting === undefined ? undefined : `${WAITING_NOTICE}${waiting}` }
+      }
       live.blocked = true
       return { block: { decision: 'block', reason: failure.reason }, warning: undefined }
     },
@@ -75,10 +88,45 @@ export function createStatusCheck(roleEnv: () => string | undefined) {
   }
 }
 
+// The waiting-on-operator signal (#873): show the notice and ring autonomic's bell from its
+// session record, in autopilot only. The session id is the one autonomic's OMP adapter
+// records under (extension.ts's io.sessionId(): ctx.sessionManager.getSessionId()). The
+// bell runs detached with a 30 s kill; a non-zero exit, a rejection or a timeout is logged
+// and nothing waits on it.
+type BellHost = { exec(file: string, argv: string[], init: { timeout: number }): Promise<unknown> }
+type StatusContext = {
+  sessionManager?: { getSessionId?: () => string }
+  ui?: { notify?: (text: string, tone: string) => void }
+}
+
+function operatorWaiting(pi: BellHost, ctx: StatusContext, notice: string, home: () => string): void {
+  const id = ctx.sessionManager?.getSessionId?.() ?? ''
+  if (id === '') return
+  let saved: string | undefined
+  try { saved = readFileSync(autonomicPath(home(), id), 'utf8') } catch { return }
+  const record = parseAutonomic(saved)
+  if (record.mode !== 'autopilot') return
+  ctx.ui?.notify?.(notice, 'info')
+  if (record.bell === undefined) return
+  try {
+    void pi.exec('sh', ['-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${record.bell}`, 'sh', notice], { timeout: 30_000 }).then(
+      result => {
+        const exit = result !== null && typeof result === 'object' && 'exitCode' in result ? result.exitCode : undefined
+        if (typeof exit === 'number' && exit !== 0) console.error(`seat-mods: bell failed exit=${exit}`)
+      },
+      error => { console.error(`seat-mods: bell failed ${String(error)}`) },
+    )
+  } catch (error) {
+    console.error(`seat-mods: bell failed ${String(error)}`)
+  }
+}
+
 const main = (ctx: any): boolean => ctx?.agent?.kind === 'main'
 
-export default function (pi: any) {
+export default function (pi: any, deps: { home?: () => string } = {}) {
   const check = createStatusCheck(() => process.env.SEAT_MODS_ROLE)
+  // The record lives under the operator's home in production; tests point it elsewhere.
+  const home = deps.home ?? homedir
   // The check can only add a stop: a throw lets the event through unchanged.
   pi.on('input', (e: any, ctx: any) => {
     try { if (main(ctx)) check.onInput(String(e?.text ?? ''), typeof ctx.isIdle === 'function' ? ctx.isIdle() === true : false) } catch {}
@@ -92,6 +140,7 @@ export default function (pi: any) {
       if (!main(ctx)) return undefined
       const r = check.onSessionStop(e ?? {})
       if (r.warning !== undefined) ctx.ui?.notify?.(r.warning, 'warning')
+      if (r.notice !== undefined) operatorWaiting(pi, ctx, r.notice, home)
       return r.block
     } catch { return undefined }
   })

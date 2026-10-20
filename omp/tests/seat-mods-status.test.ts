@@ -3,6 +3,9 @@
 // sequences are the ones the 2026-10-19 probe observed on omp 18.11.3 (AI workspace
 // docs/superpowers/reports/2026-10-19-omp-status-port-probe.md).
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import statusExtension, { createStatusCheck, replyText } from '../../seat-mods/omp/status-extension'
 import { IDLE_REASON, STATUS_CONTEXT, STATUS_LABELS, STATUS_WARNING, rewriteReason } from '../../seat-mods/hooks/status'
 
@@ -11,6 +14,8 @@ const block = (fields: string[]) => STATUS_LABELS.map((label, i) => `**${label}*
 const GOOD = block(['x', 'x', 'x', 'x', 'x'])
 const IDLE = block(['x', 'x', 'merge #1', 'none', 'none'])
 const ACTION = block(['x', 'x', 'merge #1', 'none', 'action: run /clear'])
+const WAITING = block(['x', 'x', 'x', 'x', 'decision: merge #12 now?'])
+const NOTICE = 'seat-mods: waiting on operator — decision: merge #12 now?'
 const NOTHING = { block: undefined, warning: undefined }
 
 let c: ReturnType<typeof createStatusCheck>
@@ -93,7 +98,7 @@ describe('the stop check', () => {
   })
   test('an operator action is a wait', () => {
     c.onInput('[crew message x] go', true)
-    expect(c.onSessionStop({ last_assistant_message: ACTION })).toEqual(NOTHING)
+    expect(c.onSessionStop({ last_assistant_message: ACTION })).toEqual({ block: undefined, warning: undefined, notice: 'seat-mods: waiting on operator — action: run /clear' })
   })
   test('a molt handoff line ends the turn unchecked', () => {
     c.onInput('[crew message x] go', true)
@@ -109,6 +114,36 @@ describe('the stop check', () => {
   test('the reply may be a message object', () => {
     c.onInput('[crew message x] go', true)
     expect(c.onSessionStop({ last_assistant_message: { role: 'assistant', content: [{ type: 'text', text: GOOD }] } })).toEqual(NOTHING)
+  })
+})
+
+describe('the waiting-on-operator notice (#873)', () => {
+  test('a decision on a passing block is a notice', () => {
+    c.onInput('[crew report reviewer] done', true)
+    expect(c.onSessionStop({ last_assistant_message: WAITING })).toEqual({ block: undefined, warning: undefined, notice: NOTICE })
+  })
+  test('an action on a passing block is a notice', () => {
+    c.onInput('[crew report reviewer] done', true)
+    expect(c.onSessionStop({ last_assistant_message: ACTION }).notice).toBe('seat-mods: waiting on operator — action: run /clear')
+  })
+  test('a reply let through after its rewrite still notices', () => {
+    c.onInput('[crew report reviewer] done', true)
+    expect(c.onSessionStop({ last_assistant_message: BAD }).block).toBeDefined()
+    const second = c.onSessionStop({ last_assistant_message: 'Done.\nWaiting on operator: decision: merge #12 now?', stop_hook_active: true })
+    expect(second).toEqual({ block: undefined, warning: STATUS_WARNING, notice: NOTICE })
+  })
+  test('quiet on none', () => {
+    c.onInput('[crew report reviewer] done', true)
+    expect(c.onSessionStop({ last_assistant_message: GOOD }).notice).toBeUndefined()
+  })
+  test('quiet on a molt handoff', () => {
+    c.onInput('[crew report reviewer] done', true)
+    expect(c.onSessionStop({ last_assistant_message: 'Waiting on operator: decision: go?\nMOLT-HANDOFF: /h.md' }).notice).toBeUndefined()
+  })
+  test('quiet for a non-orchestrator role', () => {
+    const k = createStatusCheck(() => 'implementer')
+    k.onInput('[crew report reviewer] done', true)
+    expect(k.onSessionStop({ last_assistant_message: WAITING }).notice).toBeUndefined()
   })
 })
 
@@ -183,5 +218,117 @@ describe('wiring', () => {
     expect(await h.get('input')!({ text: '[crew report reviewer] done' }, ctx)).toBeUndefined()
     expect(await h.get('before_agent_start')!({ prompt: '[crew report reviewer] done' }, ctx)).toBeUndefined()
     expect(await h.get('session_stop')!({ last_assistant_message: BAD }, ctx)).toBeUndefined()
+  })
+})
+
+// The OMP half of #873: the handler shows the notice and runs the bell from autonomic's
+// record. The bell is detached with a 30 s kill; a failure is logged and never blocks.
+describe('the waiting-on-operator wiring (#873)', () => {
+  type Handler = (e: unknown, c: unknown) => unknown
+  const ambientRole = process.env.SEAT_MODS_ROLE
+  const ambientHome = process.env.HOME
+  const dirs: string[] = []
+  afterEach(() => {
+    if (ambientRole === undefined) delete process.env.SEAT_MODS_ROLE; else process.env.SEAT_MODS_ROLE = ambientRole
+    if (ambientHome === undefined) delete process.env.HOME; else process.env.HOME = ambientHome
+    for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
+  })
+  const recordHome = (record: string): string => {
+    const dir = mkdtempSync(join(tmpdir(), 'seat-mods-873-'))
+    dirs.push(dir)
+    mkdirSync(join(dir, '.claude/state/autonomic/sessions'), { recursive: true })
+    writeFileSync(join(dir, '.claude/state/autonomic/sessions/s1.json'), record)
+    return dir
+  }
+  const load = (exec: (...args: unknown[]) => Promise<unknown>) => {
+    const handlers = new Map<string, Handler>()
+    statusExtension({ on: (name: string, fn: Handler) => { handlers.set(name, fn) }, exec }, { home: () => process.env.HOME ?? '' })
+    return handlers
+  }
+  const mainCtx = (notes: unknown[][]) =>
+    ({ agent: { kind: 'main' }, isIdle: () => true, sessionManager: { getSessionId: () => 's1' }, ui: { notify: (...a: unknown[]) => { notes.push(a) } } })
+  const stop = async (handlers: Map<string, Handler>, ctx: unknown, reply: string): Promise<unknown> => {
+    await handlers.get('input')!({ text: '[crew report reviewer] done', source: 'interactive' }, ctx)
+    return handlers.get('session_stop')!({ last_assistant_message: reply, stop_hook_active: false }, ctx)
+  }
+
+  test('autopilot: the notice is shown and the bell runs once', async () => {
+    process.env.SEAT_MODS_ROLE = 'orchestrator'
+    process.env.HOME = recordHome('{"mode":"autopilot","bell":"notify-me"}')
+    const execs: unknown[][] = []
+    const handlers = load(async (...args: unknown[]) => { execs.push(args); return { exitCode: 0 } })
+    const notes: unknown[][] = []
+    expect(await stop(handlers, mainCtx(notes), WAITING)).toBeUndefined()
+    expect(notes).toEqual([[NOTICE, 'info']])
+    expect(execs.length).toBe(1)
+    expect(execs[0]?.[0]).toBe('sh')
+    const argv = execs[0]?.[1] as string[]
+    expect(argv.at(-1)).toBe(NOTICE)
+    expect(argv[1]).toContain('AUTONOMIC_MESSAGE')
+    expect(execs[0]?.[2]).toEqual({ timeout: 30_000 })
+  })
+
+  test('autopilot without a bell still shows the notice', async () => {
+    process.env.SEAT_MODS_ROLE = 'orchestrator'
+    process.env.HOME = recordHome('{"mode":"autopilot"}')
+    const execs: unknown[][] = []
+    const handlers = load(async (...args: unknown[]) => { execs.push(args); return { exitCode: 0 } })
+    const notes: unknown[][] = []
+    expect(await stop(handlers, mainCtx(notes), WAITING)).toBeUndefined()
+    expect(notes).toEqual([[NOTICE, 'info']])
+    expect(execs).toEqual([])
+  })
+
+  test('manual mode, and no record at all: quiet', async () => {
+    process.env.SEAT_MODS_ROLE = 'orchestrator'
+    process.env.HOME = recordHome('{"mode":"manual","bell":"notify-me"}')
+    const execs: unknown[][] = []
+    const handlers = load(async (...args: unknown[]) => { execs.push(args); return { exitCode: 0 } })
+    const notes: unknown[][] = []
+    expect(await stop(handlers, mainCtx(notes), WAITING)).toBeUndefined()
+    expect(notes).toEqual([])
+    expect(execs).toEqual([])
+    const empty = mkdtempSync(join(tmpdir(), 'seat-mods-873-'))
+    dirs.push(empty)
+    process.env.HOME = empty
+    expect(await stop(handlers, mainCtx(notes), WAITING)).toBeUndefined()
+    expect(notes).toEqual([])
+    expect(execs).toEqual([])
+  })
+
+  test('a bell that exits non-zero is logged and does not block', async () => {
+    process.env.SEAT_MODS_ROLE = 'orchestrator'
+    process.env.HOME = recordHome('{"mode":"autopilot","bell":"exit 3"}')
+    const errors: unknown[][] = []
+    const original = console.error
+    console.error = (...args: unknown[]) => { errors.push(args) }
+    try {
+      const handlers = load(async () => ({ exitCode: 3 }))
+      const notes: unknown[][] = []
+      expect(await stop(handlers, mainCtx(notes), WAITING)).toBeUndefined()
+      expect(notes).toEqual([[NOTICE, 'info']])
+      await Promise.resolve()
+      expect(errors.flat().join(' ')).toContain('bell failed exit=3')
+    } finally {
+      console.error = original
+    }
+  })
+
+  test('a bell that rejects is logged and does not block', async () => {
+    process.env.SEAT_MODS_ROLE = 'orchestrator'
+    process.env.HOME = recordHome('{"mode":"autopilot","bell":"sleep 60"}')
+    const errors: unknown[][] = []
+    const original = console.error
+    console.error = (...args: unknown[]) => { errors.push(args) }
+    try {
+      const handlers = load(async () => { throw new Error('timed out after 30000ms') })
+      const notes: unknown[][] = []
+      expect(await stop(handlers, mainCtx(notes), WAITING)).toBeUndefined()
+      expect(notes).toEqual([[NOTICE, 'info']])
+      await Promise.resolve()
+      expect(errors.flat().join(' ')).toContain('bell failed Error: timed out after 30000ms')
+    } finally {
+      console.error = original
+    }
   })
 })
