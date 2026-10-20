@@ -191,7 +191,7 @@ function jsonCompatible(value: unknown, what: string, depth = 0): void {
   for (const entry of Object.values(value as Record<string, unknown>)) jsonCompatible(entry, what, depth + 1)
 }
 
-const CONSUMERS: readonly Consumer[] = ['permission', 'ask', 'turn-end']
+const CONSUMERS: readonly Consumer[] = ['permission', 'ask']
 const POPULATIONS: readonly ReplayCase['population'][] = ['historical', 'control']
 const OUTCOMES: readonly ReplayLabel['expected'][] = ['operator', 'release', 'answer', 'continue', 'wait', 'done']
 const SPLITS: readonly ReplayLabel['split'][] = ['calibration', 'holdout']

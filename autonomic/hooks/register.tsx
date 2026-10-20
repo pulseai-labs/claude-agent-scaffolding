@@ -222,25 +222,21 @@ async function ring($: Engine, bell: string, message: string): Promise<void> {
 let painSeq = 0   // each notice's seq: rises across a reload too, as it starts from the clock
 
 // A pain signal (spec §3.4): band, toast, bell, and the pain file a launcher may name.
-// It never resumes the run by itself. A credential request (0.4.1) is its own plain-text
-// line, never a button. #873: a turn-end pain no longer exists, so no pain carries options.
-async function pain($: Engine, id: string, reason: string, detail: string, credential?: string): Promise<void> {
+// It never resumes the run by itself. #873: no turn-end pain exists, so no pain carries options
+// or a credential; every remaining call passes a reason and a detail only.
+async function pain($: Engine, id: string, reason: string, detail: string): Promise<void> {
   const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
-  // Never cut, as an option's text is not: the end can name where the credential goes (PR #699).
-  const plain = credential === undefined ? undefined : oneLine(credential, Number.MAX_SAFE_INTEGER)
-  const listed = plain === undefined ? text : `${text} · in plain text: ${plain}`
   painSeq = Math.max(painSeq + 1, Date.now())
   const value: NonNullable<Pain> = { text, seq: painSeq }
-  if (plain !== undefined) value.credential = plain
   try { await update($, notice, () => value) } catch {}
   $.ui.toast(text)
   const bell = live.get(id)?.bell
   // Not awaited: the bell never gates the hook that paused the session — a hung bell would
   // stall the turn end for the engine's bound (#718). It still rings, and still logs a failure.
-  if (bell !== undefined) void ring($, bell, listed)
+  if (bell !== undefined) void ring($, bell, text)
   const path = ((await $.env.get('AUTONOMIC_PAIN_PATH')) ?? '').trim()
-  if (path !== '' && !(await appendLine($, path, `${new Date().toISOString()} pain ${listed}`))) await log($, `pain file append failed ${path}`)
-  await log($, `pain session=${id} ${listed}`)
+  if (path !== '' && !(await appendLine($, path, `${new Date().toISOString()} pain ${text}`))) await log($, `pain file append failed ${path}`)
+  await log($, `pain session=${id} ${text}`)
 }
 
 type Judged<T> = { v: T; usage?: Usage } | { skip: true } | { fail: string }
@@ -687,19 +683,6 @@ export const register: Register = (on, options) => {
     const value = await read($, notice)
     if (value === null || e.props.hasSurvey) return next(e)
     const { Box, Button, Text } = $.ui.resolve(e)
-    // 0.4.1: a credential request is its own line, typed in plain text; never a button.
-    const plain = value.credential === undefined ? null : <Text wrap="wrap">{`In plain text: ${value.credential}`}</Text>
-    if (plain !== null) {
-      return (
-        <Box flexDirection="column">
-          <Text bold>{value.text}</Text>
-          {plain}
-          <Box flexDirection="row">
-            <Button key="dismiss" label="Dismiss" role="dismiss" onPress={() => update($, notice, () => null)} />
-          </Box>
-        </Box>
-      )
-    }
     return (
       <Box>
         <Text>{value.text} </Text>

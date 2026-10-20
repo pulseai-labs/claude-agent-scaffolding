@@ -11,8 +11,6 @@ import { oneLine } from '../hooks/ledger'
 import { MAX_INPUT, shownInput } from '../hooks/prompts'
 import { inputShape } from '../hooks/shape'
 import { parseUniqueJSON } from '../hooks/strict-json'
-import { TURN_CASES, parseTurn } from '../hooks/verdict'
-import type { TurnCase, TurnVerdict } from '../hooks/verdict'
 import { sha256 } from './authority-store'
 
 export type Consumer = 'permission' | 'ask' | 'turn-end'
@@ -32,16 +30,15 @@ export type ApprovedQuestion = {
   membership: Record<string, 'yes' | 'no'> | null
   requires: Array<[string, string]>; excludes: Array<[string, string]>
 }
-export type ApprovedTurnCandidate = {
-  id: string; case: TurnCase; payload: TurnVerdict; evidenceIds: string[]
-  grantIds: string[]; irreversibleOptionLabels: string[]
-}
 export type ApprovedDecisions = {
   commands: Array<{ grantId: string; argv: string[]; cwd: string; evidenceIds: string[] }>
   permissions: Array<{ inputSha256: string; grantIds: string[]; decision: 'allow' | 'ask'; evidenceIds: string[] }>
   questions: ApprovedQuestion[]
-  turns: ApprovedTurnCandidate[]
-  remainingSteps: Array<{ id: string; text: string; grantIds: string[]; evidenceIds: string[] }>
+  // #873 Task 5: a version-1 bundle still carries the turn-end-only `turns` and `remainingSteps`.
+  // The parser requires both keys so an approved bundle keeps loading; it stores neither, and
+  // nothing reads them.
+  turns?: unknown
+  remainingSteps?: unknown
 }
 export type PolicyBundle = {
   version: 1; text: string; acceptance: AcceptancePolicy
@@ -368,22 +365,6 @@ function pairs(value: unknown, optionIds: readonly string[]): Array<[string, str
   })
 }
 
-function turnCandidate(value: unknown): ApprovedTurnCandidate {
-  const o = exactObject(value, ['id', 'case', 'payload', 'evidenceIds', 'grantIds', 'irreversibleOptionLabels'])
-  const kase = opaque(o.case)
-  if (!(TURN_CASES as readonly string[]).includes(kase)) throw new Error('unknown turn candidate case')
-  const payload = parseTurn(JSON.stringify(o.payload))
-  if (payload === undefined || payload.case !== kase) throw new Error('invalid turn candidate payload')
-  const irreversible = strings(o.irreversibleOptionLabels)
-  // A payload that recommends one of the candidate's own irreversible options never reaches the
-  // validator: `payloadForTurn` returns the unique live candidate directly. Rejecting it at parse
-  // disables the route, exactly as the bundle's other invariants do.
-  if (payload.options?.some(opt => opt.recommended && irreversible.includes(opt.label)))
-    throw new Error('an approved turn candidate recommends an irreversible option')
-  return { id: opaque(o.id), case: kase as TurnCase, payload, evidenceIds: strings(o.evidenceIds),
-    grantIds: strings(o.grantIds), irreversibleOptionLabels: irreversible }
-}
-
 function approved(value: unknown): ApprovedDecisions {
   const o = exactObject(value, ['commands', 'permissions', 'questions', 'turns', 'remainingSteps'])
   const list = (v: unknown, decode: (x: unknown) => unknown): unknown[] => (Array.isArray(v) ? v.map(decode) : (() => { throw new Error('expected a finite list') })())
@@ -399,14 +380,18 @@ function approved(value: unknown): ApprovedDecisions {
     if (grantIds.length === 0) throw new Error('an approved permission needs a grant reference')
     return { inputSha256: hex(p.inputSha256), grantIds, decision: p.decision, evidenceIds: strings(p.evidenceIds) }
   }) as ApprovedDecisions['permissions']
-  const remainingSteps = list(o.remainingSteps, v => {
+  // #873 Task 5: a version-1 bundle still carries the turn-end-only fields. `turns` may hold any
+  // array entries (a legacy candidate included) and `remainingSteps` keeps its exact shape check;
+  // neither is stored or read, so an unchanged approved bundle keeps the permission and ask lanes on.
+  if (!Array.isArray(o.turns)) throw new Error('expected a finite list')
+  list(o.remainingSteps, v => {
     const s = exactObject(v, ['id', 'text', 'grantIds', 'evidenceIds'])
     return { id: opaque(s.id), text: opaque(s.text), grantIds: strings(s.grantIds), evidenceIds: strings(s.evidenceIds) }
-  }) as ApprovedDecisions['remainingSteps']
+  })
   const questions = list(o.questions, question) as ApprovedQuestion[]
   // Two approved questions for one frozen fingerprint would make the match ambiguous (Plan Task 6 §8).
   if (new Set(questions.map(q => q.fingerprint)).size !== questions.length) throw new Error('duplicate approved fingerprint')
-  return { commands, permissions, questions, turns: list(o.turns, turnCandidate) as ApprovedTurnCandidate[], remainingSteps }
+  return { commands, permissions, questions }
 }
 
 function hex(value: unknown): string {

@@ -1,13 +1,14 @@
 // autonomic on OMP (omp 18.8.9): maps omp's extension events onto autonomic's pure modules (../hooks) so an OMP
-// coordinator in autopilot gets the ask reflex, the turn-end reflex and the never-approve floor. Loaded only by
+// coordinator in autopilot gets the ask reflex, the permission lanes and the never-approve floor. Loaded only by
 // omp-seat with -e (never ambient). It imports autonomic's own pure modules and node: builtins only; omp's host
 // types are `any`, so this file imports in plain bun. Every rule, threshold, text and pain list is in ../hooks.
 // 0.10.0 Task 7a: the operator-route integrity guard and the park/release key are shared there too.
 //
-// What does not port from hooks/register.tsx, and why: the pain band and its option buttons (no band on OMP: the
-// options are listed in the notice and the pain file), the permission fork (OMP seats run --approval-mode yolo,
-// so no permission prompt exists; the floor is a tool_call block instead), and the hard-deny ring (a call that a
-// seat guard blocks emits no tool_result, so there is nothing to observe).
+// What does not port from hooks/register.tsx, and why: the pain band (no band on OMP), the permission fork (OMP
+// seats run --approval-mode yolo, so no permission prompt exists; the floor is a tool_call block instead), and the
+// hard-deny ring (a call that a seat guard blocks emits no tool_result, so there is nothing to observe).
+// #873 Task 5: omp no longer registers a session_stop listener: the turn end is the session's own, no model call
+// and no block, and the v1 policy bundle's turn-end keys are accepted but unread.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { execFile } from 'node:child_process'
 import { dirname, join, resolve } from 'node:path'
@@ -16,7 +17,7 @@ import { DEFAULTS, parseConfig, retiredNote } from '../hooks/config'
 import type { AutonomicConfig } from '../hooks/config'
 import { invokesParkCommand, planPermission, settlePermission } from '../hooks/decide'
 import type { DecideContext, PermissionVerdict, Plan } from '../hooks/decide'
-import { hasMoltMarker, parseStage, parseStageCommand, stageYields, statusYields } from '../hooks/floor'
+import { parseStage } from '../hooks/floor'
 import { ledgerLine, ledgerPathFor, oneLine } from '../hooks/ledger'
 import type { LedgerCase, LedgerSource } from '../hooks/ledger'
 import { parseCommand, parseEnvMode, resolveDoc, statusText } from '../hooks/mode'
@@ -32,16 +33,14 @@ import { lineagePath, logPath, modeFilePath, parseLineageFrom, parseRecord, safe
 import type { SessionRecord } from '../hooks/records'
 import { shape } from '../hooks/shape'
 import { parsePermission } from '../hooks/verdict'
-import type { TurnCase, TurnVerdict } from '../hooks/verdict'
 import { captureLaunchBinding } from '../hooks/authority'
 import { launchWorkerRoots } from '../bin/authority'
 import { PinnedAuthority, placementFacts } from './authority-store'
 import type { AuthorityLease } from '../hooks/authority'
-import { acceptedChoice, captureFrame, judgeNative, parsePolicyBundle } from './judgment'
-import type { ConsumerHost, DecisionDraft, DecisionFrame, DecisionIO } from './judgment'
+import { captureFrame, judgeNative, parsePolicyBundle } from './judgment'
+import type { ConsumerHost, DecisionDraft, DecisionIO } from './judgment'
 import { commitDecision } from './decision-ledger'
 import { assembleAsk, holdsSecret, planAsk, snapshotAsk } from './asks'
-import { payloadForTurn, stateHoldsSecret, turnEvidence } from './turn-end'
 
 type Live = SessionRecord & { problem?: string; invalid?: string }
 
@@ -81,57 +80,6 @@ export type AutonomicIO = {
 
 const CONFIG_PATH = '.omp/agent/autonomic.json'
 const USAGE_TEXT = 'usage: /autopilot on [scope doc …] | off | status | parks | approve <park> | drop <park>'
-// omp 18.8.9's built-in tools (the binary's tool registry, the same enumeration molt/omp/core.ts records), each
-// decided once. Read-only, so a turn of these alone is no progress for the loop guard:
-//   read, grep, glob, find, ast_grep, web_search, fetch, ls, ask, todo, wait, think, recall, reflect
-// Everything else counts as a change: bash, write, edit, apply_patch, eval, js, python, notebook, github,
-// browser, puppeteer, computer, debug, ida, task, checkpoint, rewind, context_notes, new_context, memory_edit,
-// retain, learn, manage_skill, generate_image, tts, vibe_*, mcp__* and extension tools. An unknown tool is a change.
-// Three tools are decided by their call (changedBy): ast_edit's own result is a preview and changes nothing (omp stages
-// a pending action that a later `write xd://resolve` applies and `xd://reject` discards); lsp edits files only through
-// rename and rename_file (unless apply is false) and code_actions with apply true.
-const READ_ONLY = new Set(['read', 'grep', 'glob', 'find', 'ast_grep', 'web_search', 'fetch', 'ls', 'ask', 'todo', 'wait', 'think', 'recall', 'reflect'])
-const RESOLUTION_DEVICE = /^\s*xd:\/\/(resolve|reject|propose)\s*$/i
-
-// A call that confirms (`resolve`), discards (`reject`) or proposes a plan (`propose`) for a staged action: the xd:// device
-// written through `write`, or omp's own tool of that name (which takes action apply | discard).
-function resolutionOf(toolName: string, input: unknown): 'resolve' | 'reject' | 'propose' | undefined {
-  const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-  if (toolName === 'write') {
-    const path = typeof args.path === 'string' ? args.path : typeof args.file_path === 'string' ? args.file_path : ''
-    const kind = RESOLUTION_DEVICE.exec(path)?.[1]?.toLowerCase()
-    return kind === 'resolve' || kind === 'reject' || kind === 'propose' ? kind : undefined
-  }
-  if (toolName === 'resolve') return args.action === 'discard' ? 'reject' : 'resolve'
-  if (toolName === 'reject' || toolName === 'propose') return toolName
-  return undefined
-}
-
-const flag = (v: unknown): boolean | undefined => (v === true || v === 'true' ? true : v === false || v === 'false' ? false : undefined)
-
-// Whether a call whose result succeeded changed something.
-function changedBy(toolName: string, input: unknown): boolean {
-  if (toolName === 'ast_edit') return false
-  const kind = resolutionOf(toolName, input)
-  if (kind !== undefined) return kind === 'resolve'
-  if (toolName === 'lsp') {
-    const args = input !== null && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-    const action = typeof args.action === 'string' ? args.action.toLowerCase() : ''
-    const apply = flag(args.apply)
-    if (action === 'rename' || action === 'rename_file') return apply !== false
-    return action === 'code_actions' && apply === true
-  }
-  return !READ_ONLY.has(toolName)
-}
-
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
-
-const textOf = (content: unknown): string => {
-  if (typeof content === 'string') return content
-  if (!Array.isArray(content)) return ''
-  return content.filter(b => b?.type === 'text' && typeof b.text === 'string').map(b => b.text as string).join('\n')
-}
-
 // A system prompt as a list of blocks: omp 18.8.9 hands the event and ctx.getSystemPrompt() a string[]; a lone string is one block.
 const blocksOf = (v: unknown): string[] | undefined =>
   typeof v === 'string' ? [v] : Array.isArray(v) && v.every(b => typeof b === 'string') ? (v as string[]) : undefined
@@ -199,7 +147,7 @@ export function createAutonomic(io: AutonomicIO) {
   }
 
   // The entry moment of the current handler, captured before any await so a decision frame gets the
-  // real start of its one monotonic 25-second window. Read by the native consumers (Tasks 5–7).
+  // real start of its one monotonic 25-second window. Read by the ask and permission consumers.
   let lastEntryMs = 0
 
   function suspendAuthority(): void {
@@ -224,8 +172,6 @@ export function createAutonomic(io: AutonomicIO) {
   let cfg: AutonomicConfig = DEFAULTS
   let ready: Promise<void> | undefined
   const live = new Map<string, Live>()       // each session's resolved record
-  const pushes = new Map<string, number>()   // covered or stalled turn ends in a row with no change
-  const changed = new Set<string>()          // sessions that changed something since their last turn end
   const announced = new Set<string>()        // sessions whose carried scope has been announced
   const pendingScope = new Set<string>()     // prepared scope, committed only at agent_start
 
@@ -280,8 +226,8 @@ export function createAutonomic(io: AutonomicIO) {
   }
 
   // Autopilot needs its policy and a writable ledger; without either the session is manual (spec §4).
-  // An enrolled session additionally needs the native decision service; the ask and turn-end
-  // consumers stay operator-owned until Tasks 6–7 ship (see askReflex/onSessionStop).
+  // An enrolled session additionally needs the native decision service; without it the ask and
+  // permission consumers leave the call with the operator.
   async function guard(rec: Live): Promise<Live> {
     const clean: Live = { ...rec, problem: undefined }
     if (rec.mode !== 'autopilot') return clean
@@ -376,50 +322,25 @@ export function createAutonomic(io: AutonomicIO) {
     return false
   }
 
-  // The complete validated option text (Plan Task 7 §9 line 1103): a 40-character one-line label and the
-  // whole instruction a press submits, never cut, recommended first. One renderer, so the notice, the bell,
-  // the pain file and the human row all carry the same content.
-  function optionLines(options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>): string {
-    return (options ?? [])
-      .map(o => ({ label: oneLine(o.label, 40), text: o.text, recommended: o.recommended }))
-      .sort((a, b) => Number(b.recommended) - Number(a.recommended))
-      .map((o, i) => `${i + 1}) ${o.label}${o.recommended ? ' (Recommended)' : ''} — ${o.text}`)
-      .join(' ')
-  }
-
-  // The pain row a press would submit, and the bound that keeps it whole: `painOptions` allows three
-  // options of 300 characters, and the row carries every one of them complete, exactly as the notice does.
-  function painRow(options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>): { a: string; answerMax: number } {
-    const optionsText = optionLines(options)
-    const a = optionsText === '' ? 'ask the operator' : `ask the operator; options: ${optionsText}`
-    return { a, answerMax: a.length }
-  }
-
   // A pain signal (spec §3.4): notice, bell and the pain file a launcher may name. It never resumes the run by
-  // itself. Options (a turn-end pain) are listed in the notice, the bell and the pain file, numbered, recommended
-  // first, each with its complete validated instruction text; a credential request is its own plain-text line
-  // after them. No band buttons on OMP.
-  async function pain(id: string, reason: string, detail: string, options?: ReadonlyArray<{ label: string; text: string; recommended: boolean }>, credential?: string): Promise<void> {
+  // itself. #873 Task 5: no turn-end pain exists, so no pain carries options or a credential. No band on OMP.
+  async function pain(id: string, reason: string, detail: string): Promise<void> {
     const text = `autopilot: ${reason} — ${oneLine(detail, 200)}`
-    const optionsText = optionLines(options)
-    const plain = credential === undefined ? undefined : oneLine(credential, Number.MAX_SAFE_INTEGER)
-    const numbered = optionsText === '' ? text : `${text} · options: ${optionsText}`
-    const listed = plain === undefined ? numbered : `${numbered} · in plain text: ${plain}`
-    io.notify(listed)
+    io.notify(text)
     const bell = live.get(id)?.bell
     // The bell has its own timeout; it must not consume the event handler's budget.
     if (bell !== undefined) {
-      try { void io.bell(bell, listed).catch(err => log(`bell failed ${String(err)}`)) }
+      try { void io.bell(bell, text).catch(err => log(`bell failed ${String(err)}`)) }
       catch (err) { void log(`bell failed ${String(err)}`) }
     }
     const path = (io.env.AUTONOMIC_PAIN_PATH ?? '').trim()
-    if (path !== '' && !(await io.appendLine(path, `${new Date().toISOString()} pain ${listed}`))) await log(`pain file append failed ${path}`)
-    await log(`pain session=${id} ${listed}`)
+    if (path !== '' && !(await io.appendLine(path, `${new Date().toISOString()} pain ${text}`))) await log(`pain file append failed ${path}`)
+    await log(`pain session=${id} ${text}`)
   }
 
   // The bounded decision services (Task 4). Built once; absent (undefined) whenever this session is
   // not an enrolled assignment, so a consumer treats the native route as unavailable. It is exposed
-  // for Tasks 5–7 to call; nothing here activates a consumer or the old classifier.
+  // for the ask and permission consumers to call; nothing here activates the old classifier.
   const decisionIO: DecisionIO | undefined = enrolled ? {
     capture: () => {
       const host = io.captureHost?.()
@@ -493,7 +414,6 @@ export function createAutonomic(io: AutonomicIO) {
       `molt stage: ${stageNow ?? 'none'}`,
       `ledger: ${await ledgerPath()}`,
       `bell: ${rec.bell === undefined ? 'not set' : 'set'}; pain file: ${painPath === '' ? 'not set' : painPath}`,
-      `pushes in a row with no change: ${pushes.get(id) ?? 0} of ${cfg.loopMax}`,
     ]
     if (rec.invalid !== undefined) lines.push(`AUTONOMIC_MODE="${rec.invalid}" is not a mode`)
     if (cfg.problems.length > 0) lines.push(`settings: ${cfg.problems.join('; ')}`)
@@ -565,10 +485,8 @@ export function createAutonomic(io: AutonomicIO) {
     abortFrames()
     suspendAuthority()
     const id = io.sessionId()
-    changed.delete(id)
     pendingScope.delete(id)
     announced.delete(id)
-    pushes.delete(id)
   }
 
   // before_agent_start: in autopilot the policy joins the system prompt, and a carried scope is announced once.
@@ -925,166 +843,6 @@ export function createAutonomic(io: AutonomicIO) {
     return undefined
   }
 
-  // tool_result: whether this turn changed anything (the loop guard's progress).
-  async function onToolResult(e: { toolName?: string; input?: unknown; isError?: boolean; content?: unknown }): Promise<void> {
-    try {
-      const id = io.sessionId()
-      const name = String(e?.toolName ?? '')
-      if (e.isError !== true && changedBy(name, e.input)) changed.add(id)
-    } catch {}
-  }
-
-  // The one classification question (Plan Task 7 §9 Step 3): exactly five labels, judged once
-  // against the bounded state, with the operator-owned acceptance rule. Never a joint planner.
-  const TURN_QUESTIONS = { turn_end: {
-    type: 'choice' as const,
-    instructions: 'Classify this bounded turn end without granting authority or inventing payloads.',
-    criteria: {
-      covered: 'An already-decided routine choice can continue within supplied task authority.',
-      stalled: 'An approved remaining step exists and work stopped without a valid wait or operator gate.',
-      waiting: 'Real armed work or verified Molt handoff requires no continuation.',
-      done: 'Approved objective completion is evidenced; no acceptance or release approval is implied.',
-      pain: 'Operator decision, missing evidence/authority, credentials, approval gate or other unsafe ambiguity.',
-    },
-  } }
-
-  // The hosted turn-end consumer (Plan Task 7 §9 Steps 3–5): freeze the bounded state, classify once
-  // through the native bridge, render an exact candidate or one isolated generation, validate the
-  // payload against the approved records, record both rows, re-check time and freshness, and only
-  // then move the loop and return the continuation. Any shortfall leaves the operator the stop.
-  async function decideTurnEnd(id: string, answer: string, n: number, turn: { changed: boolean; stage: string | null; handoff: boolean }): Promise<{ decision: 'block'; reason: string } | undefined> {
-    const decisions = io.decisions
-    if (decisions === undefined) return undefined
-    let frame: DecisionFrame | undefined
-    const signal = frameAbort.signal
-    try {
-      frame = await captureFrame(decisions, lastEntryMs, 'turn-end', { lastReply: answer.slice(-cfg.tailChars) }, signal)
-      const state = turnEvidence(frame, answer.slice(-cfg.tailChars),
-        { pushes: n, changed: turn.changed, loopMax: cfg.loopMax }, { stage: turn.stage, handoff: turn.handoff })
-      // Every string the state would send native or generation must survive redaction unchanged.
-      if (stateHoldsSecret(state)) return void (await turnPain(id, 'turn end', 'the turn state holds content that redaction would hide'))
-      const result = await judgeNative(frame, { state: state as unknown as Readonly<Record<string, unknown>>, questions: TURN_QUESTIONS })
-      const accepted = acceptedChoice((result.judgment.answers as Record<string, unknown>).turn_end as never, frame.policy.acceptance['turn-end'])
-      if (accepted === undefined) return void (await turnPain(id, 'turn end', 'the native classification was not accepted'))
-      const rendered = await payloadForTurn(frame, accepted as TurnCase, state)
-      if (rendered === undefined) return void (await turnPain(id, 'turn end', `no grounded ${accepted} payload could be validated`))
-      const verdict = rendered.verdict
-      await commitTurn(frame, rendered, id, verdict)
-      frame.budget.check()
-      if (!frame.lease.fresh()) {
-        pushes.delete(id)
-        await turnPain(id, 'turn end', 'authority changed before the turn could continue')
-        return undefined
-      }
-      return applyTurn(id, n, verdict)
-    } catch (err) {
-      await log(`turn-end decision error ${String(err)}`)
-      if (frame !== undefined) {
-        try { frame.budget.cancel() } catch {}
-      }
-      pushes.delete(id)
-      // A frame cancelled with its session writes nothing late: the turn end belongs to a session
-      // that has ended, switched or rebuilt.
-      if (signal.aborted) return undefined
-      await turnPain(id, 'turn end', 'the native turn-end decision is unavailable')
-      return undefined
-    }
-  }
-
-  // The operator-facing escalation for a turn end that could not be groundedly decided.
-  async function turnPain(id: string, q: string, why: string): Promise<void> {
-    await record(id, 'pain', q, 'ask the operator', why)
-    await pain(id, 'pain', why)
-  }
-
-  // Both records, then the loop/progress move. `waiting` uses the existing `operator` human case with
-  // the exact planned text and the JSONL outcome `waiting`; nothing outside this branch continues.
-  async function commitTurn(frame: DecisionFrame, rendered: { verdict: TurnVerdict; source: DecisionDraft['payloadSource'] }, id: string, verdict: TurnVerdict): Promise<void> {
-    const decisions = io.decisions!
-    const draft: DecisionDraft = { outcome: verdict.case === 'covered' || verdict.case === 'stalled' ? 'continue'
-        : verdict.case === 'waiting' ? 'waiting' : verdict.case === 'done' ? 'done' : 'pain',
-      grantIds: frame.policy.approved.remainingSteps.filter(s => s.text === (verdict.answer ?? verdict.next_step)).flatMap(s => s.grantIds),
-      evidenceIds: frame.lease.evidence.filter(e => verdict.reason.includes(e.ref.id)).map(e => e.ref.id),
-      answers: {}, route: null, response: null, payloadSource: rendered.source, reason: verdict.reason }
-    const rows = verdict.case === 'waiting'
-      ? [{ kase: 'operator' as const, q: 'turn end', a: 'waiting; no continuation' }]
-      : [verdict.case === 'pain'
-        // A pain row carries the complete validated option content, exactly as the notice and pain file
-        // do, so its own row bound is the content's own length rather than the default clamp.
-        ? { kase: 'pain' as const, q: verdict.question ?? 'turn end', ...painRow(verdict.options) }
-        : { kase: verdict.case, q: verdict.question ?? 'turn end', a: verdict.answer ?? verdict.next_step ?? 'stop' }]
-    await commitDecision(decisions, frame, draft, rows)
-    void id
-  }
-
-  // The loop/progress move and the continuation text, only after both records landed.
-  function applyTurn(id: string, n: number, verdict: TurnVerdict): { decision: 'block'; reason: string } | undefined {
-    if (verdict.case === 'covered' || verdict.case === 'stalled') {
-      const a = (verdict.answer ?? verdict.next_step ?? '').replace(/[.!]\s*$/, '')
-      pushes.set(id, n + 1)
-      return { decision: 'block', reason: verdict.case === 'covered' ? `Autopilot: ${a}. Proceed.` : `Autopilot: continue — ${a}.` }
-    }
-    pushes.delete(id)
-    if (verdict.case === 'done') io.notify(`autopilot: done — ${oneLine(verdict.reason, 160)}`)
-    if (verdict.case === 'pain') void pain(id, 'pain', verdict.question ?? verdict.reason, verdict.options, verdict.credential)
-    return undefined
-  }
-
-  // session_stop: the turn-end reflex (spec §3.1). Yield to molt first, then the loop guard, then classify.
-  async function onSessionStop(e: { last_assistant_message?: unknown; session_id?: unknown }): Promise<{ decision: 'block'; reason: string } | undefined> {
-    try {
-      lastEntryMs = performance.now()   // the one monotonic window starts here, before any await
-      await load()
-      const id = io.sessionId()
-      // omp runs the handlers in extension order and molt's has already cleared the session when it molted: the event is
-      // the predecessor's and the live id is the successor's. Judging it would write the predecessor's turn under the
-      // successor's id and move the successor's loop count and mode.
-      const own = e?.session_id
-      if (typeof own === 'string' && own !== id) {
-        await log(`session_stop skipped: the event is session ${own}, the live session is ${id}`)
-        return undefined
-      }
-      if ((await modeOf()).mode !== 'autopilot') return undefined
-      const m = e?.last_assistant_message
-      const answer = typeof m === 'string' ? m : m !== null && typeof m === 'object' ? textOf((m as { content?: unknown }).content) : ''
-      // The turn end is molt's at its handoff command: molt's stage file when it exists, else the yieldAtPercent
-      // fill fallback (molt absent). The live fill is checked against the file's effective command too, so hook
-      // order cannot hide a handoff that is due. Molt outranks the decision route (Plan Task 7 §9 Step 3).
-      const stageText = safeSessionId(id) ? await io.readText(stagePath(home(), id)) : undefined
-      const stage = parseStage(stageText)
-      const at = stage === undefined ? cfg.yieldAtPercent : stage === 'off' ? undefined : parseStageCommand(stageText)
-      const fill = at === undefined ? undefined : io.usage()
-      const statusPath = (io.env.MOLT_STATUS_PATH ?? '').trim()
-      const status = statusPath === '' ? undefined : await io.readText(statusPath)
-      const handoff = hasMoltMarker(answer) || statusYields(status) || stageYields(stage) || (fill !== undefined && at !== undefined && fill >= at)
-      if (handoff) {
-        pushes.delete(id)
-        changed.delete(id)
-        await record(id, 'molt', 'turn end in a molt handoff', 'let it stop', 'molt owns this turn end')
-        return undefined
-      }
-      // The loop guard is deterministic and outranks classification (Plan Task 7 §9 Step 3).
-      const changedNow = changed.has(id)
-      const n = changedNow ? 0 : (pushes.get(id) ?? 0)
-      changed.delete(id)
-      if (n >= cfg.loopMax) {
-        pushes.delete(id)
-        await record(id, 'pain', 'turn end', 'ask the operator', `autopilot loop: ${n} pushes with no change`)
-        await pain(id, 'autopilot loop', `${n} turn ends pushed on with no change made`)
-        return undefined
-      }
-      // No decision service means no classification, no generation and no continuation: the turn end
-      // is operator-owned (R3). There is no conversational fallback left.
-      if (io.decisions === undefined) return undefined
-      // The state the classifier judges carries the facts this handler just measured — the change
-      // mark and the live molt stage — never a hardcoded false/no-stage pair.
-      return await decideTurnEnd(id, answer, n, { changed: changedNow, stage: stage ?? null, handoff })
-    } catch (err) {
-      await log(`session_stop error ${String(err)}`)
-      return undefined
-    }
-  }
-
   // /autopilot on [scope docs] | off | status. Returns the text for the operator.
   async function onCommand(args: string): Promise<string> {
     await load()
@@ -1100,7 +858,6 @@ export function createAutonomic(io: AutonomicIO) {
       suspendAuthority()
       pendingScope.delete(id)
       const off = await save(id, { ...prev, mode: 'manual', source: 'command', problem: undefined, invalid: undefined })
-      pushes.delete(id)
       if (off.problem === 'record not writable')
         return `autopilot is off for this session, but its record could not be saved: a molt successor may still start in autopilot. Check that ${sessionPath(home(), id)} can be written.`
       return 'autopilot is off for this session: every ask reaches you.'
@@ -1118,7 +875,6 @@ export function createAutonomic(io: AutonomicIO) {
         : rec.problem === 'record not writable' ? `Check that ${sessionPath(h, id)} can be written.` : `Check that ${await ledgerPath()} can be written.`
       return `autopilot refused: ${rec.problem}. ${fix}`
     }
-    pushes.delete(id)
     announced.delete(id)
     pendingScope.delete(id)
     if (scope.length === 0) return 'autopilot is on. The scope is what this session has already read.'
@@ -1126,12 +882,11 @@ export function createAutonomic(io: AutonomicIO) {
   }
 
   // Claude's composer/bridge prompt reset: OMP notices have no persistent pain band to dismiss.
-  function onInput(e: { source?: string }): void {
+  function onInput(_e: { source?: string }): void {
     if (enrolled && authorityLease && !authorityLease.fresh()) suspendAuthority()
-    if (e.source !== 'extension') pushes.delete(io.sessionId())
   }
 
-  return { authority, decisions: decisionIO, abortFrames, entryMs: () => lastEntryMs, onSessionBeforeSwitch, onSessionSwitch, onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onToolResult, onSessionStop, onCommand }
+  return { authority, decisions: decisionIO, abortFrames, entryMs: () => lastEntryMs, onSessionBeforeSwitch, onSessionSwitch, onSessionShutdown, onInput, onAgentStart, onContextRebuild, onSessionStart, onBeforeAgentStart, onToolCall, onCommand }
 }
 
 // omp's real ctx behind AutonomicIO. Each handler points `cur` at the event's ctx first.
@@ -1217,9 +972,7 @@ export default function (pi: any) {
   pi.on('tool_call', (e: any, c: any) => main(c) ? autonomic.onToolCall(e) : undefined)
   pi.on('tool_result', (e: any, c: any) => {
     if (!main(c)) return
-    // Rewind rebuilds at turn end without an event. Reset now so later retained tools keep their state.
+    // Rewind rebuilds at turn end without an event: reset the frame, authority and announced scope now.
     if (e?.toolName === 'rewind' && e.isError !== true) return autonomic.onContextRebuild()
-    return autonomic.onToolResult(e)
   })
-  pi.on('session_stop', (e: any, c: any) => main(c) ? autonomic.onSessionStop(e) : undefined)
 }

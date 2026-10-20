@@ -7,7 +7,6 @@
 // synthetic and no network/git mutation is performed. Every SDK/host import is `import type`: the
 // CSA tree has no installed host package, so a value import would not resolve under plain bun.
 import type { ExtensionContext, ExtensionJudge } from '@oh-my-pi/pi-coding-agent/extensibility/extensions/types'
-import type { AsyncJobSnapshot } from '@oh-my-pi/pi-coding-agent/session/agent-session-types'
 import type { JudgmentRequest, Usage } from '@oh-my-pi/pi-ai'
 import { createHash } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
@@ -73,14 +72,10 @@ export type RoutingWorld = {
   ctx: any; notices: string[]; nativeRequests: JudgmentRequest[]; generationRequests: unknown[]
   entryMs: () => number
   invoke: (toolName: string, input: unknown) => Promise<{ block: true; reason: string } | undefined>
-  stop: (reply: string) => Promise<{ decision: 'block'; reason: string } | undefined>
   setNative: (run: ExtensionJudge) => void
   setGeneration: (run: NonNullable<ExtensionContext['runEphemeralTurn']>) => void
   revoke: () => void; replace: () => void
   switchTo: (id: string, reason: 'new' | 'resume' | 'fork') => Promise<void>
-  // Task 7: the host's async-job snapshot, read by the turn-end state builder. Null means the host
-  // exposes none; a running entry is real armed work.
-  setJobs: (snapshot: AsyncJobSnapshot | null) => void
   // E3/E4/E5 (Plan Task 5 Step 5): an append fault injector owned by the fixture's own
   // io.appendLine, the ordered multi-extension dispatch, and a pain-file reader.
   armAppend: (hook: ((path: string, line: string) => void | Promise<void>) | undefined) => void
@@ -166,15 +161,13 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   let currentId = 'S1'
   let nativeRun: ExtensionJudge | undefined
   let generationRun: NonNullable<ExtensionContext['runEphemeralTurn']> | undefined
-  // Task 7: the host async-job snapshot the turn-end state reads. Null is the host default.
-  let jobs: AsyncJobSnapshot | null = null
 
   const ctx: Record<string, unknown> = {
     agent: { kind: 'main', id: 'fixture-agent', name: 'main' },
     cwd: tree,
     getContextUsage: () => ({ tokens: 1, contextWindow: 100, percent: 10 }),
     getSystemPrompt: () => 'FIXTURE BASE PROMPT',
-    getAsyncJobSnapshot: () => jobs,
+    getAsyncJobSnapshot: () => null,
     sessionManager: { getSessionId: () => currentId, getSessionFile: () => join(out, `${currentId}.jsonl`) },
     ui: { notify: (t: string) => { notices.push(t) }, setStatus: () => {} },
   }
@@ -200,7 +193,7 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   const host = (): ConsumerHost => ({
     sessionId: currentId, cwd: tree, sessionFile: join(out, `${currentId}.jsonl`),
     judge: ctx.judge as ExtensionJudge, generate: ctx.runEphemeralTurn as NonNullable<ExtensionContext['runEphemeralTurn']>,
-    asyncJobs: () => jobs,
+    asyncJobs: () => null,
   })
 
   // A real AutonomicIO over the fixture tree: real files, real local git, no network.
@@ -260,8 +253,10 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
   pi.on('agent_start', () => autonomic.onAgentStart())
   pi.on('before_agent_start', (e: unknown) => autonomic.onBeforeAgentStart(e as { systemPrompt?: string | string[] }))
   pi.on('tool_call', (e: unknown) => autonomic.onToolCall(e as { toolName?: string; input?: unknown }))
-  pi.on('tool_result', (e: unknown) => autonomic.onToolResult(e as { toolName?: string; input?: unknown; isError?: boolean; content?: unknown }))
-  pi.on('session_stop', (e: unknown) => autonomic.onSessionStop(e as { last_assistant_message?: unknown; session_id?: unknown }))
+  pi.on('tool_result', (e: unknown) => {
+    const event = e as { toolName?: unknown; isError?: unknown }
+    if (event?.toolName === 'rewind' && event.isError !== true) return autonomic.onContextRebuild()
+  })
 
   const invoke = async (toolName: string, rawInput: unknown) => handlers.get('tool_call')?.({ toolName, input: rawInput }, ctx) as Promise<{ block: true; reason: string } | undefined>
   // E4: the real extension order. seat-mods, molt and autonomic each register one `tool_call`
@@ -289,10 +284,8 @@ export function routingWorld(options: { grants: Grant[]; policy: PolicyBundle; b
     entryMs: autonomic.entryMs,
     invoke,
     onCommand: (args: string) => autonomic.onCommand(args),
-    stop: async (reply: string) => handlers.get('session_stop')?.({ last_assistant_message: reply, session_id: currentId }, ctx) as Promise<{ decision: 'block'; reason: string } | undefined>,
     setNative: run => { nativeRun = run },
     setGeneration: run => { generationRun = run },
-    setJobs: snapshot => { jobs = snapshot },
     // Test-only failure injectors: a revoked snapshot, and an atomic identical-bytes/new-inode swap.
     revoke: () => { writeFileSync(binding.path, JSON.stringify({ ...snapshot, lifetime: { ...snapshot.lifetime, revoked: true } })) },
     replace: () => { writeFileSync(binding.path + '.new', readFileSync(binding.path)); renameSync(binding.path + '.new', binding.path) },
