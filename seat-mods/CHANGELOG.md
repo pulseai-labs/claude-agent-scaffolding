@@ -2,6 +2,21 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.9.0 — 2026-10-20
+
+- **The orchestrator's waiting-on-operator line rings the bell** (#873, design
+  2026-10-20-873-turn-end-judge-removal-design.md §5.2). When a status turn ends with a block
+  whose `Waiting on operator:` field reads `decision:` or `action:` — whether the block passed or
+  was let through after its one rewrite — and autonomic's session record says `mode: autopilot`,
+  seat-mods rings that record's `bell` and shows `seat-mods: waiting on operator — <text>`. On
+  Claude Code the line follows the reply (and any warning) at `turn.complete`; on OMP it is
+  `ctx.ui.notify(notice, 'info')`. The text is redacted by a copy of autonomic's `redact` (pinned
+  byte-identical), cut to one line and 200 characters. The signal only adds a notification: it
+  never approves, answers or blocks, a failing or slow bell is logged and never holds the turn,
+  and `none`, a manual session, no record, a molt handoff and a non-orchestrator role are quiet.
+  `hooks/records.ts` copies molt's `autonomicPath`/`parseAutonomic`, and `hooks/register.ts` copies
+  molt's `BELL_TIMEOUT_MS` and `ring`; `tests/test-mod-shell-parity.sh` pins all four pairs.
+
 ## 0.8.0 — 2026-10-19
 
 - **The status-block check runs on OMP** (AI spec 2026-10-19-omp-status-block-port-design.md). A

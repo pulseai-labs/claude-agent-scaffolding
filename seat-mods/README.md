@@ -177,6 +177,16 @@ rewrite, and a turn whose shape rewrite is spent takes the idle warning only, no
 The check calls no model and never calls herdr, Orca or Paseo. Only `SEAT_MODS_ROLE=orchestrator`
 sessions are affected; every other role and an unset role are untouched.
 
+When a status turn that ends hands the operator a `decision:` or an `action:` — whether the block
+passed or was let through after its one rewrite — and autonomic's session record
+(`~/.claude/state/autonomic/sessions/<id>.json`) says `mode: autopilot`, seat-mods rings the
+record's `bell` (when set) and shows `seat-mods: waiting on operator — <field 5 text>`: on Claude
+Code as a line under the reply in `turn.complete`; on OMP in the notification its status entry
+already uses. The text is redacted for credential shapes, cut to one line and 200 characters. The
+signal only adds a notification: it never approves, answers or blocks, a failing or slow bell is
+logged and never holds the turn, and `none`, a manual session, no record, a molt handoff and a
+non-orchestrator role are quiet. The bell runs detached under molt's 30 s bound.
+
 A typed prompt that starts with a crew tag — `[crew report|molt|message <role>]`, crew 0.3.x — is a
 status turn. So are the two legacy ping forms, `REPORT READY: ` and `MOLT WARNING `, and the two
 rotation resume forms, `/ossify:handoff-resume ` and `skill://handoff-resume ` (a slash command a
