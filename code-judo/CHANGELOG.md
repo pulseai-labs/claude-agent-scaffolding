@@ -2,6 +2,23 @@
 
 All notable changes to the `code-judo` plugin.
 
+## 0.2.2
+
+`deep-review` gains counterweights to abstraction, adapted from `DietrichGebert/ponytail` (MIT).
+Most of its remedies add structure; these add stops on the other side. The bar and the
+presumptive blockers are unchanged.
+
+- The rubric asks whether every part of a change needs to exist, and flags speculative code:
+  options, config, modes, or extension points nobody uses yet, and single-implementation
+  abstractions.
+- Standard 6 reaches past the codebase: the standard library, a platform feature, or an
+  installed dependency before new code, and no new dependency for a few lines.
+- Remedies cut along jobs, not length, and prefer the deleting fix when two fix the problem.
+- Simplification never removes trust-boundary validation, data-loss handling, a security
+  check, or accessibility.
+- The disposition requires a concrete case for each finding, and a re-read of the lines that
+  confirms its premise.
+
 ## 0.2.1
 
 - `design-it-twice` hands each parallel brief the vocabulary source the caller resolved under
