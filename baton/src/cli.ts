@@ -1,29 +1,262 @@
-import { readFileSync } from "node:fs";
-import { validate } from "./recipe.ts";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
+import { openStore, type RunState, type UnitState } from "./state.ts";
+import { installTimer } from "./timer.ts";
 
-const USAGE = "usage: baton validate <recipe.json>\n";
+const USAGE = [
+  "usage: baton validate <recipe.json>",
+  "       baton arm <recipe.json> --run <id> [--param k=v]... [--no-timer]",
+  "       baton status [<run>]",
+  "       baton disarm <run>",
+  "       baton unpark <run> [<unit>] [--to <stage>]",
+  "       baton report <run>",
+  "",
+].join("\n");
+
+const usage = (): number => {
+  process.stderr.write(USAGE);
+  return 64;
+};
+const fail = (msg: string): number => {
+  process.stderr.write(msg + "\n");
+  return 2;
+};
 
 export async function main(argv: string[]): Promise<number> {
   const [cmd, ...rest] = argv;
-  if (cmd === "validate") return validateCmd(rest);
-  process.stderr.write(USAGE);
-  return 64;
+  switch (cmd) {
+    case "validate": return validateCmd(rest);
+    case "arm": return armCmd(rest);
+    case "status": return statusCmd(rest);
+    case "disarm": return disarmCmd(rest);
+    case "unpark": return unparkCmd(rest);
+    case "report": return reportCmd(rest);
+  }
+  return usage();
 }
 
 function validateCmd(args: string[]): number {
-  if (args.length !== 1) {
-    process.stderr.write(USAGE);
-    return 64;
-  }
+  if (args.length !== 1) return usage();
   let raw: unknown;
   try {
     raw = JSON.parse(readFileSync(args[0], "utf8"));
   } catch (e) {
-    process.stderr.write(`${args[0]}: ${(e as Error).message}\n`);
-    return 2;
+    return fail(`${args[0]}: ${(e as Error).message}`);
   }
   const res = validate(raw);
   if (res.ok) return 0;
-  process.stderr.write(res.errors.join("\n") + "\n");
-  return 2;
+  return fail(res.errors.join("\n"));
+}
+
+/** Run `fn` under the store lock; a busy lock is rc 75 (try again later). */
+async function locked(fn: () => Promise<number>): Promise<number> {
+  const r = await openStore().withLock(fn);
+  if (r === "busy") {
+    process.stderr.write("baton: another baton process holds the lock\n");
+    return 75;
+  }
+  return r;
+}
+
+function loadRecipe(runDir: string): Recipe {
+  return JSON.parse(readFileSync(join(runDir, "recipe.json"), "utf8")) as Recipe;
+}
+
+async function armCmd(args: string[]): Promise<number> {
+  let file: string | undefined;
+  let runId: string | undefined;
+  let noTimer = false;
+  const given: Record<string, string> = {};
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--run") runId = args[++i];
+    else if (a === "--param") {
+      const kv = args[++i];
+      const eq = kv === undefined ? -1 : kv.indexOf("=");
+      if (eq < 1) return usage();
+      given[kv.slice(0, eq)] = kv.slice(eq + 1);
+    } else if (a === "--no-timer") noTimer = true;
+    else if (a.startsWith("--") || file !== undefined) return usage();
+    else file = a;
+  }
+  if (file === undefined || runId === undefined) return usage();
+  if (!RUN_ID_RE.test(runId)) return fail(`run id "${runId}" must match ^[a-z0-9_-]+$`);
+
+  let bytes: Buffer;
+  try {
+    bytes = readFileSync(file);
+  } catch (e) {
+    return fail(`${file}: ${(e as Error).message}`);
+  }
+  let raw: unknown;
+  try {
+    raw = JSON.parse(bytes.toString("utf8"));
+  } catch (e) {
+    return fail(`${file}: ${(e as Error).message}`);
+  }
+  const res = validate(raw);
+  if (!res.ok) return fail(res.errors.join("\n"));
+  const recipe = res.recipe;
+
+  const declared = new Set(recipe.params);
+  const missing = recipe.params.filter((p) => !(p in given));
+  const extra = Object.keys(given).filter((p) => !declared.has(p));
+  if (missing.length) return fail(`missing param: ${missing.join(", ")}`);
+  if (extra.length) return fail(`undeclared param: ${extra.join(", ")}`);
+
+  const rc = await locked(async () => {
+    const store = openStore();
+    const dir = store.runDir(runId);
+    if (existsSync(dir)) return fail(`run "${runId}" already exists`);
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    writeFileSync(join(dir, "recipe.json"), bytes, { mode: 0o600 });
+    const now = new Date().toISOString();
+    const units: Record<string, UnitState> = {};
+    recipe.seed.forEach((s, index) => {
+      units[s.id] = {
+        id: s.id, group: 0, order: index, vars: s.vars ?? {}, stage: s.stage, launches: {}, stalls: 0,
+      };
+    });
+    const run: RunState = {
+      id: runId,
+      dir,
+      recipe_sha256: createHash("sha256").update(bytes).digest("hex"),
+      params: given,
+      armed_at: now,
+      status: "armed",
+      units,
+    };
+    store.writeRun(run);
+    store.event(runId, { kind: "armed", recipe: recipe.name });
+    return 0;
+  });
+  if (rc !== 0) return rc;
+  if (!noTimer) await installTimer(runId);
+  return 0;
+}
+
+function statusCmd(args: string[]): number {
+  if (args.length > 1) return usage();
+  const store = openStore();
+  const ids = args.length ? [args[0]] : store.listRuns();
+  for (const id of ids) {
+    let run: RunState;
+    try {
+      run = store.readRun(id);
+    } catch {
+      return fail(`no such run: ${id}`);
+    }
+    for (const u of Object.values(run.units)) {
+      const launches = Object.values(u.launches).reduce((a, b) => a + b, 0);
+      process.stdout.write(
+        `${u.id} ${u.stage} ${launches} ${u.stalls} ${u.parked?.reason ?? "-"} ${u.session?.thread_id ?? "-"}\n`,
+      );
+    }
+  }
+  return 0;
+}
+
+async function disarmCmd(args: string[]): Promise<number> {
+  if (args.length !== 1) return usage();
+  const id = args[0];
+  return locked(async () => {
+    const store = openStore();
+    let run: RunState;
+    try {
+      run = store.readRun(id);
+    } catch {
+      return fail(`no such run: ${id}`);
+    }
+    for (const u of Object.values(run.units)) {
+      if (!u.session) continue;
+      try {
+        unlinkSync(join(store.dir, "claims", `${u.session.claim_key}.env`));
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
+    }
+    run.status = "disarmed";
+    store.writeRun(run);
+    store.event(id, { kind: "disarmed" });
+    return 0;
+  });
+}
+
+async function unparkCmd(args: string[]): Promise<number> {
+  let runId: string | undefined;
+  let unitId: string | undefined;
+  let to: string | undefined;
+  const pos: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--to") to = args[++i];
+    else if (args[i].startsWith("--")) return usage();
+    else pos.push(args[i]);
+  }
+  if (pos.length < 1 || pos.length > 2) return usage();
+  [runId, unitId] = pos;
+  if (to === undefined && args.includes("--to")) return usage();
+  if (to !== undefined && unitId === undefined) return usage();
+
+  return locked(async () => {
+    const store = openStore();
+    let run: RunState;
+    try {
+      run = store.readRun(runId!);
+    } catch {
+      return fail(`no such run: ${runId}`);
+    }
+    if (unitId === undefined) {
+      delete run.parked;
+      if (run.status === "parked") run.status = "armed";
+      store.writeRun(run);
+      store.event(runId!, { kind: "unpark" });
+      return 0;
+    }
+    const unit = run.units[unitId];
+    if (!unit) return fail(`no such unit: ${unitId}`);
+    if (to !== undefined) {
+      const recipe = loadRecipe(run.dir);
+      if (!Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
+    }
+    delete unit.parked;
+    unit.stalls = 0;
+    unit.launches[unit.stage] = 0;
+    if (to !== undefined) unit.stage = to;
+    store.writeRun(run);
+    store.event(runId!, { kind: "unpark", unit: unitId, stage: unit.stage });
+    return 0;
+  });
+}
+
+function reportCmd(args: string[]): number {
+  if (args.length !== 1) return usage();
+  const id = args[0];
+  const store = openStore();
+  const path = join(store.runDir(id), "events.jsonl");
+  if (!existsSync(path)) return fail(`no such run: ${id}`);
+  const counts: Record<string, number> = { launched: 0, successor: 0, stall: 0, park: 0, unpark: 0, merged: 0 };
+  let armed: number | undefined;
+  let last: number | undefined;
+  for (const line of readFileSync(path, "utf8").split("\n")) {
+    if (!line.trim()) continue;
+    let ev: { kind?: string; at?: string };
+    try {
+      ev = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    const kind = ev.kind ?? "";
+    if (Object.prototype.hasOwnProperty.call(counts, kind)) counts[kind]++;
+    const t = ev.at ? Date.parse(ev.at) : NaN;
+    if (Number.isNaN(t)) continue;
+    if (kind === "armed" && armed === undefined) armed = t;
+    if (kind === "merged" || kind === "done") last = t;
+  }
+  const out = Object.entries(counts).map(([k, v]) => `${k} ${v}`);
+  const wall = armed !== undefined && last !== undefined ? String(Math.round((last - armed) / 1000)) : "-";
+  out.push(`wall_seconds ${wall}`);
+  process.stdout.write(out.join("\n") + "\n");
+  return 0;
 }
