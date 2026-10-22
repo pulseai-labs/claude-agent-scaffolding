@@ -22,6 +22,7 @@ const texts: Record<string, string> = {
   "MODE_STATUS": "mode (autonomic's record): {{mode}}",
   "WARNED": "warned {{percent}}",
   "PAUSED_UNATTENDED": "molt paused: {{count}} molts in a row with no message from you. Send a message to resume; the handoff is at {{path}}.",
+  "PAUSED_AGENT": "molt: the handoff did not happen. This session was not cleared, because molt is paused: {{reason}} Tell the operator to send any message to resume molt.",
   "PAUSED_NO_PROGRESS": "molt paused: no progress since the last molt (no Write, Edit or commit). Autopilot stops here; the handoff is at {{path}}.",
   "MISSING_HANDOFF": "molt: the MOLT-HANDOFF line names {{path}}, but {{path}} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>.",
   "STATUS_METER": "molt {{percent}}%/{{command}}%"

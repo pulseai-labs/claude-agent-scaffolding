@@ -164,8 +164,10 @@ cannot loop — and differ by mode:
 
 - **Manual.** After `manualMaxMolts` molts in a row with no prompt from you, molt pauses, shows
   a band, names the handoff, and drops the active marker, so a crew's context-ceiling hook
-  speaks again. Your next message resumes it and brings the marker back. The seed prompt does
-  not count as a message from you.
+  speaks again. Your next message resumes it and brings the marker back. A message an Agent SDK
+  host sends (T3 Code) counts as yours; the seed prompt and other plugin prompts do not. A manual
+  pause also rings the record's bell, and while paused, every prompt the agent gets carries a line
+  saying the handoff did not happen and you must send a message to resume.
 - **Autopilot.** There is no count limit. A molt with no progress since the previous one — no
   Write, Edit or NotebookEdit, and no `git commit` the line runs, made below the first warning —
   pauses the session and rings the record's bell, a shell command run with `AUTONOMIC_MESSAGE` set
@@ -198,6 +200,10 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   `git commit` counts only bare, or behind `time`: a `{ … }` segment cannot be told from a
   function definition's body (`f() { git commit -m m; }`, which runs no commit), and one behind
   `if`, `then`, `elif`, `else` or `!` may not run, so neither counts.
+- **Any Agent SDK prompt is a message from you, to molt.** A headless SDK driver that loops a
+  root session therefore resets the manual pause count at each prompt, as a worker's ping does
+  below; such a loop is bounded only by minimum room. The OMP extension keeps its own count and
+  is unchanged (#774).
 - **A worker's ping is a message from you, to molt.** A ping a crew worker types into a top's
   pane (`herdr agent prompt`) reaches molt as a `composer` prompt, so it resets the manual pause
   count; a looping root top is then bounded only by minimum room (#668).
