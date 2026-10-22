@@ -320,11 +320,16 @@ rm -rf "$T7"
 SP="$TMP/pr-state.json"
 oss_state_init "$SP" pr-replay >/dev/null
 oss_state_mutate "$SP" add_work_item '{"id":"r0.s1.w1","spine":"r0.s1","title":"pr","target_repo":"canonical","status":"active","created_at":"2026-10-22T00:00:00Z"}' >/dev/null
+# A second item, so a reducer that drops its select(.id == ...) is visible: the
+# PR must land on r0.s1.w1 alone.
+oss_state_mutate "$SP" add_work_item '{"id":"r0.s1.w2","spine":"r0.s1","title":"other","target_repo":"canonical","status":"active","created_at":"2026-10-22T00:00:00Z"}' >/dev/null
 oss_state_mutate "$SP" set_work_item_pr '{"work_item":"r0.s1.w1","pr_url":"https://github.com/o/r/pull/7"}' >/dev/null
 t_capture oss_state_replay "$SP"
 t_assert_rc 0 "set_work_item_pr replays to the exact live state"
 t_capture oss_state_read "$SP" '.work_items[0].pr_url'
 t_assert_eq "https://github.com/o/r/pull/7" "$T_OUT" "replay reproduces pr_url"
+t_capture oss_state_read "$SP" '[.work_items[] | select(.pr_url != null) | .id] | join(",")'
+t_assert_eq "r0.s1.w1" "$T_OUT" "set_work_item_pr gives pr_url to the named item only"
 
 rm -rf "$TMP"
 t_summary
