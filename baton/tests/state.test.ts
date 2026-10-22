@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, linkSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { openStore, type RunState } from "../src/state.ts";
+import { breakStaleLock, openStore, type RunState } from "../src/state.ts";
 
 const tmp = () => mkdtempSync(join(tmpdir(), "baton-state-"));
 
@@ -93,4 +93,36 @@ test("release leaves a lock whose pid is not ours", async () => {
   } finally {
     live.kill();
   }
+});
+
+test("two takers judge the same dead pid: the first takes the lock, the second reads busy and leaves it", async () => {
+  const dir = tmp();
+  const dead = Bun.spawn(["true"]);
+  await dead.exited;
+  const lock = join(dir, "lock");
+  writeFileSync(lock, String(dead.pid));
+  // Both takers read the dead pid; then they break in turn.
+  expect(breakStaleLock(lock, String(dead.pid))).toBe(true);
+  expect(readFileSync(lock, "utf8")).toBe(String(process.pid));
+  expect(breakStaleLock(lock, String(dead.pid))).toBe(false);
+  expect(readFileSync(lock, "utf8")).toBe(String(process.pid)); // the first taker's lock survives
+  expect(readdirSync(dir)).toEqual(["lock"]); // no marker or temp file left behind
+});
+
+test("a stale lock another taker is breaking reads busy", async () => {
+  const dir = tmp();
+  const dead = Bun.spawn(["true"]);
+  await dead.exited;
+  const lock = join(dir, "lock");
+  writeFileSync(lock, String(dead.pid));
+  linkSync(lock, `${lock}.stale.${dead.pid}`); // another breaker holds the marker
+  expect(await openStore(dir).withLock(async () => "no")).toBe("busy");
+  expect(readFileSync(lock, "utf8")).toBe(String(dead.pid));
+});
+
+test("the lock is created with the pid already in it", async () => {
+  const dir = tmp();
+  const s = openStore(dir);
+  expect(await s.withLock(async () => readFileSync(join(dir, "lock"), "utf8"))).toBe(String(process.pid));
+  expect(readdirSync(dir)).toEqual([]); // the temp file is gone, and release removed the lock
 });

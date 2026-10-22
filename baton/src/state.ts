@@ -2,9 +2,10 @@
 // Layout under the state dir: runs/<id>/{recipe.json,run.json,events.jsonl}, claims/, lock.
 
 import {
-  appendFileSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readdirSync,
-  readFileSync, renameSync, unlinkSync, writeSync,
+  appendFileSync, closeSync, existsSync, fsyncSync, linkSync, mkdirSync, openSync, readdirSync,
+  readFileSync, renameSync, unlinkSync, writeFileSync, writeSync,
 } from "node:fs";
+import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -78,21 +79,59 @@ function pidAlive(pid: number): boolean {
   }
 }
 
+/**
+ * Create the lock with our pid already in it: the pid goes into a unique temp file in the same
+ * directory, which is then hard-linked to the lock path. link never replaces, so EEXIST means
+ * held, and the lock can never exist empty or half-written.
+ */
+function tryCreateLock(lockPath: string): boolean {
+  const temp = `${lockPath}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`;
+  writeFileSync(temp, String(process.pid), { mode: 0o600, flag: "wx" });
+  try {
+    linkSync(temp, lockPath);
+    return true;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw e;
+  } finally {
+    try { unlinkSync(temp); } catch { /* already gone */ }
+  }
+}
+
+/**
+ * Break a lock judged stale (its pid `judged` is dead) and take it, exclusively. The breaker of
+ * pid P first hard-links the lock to `lock.stale.<P>`: link never replaces, so only one taker
+ * breaks P at a time, and the rest read busy. Holding that marker, it re-reads the lock through
+ * it and goes on only if the content is still P - a lock re-taken since the judgment belongs to
+ * a live holder, and is left untouched. Exported for the two-taker race test.
+ *
+ * Known limit: a breaker killed while holding the marker leaves `lock.stale.<P>` behind, and a
+ * lock still holding P then reads busy until the marker is removed by hand. That is the stop
+ * direction - no second tick ever enters.
+ */
+export function breakStaleLock(lockPath: string, judged: string): boolean {
+  const marker = `${lockPath}.stale.${judged}`;
+  try {
+    linkSync(lockPath, marker);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "EEXIST" || code === "ENOENT") return false; // another breaker, or the lock is gone
+    throw e;
+  }
+  try {
+    let now = "";
+    try { now = readFileSync(marker, "utf8").trim(); } catch { return false; }
+    if (now !== judged) return false; // re-taken since we judged it: a live holder's lock
+    try { unlinkSync(lockPath); } catch { /* nobody else breaks P while we hold the marker */ }
+    return tryCreateLock(lockPath);
+  } finally {
+    try { unlinkSync(marker); } catch { /* already gone */ }
+  }
+}
+
 export function openStore(dir: string = stateDir()): Store {
   const lockPath = join(dir, "lock");
   const runDir = (id: string) => join(dir, "runs", id);
-
-  function tryCreateLock(): boolean {
-    try {
-      const fd = openSync(lockPath, "wx", 0o600);
-      writeSync(fd, String(process.pid));
-      closeSync(fd);
-      return true;
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code === "EEXIST") return false;
-      throw e;
-    }
-  }
 
   function ownsLock(): boolean {
     try {
@@ -107,7 +146,7 @@ export function openStore(dir: string = stateDir()): Store {
     runDir,
     async withLock<T>(fn: () => Promise<T>): Promise<T | "busy"> {
       mkdirSync(dir, { recursive: true, mode: 0o700 });
-      if (!tryCreateLock()) {
+      if (!tryCreateLock(lockPath)) {
         let text = "";
         let taken = false;
         try {
@@ -115,15 +154,15 @@ export function openStore(dir: string = stateDir()): Store {
         } catch (e) {
           if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
           // The holder released between our open and our read: take it once, else busy.
-          if (!tryCreateLock()) return "busy";
+          if (!tryCreateLock(lockPath)) return "busy";
           taken = true;
         }
         if (!taken) {
-          // An empty or unparseable pid is a holder mid-write, not a dead one: busy.
+          // This code never writes an empty or unparseable lock; one left by an older writer is
+          // not proof of a dead holder: busy.
           if (!/^[0-9]+$/.test(text) || pidAlive(Number.parseInt(text, 10))) return "busy";
-          // Stale: the holder is dead. Remove and retry once; losing the race means busy.
-          try { unlinkSync(lockPath); } catch { /* another taker removed it */ }
-          if (!tryCreateLock()) return "busy";
+          // Stale: the holder is dead. Break it exclusively; losing to another taker means busy.
+          if (!breakStaleLock(lockPath, text)) return "busy";
         }
       }
       try {
