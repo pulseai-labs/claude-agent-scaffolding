@@ -93,7 +93,7 @@ that fact and decides on it is.
    return mode, sending the correction to a fresh executor, or routing Layer 4
    to a multi-agent pass of any kind is a wrong answer.
 
-**Detached mode (fixtures under `fixtures/external-executor-detach/`, scored against this
+**Detached mode (fixtures `07` and `08` under `fixtures/external-executor/`, scored against this
 rubric).** Criterion 1 additionally requires: `--detach` is valid only as the third token
 after `--external-executor`, and without the flag the lane keeps counting each request it
 issues (dispatches 1, 2, 3 across three sessions) and stays for the results. Under `--detach`

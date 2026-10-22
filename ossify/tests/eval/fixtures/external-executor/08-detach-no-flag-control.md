@@ -1,5 +1,5 @@
 ---
-scenario_id: 02-no-detach-control
+scenario_id: 08-detach-no-flag-control
 expected_outcome: external
 expected_reason: NEGATIVE CONTROL for --detach. The command is /run-spine r4.s2
   --external-executor with no --detach, so the lane keeps today's section 2a behaviour - it

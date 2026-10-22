@@ -1,5 +1,5 @@
 ---
-scenario_id: 01-two-planned-exits-count-nothing
+scenario_id: 07-detach-two-planned-exits-count-nothing
 expected_outcome: detach
 expected_reason: The command carries --detach as its third token after --external-executor, so the
   lane is in detached mode. Each lane session builds the round's requests, invokes the caller's
