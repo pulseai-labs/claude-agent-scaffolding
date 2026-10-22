@@ -60,10 +60,12 @@ export function rollup(entries: Entry[]): PrView["checks"] {
   if (entries.some((e) => (isContext(e) ? e.state === "FAILURE" || e.state === "ERROR" : RED_CONCLUSIONS.has(e.conclusion ?? "")))) {
     return "red";
   }
-  if (entries.some((e) => (isContext(e) ? e.state === "PENDING" || e.state === "EXPECTED" : e.status !== "COMPLETED"))) {
-    return "pending";
-  }
-  return "green";
+  // Green is a whitelist: anything neither red nor on it (STALE, a null or unknown conclusion,
+  // an unrecognised state) is not yet green and reads pending.
+  const isGreen = (e: Entry) =>
+    isContext(e) ? e.state === "SUCCESS"
+      : e.status === "COMPLETED" && (e.conclusion === "SUCCESS" || e.conclusion === "NEUTRAL" || e.conclusion === "SKIPPED");
+  return entries.every(isGreen) ? "green" : "pending";
 }
 
 export class GhForge implements Forge {

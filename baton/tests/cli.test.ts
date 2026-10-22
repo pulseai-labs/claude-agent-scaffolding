@@ -161,6 +161,15 @@ test("unpark resets the stage counters and logs an event", async () => {
   expect(ev[1].unit).toBe("planner");
 });
 
+test("unpark clears the merge failure count", async () => {
+  const st = await armedWithParkedUnit();
+  const run = runJson(st, "r1");
+  run.units.planner.merge_failures = 3;
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+  expect(runJson(st, "r1").units.planner.merge_failures).toBeUndefined();
+});
+
 test("unpark --to moves the unit to a recipe stage; an unknown stage is rc 2", async () => {
   const st = await armedWithParkedUnit();
   expect((await runIn(st, "unpark", "r1", "planner", "--to", "nowhere")).rc).toBe(2);
