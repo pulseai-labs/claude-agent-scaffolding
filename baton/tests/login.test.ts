@@ -11,7 +11,7 @@ const SECRET = "tok-SECRET-9f3a1c";
 type Oauth = { origin: string; base: string; registered: any[]; tokenForms: URLSearchParams[]; stop(): void };
 
 /** A stand-in OAuth server: metadata, registration, and a token endpoint that checks PKCE. */
-function startOauth(): Oauth {
+function startOauth(raw: { register?: string; token?: string } = {}): Oauth {
   const registered: any[] = [];
   const tokenForms: URLSearchParams[] = [];
   let challenge = "";
@@ -30,6 +30,7 @@ function startOauth(): Oauth {
       }
       if (u.pathname === "/register") {
         registered.push(await req.json());
+        if (raw.register !== undefined) return new Response(raw.register, { status: 201, headers: { "content-type": "application/json" } });
         return Response.json({ client_id: "cid-1" }, { status: 201 });
       }
       if (u.pathname === "/token") {
@@ -37,6 +38,7 @@ function startOauth(): Oauth {
         tokenForms.push(form);
         const ok = createHash("sha256").update(form.get("code_verifier") ?? "").digest("base64url") === challenge;
         if (!ok || form.get("code") !== "the-code") return Response.json({ error: "invalid_grant" }, { status: 400 });
+        if (raw.token !== undefined) return new Response(raw.token, { status: 200, headers: { "content-type": "application/json" } });
         return Response.json({ access_token: SECRET, token_type: "Bearer", expires_in: 2592000, scope: "read write" });
       }
       return new Response("nf", { status: 404 });
@@ -189,4 +191,33 @@ test("login failure messages do not carry the token", async () => {
   }
   expect(msg).toContain("access_denied");
   expect(msg).not.toContain(SECRET);
+});
+
+test("a non-JSON 200 from the token or registration endpoint fails without quoting the body", async () => {
+  const body = `${SECRET} is not json`;
+  for (const [raw, endpoint] of [[{ token: body }, "token endpoint"], [{ register: body }, "registration endpoint"]] as const) {
+    const o = startOauth(raw);
+    const log: string[] = [];
+    const tokenFile = join(tmp(), "t3-token.json");
+    let msg = "";
+    try {
+      await login({
+        base: o.base,
+        tokenFile,
+        timeoutMs: 3000,
+        out: (l) => {
+          log.push(l);
+          if (l.startsWith("http")) void approve(o, l);
+        },
+      });
+    } catch (e) {
+      msg = (e as Error).message;
+    } finally {
+      o.stop();
+    }
+    expect(msg).toBe(`${endpoint} returned a body that is not JSON (HTTP ${endpoint === "token endpoint" ? 200 : 201})`);
+    expect(msg).not.toContain(SECRET);
+    expect(log.join("\n")).not.toContain(SECRET);
+    expect(() => statSync(tokenFile)).toThrow();
+  }
 });

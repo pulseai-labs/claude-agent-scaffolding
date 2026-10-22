@@ -27,6 +27,19 @@ async function getJson(url: string): Promise<any | undefined> {
   }
 }
 
+/**
+ * A response body parsed as JSON. On a parse failure the error names only the endpoint and the
+ * HTTP status: the parser's message quotes the body near the fault, and these bodies may carry
+ * the access token.
+ */
+async function bodyJson(r: Response, endpoint: string): Promise<any> {
+  try {
+    return await r.json();
+  } catch {
+    throw new Error(`${endpoint} returned a body that is not JSON (HTTP ${r.status})`);
+  }
+}
+
 async function discover(base: string): Promise<{ authorization_endpoint: string; token_endpoint: string; registration_endpoint: string }> {
   const u = new URL(base);
   // The resource may name its authorization server; otherwise the origin is the issuer.
@@ -79,7 +92,7 @@ export async function login(opts: LoginOptions): Promise<void> {
       }),
       signal: AbortSignal.timeout(15_000),
     });
-    const client = reg.ok ? ((await reg.json()) as { client_id?: string }) : {};
+    const client = reg.ok ? ((await bodyJson(reg, "registration endpoint")) as { client_id?: string }) : {};
     if (!client.client_id) throw new Error(`client registration refused (HTTP ${reg.status})`);
 
     const auth = new URL(meta.authorization_endpoint);
@@ -115,7 +128,7 @@ export async function login(opts: LoginOptions): Promise<void> {
       }),
       signal: AbortSignal.timeout(15_000),
     });
-    const tok = res.ok ? ((await res.json()) as { access_token?: string; expires_in?: number; scope?: string }) : {};
+    const tok = res.ok ? ((await bodyJson(res, "token endpoint")) as { access_token?: string; expires_in?: number; scope?: string }) : {};
     if (!tok.access_token || typeof tok.expires_in !== "number") throw new Error(`token exchange refused (HTTP ${res.status})`);
 
     mkdirSync(dirname(opts.tokenFile), { recursive: true, mode: 0o700 });
