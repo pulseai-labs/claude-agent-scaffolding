@@ -13,26 +13,43 @@
       "stage": "work"
     }
   ],
-  "seed": [{ "id": "planner", "stage": "plan" }],
+  "seed": [{ "id": "planner", "stage": "planner" }],
   "stages": {
-    "plan": {
+    "planner": {
       "kind": "session",
       "instance": "planner",
       "model": "small",
       "project": "{param.project}",
       "cwd": "{param.project}",
       "title": "plan {unit.id}",
-      "message": "Write one request file per task into {run.dir}/queue, then write {run.dir}/plan.done.",
+      "message": "Write one request file per task into {run.dir}/queue. Answer any unit waiting on a gap by rewriting its record. When every unit is done, write {run.dir}/final. Then write {run.dir}/plan.done.",
       "env": { "RELAY_ROLE": "planner" },
       "handoff": null,
       "outcomes": [
-        { "when": [{ "file": "{run.dir}/plan.done" }], "to": "barrier" }
+        { "when": [{ "file": "{run.dir}/plan.done" }], "to": "planner_wait" }
       ]
     },
-    "barrier": {
+    "planner_wait": {
       "kind": "wait",
       "outcomes": [
-        { "when": [{ "units": { "stages": ["work", "land"], "count": "none" } }], "to": "done" }
+        {
+          "when": [
+            { "units": { "group": "{run.group}", "stages": ["regap"], "count": "any" } },
+            { "active": "none-in-group" }
+          ],
+          "to": "planner"
+        },
+        {
+          "when": [
+            { "units": { "group": "{run.group}", "stages": ["done"], "count": "all" } },
+            { "exit0": ["test", "-f", "{run.dir}/final"] }
+          ],
+          "to": "done"
+        },
+        {
+          "when": [{ "units": { "group": "{run.group}", "stages": ["done"], "count": "all" } }],
+          "to": "planner"
+        }
       ]
     },
     "work": {
@@ -42,12 +59,24 @@
       "project": "{param.project}",
       "cwd": "{param.project}",
       "title": "work {unit.id}",
-      "message": "Do {unit.vars.task}. Attempt {attempt}. Write {run.dir}/out/{unit.id}.done when finished.",
+      "message": "Do {unit.vars.task}. Attempt {attempt}. Write {run.dir}/out/{unit.id}.done when finished, or {run.dir}/out/{unit.id}.gaps when the task has a gap.",
       "env": { "RELAY_ROLE": "worker", "RELAY_UNIT": "{unit.id}" },
       "handoff": null,
+      "stop_file": "{run.dir}/stop/{unit.id}",
       "watch": ["{run.dir}/out"],
       "outcomes": [
-        { "when": [{ "file": "{run.dir}/out/{unit.id}.done" }], "to": "land" }
+        { "when": [{ "file": "{run.dir}/out/{unit.id}.done" }], "to": "land" },
+        {
+          "when": [{ "file": "{run.dir}/out/{unit.id}.gaps" }],
+          "to": "regap",
+          "run": [["rm", "-f", "{run.dir}/out/{unit.id}.gaps"]]
+        }
+      ]
+    },
+    "regap": {
+      "kind": "wait",
+      "outcomes": [
+        { "when": [{ "record_changed": true }], "to": "work" }
       ]
     },
     "land": {

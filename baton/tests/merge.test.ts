@@ -4,10 +4,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
 import { tick, type TickReport } from "../src/engine.ts";
-import type { Forge, PrView } from "../src/forge.ts";
+import type { PrView } from "../src/forge.ts";
 import { notifyOnce } from "../src/notify.ts";
 import { openStore, type RunState } from "../src/state.ts";
 import { FakeHost } from "./fake-host.ts";
+import { commit, FakeForge, git } from "./fake-forge.ts";
 
 const T0 = Date.parse("2026-10-22T10:00:00.000Z");
 const saved = { state: process.env.BATON_STATE_DIR, config: process.env.BATON_CONFIG, home: process.env.HOME };
@@ -42,17 +43,6 @@ afterEach(() => {
   }
 });
 
-function git(cwd: string, ...args: string[]): string {
-  const p = Bun.spawnSync(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" });
-  if (p.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${p.stderr.toString()}`);
-  return p.stdout.toString().trim();
-}
-function commit(dir: string, name: string): string {
-  writeFileSync(join(dir, name), name);
-  git(dir, "add", name);
-  git(dir, "commit", "-m", name);
-  return git(dir, "rev-parse", "HEAD");
-}
 /** A branch commit merged with a merge commit into origin's main: the shape of a landed PR. Returns the branch head. */
 function landPr(name: string): string {
   git(other, "pull", "origin", "main");
@@ -67,29 +57,6 @@ function landPr(name: string): string {
 const URL1 = "https://github.com/o/r/pull/1";
 const URL2 = "https://github.com/o/r/pull/2";
 const green: PrView = { state: "OPEN", head: "h1", base: "main", mergeable: "MERGEABLE", checks: "green" };
-
-class FakeForge implements Forge {
-  views = new Map<string, PrView>();
-  viewCalls: string[] = [];
-  merges: { url: string; head: string }[] = [];
-  mergeFails = 0;
-  /** When set, every view returns a fresh head `<prefix><n>`. */
-  rotateHead: string | null = null;
-  private n = 0;
-  async view(url: string): Promise<PrView> {
-    this.viewCalls.push(url);
-    const v = this.views.get(url);
-    if (!v) throw new Error(`no fake PR ${url}`);
-    return this.rotateHead === null ? { ...v } : { ...v, head: `${this.rotateHead}${++this.n}` };
-  }
-  async merge(url: string, head: string): Promise<void> {
-    if (this.mergeFails > 0) {
-      this.mergeFails--;
-      throw new Error("gh refused");
-    }
-    this.merges.push({ url, head });
-  }
-}
 
 function mergeStage(over: Record<string, unknown> = {}) {
   return {

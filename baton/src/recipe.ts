@@ -232,7 +232,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
           err(`${path}.units`, "must be {group?: string, stages: string[], count: all|any|none}");
         } else {
           v.stages.forEach((st, i) => {
-            if (!stageNames.has(st)) err(`${path}.units.stages[${i}]`, `names no stage: "${st}"`);
+            if (st !== "done" && !stageNames.has(st)) err(`${path}.units.stages[${i}]`, `names no stage: "${st}"`);
           });
         }
         break;

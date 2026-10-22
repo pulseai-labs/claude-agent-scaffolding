@@ -107,6 +107,15 @@ describe("validate", () => {
     expectError(q, 'sources[0].stage: names no stage: "ghost"');
   });
 
+  test("a units signal may name the terminal stage done, and no other unknown stage", () => {
+    const ok = relay();
+    ok.stages.planner_wait.outcomes[1].when[0].units.stages = ["done"];
+    expect(validate(ok).ok).toBe(true);
+    const bad = relay();
+    bad.stages.planner_wait.outcomes[1].when[0].units.stages = ["ghost"];
+    expectError(bad, 'units.stages[0]: names no stage: "ghost"');
+  });
+
   test("version other than 1", () => {
     const r = relay();
     r.version = 2;

@@ -55,7 +55,7 @@ test("arm writes a frozen recipe and seed units", async () => {
   const dir = join(st, "runs", "r1");
   expect(readFileSync(join(dir, "recipe.json"))).toEqual(readFileSync(RELAY));
   const run = runJson(st, "r1");
-  expect(run.units.planner.stage).toBe("plan");
+  expect(run.units.planner.stage).toBe("planner");
   expect(run.units.planner.group).toBe(0);
   expect(run.units.planner.order).toBe(0);
   expect(run.status).toBe("armed");
@@ -111,7 +111,7 @@ test("status prints one line per unit", async () => {
   await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer");
   const r = await runIn(st, "status", "r1");
   expect(r.rc).toBe(0);
-  expect(r.out).toBe("planner plan 0 0 - -\n");
+  expect(r.out).toBe("planner planner 0 0 - -\n");
   expect((await runIn(st, "status", "nope")).rc).toBe(2);
 });
 
@@ -120,12 +120,12 @@ test("disarm marks the run disarmed and removes only its units' claims", async (
   await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer");
   const run = runJson(st, "r1");
   run.units.planner.session = {
-    nonce: "r1/planner/plan/1", claim_nonce: "r1/planner/plan/1", launch_dir: "/x", claim_key: "abc123",
+    nonce: "r1/planner/planner/1", claim_nonce: "r1/planner/planner/1", launch_dir: "/x", claim_key: "abc123",
     launched_at: "t", last_progress_at: "t", progress_mark: "m",
   };
   writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
   mkdirSync(join(st, "claims"), { recursive: true });
-  writeFileSync(join(st, "claims", "abc123.env"), "# baton r1/planner/plan/1\nX=1\n");
+  writeFileSync(join(st, "claims", "abc123.env"), "# baton r1/planner/planner/1\nX=1\n");
   writeFileSync(join(st, "claims", "other.env"), "x");
   const r = await runIn(st, "disarm", "r1");
   expect(r.rc).toBe(0);
@@ -142,7 +142,7 @@ async function armedWithParkedUnit() {
   const run = runJson(st, "r1");
   run.units.planner.parked = { reason: "stalled", at: "t" };
   run.units.planner.stalls = 3;
-  run.units.planner.launches = { plan: 2, work: 1 };
+  run.units.planner.launches = { planner: 2, work: 1 };
   writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
   return st;
 }
@@ -154,8 +154,8 @@ test("unpark resets the stage counters and logs an event", async () => {
   const u = runJson(st, "r1").units.planner;
   expect(u.parked).toBeUndefined();
   expect(u.stalls).toBe(0);
-  expect(u.launches).toEqual({ plan: 0, work: 1 });
-  expect(u.stage).toBe("plan");
+  expect(u.launches).toEqual({ planner: 0, work: 1 });
+  expect(u.stage).toBe("planner");
   const ev = readFileSync(join(st, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
   expect(ev.map((e) => e.kind)).toEqual(["armed", "unpark"]);
   expect(ev[1].unit).toBe("planner");
