@@ -164,6 +164,26 @@ describe("ossify-spine recipe", () => {
     expect(c.before.flat()).not.toContain(PACKET);
   });
 
+  test("the spine PR wait parks a conflict and keeps its order", () => {
+    const w = loadRecipe().stages.spine_wait as WaitStage;
+    const shape = w.outcomes.map((o) => [
+      o.to, ...o.when.map((sig) => ("pr" in sig ? sig.pr.test : "exit0" in sig ? sig.exit0.slice(1, 3).join(" ") : "?")),
+    ]);
+    expect(shape).toEqual([
+      ["spine_finish", "merged"],
+      ["park", "closed"],
+      ["park", "conflict"], // spine_work runs as an implementer: no merge, no force-push, so it cannot resolve one
+      ["spine_work", "checks_red"],
+      ["spine_work", "-qx verdict: block", "checks_green"],
+      ["spine_ack", "-qx verdict: pass", "checks_green", "mergeable"],
+    ]);
+  });
+
+  test("a spine PR round clears the operator file with the review", () => {
+    const run = (loadRecipe().stages.spine_work as SessionStage).outcomes[0].run;
+    expect(run).toEqual([["rm", "-f", `${OUT}/review.md`, `${OUT}/round-done`, `${OUT}/operator.md`]]);
+  });
+
   test("land merges by plan (a)'s order", () => {
     const land = loadRecipe().stages.land as MergeStage;
     expect(land.kind).toBe("merge");
@@ -273,6 +293,16 @@ describe("ossify-spine briefs", () => {
     const spine = loadRecipe().sources.find((s) => s.stage === "spine_review")!;
     const keys = Object.keys(JSON.parse(RECORD)).sort();
     expect(keys).toEqual([spine.id_key, spine.group_key, spine.order_key, ...Object.values(spine.vars)].sort());
+  });
+
+  test("the spine PR body keeps its first two lines", () => {
+    for (const f of ["spine-open.md", "spine-work.md"]) {
+      const b = brief(f);
+      for (const pin of ["first two lines", "`pushed-tip: …`", "verbatim"]) {
+        expect([f, pin, b.includes(pin)]).toEqual([f, pin, true]);
+      }
+    }
+    expect(brief("spine-work.md")).toContain("follow-up commit, never a rewrite");
   });
 
   test("the reviewer writes a verdict line", () => {

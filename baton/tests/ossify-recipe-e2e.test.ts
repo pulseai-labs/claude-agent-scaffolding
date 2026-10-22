@@ -505,6 +505,21 @@ test("a review without a verdict relaunches, then parks", async () => {
   expect(r.notes).toEqual([`baton r1/${SPINE_UNIT} parked in spine_review: no result`]);
 });
 
+test("a spine PR conflict parks the spine PR", async () => {
+  await arm();
+  const host = newHost(() => put(join(runDir, "rounds.done"), "x"));
+  const forge = new SpineForge();
+  forge.views.set(prUrl(SPINE_UNIT), { ...openPr("main"), mergeable: "CONFLICTING" });
+  const r = rig(host, forge);
+  await drive(r, 40, () => unit(SPINE_UNIT)?.parked !== undefined || host.of(SPINE_UNIT, "spine_work").length > 0);
+  await settle(r, 3);
+
+  expect(unit(SPINE_UNIT).stage).toBe("spine_wait");
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("outcome");
+  expect(host.of(SPINE_UNIT, "spine_work")).toHaveLength(0);
+  expect(moves(SPINE_UNIT)).toEqual(["spine_review>spine_wait"]);
+});
+
 test("a molt successor gets the handoff path and is not a dispatch", async () => {
   await arm();
   const handoff = join(aiRoot, "handoffs", "w1-molt.md");

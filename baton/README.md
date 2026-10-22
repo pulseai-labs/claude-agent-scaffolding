@@ -100,7 +100,10 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   `baton unpark <run> <unit>`. A stop file left in place parks the unit again.
 - **After a gap stop**, send the item back to its implementer: `baton unpark <run> <wi> --to implement`.
 - **A reversal before the spine merges**: write it to `out/spine-pr/operator.md`, then
-  `baton unpark <run> spine-pr --to spine_work`; that round does it first.
+  `baton unpark <run> spine-pr --to spine_work`; that round does it first and then removes the file.
+- **A spine PR conflict parks `spine-pr`** in `spine_wait`. Resolve it on the spine branch in the
+  canonical root (merge the base in; never rebase or force-push), push, delete
+  `out/spine-pr/review.md`, then `baton unpark <run> spine-pr --to spine_review`.
 - **A cheap build**: implementers and corrections hold the `build` slot (1 by default), so they run
   one at a time. Raise `slots.build` in the config to run more at once.
 

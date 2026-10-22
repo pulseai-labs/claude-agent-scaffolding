@@ -333,7 +333,7 @@
       "outcomes": [
         { "when": [{ "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "merged" } }], "to": "spine_finish" },
         { "when": [{ "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "closed" } }], "to": "park" },
-        { "when": [{ "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "conflict" } }], "to": "spine_work" },
+        { "when": [{ "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "conflict" } }], "to": "park" },
         { "when": [{ "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "checks_red" } }], "to": "spine_work" },
         {
           "when": [
@@ -381,7 +381,7 @@
         {
           "when": [{ "file": "{run.dir}/out/{unit.id}/round-done" }],
           "to": "spine_review",
-          "run": [["rm", "-f", "{run.dir}/out/{unit.id}/review.md", "{run.dir}/out/{unit.id}/round-done"]]
+          "run": [["rm", "-f", "{run.dir}/out/{unit.id}/review.md", "{run.dir}/out/{unit.id}/round-done", "{run.dir}/out/{unit.id}/operator.md"]]
         }
       ]
     },
