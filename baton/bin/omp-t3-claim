@@ -41,12 +41,17 @@ log_line() {
 }
 
 # 2. No claim: launch with the instance's environment untouched.
-if [ ! -f "$claim" ]; then
+if [ ! -e "$claim" ] && [ ! -L "$claim" ]; then
   log_line none
   exec "$OMP_T3" "$@"
 fi
 
-# 3. Validate every line before exporting anything.
+# 3. Validate every line before exporting anything. A claim that exists but cannot be
+# opened is broken, not absent: refuse rather than launch with the instance's values.
+if ! { exec 3<"$claim"; } 2>/dev/null; then
+  log_line "invalid 0"
+  exit 78
+fi
 keys=() vals=()
 n=0
 first=1
@@ -72,7 +77,8 @@ while IFS= read -r line || [ -n "$line" ]; do
   esac
   keys+=("$k")
   vals+=("${line#*=}")
-done <"$claim"
+done <&3
+exec 3<&-
 
 # 4. Export literally: no expansion, no quoting.
 for i in "${!keys[@]}"; do

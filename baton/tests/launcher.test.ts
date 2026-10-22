@@ -82,6 +82,27 @@ test("control: the same file with the bad line removed launches", () => {
   expect(r.json.env.A).toBe("1");
 });
 
+const asRoot = process.getuid?.() === 0;
+
+test.skipIf(asRoot)("an unreadable claim exits 78 and launches nothing", () => {
+  const f = claimFile(proj);
+  writeFileSync(f, "# baton n1\nA=1\n");
+  chmodSync(f, 0o000);
+  const r = run(proj);
+  expect(r.rc).toBe(78);
+  expect(r.out).toBe("");
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ invalid 0 cwd /);
+});
+
+test("control: the same claim at mode 600 launches", () => {
+  const f = claimFile(proj);
+  writeFileSync(f, "# baton n1\nA=1\n");
+  chmodSync(f, 0o600);
+  const r = run(proj);
+  expect(r.rc).toBe(0);
+  expect(r.json.env.A).toBe("1");
+});
+
 test("drop removes only the T3 extension pair", () => {
   writeFileSync(claimFile(proj), "# baton n1\nOMP_T3_DROP_T3_MCP=1\n");
   const a = run(proj, ["--extension", "/x/pi-t3-mcp-extension.ts", "--extension", "/y/other.ts", "--mode", "rpc"]);
