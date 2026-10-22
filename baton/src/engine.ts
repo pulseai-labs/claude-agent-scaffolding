@@ -206,15 +206,24 @@ class RunTick {
     const { stage, scope } = this.ctx(u);
     if (o.interrupt && s.thread_id) await this.host.interrupt(s.thread_id, o.interrupt);
     removeClaim(s.claim_key, s.claim_nonce);
-    if (o.release !== false && stage.kind === "session") await this.release(u, stage, scope, s.launch_dir);
+    if (o.release !== false && stage.kind === "session") await this.release(u, stage, scope, s.launch_dir, s);
     delete u.session;
     delete u.quiet_since;
     this.save();
   }
 
-  private async release(u: UnitState, stage: SessionStage, scope: Scope, dir: string): Promise<void> {
+  /**
+   * The project and cwd a session was launched with. An in-flight session never re-renders them:
+   * its record may have been rewritten since. A session from older state without them re-renders.
+   */
+  private launchedWith(stage: SessionStage, scope: Scope, s?: Session): { project: string; cwd: string } {
+    return { project: s?.project ?? render(stage.project, scope), cwd: s?.cwd ?? render(stage.cwd, scope) };
+  }
+
+  private async release(u: UnitState, stage: SessionStage, scope: Scope, dir: string, s?: Session): Promise<void> {
     try {
-      await this.host.release(render(stage.project, scope), render(stage.cwd, scope), dir);
+      const w = this.launchedWith(stage, scope, s);
+      await this.host.release(w.project, w.cwd, dir);
     } catch (e) {
       if (isHostError(e)) throw e;
       this.report.errors.push(`${this.run.id}/${u.id}: release failed: ${message(e)}`);
@@ -347,7 +356,7 @@ class RunTick {
       await this.guard(u, async () => {
         const { stage, scope } = this.ctx(u);
         if (stage.kind !== "session") throw new Error(`session in non-session stage ${u.stage}`);
-        const ids = await this.host.findByNonce(render(stage.project, scope), s.nonce);
+        const ids = await this.host.findByNonce(this.launchedWith(stage, scope, s).project, s.nonce);
         if (ids.length === 1) {
           s.thread_id = ids[0];
           this.counted(u, s);
@@ -539,9 +548,10 @@ class RunTick {
           return;
         }
         // completed or interrupted: outcomes, then the quiet window; an interrupt never drops at once
-        const o = await this.firstOutcome(u, stage.outcomes, this.existingDir(render(stage.cwd, scope)));
+        const launchedCwd = this.launchedWith(stage, scope, s).cwd;
+        const o = await this.firstOutcome(u, stage.outcomes, this.existingDir(launchedCwd));
         if (o === "pending") return;
-        if (o) return this.takeOutcome(u, o, this.existingDir(s.launch_dir, render(stage.cwd, scope)));
+        if (o) return this.takeOutcome(u, o, this.existingDir(s.launch_dir, launchedCwd));
         const handoff = this.handoffPath(stage, scope, s);
         if (handoff !== null) return this.successor(u, stage, s, handoff);
         u.quiet_since ??= this.nowIso();
@@ -587,7 +597,7 @@ class RunTick {
     const req: LaunchRequest = {
       nonce: n,
       title: threadTitle(render(stage.title, scope), n),
-      project: render(stage.project, scope),
+      project: this.launchedWith(stage, scope, old).project,
       instance: render(stage.instance, scope),
       model: render(stage.model, scope),
       cwd: old.launch_dir,
@@ -596,6 +606,7 @@ class RunTick {
     const now = this.nowIso();
     const s: Session = {
       nonce: n, claim_nonce: old.claim_nonce, launch_dir: old.launch_dir, claim_key: old.claim_key,
+      ...this.launchedWith(stage, scope, old),
       launched_at: now, last_progress_at: now, progress_mark: this.progressMark(stage, scope, ""), successor_of: old.nonce,
     };
     delete u.quiet_since;
@@ -613,7 +624,7 @@ class RunTick {
     } catch (e) {
       if (isHostError(e)) throw e;
       if (e instanceof LaunchError) {
-        await this.launchFailed(u, e.message, { key: s.claim_key, nonce: s.claim_nonce, dir: s.launch_dir });
+        await this.launchFailed(u, e.message, { key: s.claim_key, nonce: s.claim_nonce, dir: s.launch_dir, session: s });
         return false;
       }
       // Unknown: the launch may have reached the host. Keep the session for step 0.
@@ -634,10 +645,10 @@ class RunTick {
   }
 
   /** A launch the host refused: claim and directory go, the attempt counts. */
-  private async launchFailed(u: UnitState, reason: string, c: { key?: string; nonce?: string; dir?: string }): Promise<void> {
+  private async launchFailed(u: UnitState, reason: string, c: { key?: string; nonce?: string; dir?: string; session?: Session }): Promise<void> {
     const { stage, scope } = this.ctx(u);
     if (c.key && c.nonce) removeClaim(c.key, c.nonce);
-    if (c.dir !== undefined && stage.kind === "session") await this.release(u, stage, scope, c.dir);
+    if (c.dir !== undefined && stage.kind === "session") await this.release(u, stage, scope, c.dir, c.session);
     delete u.session;
     u.launches[u.stage] = (own(u.launches, u.stage) ?? 0) + 1; // the refused attempt counts
     this.ev("launch failed", { unit: u.id, reason });
@@ -767,7 +778,7 @@ class RunTick {
     }
     const now = this.nowIso();
     const s: Session = {
-      nonce: nn, claim_nonce: nn, launch_dir: dir, claim_key: key,
+      nonce: nn, claim_nonce: nn, launch_dir: dir, claim_key: key, project, cwd,
       launched_at: now, last_progress_at: now, progress_mark: this.progressMark(stage, scope, ""),
     };
     const req: LaunchRequest = {

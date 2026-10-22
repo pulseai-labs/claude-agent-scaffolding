@@ -13,6 +13,9 @@ export type Session = {
   nonce: string;
   claim_nonce: string;
   launch_dir: string;
+  /** The project and cwd the stage rendered at launch; absent in older state (re-rendered then). */
+  project?: string;
+  cwd?: string;
   thread_id?: string;
   claim_key: string;
   launched_at: string;

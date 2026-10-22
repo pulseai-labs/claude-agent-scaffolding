@@ -819,6 +819,117 @@ test("a launch whose request cannot render parks with nothing bound and no claim
   expect(host.launches.map((l) => l.request.message)).toEqual(["Do t"]);
 });
 
+function pinnedRecipe() {
+  const rec = sourced();
+  Object.assign(rec.stages.work as Record<string, unknown>, { cwd: "{param.root}/{unit.vars.slug}", project: "{unit.vars.project}" });
+  rec.sources[0].vars = { slug: "slug", project: "project" };
+  return rec;
+}
+
+test("a record rewritten mid-session: release targets the project and cwd the session launched with", async () => {
+  await arm(pinnedRecipe());
+  for (const d of ["s1", "s2"]) mkdirSync(join(root, d), { recursive: true });
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s1", project: "p1" });
+  await doTick();
+  const s = runState().units.a.session!;
+  expect([s.project, s.cwd]).toEqual(["p1", join(root, "s1")]);
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s2", project: "p2" });
+  host.advance();
+  at(1);
+  await doTick();
+  expect(host.releases[0]).toEqual({ project: "p1", cwd: join(root, "s1"), dir: join(root, "s1") });
+  // the relaunch follows the rewritten record
+  expect(host.launches.map((l) => [l.request.project, l.request.cwd])).toEqual([["p1", join(root, "s1")], ["p2", join(root, "s2")]]);
+});
+
+test("a successor after a record rewrite launches in the pinned project, and a refused one releases there", async () => {
+  const rec = pinnedRecipe();
+  Object.assign(rec.stages.work as Record<string, unknown>, {
+    handoff: { file: "{run.dir}/h/{unit.id}", token: "handed-off", message: "resume from {handoff_path}" },
+  });
+  await arm(rec);
+  for (const d of ["s1", "s2"]) mkdirSync(join(root, d), { recursive: true });
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [handoffWrite(1)] } });
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s1", project: "p1" });
+  await doTick();
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s2", project: "p2" });
+  host.advance();
+  at(2);
+  await doTick();
+  expect(host.launches.map((l) => l.request.project)).toEqual(["p1", "p1"]);
+  const s = runState().units.a.session!;
+  expect(s.successor_of).toBe("r1/a/work/1");
+  expect([s.project, s.cwd]).toEqual(["p1", join(root, "s1")]);
+  // a successor the host refuses releases the launched directory in the launched project
+  host.advance();
+  writeFileSync(join(runDir(), "h", "a"), `${iso(3)} handed-off /tmp/hand2 a.md\n`);
+  failNextLaunch(new LaunchError("refused"), false);
+  at(4);
+  await doTick();
+  expect(kinds()).toContain("launch failed");
+  expect(host.releases[0]).toEqual({ project: "p1", cwd: join(root, "s1"), dir: join(root, "s1") });
+});
+
+test("outcome signals of a rewritten record run in the cwd the session launched in", async () => {
+  const rec = pinnedRecipe();
+  (rec.stages.work as { outcomes: unknown[] }).outcomes = [
+    { when: [{ exit0: ["sh", "-c", `test "$(basename "$PWD")" = s1`] }], to: "done" },
+  ];
+  await arm(rec);
+  for (const d of ["s1", "s2"]) mkdirSync(join(root, d), { recursive: true });
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s1", project: "p1" });
+  await doTick();
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s2", project: "p2" });
+  host.advance();
+  at(1);
+  await doTick();
+  expect(runState().units.a.stage).toBe("done");
+});
+
+test("a session from older state, without the pinned fields, re-renders project and cwd", async () => {
+  await arm(pinnedRecipe());
+  mkdirSync(join(root, "s1"), { recursive: true });
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s1", project: "p1" });
+  await doTick();
+  const run = runState();
+  delete run.units.a.session!.project;
+  delete run.units.a.session!.cwd;
+  store().writeRun(run);
+  host.advance();
+  at(1);
+  await doTick();
+  expect(host.releases[0]).toEqual({ project: "p1", cwd: join(root, "s1"), dir: join(root, "s1") });
+});
+
+test("a lost launch response is adopted through the launched project after the record moves", async () => {
+  await arm(pinnedRecipe());
+  for (const d of ["s1", "s2"]) mkdirSync(join(root, d), { recursive: true });
+  host = new FakeHost({ work: { ticks: 100, end: "completed", loseResponse: true } });
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s1", project: "p1" });
+  await doTick();
+  expect(runState().units.a.session?.thread_id).toBeUndefined();
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s2", project: "p2" });
+  // The host does not list the thread yet on the next tick, which also reads the rewritten record.
+  const find = host.findByNonce.bind(host);
+  const asked: string[] = [];
+  let hidden = 1;
+  host.findByNonce = async (project, n) => { asked.push(project); return hidden-- > 0 ? [] : find(project, n); };
+  at(1);
+  await doTick();
+  expect(runState().units.a.vars.project).toBe("p2");
+  at(2);
+  await doTick();
+  expect(asked).toEqual(["p1", "p1"]);
+  const u = runState().units.a;
+  expect(u.session?.thread_id).toBe("thread-1");
+  expect(kinds()).toContain("adopted");
+  expect(host.launches).toHaveLength(1);
+  expect(host.releases).toEqual([]);
+});
+
 // ---- sources -------------------------------------------------------------------------
 
 function sourced(waitOutcomes?: unknown[]) {
