@@ -154,7 +154,7 @@
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root", "title": "close {unit.id}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Verify file: {param.spine_dir}/work-{unit.id}/verify.md. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Worktree: {unit.vars.worktree_path}. Branch: {unit.vars.branch}. Base SHA: {unit.vars.base_sha}. Correction packet: {run.dir}/out/{unit.id}/correction.txt. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
@@ -176,10 +176,7 @@
           "to": "land"
         },
         {
-          "when": [
-            { "file": "{param.spine_dir}/work-{unit.id}/verify.md" },
-            { "exit0": ["grep", "-qF", "[fidelity]", "{param.spine_dir}/work-{unit.id}/verify.md"] }
-          ],
+          "when": [{ "file": "{run.dir}/out/{unit.id}/correction.txt" }],
           "to": "correct"
         }
       ]
@@ -192,7 +189,7 @@
       "cwd": "{unit.vars.worktree_path}",
       "launch_dir": "worktree",
       "title": "correct {unit.id}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/correct.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Verify file: {param.spine_dir}/work-{unit.id}/verify.md. Corrected file: {run.dir}/out/{unit.id}/corrected. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/correct.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Correction packet: {run.dir}/out/{unit.id}/correction.txt. Corrected file: {run.dir}/out/{unit.id}/corrected. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{param.spine_dir}/work-{unit.id}:{run.dir}/out/{unit.id}",
@@ -216,7 +213,7 @@
         {
           "when": [{ "file": "{run.dir}/out/{unit.id}/corrected" }],
           "to": "reclose",
-          "run": [["rm", "-f", "{run.dir}/out/{unit.id}/corrected"]]
+          "run": [["rm", "-f", "{run.dir}/out/{unit.id}/corrected", "{run.dir}/out/{unit.id}/correction.txt"]]
         }
       ]
     },
@@ -227,7 +224,7 @@
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root", "title": "reclose {unit.id}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Verify file: {param.spine_dir}/work-{unit.id}/verify.md. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Worktree: {unit.vars.worktree_path}. Branch: {unit.vars.branch}. Base SHA: {unit.vars.base_sha}. Correction packet: {run.dir}/out/{unit.id}/correction.txt. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
@@ -249,10 +246,7 @@
           "to": "land"
         },
         {
-          "when": [
-            { "file": "{param.spine_dir}/work-{unit.id}/verify.md" },
-            { "exit0": ["grep", "-qF", "[fidelity]", "{param.spine_dir}/work-{unit.id}/verify.md"] }
-          ],
+          "when": [{ "file": "{run.dir}/out/{unit.id}/correction.txt" }],
           "to": "correct"
         }
       ]

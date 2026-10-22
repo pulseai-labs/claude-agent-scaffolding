@@ -213,6 +213,18 @@ function seats(): Record<string, Effect> {
   };
 }
 
+/** What close writes on a red gate: ossify's correction packet (correction-continuation.md §2). */
+function packet(wi: string, failure: string): string {
+  return ["OSSIFY CORRECTION CONTINUATION v1", `handoff_path: ${workFile(wi, "handoff.md")}`, `work_item_id: ${wi}`,
+    `expected_branch: work/${wi}`, `expected_head_sha: ${"a".repeat(40)}`, `expected_tree_oid: ${"b".repeat(40)}`,
+    "failures:", `- ${failure}`, ""].join("\n");
+}
+/** A Layer 4 red: close writes the `[fidelity]` finding to verify.md and the packet. */
+const fidelityRed = (u: string) => {
+  put(workFile(u, "verify.md"), "## Findings\n- [fidelity] AC2 is not what the spec says\n");
+  put(out(u, "correction.txt"), packet(u, "[fidelity] AC2 is not what the spec says"));
+};
+
 function newHost(lane: Effect, extra: Record<string, Effect> = {}): SeatHost {
   const host = new SeatHost(Object.fromEntries(SESSION_STAGES.map((s) => [s, oneTick()])));
   host.effects = { ...seats(), lane, ...extra };
@@ -365,7 +377,7 @@ test("a gap waits while a sibling is in correction", async () => {
     if (n === 1) { queue(W2, 1, 1); queue(W1, 1, 2); put(out("lane", "lane.done"), "x"); }
   }, {
     implement: (u, n) => (u === W1 && n === 1 ? put(out(u, "gaps.json"), "{}") : put(workFile(u, "report.md"), "r")),
-    close: (u) => put(workFile(u, "verify.md"), "## Findings\n- [fidelity] AC2 is not what the spec says\n"),
+    close: fidelityRed,
     correct: (u, n) => put(out(u, n === 1 ? "stop" : "corrected"), "x"),
   });
   const r = rig(host);
@@ -397,7 +409,7 @@ test("an item at the dispatch cap parks before a fourth execution", async () => 
   const host = newHost((_u, n) => {
     if (n === 1) { queue(W1, 1, 1); queue(W2, 1, 2); put(out("lane", "lane.done"), "x"); }
   }, {
-    close: (u) => put(workFile(u, "verify.md"), "- [fidelity] off spec\n"),
+    close: fidelityRed,
   });
   const r = rig(host);
   await drive(r, 40, () => unit(W1)?.parked !== undefined && unit(W2)?.parked !== undefined);
@@ -422,7 +434,7 @@ test("control: an item below the dispatch cap launches its correction", async ()
   const host = newHost((_u, n) => {
     if (n === 1) { queue(W1, 1, 1); put(out("lane", "lane.done"), "x"); }
   }, {
-    close: (u) => put(workFile(u, "verify.md"), "- [fidelity] off spec\n"),
+    close: fidelityRed,
   });
   const r = rig(host);
   await drive(r, 30, () => host.of(W1, "correct").length === 1);
@@ -534,4 +546,29 @@ test("the lane watches the latest round", async () => {
   expect(moved(W2, "land", "done")).toBeGreaterThan(launchedEv("lane", "lane", 2));
   expect(launchedEv("lane", "lane", 3)).toBeGreaterThan(moved(W2, "land", "done"));
   expect(readRun().units[W2].group).toBe(2);
+});
+
+test("a red close at any layer routes through the correction packet", async () => {
+  await arm();
+  let packetAtCorrect = false;
+  const host = newHost((_u, n) => {
+    if (n === 1) { queue(W1, 1, 1); put(out("lane", "lane.done"), "x"); }
+  }, {
+    // A Layer 1 red: impl-check halts before Layer 4, so there is no verify.md, only the packet.
+    close: (u) => put(out(u, "correction.txt"), packet(u, "[AC] AC1 fails: exit 1")),
+    correct: (u) => {
+      packetAtCorrect = existsSync(out(u, "correction.txt"));
+      put(out(u, "corrected"), "x");
+    },
+  });
+  const r = rig(host);
+  await drive(r, 40, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined);
+
+  expect(existsSync(workFile(W1, "verify.md"))).toBe(false);
+  expect(moves(W1)).toEqual(["implement>close", "close>correct", "correct>reclose", "reclose>land", "land>done"]);
+  expect(host.of(W1, "close")).toHaveLength(1); // routed on the first close, no no-result relaunch
+  expect(host.of(W1, "correct")[0].request.message).toContain(`Correction packet: ${out(W1, "correction.txt")}.`);
+  expect(packetAtCorrect).toBe(true);
+  expect(existsSync(out(W1, "correction.txt"))).toBe(false); // cleared on the way to reclose
+  expect(item(W1).dispatches).toBe(2);
 });

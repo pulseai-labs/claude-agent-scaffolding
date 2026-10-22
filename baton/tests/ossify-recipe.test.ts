@@ -139,6 +139,31 @@ describe("ossify-spine recipe", () => {
     });
   });
 
+  test("a red close routes to correct through the correction packet", () => {
+    const PACKET = `${OUT}/correction.txt`;
+    const PR_RECORDED = [
+      "jq", "-e", "--arg", "w", "{unit.id}",
+      'any(.work_items[]; .id == $w and (.pr_url | type) == "string")', "{param.state_file}",
+    ];
+    const r = raw();
+    for (const name of ["close", "reclose"]) {
+      const s = r.stages[name];
+      // the packet is the only route to correct: no verify.md grep, so a stale one cannot re-route
+      expect([name, s.outcomes]).toEqual([name, [
+        { when: [{ exit0: PR_RECORDED }], to: "land" },
+        { when: [{ file: PACKET }], to: "correct" },
+      ]]);
+      for (const field of ["{unit.vars.handoff_path}", "{unit.vars.worktree_path}", "{unit.vars.branch}", "{unit.vars.base_sha}", `Correction packet: ${PACKET}.`]) {
+        expect([name, field, s.message.includes(field)]).toEqual([name, field, true]);
+      }
+    }
+    const c = r.stages.correct;
+    expect(c.message).toContain(`Correction packet: ${PACKET}.`);
+    // cleared on the way to reclose, never before a launch: a relaunched correction still reads it
+    expect(c.outcomes[0].run).toEqual([["rm", "-f", `${OUT}/corrected`, PACKET]]);
+    expect(c.before.flat()).not.toContain(PACKET);
+  });
+
   test("land merges by plan (a)'s order", () => {
     const land = loadRecipe().stages.land as MergeStage;
     expect(land.kind).toBe("merge");
@@ -228,6 +253,15 @@ describe("ossify-spine briefs", () => {
     expect(c).toContain("skill://close");
     expect(c).toContain("--pr");
     expect(c).toContain("Never pick a recovery option");
+  });
+
+  test("close writes the correction packet on any red gate", () => {
+    const c = brief("close.md");
+    for (const pin of ["any red gate", "OSSIFY CORRECTION CONTINUATION v1", "expected_branch", "expected_head_sha",
+      "expected_tree_oid", "write-tree", "failures", "correction packet file"]) {
+      expect([pin, c.includes(pin)]).toEqual([pin, true]);
+    }
+    expect(brief("correct.md")).toContain("correction packet");
   });
 
   test("spine-open stops after the PR opens", () => {
