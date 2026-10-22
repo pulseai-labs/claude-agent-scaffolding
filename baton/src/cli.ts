@@ -8,7 +8,7 @@ import { HostAuthError, HostDownError } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
 import { loadT3Config, T3Host } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
-import { RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
+import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
 import { openStore, type RunState, type UnitState } from "./state.ts";
 import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
@@ -100,6 +100,7 @@ async function armCmd(args: string[]): Promise<number> {
   }
   if (file === undefined || runId === undefined) return usage();
   if (!RUN_ID_RE.test(runId)) return fail(`run id "${runId}" must match ^[a-z0-9_-]+$`);
+  if (isProtoName(runId)) return fail(`run id "${runId}" ${PROTO_NAME_ERROR}`);
 
   let bytes: Buffer;
   try {
@@ -217,6 +218,8 @@ async function unparkCmd(args: string[]): Promise<number> {
   [runId, unitId] = pos;
   if (to === undefined && args.includes("--to")) return usage();
   if (to !== undefined && unitId === undefined) return usage();
+  if (unitId !== undefined && isProtoName(unitId)) return fail(`unit "${unitId}" ${PROTO_NAME_ERROR}`);
+  if (to !== undefined && isProtoName(to)) return fail(`stage "${to}" ${PROTO_NAME_ERROR}`);
 
   return locked(async () => {
     const store = openStore();
@@ -233,7 +236,7 @@ async function unparkCmd(args: string[]): Promise<number> {
       store.event(runId!, { kind: "unpark" });
       return 0;
     }
-    const unit = run.units[unitId];
+    const unit = own(run.units, unitId);
     if (!unit) return fail(`no such unit: ${unitId}`);
     if (to !== undefined) {
       const recipe = loadRecipe(run.dir);
@@ -289,7 +292,7 @@ const DAY_MS = 86_400_000;
 
 async function tickCmd(args: string[]): Promise<number> {
   let runId: string | undefined;
-  if (args.length === 2 && args[0] === "--run" && RUN_ID_RE.test(args[1])) runId = args[1];
+  if (args.length === 2 && args[0] === "--run" && RUN_ID_RE.test(args[1]) && !isProtoName(args[1])) runId = args[1];
   else if (args.length !== 0) return usage();
   try {
     const cfg = loadT3Config();

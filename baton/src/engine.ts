@@ -11,7 +11,7 @@ import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type Pr
 import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest } from "./host.ts";
 import { readConfig, type Config } from "./notify.ts";
 import {
-  DEFAULT_SLOTS, DEFAULT_STAGE_SLOTS, nonce as launchNonce, render, threadTitle, UNIT_ID_RE,
+  DEFAULT_SLOTS, DEFAULT_STAGE_SLOTS, isProtoName, nonce as launchNonce, own, render, threadTitle, UNIT_ID_RE,
   type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type WaitStage,
 } from "./recipe.ts";
 import { mergeUnit } from "./merge.ts";
@@ -174,17 +174,17 @@ class RunTick {
       param: this.run.params,
       unit: { id: u.id, group: String(u.group), order: u.order, vars: u.vars },
       run: { id: this.run.id, dir: this.run.dir, group: String(this.group()) },
-      attempt: u.launches[u.stage] ?? 0,
+      attempt: own(u.launches, u.stage) ?? 0,
       ...extra,
     };
   }
 
   private ctx(u: UnitState): Ctx {
-    return { stage: this.recipe.stages[u.stage], scope: this.scope(u) };
+    return { stage: own(this.recipe.stages, u.stage), scope: this.scope(u) };
   }
 
   stageSlots(stageName: string): string[] {
-    const st = this.recipe.stages[stageName];
+    const st = own(this.recipe.stages, stageName);
     return st?.kind === "session" ? st.slots ?? DEFAULT_STAGE_SLOTS : [];
   }
 
@@ -361,8 +361,8 @@ class RunTick {
           // No thread for the nonce: the launch went nowhere. It counts one attempt, so a launch
           // whose outcome is always unknown reaches max_launches and parks `cap` with a notice.
           this.ev("orphan", { unit: u.id, nonce: s.nonce });
-          u.launches[u.stage] = (u.launches[u.stage] ?? 0) + 1; // the dropped attempt counts
-          this.ev("launch unknown", { unit: u.id, nonce: s.nonce, launches: u.launches[u.stage] });
+          u.launches[u.stage] = (own(u.launches, u.stage) ?? 0) + 1; // the dropped attempt counts
+          this.ev("launch unknown", { unit: u.id, nonce: s.nonce, launches: own(u.launches, u.stage) });
           await this.endSession(u);
         }
       });
@@ -375,7 +375,7 @@ class RunTick {
    */
   private mint(u: UnitState): string {
     u.seq ??= {};
-    const n = Math.max(u.seq[u.stage] ?? 0, u.launches[u.stage] ?? 0) + 1;
+    const n = Math.max(own(u.seq, u.stage) ?? 0, own(u.launches, u.stage) ?? 0) + 1;
     u.seq[u.stage] = n;
     return launchNonce(this.run.id, u.id, u.stage, n);
   }
@@ -386,7 +386,7 @@ class RunTick {
       this.ev("successor", { unit: u.id, nonce: s.nonce, of: s.successor_of, thread: s.thread_id });
       return;
     }
-    u.launches[u.stage] = (u.launches[u.stage] ?? 0) + 1;
+    u.launches[u.stage] = (own(u.launches, u.stage) ?? 0) + 1;
     this.ev("launched", { unit: u.id, nonce: s.nonce, thread: s.thread_id });
     this.report.launched.push(u.id);
   }
@@ -416,7 +416,7 @@ class RunTick {
           && typeof r[src.id_key] === "string" && UNIT_ID_RE.test(r[src.id_key] as string)
           && typeof r[src.group_key] === "number" && Number.isFinite(r[src.group_key])
           && typeof r[src.order_key] === "number" && Number.isFinite(r[src.order_key])
-          && !seen.has(r[src.id_key] as string);
+          && !isProtoName(r[src.id_key] as string) && !seen.has(r[src.id_key] as string);
         if (!ok) return this.parkRun(`invalid record ${file}`);
         const id = r![src.id_key] as string;
         seen.add(id);
@@ -432,7 +432,7 @@ class RunTick {
       }
     }
     for (const rec of recs) {
-      const known = this.run.units[rec.id];
+      const known = own(this.run.units, rec.id);
       if (known) {
         known.record_seen = rec.digest;
         continue;
@@ -524,7 +524,7 @@ class RunTick {
         }
         const idle = this.nowMs() - Date.parse(s.last_progress_at);
         const max = stage.max_launches ?? DEFAULT_MAX_LAUNCHES;
-        const launches = u.launches[u.stage] ?? 0;
+        const launches = own(u.launches, u.stage) ?? 0;
         if (st.state === "active" || st.state === "waiting") {
           if (idle >= (stage.stall_minutes ?? DEFAULT_STALL_MINUTES) * MIN) await this.stall(u, s);
           return;
@@ -636,10 +636,10 @@ class RunTick {
     if (c.key && c.nonce) removeClaim(c.key, c.nonce);
     if (c.dir !== undefined && stage.kind === "session") await this.release(u, stage, scope, c.dir);
     delete u.session;
-    u.launches[u.stage] = (u.launches[u.stage] ?? 0) + 1; // the refused attempt counts
+    u.launches[u.stage] = (own(u.launches, u.stage) ?? 0) + 1; // the refused attempt counts
     this.ev("launch failed", { unit: u.id, reason });
     this.save();
-    if (u.launches[u.stage] >= ((stage as SessionStage).max_launches ?? DEFAULT_MAX_LAUNCHES)) {
+    if ((own(u.launches, u.stage) ?? 0) >= ((stage as SessionStage).max_launches ?? DEFAULT_MAX_LAUNCHES)) {
       await this.park(u, "launch failed");
     } else {
       this.held.add(u.id); // a refused launch relaunches next tick
@@ -649,7 +649,7 @@ class RunTick {
   /** Step 4: wait stages move on their first matching outcome. */
   private async waits(): Promise<void> {
     for (const u of this.ordered()) {
-      const stage = this.recipe.stages[u.stage];
+      const stage = own(this.recipe.stages, u.stage);
       if (u.parked || stage?.kind !== "wait" || this.entered.has(u.id)) continue;
       await this.guard(u, async () => {
         const o = await this.firstOutcome(u, (stage as WaitStage).outcomes, this.run.dir);
@@ -661,7 +661,7 @@ class RunTick {
   /** Step 5: merge stages, decided by the recipe's rule in merge.ts. */
   private async merges(): Promise<void> {
     for (const u of this.ordered()) {
-      const stage = this.recipe.stages[u.stage];
+      const stage = own(this.recipe.stages, u.stage);
       if (u.parked || stage?.kind !== "merge" || this.entered.has(u.id)) continue;
       await this.guard(u, () => mergeUnit({
         run: this.run, forge: this.opts.forge, prViews: this.prViews,
@@ -702,14 +702,14 @@ class RunTick {
   private async launches(): Promise<void> {
     if (this.run.status !== "armed") return;
     for (const u of this.ordered()) {
-      const stage = this.recipe.stages[u.stage];
+      const stage = own(this.recipe.stages, u.stage);
       if (u.session || u.parked || this.held.has(u.id) || stage?.kind !== "session") continue;
       await this.guard(u, () => this.launch(u, stage));
     }
   }
 
   private async launch(u: UnitState, stage: SessionStage): Promise<void> {
-    const attempt = (u.launches[u.stage] ?? 0) + 1;
+    const attempt = (own(u.launches, u.stage) ?? 0) + 1;
     const scope = this.scope(u, { attempt });
     const cwd = render(stage.cwd, scope);
     const project = render(stage.project, scope);
@@ -727,10 +727,10 @@ class RunTick {
     }
     if (!this.slotsFree(stage)) return;
     delete u.cwd_busy;
-    if ((u.launches[u.stage] ?? 0) >= (stage.max_launches ?? DEFAULT_MAX_LAUNCHES)) return this.park(u, "cap");
+    if ((own(u.launches, u.stage) ?? 0) >= (stage.max_launches ?? DEFAULT_MAX_LAUNCHES)) return this.park(u, "cap");
     if (!this.hooks(stage.before, scope, this.existingDir(cwd))) return this.park(u, "before failed");
 
-    const seqBefore = u.seq?.[u.stage];
+    const seqBefore = own(u.seq, u.stage);
     const nn = this.mint(u);
     let dir: string;
     try {

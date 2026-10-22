@@ -833,6 +833,30 @@ test("invalid record parks the run with the file name", async () => {
   expect(host.launches.length).toBe(2);
 });
 
+test("a record whose id names an Object.prototype member is an invalid record", async () => {
+  for (const id of ["toString", "__proto__", "constructor"]) {
+    fresh();
+    await arm(sourced());
+    host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+    record("a.json", { id, group: 1, order: 1, task: "x" });
+    await doTick();
+    const run = runState();
+    expect(run.status).toBe("parked");
+    expect(run.parked?.reason).toBe("invalid record a.json");
+    expect(Object.getOwnPropertyNames(run.units)).toEqual([]);
+    expect(({} as Record<string, unknown>).record_seen).toBeUndefined(); // Object.prototype untouched
+  }
+  // adjacent control: an ordinary id that only contains such a name is a unit like any other
+  fresh();
+  await arm(sourced());
+  mkdirSync(join(root, "w", "toStrings"), { recursive: true });
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  record("a.json", { id: "toStrings", group: 1, order: 1, task: "x" });
+  await doTick();
+  expect(runState().status).toBe("armed");
+  expect(Object.keys(runState().units)).toEqual(["toStrings"]);
+});
+
 test("record_changed is true only after a new digest", async () => {
   await arm(sourced([{ when: [{ record_changed: true }], to: "done" }]));
   host = new FakeHost({});

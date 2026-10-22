@@ -90,6 +90,30 @@ test("arm checks params by own property: constructor and __proto__ are params li
   }
 });
 
+test("an Object.prototype member is refused as a run id, an unpark unit or an unpark --to stage", async () => {
+  for (const n of ["__proto__", "constructor"]) {
+    const st = newState();
+    const a = await runIn(st, "arm", RELAY, "--run", n, ...PARAMS, "--no-timer");
+    expect(a.rc).toBe(2);
+    expect(a.err).toContain("must not name an Object.prototype member");
+    expect(existsSync(join(st, "runs", n))).toBe(false);
+    expect((await runIn(st, "tick", "--run", n)).rc).toBe(64);
+  }
+  const st = await armedWithParkedUnit();
+  const before = readFileSync(join(st, "runs", "r1", "run.json"), "utf8");
+  for (const n of ["__proto__", "constructor", "toString"]) {
+    const u = await runIn(st, "unpark", "r1", n);
+    expect(u.rc).toBe(2);
+    expect(u.err).toContain("must not name an Object.prototype member");
+    const t = await runIn(st, "unpark", "r1", "planner", "--to", n);
+    expect(t.rc).toBe(2);
+    expect(t.err).toContain("must not name an Object.prototype member");
+  }
+  expect(readFileSync(join(st, "runs", "r1", "run.json"), "utf8")).toBe(before);
+  // adjacent control: an ordinary unit and stage still unpark
+  expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
+});
+
 test("arm refuses a reused run id and leaves state unchanged", async () => {
   const st = newState();
   expect((await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer")).rc).toBe(0);

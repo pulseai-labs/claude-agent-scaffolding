@@ -83,6 +83,17 @@ export type Scope = {
 export const RUN_ID_RE = /^[a-z0-9_-]+$/;
 export const STAGE_NAME_RE = /^[a-z0-9_-]+$/;
 export const UNIT_ID_RE = /^[A-Za-z0-9._-]+$/;
+
+// Every name that keys a plain-object map (run, unit, stage) must not name an Object.prototype
+// member: `units["__proto__"] = u` sets the prototype, `launches["constructor"]` reads a function.
+const PROTO_NAMES = new Set([...Object.getOwnPropertyNames(Object.prototype), "__proto__"]);
+export const isProtoName = (name: string): boolean => PROTO_NAMES.has(name);
+export const PROTO_NAME_ERROR = "must not name an Object.prototype member (__proto__, constructor, toString, ...)";
+
+/** `map[key]` only when `key` is the map's own property; never a value from the prototype chain. */
+export function own<T>(map: Record<string, T> | undefined, key: string): T | undefined {
+  return map !== undefined && Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+}
 export const ENV_KEY_RE = /^[A-Z][A-Z0-9_]*$/;
 export const ENV_DENYLIST = [
   "PATH", "HOME", "USER", "SHELL", "IFS", "ENV", "BASH_ENV", "LD_PRELOAD", "LD_LIBRARY_PATH",
@@ -173,6 +184,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
 
   if (r.version !== 1) err("version", "must be 1");
   if (!isStr(r.name) || !RUN_ID_RE.test(r.name)) err("name", "must match ^[a-z0-9_-]+$");
+  else if (isProtoName(r.name)) err("name", PROTO_NAME_ERROR);
 
   const paramList: string[] = [];
   if (!Array.isArray(r.params)) err("params", "must be an array of names");
@@ -200,6 +212,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
   const stageNames = new Set(Object.keys(stages));
   for (const name of stageNames) {
     if (!STAGE_NAME_RE.test(name)) err(`stages.${name}`, "stage name must match ^[a-z0-9_-]+$");
+    else if (isProtoName(name)) err(`stages.${name}`, PROTO_NAME_ERROR);
     else if (TERMINALS.includes(name)) err(`stages.${name}`, `"${name}" is a terminal (done, park), not a stage name`);
   }
   const target = (path: string, to: unknown) => {
@@ -346,6 +359,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       const p = `seed[${i}]`;
       if (!isObj(s)) return err(p, "must be an object");
       if (!isStr(s.id) || !UNIT_ID_RE.test(s.id)) err(`${p}.id`, "must match ^[A-Za-z0-9._-]+$");
+      else if (isProtoName(s.id)) err(`${p}.id`, PROTO_NAME_ERROR);
       unitStage(`${p}.stage`, s.stage);
       if (s.vars !== undefined && (!isObj(s.vars) || !Object.values(s.vars).every(isStr))) {
         err(`${p}.vars`, "must be an object of strings");

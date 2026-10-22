@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  nonce, render, threadTitle, validate, RUN_ID_RE, type Scope,
+  nonce, own, render, threadTitle, validate, RUN_ID_RE, type Scope,
 } from "../src/recipe.ts";
 
 const FIX = join(import.meta.dir, "fixtures", "recipes");
@@ -112,6 +112,40 @@ describe("validate", () => {
       ok.seed[0].stage = n;
       expect(validate(ok).ok).toBe(true);
     }
+  });
+
+  test("an Object.prototype member is refused as a stage name, seed id or recipe name", () => {
+    const own = (o: Record<string, unknown>, k: string, v: unknown) =>
+      Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true });
+    for (const n of ["__proto__", "constructor"]) {
+      const st = relay();
+      own(st.stages, n, st.stages.work);
+      expectError(st, `stages.${n}: must not name an Object.prototype member`);
+      const sd = relay();
+      sd.seed[0].id = n;
+      expectError(sd, "seed[0].id: must not name an Object.prototype member");
+      const nm = relay();
+      nm.name = n;
+      expectError(nm, "name: must not name an Object.prototype member");
+    }
+    const ts = relay();
+    ts.seed[0].id = "toString";
+    expectError(ts, "seed[0].id: must not name an Object.prototype member");
+    // adjacent control: names that only contain such a member are ordinary
+    const ok = relay();
+    own(ok.stages, "constructors", ok.stages.work);
+    ok.seed[0].id = "toStrings";
+    ok.name = "proto";
+    expect(validate(ok).ok).toBe(true);
+  });
+
+  test("own reads a map's own value and nothing from its prototype", () => {
+    const m = JSON.parse('{"work": 2, "__proto__": 3}') as Record<string, number>;
+    expect(own(m, "constructor")).toBeUndefined();
+    expect(own(m, "toString")).toBeUndefined();
+    expect(own(m, "work")).toBe(2); // control
+    expect(own(m, "__proto__")).toBe(3); // an own key named __proto__ is a value like any other
+    expect(own(undefined, "work")).toBeUndefined();
   });
 
   test("a seed or source naming no stage", () => {
