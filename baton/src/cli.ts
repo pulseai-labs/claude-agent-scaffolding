@@ -10,7 +10,8 @@ import { loadT3Config, T3Host } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
 import { openStore, type RunState, type UnitState } from "./state.ts";
-import { installTimer } from "./timer.ts";
+import { login } from "./hosts/t3-login.ts";
+import { installTimer, removeTimer } from "./timer.ts";
 
 const USAGE = [
   "usage: baton validate <recipe.json>",
@@ -22,6 +23,8 @@ const USAGE = [
   "       baton tick [--run <id>]",
   "       baton t3 call <tool> <json-object>",
   "       baton t3 token-status",
+  "       baton t3 login",
+  "       baton timer install|remove",
   "",
 ].join("\n");
 
@@ -45,6 +48,7 @@ export async function main(argv: string[]): Promise<number> {
     case "report": return reportCmd(rest);
     case "tick": return tickCmd(rest);
     case "t3": return t3Cmd(rest);
+    case "timer": return timerCmd(rest);
   }
   return usage();
 }
@@ -145,7 +149,13 @@ async function armCmd(args: string[]): Promise<number> {
     return 0;
   });
   if (rc !== 0) return rc;
-  if (!noTimer) await installTimer(runId);
+  if (!noTimer) {
+    try {
+      await installTimer(runId);
+    } catch (e) {
+      return fail(`armed ${runId}, but the timer was not installed: ${(e as Error).message}`);
+    }
+  }
   return 0;
 }
 
@@ -309,7 +319,29 @@ async function t3Cmd(args: string[]): Promise<number> {
   const [sub, ...rest] = args;
   if (sub === "token-status" && rest.length === 0) return t3TokenStatus();
   if (sub === "call" && rest.length === 2) return t3Call(rest[0], rest[1]);
+  if (sub === "login" && rest.length === 0) return t3Login();
   return usage();
+}
+
+async function t3Login(): Promise<number> {
+  try {
+    const cfg = loadT3Config();
+    await login({ base: cfg.base, tokenFile: cfg.tokenFile, out: (l) => process.stdout.write(l + "\n") });
+    return 0;
+  } catch (e) {
+    return fail(`baton t3 login: ${(e as Error).message}`);
+  }
+}
+
+async function timerCmd(args: string[]): Promise<number> {
+  if (args.length !== 1 || (args[0] !== "install" && args[0] !== "remove")) return usage();
+  try {
+    if (args[0] === "install") await installTimer("");
+    else await removeTimer();
+    return 0;
+  } catch (e) {
+    return fail(`baton timer: ${(e as Error).message}`);
+  }
 }
 
 function t3TokenStatus(): number {

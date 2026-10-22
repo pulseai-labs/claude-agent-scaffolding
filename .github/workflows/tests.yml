@@ -120,6 +120,9 @@ jobs:
       - name: Install Bun 1.4.2
         run: npm install --global bun@1.4.2 && bun --version
 
+      - name: baton suite
+        run: bash baton/run-tests.sh
+
       - name: OMP bin-path module and loader (bun test)
         run: bun test omp/
 
