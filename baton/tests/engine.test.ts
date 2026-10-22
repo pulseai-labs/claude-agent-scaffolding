@@ -160,6 +160,30 @@ test("a nonce T3 never saw is relaunched after 2 minutes", async () => {
   expect(runState().units.a.launches.work).toBe(1);
 });
 
+test("an orphan dropped at 2 minutes relaunches with a new nonce and a new directory", async () => {
+  const projRoot = join(root, "proj");
+  mkdirSync(projRoot);
+  await arm(recipe({ work: sess({ cwd: "{param.root}/proj" }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 5, end: "completed" } });
+  t3LikeBind(projRoot);
+  failNextLaunch(new HostDownError(), false);
+  await doTick();
+  const first = runState().units.a.session!;
+  expect(first.nonce).toBe("r1/a/work/1");
+  expect(first.launch_dir).toBe(join(state, "launch", "r1_a_work_1"));
+  at(3);
+  await doTick();
+  expect(host.releases.map((r) => r.dir)).toEqual([first.launch_dir]);
+  expect(host.launches.length).toBe(1);
+  const l = host.launches[0];
+  expect(l.request.nonce).toBe("r1/a/work/2");
+  expect(l.request.cwd).toBe(join(state, "launch", "r1_a_work_2"));
+  expect(l.request.cwd).not.toBe(first.launch_dir);
+  const u = runState().units.a;
+  expect(u.launches.work).toBe(1);
+  expect(u.seq?.work).toBe(2);
+});
+
 test("a session without thread_id younger than 2 minutes blocks a second launch", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 5, end: "completed" } });
@@ -249,7 +273,7 @@ test("a successor keeps the claim header nonce and removal still works", async (
   await doTick();
   expect(host.launches.length).toBe(2);
   expect(host.launches[1].claim?.nonce).toBe("r1/a/work/1");
-  expect(host.launches[1].request.title).toBe("t a [baton r1/a/work/1.1]");
+  expect(host.launches[1].request.title).toBe("t a [baton r1/a/work/2]");
   const s = runState().units.a.session!;
   expect(s.successor_of).toBe("r1/a/work/1");
   expect(s.claim_nonce).toBe("r1/a/work/1");
@@ -556,6 +580,12 @@ test("cap parks at max_launches before running before", async () => {
   expect(runState().units.a.parked?.reason).toBe("cap");
   expect(lines(before)).toEqual(["a"]);
   expect(host.launches.length).toBe(1);
+  // unpark resets the count, never the nonce sequence
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  at(4);
+  await doTick();
+  expect(host.launches.length).toBe(2);
+  expect(host.launches[1].request.nonce).toBe("r1/a/work/2");
 });
 
 test("a failed thread counts the attempt and relaunches", async () => {

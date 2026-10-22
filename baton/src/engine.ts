@@ -346,6 +346,17 @@ class RunTick {
     }
   }
 
+  /**
+   * A fresh nonce `<run>/<unit>/<stage>/<seq>`. The sequence advances on every nonce minted
+   * and is never reset, so no relaunch reuses a nonce or the per-launch directory named after it.
+   */
+  private mint(u: UnitState): string {
+    u.seq ??= {};
+    const n = Math.max(u.seq[u.stage] ?? 0, u.launches[u.stage] ?? 0) + 1;
+    u.seq[u.stage] = n;
+    return launchNonce(this.run.id, u.id, u.stage, n);
+  }
+
   /** A launch that now has its thread: a counted launch, or a successor (not counted). */
   private counted(u: UnitState, s: Session): void {
     if (s.successor_of) {
@@ -545,9 +556,7 @@ class RunTick {
   }
 
   private async successor(u: UnitState, stage: SessionStage, old: Session, path: string): Promise<void> {
-    // `<run>/<unit>/<stage>/<n>` gets `.1`, then `.2`, ...: unique per successor, never counted.
-    const m = /^(.+\/\d+)\.(\d+)$/.exec(old.nonce);
-    const n = m ? `${m[1]}.${Number(m[2]) + 1}` : `${old.nonce}.1`;
+    const n = this.mint(u);
     const scope = this.scope(u, { handoff_path: path });
     const req: LaunchRequest = {
       nonce: n,
@@ -672,8 +681,8 @@ class RunTick {
   }
 
   private async launch(u: UnitState, stage: SessionStage): Promise<void> {
-    const n = (u.launches[u.stage] ?? 0) + 1;
-    const scope = this.scope(u, { attempt: n });
+    const attempt = (u.launches[u.stage] ?? 0) + 1;
+    const scope = this.scope(u, { attempt });
     const cwd = render(stage.cwd, scope);
     const project = render(stage.project, scope);
     const env: Record<string, string> = {};
@@ -693,12 +702,19 @@ class RunTick {
     if ((u.launches[u.stage] ?? 0) >= (stage.max_launches ?? DEFAULT_MAX_LAUNCHES)) return this.park(u, "cap");
     if (!this.hooks(stage.before, scope, this.existingDir(cwd))) return this.park(u, "before failed");
 
-    const nn = launchNonce(this.run.id, u.id, u.stage, n);
+    const seqBefore = u.seq?.[u.stage];
+    const nn = this.mint(u);
     let dir: string;
     try {
       dir = await this.host.bind(project, cwd, nn, stage.launch_dir ?? DEFAULT_LAUNCH_DIR);
     } catch (e) {
-      if (isHostError(e)) throw e;
+      if (isHostError(e)) {
+        // The host was not reached for this nonce and made no directory: nothing is marked.
+        if (seqBefore === undefined) delete u.seq![u.stage];
+        else u.seq![u.stage] = seqBefore;
+        if (Object.keys(u.seq!).length === 0) delete u.seq;
+        throw e;
+      }
       return this.launchFailed(u, `bind: ${message(e)}`, {});
     }
     let key: string;

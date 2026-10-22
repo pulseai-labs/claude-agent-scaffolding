@@ -29,6 +29,8 @@ export type UnitState = {
   record_seen?: string;
   record_at_entry?: string;
   launches: Record<string, number>;
+  /** Nonces minted per stage: every launch, successor and dropped orphan; never reset. */
+  seq?: Record<string, number>;
   stalls: number;
   session?: Session;
   parked?: { reason: string; at: string };

@@ -293,6 +293,18 @@ describe("T3Host.status", () => {
     }
   });
 
+  test("a failure run with an active run id is still active", async () => {
+    const w = world();
+    expect(fixture("thread-read-completed.json").thread.activeRunId).toBeNull();
+    for (const st of ["failed", "interrupted", "cancelled", "rolled_back"]) {
+      w.tool.t3_thread_read = readReturning("thread-read-completed.json", (j) => {
+        j.recentRuns[0].status = st;
+        j.thread.activeRunId = "run:next";
+      });
+      expect([st, (await w.host.status("mcp:t1")).state]).toEqual([st, "active"]);
+    }
+  });
+
   test("waiting maps to waiting; preparing and queued are active", async () => {
     const w = world();
     for (const [st, want] of [["waiting", "waiting"], ["preparing", "active"], ["queued", "active"]]) {

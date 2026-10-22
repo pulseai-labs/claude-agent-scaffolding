@@ -173,7 +173,8 @@ export class T3Host implements Host {
     const st: string | undefined = run?.status;
     // Turn end is the run's status with no active run; `thread.settled` is never read.
     if (st === "completed" && r.thread?.activeRunId == null) return { state: "completed", activity };
-    if (st !== undefined && FAILED.has(st)) return { state: "failed", activity };
+    // A failure run is final only with no active run: run status alone never ends a thread.
+    if (st !== undefined && FAILED.has(st) && r.thread?.activeRunId == null) return { state: "failed", activity };
     if (st === "waiting") return { state: "waiting", activity };
     return { state: "active", activity };
   }
