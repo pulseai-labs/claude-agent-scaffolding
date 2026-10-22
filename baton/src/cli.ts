@@ -242,8 +242,8 @@ async function unparkCmd(args: string[]): Promise<number> {
     unit.stalls = 0;
     delete unit.merge_failures;
     delete unit.forge_failures;
-    unit.launches[unit.stage] = 0;
     if (to !== undefined) unit.stage = to;
+    unit.launches[unit.stage] = 0; // the stage the unit resumes in: a capped target must not re-park at once
     store.writeRun(run);
     store.event(runId!, { kind: "unpark", unit: unitId, stage: unit.stage });
     return 0;

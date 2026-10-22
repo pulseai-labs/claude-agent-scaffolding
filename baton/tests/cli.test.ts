@@ -191,6 +191,14 @@ test("unpark --to moves the unit to a recipe stage; an unknown stage is rc 2", a
   expect((await runIn(st, "unpark", "r1", "ghost")).rc).toBe(2);
 });
 
+test("unpark --to resets the launch count of the stage the unit moves to", async () => {
+  const st = await armedWithParkedUnit(); // launches { planner: 2, work: 1 }
+  expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
+  const u = runJson(st, "r1").units.planner;
+  expect(u.stage).toBe("work");
+  expect(u.launches).toEqual({ planner: 2, work: 0 });
+});
+
 test("unpark with no unit un-parks the run", async () => {
   const st = await armedWithParkedUnit();
   const run = runJson(st, "r1");
