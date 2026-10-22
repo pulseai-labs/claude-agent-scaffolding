@@ -131,6 +131,7 @@ D	skills/close/references/patch-lane.md	1	#138	the patch commit's branch placeme
 I	skills/close/references/patch-lane.md	1	single patch_add call with <placeholder> args
 O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: the merge guard fires when the item's own repo (target_repo, not always canonical since #272/#310 Task 9) is parked on the wrong branch
 D	skills/close/references/work-item-close.md	4	#138	path resolution (which now reads .status and refuses an `abandoned` item BEFORE diagnosing a missing worktree, #531) - and that arm's route out reopens an already-closed parent spine, since un-withdrawing alone leaves a planned item inside a closed spine that release close's tag selector then accepts, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
+D	skills/close/references/work-item-close.md	1	#138	section 4a's PR-mode block (/close <wi-id> --pr): the remote-leg probe and the spine-branch push when origin lacks it, commit-or-resume, push, existing-PR lookup, gh pr create and work_item_pr. Pinned by prose-contract pins; walked by hand against a throwaway bare-origin fixture with a stubbed gh (task 3 live check), not extracted by the suite - it needs gh and a remote
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
 O	skills/close/references/cumulative-demo.md	elapsed=	tests/test-close.sh	D1-D4: the demo measurement block preserves the runner's rc instead of flattening it
 O	skills/close/references/cumulative-demo.md	evd=	tests/test-close.sh	F3a-g: the quarantine-comparison block disposes of its evidence dir on green, differing, halt, failing-command, lookup-failure, and signal-during-diff paths; P5i: the before-checkout reads a line's before-point, else sha^1
@@ -234,7 +235,7 @@ H	skills/close/references/release-close.md	143548614-14087
 H	skills/close/references/retrospective.md	3602587869-249
 H	skills/close/references/routing.md	261804248-259
 H	skills/close/references/spine-close.md	4161585388-46221
-H	skills/close/references/work-item-close.md	1799353906-6394
+H	skills/close/references/work-item-close.md	1098212727-10840
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	630905567-126
 H	skills/doctor/references/budget-check.md	2942541912-1024

@@ -1,4 +1,4 @@
-# ossify (v1.25.0)
+# ossify (v1.26.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -27,6 +27,17 @@ rejected item is repaired through a correction continuation that returns the
 same `complete` shape, and Layer 4 runs inline there as it does everywhere.
 **On Claude Code, `/ossify:run-spine <spine-id>` with no flag is
 completely unchanged** and still dispatches `ossify:implementer-agent`.
+
+Since 1.26.0, `/ossify:run-spine <spine-id> --external-executor --detach` ends the lane
+after it writes a round's requests: it counts no dispatch, validates no result and
+closes or merges nothing, and the caller counts each execution and closes the items.
+`oss work_item_pr <wi-id> <pr-url>` records an item's PR, and `/ossify:close <wi-id> --pr`
+commits, pushes, opens the item's PR into the spine branch, records it and leaves the
+item `active`. Re-entry reads such an item as `in-flight` (an `active` item with a
+recorded PR and unmerged commits), and a `complete` item with a recorded PR whose
+commits are not on the local spine branch halts as `halt:pr-not-local`. The inventory
+reads state and git only; it does not ask the forge whether a PR was closed unmerged.
+The no-flag command is unchanged.
 
 Since 1.18.0, `/ossify:run-spine` dispatches OMP work items via omp-roles' `implementer` agent.
 
@@ -272,19 +283,22 @@ resume. Before anything mutates it prints a reconcile read-out from the new
 read-only `oss spine_inventory` — one row per hosting repo (`fresh`, `ok`,
 `base-backfill`, `cut-missing`, or a named `halt:`) and one per work item
 (`skip`, `spawn`, `adopt`, `redispatch`, `close-finished`, `finish-merge`,
-`finish-status`, `reattach`, or a named halt); any halt row stops the lane
+`finish-status`, `reattach`, `in-flight` (since 1.26.0), or a named halt, among them
+`halt:pr-not-local`); any halt row stops the lane
 having changed nothing, and the repairable rows are repaired before the resume
-round runs. Two optional state fields carry what a respawned session cannot
-recover from context, and both read as absent on a journal an earlier 1.x
+round runs. Optional state fields carry what a respawned session cannot
+recover from context, and each reads as absent on a journal an earlier 1.x
 wrote, so there is no schema bump: `spines[].bases`, recorded by the fresh arm
 at cut time with `oss spine_base_set` and read back with `oss spine_base_get`
 (a recorded base is validated — it must be a local branch that exists in that
 repo — and it is evidence: a different value refuses rc 7, with
 `oss spine_base_reset` named as the sanctioned operator correction, journaled
 as its own op; it is never re-derived from HEAD, which is the spine branch by
-then), and
+then),
 `work_items[].dispatches`, counted with `oss work_item_dispatched` before every
-dispatch, so the 3-dispatch cap survives a session loss. `oss worktree_reattach`
+dispatch, so the 3-dispatch cap survives a session loss, and (since 1.26.0)
+`work_items[].pr_url`, recorded by `/close <wi-id> --pr` with
+`oss work_item_pr`, which re-entry reads to route an item as `in-flight`. `oss worktree_reattach`
 re-attaches a work item's worktree whose directory was deleted but whose branch
 survives, refusing a branch that is live elsewhere, a locked registration, or a
 missing branch — and pruning nothing. On the external seam,

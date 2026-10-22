@@ -86,6 +86,12 @@ t_assert_rc 0 "the happy path is untouched by the guard"
 t_capture bash "$OSS" bone_add ADR-2 title2 src/b "revisit when X"
 t_assert_rc 0 "the optional 4th argument is still accepted"
 
+# --- work_item_pr (1.26.0): exactly two arguments ---------------------------
+t_capture bash "$OSS" work_item_pr r0.s1.w1
+t_assert_rc 2 "work_item_pr with 1 argument is rc 2"
+t_capture bash "$OSS" work_item_pr r0.s1.w1 https://github.com/o/r/pull/7 extra
+t_assert_rc 2 "work_item_pr with 3 arguments is rc 2"
+
 # --- #530: a SPLIT glob list is refused, not silently shrunk ---------------
 # `_oss_need` counts with `-ge`, so a caller who space-splits a glob list
 # instead of using the documented CSV grammar got rc 0 and a ONE-glob surface -

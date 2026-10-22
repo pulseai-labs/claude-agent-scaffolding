@@ -1,6 +1,6 @@
 ---
 description: Drive a planned ossify spine's rounds end to end (spine-branch cut, one worktree per work item, implementer dispatch in decomposition order, the round barrier)
-argument-hint: "<spine-id> [--external-executor]"
+argument-hint: "<spine-id> [--external-executor [--detach]]"
 allowed-tools: Bash(bash:*), Read, Write, Edit, Glob, Grep, Task, Skill
 ---
 

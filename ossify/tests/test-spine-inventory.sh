@@ -666,6 +666,67 @@ inv "$F2"
 t_assert_eq "halt:unclassified" "$(route r0.s1.w1)" "S42b: ...nor reattach on the active arm"
 t_assert_rc 3 "S42b: ...rc 3"
 
+# ---- 1.26.0: an item with an open PR is in flight, not a merge to repair ------
+# `/close <wi-id> --pr` (work-item-close.md §4a) leaves the item `active` with one
+# commit past base, pushed, the PR open and `pr_url` recorded. The merge belongs
+# to the PR now, so re-entry must not re-land it locally (`finish-merge`): it
+# reads `in-flight`. Every case sits beside its no-PR control, which must keep
+# today's route byte-for-byte. The PR is recorded BEFORE any status `complete`:
+# work_item_pr refuses a non-active item.
+PR=https://github.com/o/r/pull/1
+# S43: S9b's shape (commit past base, clean, report present) + pr -> in-flight.
+F="$TMP/s43"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
+D43="$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"; mkdir -p "$D43"; echo r > "$D43/report.md"
+inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S43c control: S9b's shape with no PR recorded stays finish-merge"
+oss_in "$F" work_item_pr r0.s1.w1 "$PR" >/dev/null
+inv "$F"
+t_assert_eq "in-flight" "$(route r0.s1.w1)" "S43: an active item with a commit past base and a recorded PR is in-flight"
+t_assert_rc 0 "S43: ...rc 0 - a pending merge is not a halt"
+t_assert_eq "$(printf 'item\tr0.s1.w1\tactive\tin-flight\trepo=core wt=present clean=yes head_at_base=no merged=no report=yes dispatches=absent')" \
+  "$(row item r0.s1.w1)" "S43: ...and the row format is unchanged (no new fact field)"
+# S44: S43 + a [fidelity] record -> halt:close-rejected; the record is read FIRST.
+printf '[fidelity] src/x.ts:3 - rejected\n' > "$D43/verify.md"
+inv "$F"
+t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S44: a recorded rejection outranks the PR - halt:close-rejected, never in-flight"
+t_assert_rc 3 "S44: ...rc 3"
+rm "$D43/verify.md"; mkdir "$D43/verify.md"
+inv "$F"
+t_assert_eq "halt:unreadable" "$(route r0.s1.w1)" "S44b: an unreadable record with a PR halts, never in-flight"
+rmdir "$D43/verify.md"
+# S45: S12's shape (complete, unmerged commits) + pr -> halt:pr-not-local.
+F="$TMP/s45c"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+t_assert_eq "finish-merge" "$(route r0.s1.w1)" "S45c control: S12's shape with no PR recorded stays finish-merge"
+F="$TMP/s45"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm c
+oss_in "$F" work_item_pr r0.s1.w1 "$PR" >/dev/null
+oss_in "$F" work_item_status r0.s1.w1 complete >/dev/null; inv "$F"
+t_assert_eq "halt:pr-not-local" "$(route r0.s1.w1)" "S45: complete + unmerged + PR -> halt:pr-not-local, never a local merge"
+t_assert_rc 3 "S45: ...rc 3"
+mkdir -p "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"
+printf '[fidelity] rejected earlier\n' > "$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1/verify.md"; inv "$F"
+t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S45b: the rejection record is still read first on the complete arm"
+# S46: active + merged + pr -> finish-status (the caller fast-forwarded, status unwritten).
+F="$TMP/s46"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
+oss_in "$F" work_item_pr r0.s1.w1 "$PR" >/dev/null
+git -C "$F/core" merge -q --no-ff work/r0.s1.w1-one -m "merge r0.s1.w1"; inv "$F"
+t_assert_eq "finish-status" "$(route r0.s1.w1)" "S46: merged while active, PR recorded -> finish-status (unchanged)"
+t_assert_rc 0 "S46: ...rc 0"
+# S47: an in-flight item in round 1, a planned one behind it -> in-flight / spawn, rc 0.
+F="$TMP/s47"; fx "$F" 2; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a; git -C "$WT" commit -qm "close r0.s1.w1"
+oss_in "$F" work_item_pr r0.s1.w1 "$PR" >/dev/null
+# S48: the in-flight read-out mutates nothing.
+BEFORE="$(snap "$F")"; inv "$F"
+t_assert_eq "in-flight" "$(route r0.s1.w1)" "S47: the PR'd item reads in-flight"
+t_assert_eq "spawn" "$(route r0.s1.w2)" "S47: ...and the next round's planned item reads spawn"
+t_assert_rc 0 "S47: ...rc 0 - no halt row"
+t_assert_eq "$BEFORE" "$(snap "$F")" "S48: the in-flight inventory leaves state, refs, worktrees, index and status byte-identical"
+
 # ---- the shipped §2 re-entry blocks, extracted and RUN (block-ledger O rows) ----
 SKILLS="$HERE/../skills"
 ROUND="$SKILLS/work-item/references/round-orchestration.md"

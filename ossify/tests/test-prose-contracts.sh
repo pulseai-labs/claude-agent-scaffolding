@@ -1593,8 +1593,23 @@ for _pair in "$_RO|halt: spine_inventory could not read the spine" "$_RO|The cou
   _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
 done
+# 1.26.0: an item with an open PR reads `in-flight` on re-entry (no dispatch in
+# any mode; the barrier reports it, never halts), and a complete item whose PR
+# merged remotely but not locally is `halt:pr-not-local`.
+for _pair in "$_RO|| \`in-flight\` | nothing, in every mode" "$_RO|an \`in-flight\` row counts as" \
+             "$_RO|| \`halt:pr-not-local\` — a \`complete\` item with a PR recorded" "$_RO|never merge the work branch locally — that forks the local spine branch from the remote" \
+             "$_RO|An \`in-flight\` item gets no dispatch either, in every mode" "$_RO|An \`in-flight\` item (§2b) is not a" \
+             "$_EX|item (its PR open, \`round-orchestration.md\` §2b) gets no request either" \
+             "$_EX|the lane ends only after issuing every" "$_EX|(\`close-finished\`, \`in-flight\`, an unrepaired \`finish-merge\`), it reports them" \
+             "$_EX|| \`in-flight\` | no request; reported with its PR; the caller merges it |"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.26.0 in-flight)"
+done
+_r=1; ! grep -Fq 'with no request to issue (`close-finished`), the lane reports them' "$_EX" && _r=0
+_pin "$_r" "external-executor.md §2b still ends the detached lane on a close-finished item before issuing the round's other requests (R4)"
 # 1.15.0 - the run-spine grammar rails moved with the body into the skill (Rule 2).
-for _lit in 'Exactly two command shapes are accepted' 'refuse before the spine-branch cut, naming' 'refuse rather than guess'; do
+for _lit in 'Exactly three command shapes are accepted' 'refuse before the spine-branch cut, naming' 'refuse rather than guess'; do
   _r=1; grep -Fq -- "$_lit" "$_RS" && _r=0
   _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 grammar rails)"
 done
@@ -2153,5 +2168,82 @@ pin "$_PRW_WP" "the ask — or, under a standing order in the autopilot policy t
   "work-pr/SKILL.md's merge rail still stops at the ask with no standing-order branch (#869 disposition 2)"
 pin "$_PRW_WP" "Never auto-merge." \
   "work-pr/SKILL.md's merge rail lost 'Never auto-merge' - a merge queue's auto-merge stays forbidden (#869 disposition 2)"
+
+# --- /close <wi-id> --pr: the work item's PR instead of a local merge --------------
+# Control first: the default path (section 4's local merge) is byte-for-byte what it
+# was. The new arm may not edit it, and the pin counts the line exactly once, so a
+# copy of it into section 4a would turn this red too.
+_WCP="$HERE/../skills/close/references/work-item-close.md"
+_CLP="$HERE/../skills/close/SKILL.md"
+_CMD="$HERE/../commands/close.md"
+pin "$_WCP" 'git -C "$repo_root" merge --no-ff "$wi_branch" -m "merge $wi" || { echo "close: merge conflict - halt"; exit 1; }' \
+  "control: close section 4's local merge line is unchanged (default /close <id> behaves as before)"
+pin "$_CLP" '`--pr` applies to a work-item close only' "close grammar: --pr on a spine or release id refuses"
+pin "$_CLP" '`/close <wi-id> --pr`' "close grammar: the work-item --pr shape is named"
+pin "$_WCP" '## 4a. PR mode' "work-item-close.md has section 4a"
+pin "$_WCP" 'never a local merge' "4a: a missing remote leg halts, never a local merge (the #339 rule)"
+pin "$_WCP" 'ls-remote --exit-code origin' "4a: the spine branch is probed on the remote before the commit"
+# PR #889 round 1 B1: nothing in the lane pushes the spine branch, so 4a pushes it
+# when ls-remote reports it absent (rc 2), before the item commit; any other rc
+# halts. Ordering: the spine push precedes the commit line.
+pin "$_WCP" 'if [ "$spine_rc" -eq 2 ]; then' "4a B1: an absent spine branch (ls-remote rc 2) takes the push arm"
+pin "$_WCP" 'git -C "$repo_root" push -u origin "$spine_branch"' "4a B1: PR mode pushes the spine branch when origin lacks it"
+pin "$_WCP" 'elif [ "$spine_rc" -ne 0 ]; then' "4a B1: an unreadable remote (rc other than 0/2) still halts"
+_r=1; _p="$(grep -nF 'git -C "$repo_root" push -u origin "$spine_branch"' "$_WCP" | cut -d: -f1)"; _m="$(grep -nF 'close: commit failed in $wt - nothing was pushed' "$_WCP" | cut -d: -f1)"
+[ -n "$_p" ] && [ -n "$_m" ] && [ "$_p" -lt "$_m" ] && _r=0
+_pin "$_r" "4a B1: the spine-branch push does not run before the item commit"
+pin "$_RO" 'pushes the branch when origin lacks it, as its PR'"'"'s' "RO 2a B1: the PR-mode close's spine-branch push is named as the one sanctioned early push"
+pin "$_WCP" 'close: commit failed in $wt - nothing was pushed - halt' "4a: a failed commit halts before the push"
+pin "$_WCP" 'is not past base $base_sha - no commit to open a PR for; nothing was pushed - halt' "4a: HEAD must be past the recorded base before the push"
+pin "$_WCP" 'oss work_item_pr "$wi" "$pr_url"' "4a: the PR URL is recorded through the verb"
+pin "$_WCP" 'Do **not** set `complete`' "4a: the status stays active, the merge and status are the caller's"
+pin "$_WCP" 'never squash or rebase' "4a: the caller merges with a merge commit"
+# Final review I1: gh takes the origin URL itself as --repo; no sed strips the
+# host (an origin on a non-default host then resolved on gh's default). The
+# zero-count absence check carries its positive control beside it: both gh
+# calls name "$origin_url", so a deleted or renamed variable cannot leave the
+# absence vacuously green.
+_r=1; ! grep -Fq 'gh_repo=' "$_WCP" && ! grep -Fq "sed -E 's#^(git@" "$_WCP" && _r=0
+_pin "$_r" "4a: the origin URL is taken apart with sed to build gh's --repo (the host is lost - final review I1)"
+pin "$_WCP" 'pr_url="$(gh --repo "$origin_url" pr list --head "$wi_branch" --base "$spine_branch" --state open --json url' \
+  "4a control: the PR lookup passes the origin URL itself as --repo"
+pin "$_WCP" 'pr_url="$(gh --repo "$origin_url" pr create --base "$spine_branch" --head "$wi_branch"' \
+  "4a control: the PR create passes the origin URL itself as --repo"
+# Final review I2 / R6(a): section 4a resumes in place - an empty index with the
+# recorded branch past base skips the commit; an open PR for the branch is
+# reused, never re-created; the lookup runs before the create.
+pin "$_WCP" 'elif [ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ]; then' \
+  "4a: an empty index with HEAD past base on the recorded branch is a resume, not a halt"
+# PR #889 round 1 class A: the recorded-branch guard runs before BOTH arms (a
+# worktree switched off $wi_branch committed there, then pushed $wi_branch
+# without the commit), and the recorded base must be an ancestor of HEAD before
+# the push. Ordering: the guard precedes the commit line.
+pin "$_WCP" "[ \"\$wt_branch\" = \"\$wi_branch\" ] \\" "4a A: the recorded-branch guard is a standalone check"
+pin "$_WCP" "not the recorded '\$wi_branch' - nothing was committed or pushed - halt" "4a A: a worktree off the recorded branch halts before the commit"
+_r=1; _g="$(grep -nF "not the recorded '\$wi_branch' - nothing was committed" "$_WCP" | cut -d: -f1)"; _m="$(grep -nF 'close: commit failed in $wt - nothing was pushed' "$_WCP" | cut -d: -f1)"
+[ -n "$_g" ] && [ -n "$_m" ] && [ "$_g" -lt "$_m" ] && _r=0
+_pin "$_r" "4a A: the recorded-branch guard does not run before the commit arm"
+pin "$_WCP" 'git -C "$wt" merge-base --is-ancestor "$base_sha" HEAD \' "4a A: the recorded base must be an ancestor of HEAD before the push"
+_r=1; _a="$(grep -nF 'git -C "$wt" merge-base --is-ancestor "$base_sha" HEAD' "$_WCP" | cut -d: -f1)"; _u="$(grep -nF 'git -C "$wt" push -u origin "$wi_branch"' "$_WCP" | cut -d: -f1)"
+[ -n "$_a" ] && [ -n "$_u" ] && [ "$_a" -lt "$_u" ] && _r=0
+_pin "$_r" "4a A: the base-ancestry check does not run before the item push"
+pin "$_WCP" 'resuming after the commit' "4a: the resume says it skipped the commit"
+pin "$_WCP" "reusing it, not opening another" "4a: an open PR for the branch is reused"
+_r=1; _l="$(grep -nF 'pr list --head "$wi_branch"' "$_WCP" | cut -d: -f1)"; _c="$(grep -nF 'pr create --base "$spine_branch" --head "$wi_branch"' "$_WCP" | cut -d: -f1)"
+[ -n "$_l" ] && [ -n "$_c" ] && [ "$_l" -lt "$_c" ] && _r=0
+_pin "$_r" "4a: the existing-PR lookup does not run before gh pr create"
+pin "$_WCP" 'must not be re-entered over a half-done PR-mode close' "4a: a self-closing lane over a half-done PR-mode close is out of contract"
+# R6(b)(c): under --detach the lane never runs the finish-merge local merge; the
+# steps it runs are named, not "section 2 through 4".
+pin "$_EX" '**`finish-merge` is never repaired under `--detach`.**' "EXT 2b: finish-merge is never repaired under --detach"
+pin "$_EX" "| \`finish-merge\` | not repaired, nothing merged, no request; reported as awaiting the caller's close" \
+  "EXT 2b: the re-entry row table has the finish-merge row"
+_r=1; ! grep -Fq 'runs §2 through §4 unchanged' "$_EX" && grep -Fq 'The lane runs `round-orchestration.md` §2 (the fresh cut' "$_EX" && _r=0
+_pin "$_r" "EXT 2b: still says 'runs §2 through §4 unchanged' instead of naming the round-orchestration steps"
+# PR #889 round 1 N2: round-orchestration section 3's external-mode request for a
+# close-finished item yields to section 2b under --detach (no request; the caller closes).
+pin "$_RO" '`--detach`, where it gets no request and the caller closes it (§2b)' "RO 3 N2: close-finished under --detach gets no request, matching EXT 2b"
+_ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$_CMD")"
+t_assert_eq '"<id> [--pr]"' "$_ah" "close.md argument-hint declares the optional flag"
 
 t_summary

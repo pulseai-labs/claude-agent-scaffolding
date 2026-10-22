@@ -212,9 +212,13 @@ value is right, which the lane never makes or calls on its own.
 **A spine branch cut here is local until spine close pushes it.** The branch is
 created, never pushed — rounds land work items onto it locally, and only spine
 close's PR arm pushes it and opens the PR against the repo's base branch
-(`close/references/spine-close.md` §3, #339). Nothing in the lane pushes, and
-nothing else should: a premature push creates a PR-shaped artifact the close's
-resume probe would then find and have to reason about.
+(`close/references/spine-close.md` §3, #339). Nothing in the lane pushes. One
+other step does: a PR-mode item close (`/close <wi-id> --pr`,
+`work-item-close.md` §4a) pushes the branch when origin lacks it, as its PR's
+base, and opens no PR for it. Spine close's resume probe looks for a PR, never
+for the branch, so it pushes again and opens the spine PR as usual. Nothing
+else should push it: a spine PR opened early is an artifact that probe would
+then find and have to reason about.
 
 **Check every repo before cutting a branch in any of them.** This was one loop
 that checked and mutated per repo. With an earlier-sorted repo clean and a later
@@ -288,7 +292,8 @@ field that its prior dispatches are unknown and count from zero.
 
 **2. Map the routes onto the rounds** — still before any mutation. The rounds
 come from the spine plan document (§1). The **resume round *R*** is the first
-round holding an item whose route is not `skip`. Every item in a round after
+round holding an item whose route is not `skip`; an `in-flight` row counts as
+not `skip`, so its round stays unfinished until its PR merges. Every item in a round after
 *R* must route `spawn` (or `skip` for an `abandoned` item); anything else is
 **`halt:out-of-order`** — work exists beyond an unfinished barrier. Name it and
 stop. If no round holds a non-`skip` item, the rounds are done: say so and hand
@@ -326,6 +331,7 @@ the verb that already owns the step:
 | `adopt` | the row reads `wt=present` but state holds no `worktree_path` yet and §2b defines no `$wt` for you (#673 B2): set `root="$(oss repo_root "<the item's target_repo>")"` and `wt="$root/.worktrees/<wi-id>"` (the derived path, exactly as `worktree_add` builds it) — then `oss work_item_exec <wi-id> "$(git -C "$wt" rev-parse --abbrev-ref HEAD)" "$wt" "$(git -C "$wt" rev-parse HEAD)"`, then `oss work_item_status <wi-id> active` — the crash came between §3's spawn and its journal |
 | `finish-merge` | Re-land the claim the state makes: the branch holds the item's commits and the spine branch does not. Recover, in this order, BEFORE anything merges (#673 C3/L1): `target_repo` from state (`.work_items[].target_repo`), then `repo_root="$(oss repo_root "$target_repo")"` — `$repo_root` is not otherwise in this arm's scope — then `wi_branch` from state (`work_items[].branch`) and `wi_sha="$(git -C "$repo_root" rev-parse "refs/heads/$wi_branch")"`, the work-branch tip the reachability check compares. **Then RE-RUN close §2's gate on the item's committed tree before the merge (#673 K1)**: neither a commit on the branch nor a present `report.md` proves the gate ran — the item skill authors the report BEFORE staging — so §2's four layers (`work-item-close.md` §2, `references/impl-check.md`) run again over the branch's committed diff (read the committed tree, not a staged worktree, when the worktree is gone), against the item's `spec.md`, `handoff.md` and `report.md`. Green → close §4 from its merge onward: `git -C "$repo_root" merge --no-ff "$wi_branch"`, then `merge-base --is-ancestor "$wi_sha" HEAD`, then `work_item_status "$wi" complete`. Red → `halt:unverified-merge`, naming the item; **nothing is merged**. The gate is repeatable and records only what §2 already writes. **The durable `[fidelity]` rejection record gates this route in the read-out too (#673 J1)**: the same `verify.md` read that routes `close-finished` to `halt:close-rejected` runs here and on the complete-item arm — a recorded rejection is never re-landed by a merge, and an unreadable record halts (`halt:unreadable`) rather than reading as clear |
 | `finish-status` | `oss work_item_status <wi-id> complete` — the merge landed and the status write did not |
+| `in-flight` | nothing, in every mode — the item is `active` with its commit past base and `pr_url` recorded (`/close <wi-id> --pr`, `work-item-close.md` §4a), so its merge belongs to the PR. Never merge the work branch locally and never redispatch it; §3 gives it no dispatch and §7 reports it with its PR. Once the PR merges and the spine branch is fast-forwarded, the next read-out routes it `finish-status`, or `skip` once its status is `complete` |
 | `redispatch`, `close-finished`, `spawn` | nothing here — §3 handles them |
 | `skip` | nothing |
 
@@ -342,6 +348,7 @@ arm's own repairs can hand back, and their routes out:
 | `halt:worktree-held` | the branch is checked out somewhere that is not this item's own missing registration (`git -C <repo-root> worktree list`) — or that list itself could not be read, which reads the same way (#673 A4/G1), or the registration is LOCKED, which reattach refuses too (#673 L4); for a complete item with the conventional path absent, cleanup also owns a live `/.worktrees/<wi>` registration under the derived or recorded root (compared physically), so a clean merged item there skips; an occupied conventional path outside that live worktree or a holder cleanup does not own still halts. Reconcile with the holder — the lane touches nothing on an unowned holder's behalf (#673 A4) |
 | `halt:unverified-merge` | the row's RE-RUN of close §2's gate came back RED on the item's committed tree (#673 K1): run the item's correction — the recovery menu's path, or the external seam's continuation — before anything merges; nothing was merged, and a `[fidelity]` finding the red run wrote routes the next read-out `halt:close-rejected` |
 | `halt:close-rejected` | the result's last completed gate run recorded a `[fidelity]` finding (durable in `verify.md`); the correction must complete — the external seam's continuation or the close's recovery menu — before anything re-verifies or RE-LANDS the result. Gates `close-finished` AND every `finish-merge` arm (#673 C2/J1) |
+| `halt:pr-not-local` — a `complete` item with a PR recorded whose commits the local spine branch lacks | the PR merged on the remote but the local spine branch lacks it: fetch and fast-forward the spine branch (`git merge --ff-only origin/<spine-branch>`), then re-run; never merge the work branch locally — that forks the local spine branch from the remote |
 | `halt:unreadable` | a repo root, a branch-presence probe, a `git status`, the `spine_base_get` base getter, a `verify.md` rejection record, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3/G2) |
 | `halt:unclassified` — an `abandoned` item retaining execution evidence | halt rather than skip: inspect the item's recorded `branch`, `worktree_path`, `base_sha` and `dispatches`, its handoff/report, and the branch and worktree in its target repo. The operator decides which record is right before retrying; never erase evidence or invent a state-editing verb to clear the halt |
 | `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide — a branch no longer descended from its recorded `base_sha` is a history rewrite, never a landing: restore the expected history or re-dispatch the item (#673 H1); a completed item's dirty worktree halts here too, since cleanup's `worktree_remove` would refuse it at close (#673 I2); a recorded branch that is not this item's own `work/<wi-id>-*` is never reused for reattach, redispatch or merge (#673 L2) |
@@ -404,11 +411,14 @@ inventory gave it. `close-finished` skips dispatch entirely — default mode
 hands it to close Route A as a complete return with the recorded `report_path`,
 summary `recovered on resume: return lost with the prior session`, and
 `stage_status all_staged` (close's gate runs in full); external mode sends it
-in the round's request set (`external-executor.md` §2a). An item already
+in the round's request set (`external-executor.md` §2a), except under
+`--detach`, where it gets no request and the caller closes it (§2b). An item already
 `complete` — a `skip` row for a merged item, or a `finish-status` /
 `finish-merge` row §2b step 4 just repaired — gets nothing here: no worktree,
 no handoff, no request, no dispatch. §7 does not wait on it again (it is
-complete).
+complete). An `in-flight` item gets no dispatch either, in every mode: its
+result is committed and its PR is open, so no worktree, no handoff, no request
+and no dispatch; §7 reports it and ends the lane.
 
 **Before spawning anything: confirm the round's specs exist and parse.**
 `plan-spine` may legitimately defer a later round's specs until that round starts
@@ -539,7 +549,9 @@ decided by the command that started you and never changes mid-spine:
 '.work_items[] | select(.id=="<wi-id>") | .dispatches // 0'`. At 3 or more, do
 not dispatch — escalate as §6's cap says. Otherwise run `oss
 work_item_dispatched <wi-id>`, then dispatch. This holds for the first run,
-every clarification re-dispatch and every broken-envelope retry.
+every clarification re-dispatch and every broken-envelope retry — except under `--detach`,
+where the lane counts nothing and the caller counts each execution
+(`external-executor.md` §2b).
 
 ### The default dispatch
 
@@ -642,7 +654,10 @@ state is the evidence for diagnosing what happened.
 **Every work item in a round reaches `complete` before the next round starts** —
 strict-order verification, spec §6. An `abandoned` item was never dispatched and
 is not waited for (§3). A work item still `active` at the barrier
-**halts the round**; name it and stop.
+**halts the round**; name it and stop. An `in-flight` item (§2b) is not a
+halt: its merge is pending, not failed. Once the round's other items are
+through, the lane ends with a report naming the item and its PR (`pr_url`); re-run `/run-spine` once the PR has merged and the
+spine branch is fast-forwarded.
 
 The barrier is what the DAG's edges bought. Round *K+1*'s items were declared to
 depend on round *K*'s, so starting one early means building against a seam that is

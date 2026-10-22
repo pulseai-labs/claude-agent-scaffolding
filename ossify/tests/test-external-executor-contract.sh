@@ -112,11 +112,16 @@ assert_keyset() {
 # ---------------------------------------------------------------------------
 # 1. Flag grammar — the two command shapes a consumer types
 # ---------------------------------------------------------------------------
-pin "$RUNSPINE_SK" '/run-spine <spine-id> --external-executor' \
-  "run-spine/SKILL.md names the external command shape exactly once"
+pin "$RUNSPINE_SK" '`/run-spine <spine-id> --external-executor` — the caller supplies' \
+  "control: shape 2 unchanged (run-spine/SKILL.md names the external command shape exactly once)"
+pin "$RUNSPINE_SK" '/run-spine <spine-id> --external-executor --detach' "grammar: the third shape"
+pin "$RUNSPINE_SK" '`--detach` without `--external-executor`' "grammar: detach alone refused"
+pin "$EXT" 'the lane counts no request' "detach: the lane does not count"
+pin "$EXT" 'the caller counts each execution, the first one included' "detach: the caller counts"
+pin "$RO" 'except under `--detach`' "§5: the one counting exception"
 
 ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$RUNSPINE")"
-t_assert_eq '"<spine-id> [--external-executor]"' "$ah" \
+t_assert_eq '"<spine-id> [--external-executor [--detach]]"' "$ah" \
   "run-spine.md argument-hint declares the optional flag"
 
 # ---------------------------------------------------------------------------

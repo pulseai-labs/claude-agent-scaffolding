@@ -3,16 +3,21 @@ name: run-spine
 description: Use when told to run the rounds, execute the spine or dispatch the work items, or resume a started spine — drive its rounds end to end (worktree per item, implementer dispatch, round barrier)
 ---
 
-**Exactly two command shapes are accepted**, and the grammar is closed:
+**Exactly three command shapes are accepted**, and the grammar is closed:
 
 - `/run-spine <spine-id>` — the default. The lane dispatches its own nested
   implementer per work item, unchanged.
 - `/run-spine <spine-id> --external-executor` — the caller supplies the
   execution procedure instead. `../work-item/references/external-executor.md`
   is that mode's contract.
+- `/run-spine <spine-id> --external-executor --detach` — the same, except the
+  lane writes the round's requests, counts nothing, and ends the session
+  (`external-executor.md` §2b). `--detach` is valid only as the third token,
+  after `--external-executor`; `--detach` without `--external-executor` is a
+  refusal, as is `--detach` in any other position.
 
 Outside the slash command (Codex, `skill://run-spine`, natural language) the spine
-id and flag arrive as tokens in the request; the same two shapes and refusals
+id and flag arrive as tokens in the request; the same three shapes and refusals
 apply. The default shape dispatches Claude Code's `ossify:implementer-agent`. On OMP whose `task` tool
 lists an `implementer` agent (omp-roles 0.2.0+), dispatch each item with `task`, setting
 `agent: "implementer"` in every `tasks[]` entry (never `task`). On a harness
@@ -23,7 +28,7 @@ before any worktree, and before any state write** — a lane that mutates first 
 validates second has already changed the repository by the time it reports the
 typo. Refuse a flag you do not recognise, a flag spelled differently, the flag
 given twice, the flag given before the spine id, and any extra argument. Name
-what you saw and the two shapes above; do not guess which one was meant, and do
+what you saw and the three shapes above; do not guess which one was meant, and do
 not silently drop the token and run the default.
 
 Now load the lane contract and follow it:
