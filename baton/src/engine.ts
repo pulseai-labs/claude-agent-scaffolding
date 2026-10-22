@@ -358,7 +358,11 @@ class RunTick {
           this.ev("ambiguous nonce", { unit: u.id, nonce: s.nonce, threads: ids, dir: s.launch_dir });
           await this.park(u, "ambiguous nonce", { release: false });
         } else if (this.nowMs() - Date.parse(s.launched_at) > ORPHAN_MS) {
+          // No thread for the nonce: the launch went nowhere. It counts one attempt, so a launch
+          // whose outcome is always unknown reaches max_launches and parks `cap` with a notice.
           this.ev("orphan", { unit: u.id, nonce: s.nonce });
+          u.launches[u.stage] = (u.launches[u.stage] ?? 0) + 1; // the dropped attempt counts
+          this.ev("launch unknown", { unit: u.id, nonce: s.nonce, launches: u.launches[u.stage] });
           await this.endSession(u);
         }
       });

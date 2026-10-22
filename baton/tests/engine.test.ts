@@ -157,7 +157,45 @@ test("a nonce T3 never saw is relaunched after 2 minutes", async () => {
   expect(host.launches.length).toBe(1);
   expect(runState().units.a.session?.thread_id).toBe("thread-1");
   expect(count("orphan")).toBe(1);
-  expect(runState().units.a.launches.work).toBe(1);
+  // The dropped orphan counts one attempt (final re-review ruling), and the relaunch a second.
+  expect(runState().units.a.launches.work).toBe(2);
+});
+
+test("three unknown launch outcomes in a row park cap with one notice", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 5, end: "completed" } });
+  // Every launch is an unknown outcome and T3 never lists a thread for the nonce.
+  host.launch = async () => { throw new HostDownError("t3_thread_launch outcome unknown: JSON-RPC error -32602: bad model"); };
+  for (let i = 0; i < 12 && !runState().units.a.parked; i++) {
+    at(i * 1.5);
+    await doTick();
+  }
+  const u = runState().units.a;
+  expect(u.parked?.reason).toBe("cap");
+  expect(u.launches.work).toBe(3);
+  expect(count("orphan")).toBe(3);
+  const unknown = events().filter((e) => e.kind === "launch unknown");
+  expect(unknown.map((e) => e.nonce)).toEqual(["r1/a/work/1", "r1/a/work/2", "r1/a/work/3"]);
+  expect(notifyLines().length).toBe(1);
+  expect(notifyLines()[0]).toContain("parked in work: cap");
+  expect(claimFiles()).toEqual([]);
+});
+
+test("control: an adopted lost response is counted exactly once", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 5, end: "completed" } });
+  failNextLaunch(new HostDownError(), true);
+  await doTick();
+  at(1);
+  await doTick();
+  at(3);
+  await doTick();
+  const u = runState().units.a;
+  expect(u.session?.thread_id).toBe("thread-1");
+  expect(u.launches.work).toBe(1);
+  expect(count("orphan")).toBe(0);
+  expect(count("launch unknown")).toBe(0);
+  expect(host.launches.length).toBe(1);
 });
 
 test("an orphan dropped at 2 minutes relaunches with a new nonce and a new directory", async () => {
@@ -180,7 +218,7 @@ test("an orphan dropped at 2 minutes relaunches with a new nonce and a new direc
   expect(l.request.cwd).toBe(join(state, "launch", "r1_a_work_2"));
   expect(l.request.cwd).not.toBe(first.launch_dir);
   const u = runState().units.a;
-  expect(u.launches.work).toBe(1);
+  expect(u.launches.work).toBe(2); // the dropped orphan counts one attempt (final re-review ruling)
   expect(u.seq?.work).toBe(2);
 });
 
