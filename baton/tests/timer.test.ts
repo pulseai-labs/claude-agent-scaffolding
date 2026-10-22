@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
 import { existsSync, mkdtempSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,40 @@ import { installTimer, removeTimer, unitText } from "../src/timer.ts";
 const BIN = join(import.meta.dir, "..", "bin", "baton");
 const tmp = () => mkdtempSync(join(tmpdir(), "baton-timer-"));
 const lines = (s: string) => s.split("\n");
+
+// The service carries BATON_STATE_DIR and BATON_CONFIG from the installing process: pin both unset.
+const savedEnv = { s: process.env.BATON_STATE_DIR, c: process.env.BATON_CONFIG };
+const setEnv = (k: string, v: string | undefined) => { if (v === undefined) delete process.env[k]; else process.env[k] = v; };
+beforeEach(() => { delete process.env.BATON_STATE_DIR; delete process.env.BATON_CONFIG; });
+afterEach(() => { setEnv("BATON_STATE_DIR", savedEnv.s); setEnv("BATON_CONFIG", savedEnv.c); });
+const envLines = (service: string) => lines(service).filter((l) => l.startsWith('Environment="BATON_'));
+
+test("the service carries each set location, quoted for systemd", () => {
+  const { service } = unitText("/h/baton", { BATON_STATE_DIR: '/s p/a"b\\c%d', BATON_CONFIG: "/c/config.json" });
+  expect(envLines(service)).toEqual([
+    'Environment="BATON_STATE_DIR=/s p/a\\"b\\\\c%%d"',
+    'Environment="BATON_CONFIG=/c/config.json"',
+  ]);
+  // control: nothing set, no line
+  expect(envLines(unitText("/h/baton").service)).toEqual([]);
+  expect(envLines(unitText("/h/baton", { BATON_CONFIG: "/c" }).service)).toEqual(['Environment="BATON_CONFIG=/c"']);
+});
+
+test("a location with a line break is refused, not written into the unit", () => {
+  expect(() => unitText("/h/baton", { BATON_STATE_DIR: "/s\nExecStartPost=/bin/x" })).toThrow(/line break/);
+});
+
+test("install writes the locations set at install time; unset or empty writes none", async () => {
+  const dir = tmp();
+  const run = () => ({ status: 0 });
+  process.env.BATON_STATE_DIR = "/st ate";
+  process.env.BATON_CONFIG = "";
+  await installTimer("r1", { dir, batonPath: "/h/baton", run });
+  expect(envLines(readFileSync(join(dir, "baton.service"), "utf8"))).toEqual(['Environment="BATON_STATE_DIR=/st ate"']);
+  delete process.env.BATON_STATE_DIR;
+  await installTimer("r1", { dir, batonPath: "/h/baton", run });
+  expect(envLines(readFileSync(join(dir, "baton.service"), "utf8"))).toEqual([]);
+});
 
 test("unit text pins the tick cadence and idle IO", () => {
   const { service, timer } = unitText("/h/.local/bin/baton");
@@ -68,8 +102,10 @@ test("baton timer install and remove go through the overrides, never the real sy
   const dir = tmp();
   const fake = fakeSystemctl();
   const env = { BATON_SYSTEMD_DIR: dir, BATON_SYSTEMCTL: fake.path };
-  expect((await baton(env, "timer", "install")).rc).toBe(0);
+  const st = join(tmp(), "custom state");
+  expect((await baton({ ...env, BATON_STATE_DIR: st }, "timer", "install")).rc).toBe(0);
   expect(existsSync(join(dir, "baton.timer"))).toBe(true);
+  expect(envLines(readFileSync(join(dir, "baton.service"), "utf8"))).toEqual([`Environment="BATON_STATE_DIR=${st}"`]);
   expect(readFileSync(fake.log, "utf8").trim().split("\n")).toEqual(["--user daemon-reload", "--user enable --now baton.timer"]);
   expect((await baton(env, "timer", "remove")).rc).toBe(0);
   expect(existsSync(join(dir, "baton.timer"))).toBe(false);

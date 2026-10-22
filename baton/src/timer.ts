@@ -3,7 +3,7 @@
 
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 export type Runner = (argv: string[]) => { status: number; stderr?: string };
 
@@ -15,7 +15,17 @@ export type TimerOptions = {
   run?: Runner;
 };
 
-export function unitText(batonPath: string): { service: string; timer: string } {
+/** The documented locations a tick reads; the service carries each one set at install time. */
+export const UNIT_ENV = ["BATON_STATE_DIR", "BATON_CONFIG"] as const;
+export type UnitEnv = Partial<Record<(typeof UNIT_ENV)[number], string>>;
+
+/** A systemd `Environment=` line, quoted: `\` and `"` escaped, `%` doubled (else a specifier). */
+export function envLine(name: string, value: string): string {
+  if (/[\r\n]/.test(value)) throw new Error(`${name} holds a line break, which a systemd unit cannot carry`);
+  return `Environment="${`${name}=${value}`.replace(/[\\"]/g, (c) => `\\${c}`).replace(/%/g, "%%")}"`;
+}
+
+export function unitText(batonPath: string, env: UnitEnv = {}): { service: string; timer: string } {
   const service = [
     "[Unit]",
     "Description=baton tick",
@@ -26,6 +36,7 @@ export function unitText(batonPath: string): { service: string; timer: string } 
     "Nice=10",
     "IOSchedulingClass=idle",
     "Environment=PATH=%h/.local/bin:%h/.bun/bin:/usr/local/bin:/usr/bin:/bin",
+    ...UNIT_ENV.flatMap((k) => (env[k] ? [envLine(k, env[k]!)] : [])),
     "",
   ].join("\n");
   const timer = [
@@ -60,7 +71,11 @@ function systemctl(run: Runner, ...args: string[]): void {
 export async function installTimer(_runId: string, opts: TimerOptions = {}): Promise<void> {
   const dir = opts.dir ?? defaultDir();
   const run = opts.run ?? defaultRun;
-  const { service, timer } = unitText(opts.batonPath ?? join(homedir(), ".local", "bin", "baton"));
+  // An empty value reads as unset, as it does in the tick (`||`); a relative one is made absolute
+  // here, where it means what the operator meant.
+  const env: UnitEnv = {};
+  for (const k of UNIT_ENV) if (process.env[k]) env[k] = resolve(process.env[k]!);
+  const { service, timer } = unitText(opts.batonPath ?? join(homedir(), ".local", "bin", "baton"), env);
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, "baton.service"), service);
   writeFileSync(join(dir, "baton.timer"), timer);

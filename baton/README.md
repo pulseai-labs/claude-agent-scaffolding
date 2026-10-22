@@ -17,6 +17,8 @@ The timer's unit runs `~/.local/bin/baton tick`, so re-point the symlinks after 
 and the timer follows. `baton timer install` writes `baton.service` and `baton.timer` under
 `~/.config/systemd/user` and enables the timer (it ticks 2 min after boot, then every 90 s);
 `baton arm` does the same unless it gets `--no-timer`. `baton timer remove` undoes it.
+The service keeps `BATON_STATE_DIR` and `BATON_CONFIG` as they were set at install time; change
+either and run `baton timer install` again.
 
 ## T3 login
 
