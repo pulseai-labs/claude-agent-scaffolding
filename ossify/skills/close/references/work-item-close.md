@@ -318,8 +318,14 @@ is replaced by the commit-or-resume test in the block below. What differs is
 the end: the commit is pushed and a PR opened into the spine branch, and
 **nothing is merged here**. The default `/close <id>` is §4, untouched.
 
-**The remote leg is checked before the commit.** `origin` must resolve and the
-spine branch must exist on it. Either failing halts, naming which one: **never a local merge** —
+**The remote leg is checked before the commit.** `origin` must resolve, and
+the spine branch must be on it — the item's PR needs it as the base. The lane
+never pushes it (`round-orchestration.md` §2a), so the first `--pr` close of a
+spine finds it absent (`ls-remote` rc 2) and pushes it, opening no PR. Spine
+close is unaffected: its resume probe looks for a PR headed by the spine
+branch, never for the branch, so with none open it pushes the branch again and
+opens the spine PR as usual (`spine-close.md` §3). No `origin`, a failed push,
+or an unreadable remote halts, naming which: **never a local merge** —
 the work would land on the spine without the PR the caller is
 waiting on (the #339 rule). `gh` takes the origin URL itself as `--repo`, and
 parses it, keeping the host — this layer never takes the URL apart.
@@ -343,8 +349,15 @@ head_branch="$(git -C "$repo_root" symbolic-ref --short HEAD)"
 
 origin_url="$(git -C "$repo_root" remote get-url origin)" \
   || { echo "close: $target_repo has no 'origin' remote - PR mode needs one and merges nothing locally - halt"; exit 1; }
-git -C "$repo_root" ls-remote --exit-code origin "refs/heads/$spine_branch" >/dev/null \
-  || { echo "close: origin has no '$spine_branch' - push the spine branch first; PR mode merges nothing locally - halt"; exit 1; }
+spine_rc=0
+git -C "$repo_root" ls-remote --exit-code origin "refs/heads/$spine_branch" >/dev/null || spine_rc=$?
+if [ "$spine_rc" -eq 2 ]; then
+  git -C "$repo_root" push -u origin "$spine_branch" \
+    || { echo "close: origin has no '$spine_branch' and pushing it failed - nothing was committed or pushed; PR mode merges nothing locally - halt"; exit 1; }
+  echo "close: pushed '$spine_branch' to origin as the PR base - no PR opened for it; spine close opens that"
+elif [ "$spine_rc" -ne 0 ]; then
+  echo "close: cannot read '$spine_branch' on origin (ls-remote rc $spine_rc) - nothing was committed or pushed; PR mode merges nothing locally - halt"; exit 1
+fi
 
 # Commit, or recognise a resume: an empty index with the recorded branch
 # checked out and HEAD already past base is this block's own earlier commit.

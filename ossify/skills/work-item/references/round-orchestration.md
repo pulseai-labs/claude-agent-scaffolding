@@ -212,9 +212,13 @@ value is right, which the lane never makes or calls on its own.
 **A spine branch cut here is local until spine close pushes it.** The branch is
 created, never pushed — rounds land work items onto it locally, and only spine
 close's PR arm pushes it and opens the PR against the repo's base branch
-(`close/references/spine-close.md` §3, #339). Nothing in the lane pushes, and
-nothing else should: a premature push creates a PR-shaped artifact the close's
-resume probe would then find and have to reason about.
+(`close/references/spine-close.md` §3, #339). Nothing in the lane pushes. One
+other step does: a PR-mode item close (`/close <wi-id> --pr`,
+`work-item-close.md` §4a) pushes the branch when origin lacks it, as its PR's
+base, and opens no PR for it. Spine close's resume probe looks for a PR, never
+for the branch, so it pushes again and opens the spine PR as usual. Nothing
+else should push it: a spine PR opened early is an artifact that probe would
+then find and have to reason about.
 
 **Check every repo before cutting a branch in any of them.** This was one loop
 that checked and mutated per repo. With an earlier-sorted repo clean and a later

@@ -2183,6 +2183,16 @@ pin "$_CLP" '`/close <wi-id> --pr`' "close grammar: the work-item --pr shape is 
 pin "$_WCP" '## 4a. PR mode' "work-item-close.md has section 4a"
 pin "$_WCP" 'never a local merge' "4a: a missing remote leg halts, never a local merge (the #339 rule)"
 pin "$_WCP" 'ls-remote --exit-code origin' "4a: the spine branch is probed on the remote before the commit"
+# PR #889 round 1 B1: nothing in the lane pushes the spine branch, so 4a pushes it
+# when ls-remote reports it absent (rc 2), before the item commit; any other rc
+# halts. Ordering: the spine push precedes the commit line.
+pin "$_WCP" 'if [ "$spine_rc" -eq 2 ]; then' "4a B1: an absent spine branch (ls-remote rc 2) takes the push arm"
+pin "$_WCP" 'git -C "$repo_root" push -u origin "$spine_branch"' "4a B1: PR mode pushes the spine branch when origin lacks it"
+pin "$_WCP" 'elif [ "$spine_rc" -ne 0 ]; then' "4a B1: an unreadable remote (rc other than 0/2) still halts"
+_r=1; _p="$(grep -nF 'git -C "$repo_root" push -u origin "$spine_branch"' "$_WCP" | cut -d: -f1)"; _m="$(grep -nF 'close: commit failed in $wt - nothing was pushed' "$_WCP" | cut -d: -f1)"
+[ -n "$_p" ] && [ -n "$_m" ] && [ "$_p" -lt "$_m" ] && _r=0
+_pin "$_r" "4a B1: the spine-branch push does not run before the item commit"
+pin "$_RO" 'pushes the branch when origin lacks it, as its PR'"'"'s' "RO 2a B1: the PR-mode close's spine-branch push is named as the one sanctioned early push"
 pin "$_WCP" 'close: commit failed in $wt - nothing was pushed - halt' "4a: a failed commit halts before the push"
 pin "$_WCP" 'is not past base $base_sha - no commit to open a PR for; nothing was pushed - halt' "4a: HEAD must be past the recorded base before the push"
 pin "$_WCP" 'oss work_item_pr "$wi" "$pr_url"' "4a: the PR URL is recorded through the verb"
