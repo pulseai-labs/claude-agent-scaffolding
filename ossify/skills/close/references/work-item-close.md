@@ -363,16 +363,20 @@ fi
 # checked out and HEAD already past base is this block's own earlier commit.
 staged="$(git -C "$wt" diff --cached --name-only)"
 wt_branch="$(git -C "$wt" symbolic-ref --short HEAD)"
+[ "$wt_branch" = "$wi_branch" ] \
+  || { echo "close: $wt is on '$wt_branch', not the recorded '$wi_branch' - nothing was committed or pushed - halt"; exit 1; }
 if [ -n "$staged" ]; then
   git -C "$wt" commit -m "<message>" \
     || { echo "close: commit failed in $wt - nothing was pushed - halt"; exit 1; }
-elif [ "$wt_branch" = "$wi_branch" ] && [ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ]; then
+elif [ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ]; then
   echo "close: index empty and '$wi_branch' is already past base $base_sha - resuming after the commit"
 else
   echo "close: gate is green but the index is empty in $wt and HEAD is not past base on '$wi_branch' - nothing was committed or pushed - halt"; exit 1
 fi
 [ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ] \
   || { echo "close: HEAD in $wt is not past base $base_sha - no commit to open a PR for; nothing was pushed - halt"; exit 1; }
+git -C "$wt" merge-base --is-ancestor "$base_sha" HEAD \
+  || { echo "close: recorded base $base_sha is not an ancestor of HEAD in $wt - '$wi_branch' was rewritten off its base; nothing was pushed - halt"; exit 1; }
 git -C "$wt" push -u origin "$wi_branch" \
   || { echo "close: push of '$wi_branch' failed - the commit is on the local branch; this run opened and recorded no PR - re-run /close $wi --pr to resume - halt"; exit 1; }
 pr_url="$(gh --repo "$origin_url" pr list --head "$wi_branch" --base "$spine_branch" --state open --json url --jq '.[0].url // ""')" \

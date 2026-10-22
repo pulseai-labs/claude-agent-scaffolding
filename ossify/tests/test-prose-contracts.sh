@@ -2212,8 +2212,21 @@ pin "$_WCP" 'pr_url="$(gh --repo "$origin_url" pr create --base "$spine_branch" 
 # Final review I2 / R6(a): section 4a resumes in place - an empty index with the
 # recorded branch past base skips the commit; an open PR for the branch is
 # reused, never re-created; the lookup runs before the create.
-pin "$_WCP" 'elif [ "$wt_branch" = "$wi_branch" ] && [ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ]; then' \
+pin "$_WCP" 'elif [ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ]; then' \
   "4a: an empty index with HEAD past base on the recorded branch is a resume, not a halt"
+# PR #889 round 1 class A: the recorded-branch guard runs before BOTH arms (a
+# worktree switched off $wi_branch committed there, then pushed $wi_branch
+# without the commit), and the recorded base must be an ancestor of HEAD before
+# the push. Ordering: the guard precedes the commit line.
+pin "$_WCP" "[ \"\$wt_branch\" = \"\$wi_branch\" ] \\" "4a A: the recorded-branch guard is a standalone check"
+pin "$_WCP" "not the recorded '\$wi_branch' - nothing was committed or pushed - halt" "4a A: a worktree off the recorded branch halts before the commit"
+_r=1; _g="$(grep -nF "not the recorded '\$wi_branch' - nothing was committed" "$_WCP" | cut -d: -f1)"; _m="$(grep -nF 'close: commit failed in $wt - nothing was pushed' "$_WCP" | cut -d: -f1)"
+[ -n "$_g" ] && [ -n "$_m" ] && [ "$_g" -lt "$_m" ] && _r=0
+_pin "$_r" "4a A: the recorded-branch guard does not run before the commit arm"
+pin "$_WCP" 'git -C "$wt" merge-base --is-ancestor "$base_sha" HEAD \' "4a A: the recorded base must be an ancestor of HEAD before the push"
+_r=1; _a="$(grep -nF 'git -C "$wt" merge-base --is-ancestor "$base_sha" HEAD' "$_WCP" | cut -d: -f1)"; _u="$(grep -nF 'git -C "$wt" push -u origin "$wi_branch"' "$_WCP" | cut -d: -f1)"
+[ -n "$_a" ] && [ -n "$_u" ] && [ "$_a" -lt "$_u" ] && _r=0
+_pin "$_r" "4a A: the base-ancestry check does not run before the item push"
 pin "$_WCP" 'resuming after the commit' "4a: the resume says it skipped the commit"
 pin "$_WCP" "reusing it, not opening another" "4a: an open PR for the branch is reused"
 _r=1; _l="$(grep -nF 'pr list --head "$wi_branch"' "$_WCP" | cut -d: -f1)"; _c="$(grep -nF 'pr create --base "$spine_branch" --head "$wi_branch"' "$_WCP" | cut -d: -f1)"
