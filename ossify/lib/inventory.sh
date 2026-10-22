@@ -151,7 +151,7 @@ EOF
 _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if any halt
   local sf="$1" spine="$2" spine_dir="$3" sb="$4" halt=0
   local wi st repo br wtp bs dc root conv has_exec wt clean hab merged report tip route por cands wtp_phys top_phys wt_common root_common held holders hp hl adopt_br brx feed feed_rc=0 gr descends foreign ref_rc
-  local cleanup_kept derived_root rec_root hp_root
+  local cleanup_kept derived_root rec_root hp_root pr
   # The feed's own rc is caught, and each item renders inside a `try`/`catch`
   # (#673 A2): one unrenderable field used to collapse the WHOLE stream - the
   # shell read a partial feed with no error channel, the empty-field skip
@@ -166,7 +166,8 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
        (if (.branch // "") == "" then "-" else .branch end),
        (if (.worktree_path // "") == "" then "-" else .worktree_path end),
        (if (.base_sha // "") == "" then "-" else .base_sha end),
-       (if has("dispatches") then (.dispatches | tostring) else "absent" end)] | @tsv)
+       (if has("dispatches") then (.dispatches | tostring) else "absent" end),
+       (if (.pr_url // "") == "" then "-" else .pr_url end)] | @tsv)
       catch "!\($id)"' "$sf")" || feed_rc=$?
   if [ "$feed_rc" -ne 0 ]; then
     echo "oss: spine_inventory: cannot render the work-item feed from $sf" >&2
@@ -174,7 +175,7 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
     halt=1
     feed=""
   fi
-  while IFS="$(printf '\t')" read -r wi st repo br wtp bs dc; do
+  while IFS="$(printf '\t')" read -r wi st repo br wtp bs dc pr; do
     # A `!<id>` line is the caught render above, not a record: fail closed on
     # the item it names. Work-item ids cannot start with `!` (lib/id.sh owns
     # the grammar), so this cannot shadow a real row.
@@ -190,6 +191,9 @@ _oss_inv_items() { # $1=state $2=spine $3=spine-dir $4=spine-branch ; rc 1 if an
     [ "$br" = "-" ] && br=""
     [ "$wtp" = "-" ] && wtp=""
     [ "$bs" = "-" ] && bs=""
+    # 1.26.0: `pr_url` (work_item_pr) is the eighth column, `-` when absent for
+    # the same folding reason; it is the LAST field, so unwrap it like the rest.
+    [ "$pr" = "-" ] && pr=""
     [ -n "$wi" ] || continue
     wt=-; clean=-; hab=-; merged=-; report=no; route=""; descends=-
     held=0; brx=no
@@ -414,11 +418,16 @@ HOLD
           # must complete first, and an unreadable record halts rather than
           # reading as clear. The row itself re-runs close §2's gate on the
           # committed tree before it merges (#673 K1).
+          # 1.26.0: with a PR recorded, the merge belonged to the PR (close
+          # §4a). A complete item whose commits the LOCAL spine branch lacks
+          # is a remote merge not yet fast-forwarded here - a local merge
+          # would fork the local spine branch from the remote. The rejection
+          # record is still read first.
           else
             gr=0; _oss_inv_rejection "$spine_dir/work-$wi/verify.md" || gr=$?
             case "$gr" in
               0) route=halt:close-rejected ;;
-              1) route=finish-merge ;;
+              1) if [ -n "$pr" ]; then route=halt:pr-not-local; else route=finish-merge; fi ;;
               *) route=halt:unreadable ;;
             esac
           fi ;;
@@ -491,10 +500,13 @@ HOLD
                 # this shape, and merging it would land gate-rejected work on
                 # the spine branch - the harm the record exists to prevent.
                 # Same tri-state read as the close-finished arm (G2).
+                # 1.26.0: a recorded PR (close §4a) means the merge is the
+                # PR's, pending - `in-flight`, never a local re-land. The
+                # rejection record is still read first.
                 gr=0; _oss_inv_rejection "$spine_dir/work-$wi/verify.md" || gr=$?
                 case "$gr" in
                   0) route=halt:close-rejected ;;
-                  1) route=finish-merge ;;
+                  1) if [ -n "$pr" ]; then route=in-flight; else route=finish-merge; fi ;;
                   *) route=halt:unreadable ;;
                 esac
               fi

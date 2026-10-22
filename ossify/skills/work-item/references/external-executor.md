@@ -53,7 +53,9 @@ declared decomposition order, before building any request — its route decides
 what §3 and §4 actually do for it. An `abandoned` item is skipped at the top of
 §3, and an item whose route is already `complete` — a `skip` row for a merged
 item, or a `finish-status` / `finish-merge` row §2b step 4 repaired on
-re-entry — gets no step there either; neither gets a request. Worktrees created
+re-entry — gets no step there either; neither gets a request. An `in-flight`
+item (its PR open, `round-orchestration.md` §2b) gets no request either, in
+every mode. Worktrees created
 and journaled, handoffs
 authored, specs confirmed to parse — the whole round's preparation lands first.
 
@@ -126,15 +128,17 @@ nothing, and ends.
 **Close belongs to the caller** (`/close <wi-id>`, with or without `--pr`). A
 `close-finished` row gets no request in this mode: the caller closes it.
 
-**The round barrier.** On re-entry, if round *R* holds items that are `active`
-with no request to issue (`close-finished`), the lane reports them and ends. It
-never halts for them.
+**The round barrier.** On re-entry the lane ends only after issuing every
+request the round needs; if items then remain `active` with no request to issue
+(`close-finished`, `in-flight`), it reports them and ends. It never halts for
+them.
 
 | Row on re-entry | Under `--detach` |
 |---|---|
 | a planned item | request issued, nothing counted; the lane ends |
 | a gaps record in scope | one replacement request, nothing counted; the lane ends |
 | `close-finished` | no request; reported; the caller closes it |
+| `in-flight` | no request; reported with its PR; the caller merges it |
 
 ---
 

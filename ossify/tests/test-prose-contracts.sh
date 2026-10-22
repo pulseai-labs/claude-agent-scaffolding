@@ -1593,6 +1593,21 @@ for _pair in "$_RO|halt: spine_inventory could not read the spine" "$_RO|The cou
   _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
 done
+# 1.26.0: an item with an open PR reads `in-flight` on re-entry (no dispatch in
+# any mode; the barrier reports it, never halts), and a complete item whose PR
+# merged remotely but not locally is `halt:pr-not-local`.
+for _pair in "$_RO|| \`in-flight\` | nothing, in every mode" "$_RO|an \`in-flight\` row counts as" \
+             "$_RO|| \`halt:pr-not-local\` — a \`complete\` item with a PR recorded" "$_RO|never merge the work branch locally — that forks the local spine branch from the remote" \
+             "$_RO|An \`in-flight\` item gets no dispatch either, in every mode" "$_RO|An \`in-flight\` item (§2b) is not a" \
+             "$_EX|item (its PR open, \`round-orchestration.md\` §2b) gets no request either" \
+             "$_EX|the lane ends only after issuing every" "$_EX|(\`close-finished\`, \`in-flight\`), it reports them and ends" \
+             "$_EX|| \`in-flight\` | no request; reported with its PR; the caller merges it |"; do
+  _f="${_pair%%|*}"; _lit="${_pair#*|}"
+  _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
+  _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.26.0 in-flight)"
+done
+_r=1; ! grep -Fq 'with no request to issue (`close-finished`), the lane reports them' "$_EX" && _r=0
+_pin "$_r" "external-executor.md §2b still ends the detached lane on a close-finished item before issuing the round's other requests (R4)"
 # 1.15.0 - the run-spine grammar rails moved with the body into the skill (Rule 2).
 for _lit in 'Exactly three command shapes are accepted' 'refuse before the spine-branch cut, naming' 'refuse rather than guess'; do
   _r=1; grep -Fq -- "$_lit" "$_RS" && _r=0
