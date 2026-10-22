@@ -125,7 +125,7 @@ test("disarm marks the run disarmed and removes only its units' claims", async (
   };
   writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
   mkdirSync(join(st, "claims"), { recursive: true });
-  writeFileSync(join(st, "claims", "abc123.env"), "x");
+  writeFileSync(join(st, "claims", "abc123.env"), "# baton r1/planner/plan/1\nX=1\n");
   writeFileSync(join(st, "claims", "other.env"), "x");
   const r = await runIn(st, "disarm", "r1");
   expect(r.rc).toBe(0);

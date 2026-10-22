@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { removeClaim } from "./claims.ts";
 import { RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
 import { openStore, type RunState, type UnitState } from "./state.ts";
 import { installTimer } from "./timer.ts";
@@ -171,11 +172,7 @@ async function disarmCmd(args: string[]): Promise<number> {
     }
     for (const u of Object.values(run.units)) {
       if (!u.session) continue;
-      try {
-        unlinkSync(join(store.dir, "claims", `${u.session.claim_key}.env`));
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-      }
+      removeClaim(u.session.claim_key, u.session.claim_nonce);
     }
     run.status = "disarmed";
     store.writeRun(run);
