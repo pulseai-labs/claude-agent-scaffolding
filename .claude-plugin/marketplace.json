@@ -71,6 +71,12 @@
       "description": "Autopilot as a Claude Code mod: standing orders in the system prompt; a cached fork judges each AskUserQuestion and permission ask against the policy and scope, never a turn end; a committed decision ledger; a closed pain list by toast, band and bell. Fails toward manual.",
       "category": "workflow",
       "source": "./autonomic"
+    },
+    {
+      "name": "baton",
+      "description": "A recipe-driven engine that launches model sessions on a host when a unit is due, waits on closed signals at no token cost, and merges pull requests only by the recipe's rule. A CLI, a claim launcher and a systemd timer; no skill.",
+      "category": "workflow",
+      "source": "./baton"
     }
   ]
 }

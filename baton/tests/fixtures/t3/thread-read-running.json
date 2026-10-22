@@ -1,0 +1,70 @@
+{
+  "_captured": {
+    "date": "2026-10-22",
+    "t3": "T3 Code 0.1.0 (draco-desk)",
+    "how": "derived from thread-read-completed.json: run and thread set to running, activeRunId set, settled set to true (no running thread was live to capture)"
+  },
+  "thread": {
+    "threadId": "mcp:f0f33320-54e7-4a05-adf2-ef083b783dc1",
+    "projectId": "8f672ec2-47ef-4237-9ff2-a0d4366bc8c5",
+    "title": "spike 2d: no claim",
+    "createdBy": "agent",
+    "creationSource": "mcp",
+    "status": "running",
+    "latestRunId": "run:thread:mcp%3Af0f33320-54e7-4a05-adf2-ef083b783dc1:ordinal:1",
+    "activeRunId": "run:thread:mcp%3Af0f33320-54e7-4a05-adf2-ef083b783dc1:ordinal:1",
+    "providerInstanceId": "OMP_Seat_Spike",
+    "model": "default",
+    "runtimeMode": "full-access",
+    "interactionMode": "default",
+    "linkedPullRequest": null,
+    "titleRegeneration": null,
+    "branch": "spike/autopilot-2",
+    "worktreePath": "/srv/fixture/pilot-fourseat-spike2",
+    "parentThreadId": null,
+    "relationshipToParent": null,
+    "runCount": 1,
+    "itemCount": 8,
+    "pendingRequestCount": 0,
+    "archived": false,
+    "settled": true,
+    "settledAt": "2026-10-21T18:59:30.000Z",
+    "snoozed": false,
+    "snoozedUntil": null,
+    "createdAt": "2026-10-21T18:59:17.593Z",
+    "updatedAt": "2026-10-21T19:29:25.913Z"
+  },
+  "recentRuns": [
+    {
+      "runId": "run:thread:mcp%3Af0f33320-54e7-4a05-adf2-ef083b783dc1:ordinal:1",
+      "ordinal": 1,
+      "status": "running",
+      "providerInstanceId": "OMP_Seat_Spike",
+      "model": "default",
+      "requestedAt": "2026-10-21T18:59:17.598Z",
+      "startedAt": "2026-10-21T18:59:18.970Z",
+      "completedAt": null
+    }
+  ],
+  "items": [
+    {
+      "position": 0,
+      "visibility": "local",
+      "sourceThreadId": "mcp:f0f33320-54e7-4a05-adf2-ef083b783dc1",
+      "itemId": "turn-item:message:mcp%3Af0f33320-54e7-4a05-adf2-ef083b783dc1",
+      "runId": "run:thread:mcp%3Af0f33320-54e7-4a05-adf2-ef083b783dc1:ordinal:1",
+      "messageId": "mcp:f0f33320-54e7-4a05-adf2-ef083b783dc1",
+      "createdBy": "agent",
+      "creationSource": "mcp",
+      "type": "user_message",
+      "status": "running",
+      "title": null,
+      "text": "Run: pwd. Reply with the line, then end the turn.",
+      "textTruncated": false,
+      "nextTextOffset": null,
+      "updatedAt": "2026-10-21T18:59:17.598Z"
+    }
+  ],
+  "nextPosition": 0,
+  "hasMore": true
+}

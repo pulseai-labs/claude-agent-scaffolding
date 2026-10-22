@@ -1,0 +1,8 @@
+{
+  "name": "baton",
+  "version": "0.1.0",
+  "description": "A recipe-driven engine that launches model sessions on a host when a unit is due, waits on closed signals at no token cost, and merges pull requests only by the recipe's rule.",
+  "author": {
+    "name": "Pras"
+  }
+}

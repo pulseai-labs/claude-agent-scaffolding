@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+#
+# omp-t3-claim - launcher that applies a baton claim file before starting omp-t3.
+#
+# Looks up <state>/claims/<sha256 of the real cwd>.env. No claim: the instance's
+# environment is untouched. A claim with a bad line, or one that is not a regular file,
+# refuses to launch (exit 78).
+# A valid claim is exported, optionally drops T3's MCP extension, and is logged to
+# <state>/claims/lookup.log (T3 discards stderr).
+
+set -u
+
+OMP_T3="${BATON_OMP_T3:-$HOME/.local/bin/omp-t3}"
+state="${BATON_STATE_DIR:-$HOME/.local/state/baton}"
+
+cwd="$(realpath . 2>/dev/null)" || cwd="$PWD"
+
+# 1. T3's provider probe runs in $HOME: pass straight through, no lookup, no log.
+home_real="$(realpath "$HOME" 2>/dev/null)" || home_real="$HOME"
+if [ "$cwd" = "$home_real" ]; then
+  exec "$OMP_T3" "$@"
+fi
+
+claims="$state/claims"
+key="$(printf '%s' "$cwd" | sha256sum | cut -d' ' -f1)"
+claim="$claims/$key.env"
+
+drop=0
+dropped=0
+nonce=none
+
+log_line() {
+  local log="$claims/lookup.log" size
+  {
+    if [ -f "$log" ]; then
+      size="$(wc -c <"$log")"
+      if [ "$size" -gt 1048576 ]; then mv -f "$log" "$log.1"; fi
+    fi
+    printf '%s %s cwd %s drop %s dropped %s\n' \
+      "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$cwd" "$drop" "$dropped" >>"$log"
+  } 2>/dev/null || true
+}
+
+# 2. No claim: launch with the instance's environment untouched.
+if [ ! -e "$claim" ] && [ ! -L "$claim" ]; then
+  log_line none
+  exec "$OMP_T3" "$@"
+fi
+
+# 3. Validate every line before exporting anything. A claim that exists but is not a
+# regular file (a directory, FIFO, socket, device) or cannot be opened is broken, not
+# absent: refuse rather than launch with the instance's values. The -f check comes before
+# the open, so a FIFO is never opened and cannot hang the provider start.
+if [ ! -f "$claim" ]; then
+  log_line "invalid 0"
+  exit 78
+fi
+if ! { exec 3<"$claim"; } 2>/dev/null; then
+  log_line "invalid 0"
+  exit 78
+fi
+keys=() vals=()
+n=0
+first=1
+while IFS= read -r line || [ -n "$line" ]; do
+  n=$((n + 1))
+  if [ "$first" = 1 ] && [[ "$line" == "# baton "* ]]; then
+    nonce="${line#\# baton }"
+    first=0
+    continue
+  fi
+  first=0
+  [ -z "$line" ] && continue
+  k="${line%%=*}"
+  if [[ "$line" != *=* ]] || ! [[ "$k" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+    log_line "invalid $n"
+    exit 78
+  fi
+  case "$k" in
+    PATH|HOME|USER|SHELL|IFS|ENV|BASH_ENV|LD_PRELOAD|LD_LIBRARY_PATH)
+      log_line "invalid $n"
+      exit 78
+      ;;
+  esac
+  keys+=("$k")
+  vals+=("${line#*=}")
+done <&3
+exec 3<&-
+
+# 4. Export literally: no expansion, no quoting.
+for i in "${!keys[@]}"; do
+  export "${keys[$i]}=${vals[$i]}"
+  [ "${keys[$i]}" = OMP_T3_DROP_T3_MCP ] && [ "${vals[$i]}" = 1 ] && drop=1
+done
+
+# 5. Drop T3's MCP extension pair when asked.
+args=()
+if [ "$drop" = 1 ]; then
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --extension)
+        if [ "$#" -ge 2 ] && [ "$(basename -- "$2")" = pi-t3-mcp-extension.ts ]; then
+          dropped=$((dropped + 1)); shift 2; continue
+        fi
+        ;;
+      --extension=*)
+        if [ "$(basename -- "${1#--extension=}")" = pi-t3-mcp-extension.ts ]; then
+          dropped=$((dropped + 1)); shift; continue
+        fi
+        ;;
+    esac
+    args+=("$1")
+    shift
+  done
+else
+  args=("$@")
+fi
+
+# 6. Log and launch.
+log_line "$nonce"
+exec "$OMP_T3" "${args[@]+"${args[@]}"}"
