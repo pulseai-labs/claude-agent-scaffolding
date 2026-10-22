@@ -1,0 +1,3 @@
+# Spine close, second pass
+
+The spine PR is merged. Run `skill://close <spine>` through its second pass: record the landing, then the demo, bone registration, audit, retro and harvest. Commit the ledger with the close record.

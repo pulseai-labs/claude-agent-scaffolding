@@ -2,7 +2,8 @@
 // structurally: the claim every seat carries, the roles, where each stage launches, the
 // dispatch count and cap, the R7 gap re-entry, the land order, and the build slot.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { render, validate, type MergeStage, type Recipe, type SessionStage, type WaitStage } from "../src/recipe.ts";
 
@@ -187,5 +188,91 @@ describe("ossify-spine recipe", () => {
       const want = name === "implement" || name === "correct" ? ["session", "build"] : ["session"];
       expect([name, s.slots]).toEqual([name, want]);
     }
+  });
+});
+
+// The briefs each seat reads (baton/examples/ossify-spine/briefs/). Prose, so the pins are
+// the decisions a seat cannot do without: the never-wait line, the stop rule, the ledger
+// append, the file each stage's outcome waits on.
+const BRIEFS_DIR = join(import.meta.dir, "..", "examples", "ossify-spine", "briefs");
+const brief = (name: string): string => readFileSync(join(BRIEFS_DIR, name), "utf8");
+const NEVER_WAIT = "Never wait for CI, reviews or other sessions. End the turn; the dispatcher waits.";
+
+/** Each session stage's message problems against a brief directory: none means every message
+ *  names common.md first, then at least one more brief, and every named brief exists there. */
+function briefProblems(dir: string): string[] {
+  const problems: string[] = [];
+  for (const [name, s] of sessions(loadRecipe())) {
+    const named = [...s.message.matchAll(/\{param\.briefs\}\/([A-Za-z0-9_-]+\.md)/g)].map((m) => m[1]);
+    if (named[0] !== "common.md") problems.push(`${name}: common.md is not named first`);
+    if (named.length < 2) problems.push(`${name}: names no stage brief`);
+    for (const f of named) if (!existsSync(join(dir, f))) problems.push(`${name}: ${f} missing`);
+  }
+  return problems;
+}
+
+describe("ossify-spine briefs", () => {
+  test("every message names common.md and an existing brief", () => {
+    expect(briefProblems(BRIEFS_DIR)).toEqual([]);
+    // control: the same check fails on a copy of the directory with one brief removed
+    const copy = mkdtempSync(join(tmpdir(), "briefs-"));
+    try {
+      cpSync(BRIEFS_DIR, copy, { recursive: true });
+      rmSync(join(copy, "spine-review.md"));
+      expect(briefProblems(copy)).toEqual(["spine_review: spine-review.md missing"]);
+    } finally {
+      rmSync(copy, { recursive: true, force: true });
+    }
+  });
+
+  test("common carries the never-wait line", () => {
+    expect(brief("common.md")).toContain(NEVER_WAIT);
+    // one copy: every message names common.md, so no stage brief restates it (ruling P2)
+    const others = readdirSync(BRIEFS_DIR).filter((f) => f !== "common.md" && brief(f).includes("Never wait"));
+    expect(others).toEqual([]);
+  });
+
+  test("common carries the stop rule and the append-only ledger", () => {
+    const c = brief("common.md");
+    for (const pin of ["ADR", "bone", "skeleton", "when in doubt", "$SPINE_STOP_FILE", "$SPINE_LEDGER", ">>"]) {
+      expect([pin, c.includes(pin)]).toEqual([pin, true]);
+    }
+  });
+
+  test("the lane runs detached and writes through mv", () => {
+    const l = brief("lane.md");
+    for (const pin of ["--external-executor --detach", "mv", "rounds.done", "lane.done", "more than one target_repo"]) {
+      expect([pin, l.includes(pin)]).toEqual([pin, true]);
+    }
+    // the three keys the queue source reads beyond ossify's own record, plus issued_at
+    const queue = loadRecipe().sources.find((s) => s.stage === "implement")!;
+    for (const key of [queue.group_key, queue.order_key, "issued_at"]) {
+      expect([key, l.includes(`\`${key}\``)]).toEqual([key, true]);
+    }
+  });
+
+  test("close runs PR mode and never picks a recovery option", () => {
+    const c = brief("close.md");
+    expect(c).toContain("skill://close");
+    expect(c).toContain("--pr");
+    expect(c).toContain("Never pick a recovery option");
+  });
+
+  test("spine-open stops after the PR opens", () => {
+    const o = brief("spine-open.md");
+    expect(o).toContain("do not run work-pr");
+    const RECORD = '{"id":"spine-pr","group":0,"order":0,"pr_url":"<url>"}';
+    expect(o).toContain(RECORD);
+    // the record's keys are the ones the spine source reads
+    const spine = loadRecipe().sources.find((s) => s.stage === "spine_review")!;
+    const keys = Object.keys(JSON.parse(RECORD)).sort();
+    expect(keys).toEqual([spine.id_key, spine.group_key, spine.order_key, ...Object.values(spine.vars)].sort());
+  });
+
+  test("the reviewer writes a verdict line", () => {
+    const r = brief("spine-review.md");
+    expect(r).toContain("verdict: pass");
+    expect(r).toContain("verdict: block");
+    expect(r).toContain("head: ");
   });
 });
