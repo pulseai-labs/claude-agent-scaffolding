@@ -429,9 +429,9 @@ class RunTick {
         if (!ok) return this.parkRun(`invalid record ${file}`);
         const id = r![src.id_key] as string;
         seen.add(id);
-        const vars: Record<string, string> = {};
+        const vars: Record<string, string> = Object.create(null);
         for (const [name, key] of Object.entries(src.vars)) {
-          const v = r![key];
+          const v = own(r!, key);
           if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") vars[name] = String(v);
         }
         recs.push({

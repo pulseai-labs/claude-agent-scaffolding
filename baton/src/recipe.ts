@@ -340,6 +340,11 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     else if (!stageNames.has(stage)) err(path, `names no stage: "${stage}"`);
   };
 
+  // A var name keys the unit's vars map: an Object.prototype member there is dropped or shadowed.
+  const varKeys = (path: string, v: Obj) => {
+    for (const k of Object.keys(v)) if (isProtoName(k)) err(`${path}.${k}`, PROTO_NAME_ERROR);
+  };
+
   if (!Array.isArray(r.sources)) err("sources", "must be an array");
   else {
     r.sources.forEach((s, i) => {
@@ -349,6 +354,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
         if (!isStr(s[f])) err(`${p}.${f}`, "must be a string");
       }
       if (!isObj(s.vars) || !Object.values(s.vars).every(isStr)) err(`${p}.vars`, "must be an object of strings");
+      else varKeys(`${p}.vars`, s.vars);
       unitStage(`${p}.stage`, s.stage);
     });
   }
@@ -363,7 +369,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       unitStage(`${p}.stage`, s.stage);
       if (s.vars !== undefined && (!isObj(s.vars) || !Object.values(s.vars).every(isStr))) {
         err(`${p}.vars`, "must be an object of strings");
-      }
+      } else if (s.vars !== undefined) varKeys(`${p}.vars`, s.vars as Obj);
     });
   }
 

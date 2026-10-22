@@ -139,6 +139,22 @@ describe("validate", () => {
     expect(validate(ok).ok).toBe(true);
   });
 
+  test("an Object.prototype member is refused as a source or seed var name", () => {
+    for (const n of ["__proto__", "constructor", "toString"]) {
+      const src = relay();
+      Object.defineProperty(src.sources[0].vars, n, { value: "task", enumerable: true, writable: true, configurable: true });
+      expectError(src, `sources[0].vars.${n}: must not name an Object.prototype member`);
+      const sd = relay();
+      sd.seed[0].vars = JSON.parse(`{"${n}": "x"}`);
+      expectError(sd, `seed[0].vars.${n}: must not name an Object.prototype member`);
+    }
+    // adjacent control: ordinary var names, including ones containing such a member, pass
+    const ok = relay();
+    ok.sources[0].vars = { task: "task", proto_task: "task", constructors: "task" };
+    ok.seed[0].vars = { task: "x", toStrings: "y" };
+    expect(validate(ok).ok).toBe(true);
+  });
+
   test("own reads a map's own value and nothing from its prototype", () => {
     const m = JSON.parse('{"work": 2, "__proto__": 3}') as Record<string, number>;
     expect(own(m, "constructor")).toBeUndefined();

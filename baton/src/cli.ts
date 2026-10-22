@@ -134,7 +134,7 @@ async function armCmd(args: string[]): Promise<number> {
     const units: Record<string, UnitState> = {};
     recipe.seed.forEach((s, index) => {
       units[s.id] = {
-        id: s.id, group: 0, order: index, vars: s.vars ?? {}, stage: s.stage, launches: {}, stalls: 0,
+        id: s.id, group: 0, order: index, vars: Object.assign(Object.create(null), s.vars), stage: s.stage, launches: {}, stalls: 0,
       };
     });
     const run: RunState = {
