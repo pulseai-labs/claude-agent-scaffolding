@@ -244,6 +244,9 @@ async function unparkCmd(args: string[]): Promise<number> {
     }
     const unit = own(run.units, unitId);
     if (!unit) return fail(`no such unit: ${unitId}`);
+    // A park always ends the session first. A unit that still has one is running: moving or
+    // resetting it here would leave that session bound to state it was not launched in.
+    if (unit.session) return fail(`unit ${unitId} has a live session; it can be unparked once it parks`);
     if (to !== undefined) {
       const recipe = loadRecipe(run.dir);
       if (!Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);

@@ -226,6 +226,23 @@ async function armedWithParkedUnit() {
   return st;
 }
 
+test("unpark refuses a unit with a live session; control: the same unit with none unparks", async () => {
+  const st = await armedWithParkedUnit();
+  const run = runJson(st, "r1");
+  run.units.planner.session = { nonce: "r1/planner/planner/3", claim_nonce: "r1/planner/planner/3", launch_dir: "/tmp/x", thread_id: "t1", started: "t" };
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  for (const args of [["unpark", "r1", "planner"], ["unpark", "r1", "planner", "--to", "work"]]) {
+    expect((await runIn(st, ...args)).rc).toBe(2);
+    const u = runJson(st, "r1").units.planner;
+    expect(u.stage).toBe("planner");
+    expect(u.session?.nonce).toBe("r1/planner/planner/3");
+  }
+  delete run.units.planner.session;
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
+  expect(runJson(st, "r1").units.planner.stage).toBe("work");
+});
+
 test("unpark resets the stage counters and logs an event", async () => {
   const st = await armedWithParkedUnit();
   const r = await runIn(st, "unpark", "r1", "planner");
