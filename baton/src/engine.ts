@@ -243,8 +243,11 @@ class RunTick {
     await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}`);
   }
 
-  private async move(u: UnitState, o: Outcome): Promise<void> {
+  /** `scope` is the one the outcome's signals were read with (it carries `pr`). */
+  private async move(u: UnitState, o: Outcome, scope?: Scope): Promise<void> {
     if (o.to === "park") return this.park(u, "outcome");
+    // Rendered before anything is marked: a notice that cannot render leaves the unit where it was.
+    const note = o.notify === undefined ? undefined : render(o.notify, scope ?? this.scope(u));
     const from = u.stage;
     u.stage = o.to;
     this.entered.add(u.id);
@@ -259,9 +262,7 @@ class RunTick {
     this.save();
     this.ev("transition", { unit: u.id, from, to: o.to });
     this.report.transitioned.push(u.id);
-    if (o.notify !== undefined) {
-      await this.notify(`${this.run.id}/${u.id}/${o.to}/${this.nowIso()}`, render(o.notify, this.scope(u)));
-    }
+    if (note !== undefined) await this.notify(`${this.run.id}/${u.id}/${o.to}/${this.nowIso()}`, note);
   }
 
   /** Run hook argvs in order with no shell; false at the first non-zero. */
@@ -282,8 +283,11 @@ class RunTick {
     return this.run.dir;
   }
 
-  /** The first outcome whose signals all read true; "pending" when an undecided one comes first. */
-  private async firstOutcome(u: UnitState, outcomes: Outcome[], cwd: string): Promise<Outcome | "pending" | null> {
+  /**
+   * The first outcome whose signals all read true, with the scope they were read with (a `pr`
+   * signal sets `pr` on it); "pending" when an undecided one comes first.
+   */
+  private async firstOutcome(u: UnitState, outcomes: Outcome[], cwd: string): Promise<{ o: Outcome; scope: Scope } | "pending" | null> {
     const ctx: EvalCtx = {
       run: this.run, unit: u, scope: this.scope(u), cwd, forge: this.opts.forge, prViews: this.prViews,
     };
@@ -296,15 +300,15 @@ class RunTick {
         if (v === "pending") pending = true;
       }
       if (!matched) continue;
-      return pending ? "pending" : o;
+      return pending ? "pending" : { o, scope: ctx.scope };
     }
     return null;
   }
 
-  private async takeOutcome(u: UnitState, o: Outcome, hookCwd: string): Promise<void> {
-    if (!this.hooks(o.run, this.scope(u), hookCwd)) return this.park(u, "run failed");
+  private async takeOutcome(u: UnitState, m: { o: Outcome; scope: Scope }, hookCwd: string): Promise<void> {
+    if (!this.hooks(m.o.run, m.scope, hookCwd)) return this.park(u, "run failed");
     await this.endSession(u);
-    await this.move(u, o);
+    await this.move(u, m.o, m.scope);
   }
 
   /** Per-unit guard: a host error stops the tick; anything else parks only this unit. */

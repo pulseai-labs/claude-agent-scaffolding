@@ -11,6 +11,7 @@ import type { Forge } from "../src/forge.ts";
 import { HostDownError, LaunchError, type LaunchRequest } from "../src/host.ts";
 import { notifyOnce } from "../src/notify.ts";
 import { openStore, type RunState } from "../src/state.ts";
+import { FakeForge } from "./fake-forge.ts";
 import { FakeHost } from "./fake-host.ts";
 
 const T0 = Date.parse("2026-10-22T10:00:00.000Z");
@@ -1207,6 +1208,55 @@ test("a unit enters one stage per tick: a wait whose outcome already matches rea
   expect(runState().units.a.stage).toBe("gate");
   await doTick(); // control: the next tick reads it
   expect(runState().units.a.stage).toBe("done");
+});
+
+const PR = "https://github.com/o/r/pull/7";
+function mergedForge(): FakeForge {
+  const f = new FakeForge();
+  f.views.set(PR, { state: "MERGED", head: "abc123", base: "main", mergeable: "MERGEABLE", checks: "green" });
+  return f;
+}
+const prOutcome = (to: string) => ({
+  when: [{ pr: { url: ["echo", PR], test: "merged" } }], to,
+  run: [["touch", "{run.dir}/hook-{pr.head}"]], notify: "landed {pr.url} at {pr.head}",
+});
+
+test("a wait outcome's run hooks and notify render the pr its signal read", async () => {
+  await arm(recipe({ gate: { kind: "wait", outcomes: [prOutcome("done")] } }, ["a"]));
+  host = new FakeHost({});
+  await doTick({ forge: mergedForge() });
+  expect(runState().units.a.parked).toBeUndefined();
+  expect(runState().units.a.stage).toBe("done");
+  expect(existsSync(join(runDir(), "hook-abc123"))).toBe(true);
+  expect(notifyLines().some((l) => l.includes(`landed ${PR} at abc123`))).toBe(true);
+});
+
+test("a session outcome's run hooks and notify render the pr its signal read", async () => {
+  await arm(recipe({ work: sess({ outcomes: [prOutcome("done")] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  const forge = mergedForge();
+  await doTick({ forge });
+  host.advance();
+  at(1);
+  await doTick({ forge });
+  expect(runState().units.a.parked).toBeUndefined();
+  expect(runState().units.a.stage).toBe("done");
+  expect(existsSync(join(runDir(), "hook-abc123"))).toBe(true);
+  expect(notifyLines().some((l) => l.includes(`landed ${PR} at abc123`))).toBe(true);
+});
+
+test("control: an outcome with no pr signal cannot render {pr.url}, and parks where it was, unmoved", async () => {
+  await arm(recipe({
+    gate: { kind: "wait", outcomes: [{ when: [{ file: "{run.dir}/go" }], to: "next", notify: "moved {pr.url}" }] },
+    next: { kind: "wait", outcomes: [{ when: [{ file: "{run.dir}/never" }], to: "done" }] },
+  }, ["a"]));
+  host = new FakeHost({});
+  writeFileSync(join(runDir(), "go"), "ok");
+  await doTick({ forge: mergedForge() });
+  const u = runState().units.a;
+  expect(u.stage).toBe("gate");
+  expect(u.parked?.reason).toBe("error: no pr in scope");
+  expect(count("transition")).toBe(0);
 });
 
 test("every unit done marks the run done and notifies once", async () => {
