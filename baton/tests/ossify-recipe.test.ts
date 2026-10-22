@@ -256,11 +256,20 @@ describe("ossify-spine briefs", () => {
     }
   });
 
+  test("common turns an ossify halt into a stop", () => {
+    const c = brief("common.md");
+    expect(c).toContain("An ossify halt or refusal you cannot clear within your brief is a stop");
+    expect(c).toContain("copy the halt line into `$SPINE_STOP_FILE`");
+    // scoped to the seat's own commands: spine close's cleanup deletes merged work branches
+    expect(c).toContain("by your own command");
+  });
+
   test("the lane runs detached and writes through mv", () => {
     const l = brief("lane.md");
-    for (const pin of ["--external-executor --detach", "mv", "rounds.done", "lane.done", "more than one target_repo"]) {
+    for (const pin of ["--external-executor --detach", "rounds.done", "lane.done", "more than one target_repo", "do not run `/close`"]) {
       expect([pin, l.includes(pin)]).toEqual([pin, true]);
     }
+    expect(l).toMatch(/\bmv\b/);
     // the three keys the queue source reads beyond ossify's own record, plus issued_at
     const queue = loadRecipe().sources.find((s) => s.stage === "implement")!;
     for (const key of [queue.group_key, queue.order_key, "issued_at"]) {
