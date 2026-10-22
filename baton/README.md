@@ -82,14 +82,14 @@ update moves the cache, and a run armed on the old path would lose its briefs.
     cp -r <plugin root>/examples/ossify-spine ~/baton-recipes/ossify-spine
     baton arm ~/baton-recipes/ossify-spine/recipe.json --run r0-s6 \
       --param spine=r0.s6 \
-      --param spine_branch=<output of: oss branch_name r0.s6 SLUG> \
+      --param spine_branch=<output of: oss branch_name <spine> <slug>> \
       --param spine_dir=<absolute AI-workspace spine directory> \
       --param ai_root=<AI workspace root> \
       --param ai_project=<T3 project title of the AI workspace> \
       --param repo=<canonical root> \
       --param project=<T3 project title of the canonical> \
-      --param state_file=<output of: oss state_path> \
-      --param oss=<absolute path of oss> \
+      --param state_file=<output of: oss state_path, run in the AI workspace root> \
+      --param oss=<absolute path of <ossify plugin root>/bin/oss> \
       --param briefs=$HOME/baton-recipes/ossify-spine/briefs \
       --param via=omp-deepseek-cpa
 
@@ -104,6 +104,20 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - **A spine PR conflict parks `spine-pr`** in `spine_wait`. Resolve it on the spine branch in the
   canonical root (merge the base in; never rebase or force-push), push, delete
   `out/spine-pr/review.md`, then `baton unpark <run> spine-pr --to spine_review`.
+- **The spine PR ack.** On the "merge it by hand" notice, read the PR's needs-you list, then merge
+  it; baton sees the merge and runs the second spine close.
+- **`--to spine_work` is refused while `spine-pr` has a live session** (a review is running): wait
+  for the review to end, then unpark.
+- **A `land` park** names its reason. `run failed`: the canonical root is not on the spine branch
+  (or the fast-forward failed); check the spine branch out there, then `baton unpark <run> <wi>`.
+  `outcome`: the item PR's checks are red or it conflicts; fix it on the item branch, then unpark.
+  `pr closed`: reopen the PR and unpark, or finish the item by hand. `not landed`: the PR merged
+  but its head is not on the spine branch (a squash or rebase); the recipe cannot record that
+  landing, so finish the item by hand.
+- **A run-level park** (`invalid record …`): fix or remove the record file, then `baton unpark <run>`.
+- **A seat stopped mid-work leaves its worktree dirty.** work-item's Gate 3 refuses a dirty
+  worktree on a plain `unpark` of `implement`, and a correction's packet no longer matches the
+  staged tree: clean the worktree, or finish the work by hand, before you unpark.
 - **A cheap build**: implementers and corrections hold the `build` slot (1 by default), so they run
   one at a time. Raise `slots.build` in the config to run more at once.
 

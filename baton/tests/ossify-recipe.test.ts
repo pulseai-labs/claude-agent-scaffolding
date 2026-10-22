@@ -279,6 +279,10 @@ describe("ossify-spine briefs", () => {
     }
   });
 
+  test("a gap re-entry rewrites only its own request", () => {
+    expect(brief("regap.md")).toContain("writes **only this item's** replacement request");
+  });
+
   test("close runs PR mode and never picks a recovery option", () => {
     const c = brief("close.md");
     expect(c).toContain("skill://close");

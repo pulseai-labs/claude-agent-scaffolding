@@ -488,8 +488,8 @@ test("a merged item with the canonical root off the spine branch parks", async (
 
   expect(r.forge.merges.map((m) => m.url)).toEqual([prUrl(W1)]); // merged on the remote
   expect(unit(W1).stage).toBe("land");
-  expect(unit(W1).parked?.reason).toBe("run failed");
-  expect(git(repo, "rev-parse", "main")).toBe(mainBefore);
+  expect(unit(W1).parked?.reason).toBe("run failed"); // generic: any run_after argv failing reads the same
+  expect(git(repo, "rev-parse", "main")).toBe(mainBefore); // load-bearing: nothing fast-forwarded main
   expect(git(repo, "symbolic-ref", "--short", "HEAD")).toBe("main");
   expect(item(W1).status).toBe("active");
 });
