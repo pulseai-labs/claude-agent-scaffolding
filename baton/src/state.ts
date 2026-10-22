@@ -86,22 +86,45 @@ export function openStore(dir: string = stateDir()): Store {
     }
   }
 
+  function ownsLock(): boolean {
+    try {
+      return readFileSync(lockPath, "utf8").trim() === String(process.pid);
+    } catch {
+      return false;
+    }
+  }
+
   return {
     dir,
     runDir,
     async withLock<T>(fn: () => Promise<T>): Promise<T | "busy"> {
       mkdirSync(dir, { recursive: true, mode: 0o700 });
       if (!tryCreateLock()) {
-        const holder = Number.parseInt(readFileSync(lockPath, "utf8").trim(), 10);
-        if (pidAlive(holder)) return "busy";
-        // Stale: the holder is dead. Remove and retry once; losing the race means busy.
-        try { unlinkSync(lockPath); } catch { /* another taker removed it */ }
-        if (!tryCreateLock()) return "busy";
+        let text = "";
+        let taken = false;
+        try {
+          text = readFileSync(lockPath, "utf8").trim();
+        } catch (e) {
+          if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+          // The holder released between our open and our read: take it once, else busy.
+          if (!tryCreateLock()) return "busy";
+          taken = true;
+        }
+        if (!taken) {
+          // An empty or unparseable pid is a holder mid-write, not a dead one: busy.
+          if (!/^[0-9]+$/.test(text) || pidAlive(Number.parseInt(text, 10))) return "busy";
+          // Stale: the holder is dead. Remove and retry once; losing the race means busy.
+          try { unlinkSync(lockPath); } catch { /* another taker removed it */ }
+          if (!tryCreateLock()) return "busy";
+        }
       }
       try {
         return await fn();
       } finally {
-        try { unlinkSync(lockPath); } catch { /* already gone */ }
+        // Release only a lock that still holds our pid; another process may have taken it over.
+        if (ownsLock()) {
+          try { unlinkSync(lockPath); } catch { /* already gone */ }
+        }
       }
     },
     readRun(id: string): RunState {

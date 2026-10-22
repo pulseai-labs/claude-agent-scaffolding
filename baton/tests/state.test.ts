@@ -64,3 +64,33 @@ test("event appends one JSON line with an at stamp", () => {
   expect(lines.map((l: string) => JSON.parse(l).kind)).toEqual(["launched", "stall"]);
   expect(typeof JSON.parse(lines[0]).at).toBe("string");
 });
+
+test("a lock that vanishes between open and read does not throw", async () => {
+  const dir = tmp();
+  // A dangling symlink: the exclusive create sees EEXIST, the read sees ENOENT.
+  require("node:fs").symlinkSync(join(dir, "gone"), join(dir, "lock"));
+  expect(await openStore(dir).withLock(async () => "no")).toBe("busy");
+});
+
+test("an empty lock file reads busy, never stale", async () => {
+  const dir = tmp();
+  writeFileSync(join(dir, "lock"), "");
+  expect(await openStore(dir).withLock(async () => "no")).toBe("busy");
+  writeFileSync(join(dir, "lock"), "not-a-pid");
+  expect(await openStore(dir).withLock(async () => "no")).toBe("busy");
+});
+
+test("release leaves a lock whose pid is not ours", async () => {
+  const dir = tmp();
+  const live = Bun.spawn(["sleep", "30"]);
+  try {
+    const s = openStore(dir);
+    expect(await s.withLock(async () => {
+      writeFileSync(join(dir, "lock"), String(live.pid)); // another process took over
+      return "ran";
+    })).toBe("ran");
+    expect(require("node:fs").readFileSync(join(dir, "lock"), "utf8")).toBe(String(live.pid));
+  } finally {
+    live.kill();
+  }
+});
