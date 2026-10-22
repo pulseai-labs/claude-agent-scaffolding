@@ -539,7 +539,9 @@ decided by the command that started you and never changes mid-spine:
 '.work_items[] | select(.id=="<wi-id>") | .dispatches // 0'`. At 3 or more, do
 not dispatch — escalate as §6's cap says. Otherwise run `oss
 work_item_dispatched <wi-id>`, then dispatch. This holds for the first run,
-every clarification re-dispatch and every broken-envelope retry.
+every clarification re-dispatch and every broken-envelope retry — except under `--detach`,
+where the lane counts nothing and the caller counts each execution
+(`external-executor.md` §2b).
 
 ### The default dispatch
 

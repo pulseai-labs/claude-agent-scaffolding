@@ -4,7 +4,7 @@ Score each 1-5 (5 criteria). Pass = all ≥4. `expected_outcome` vocabulary:
 `nested` | `external` | `halt` | `gap-loop`. `nested` = the lane dispatches its
 own `ossify:implementer-agent` per work item. `external` = the lane hands the
 round to the caller-supplied in-session procedure and processes the results it
-returns. `halt` = the lane stops the round, naming the failing check, without
+returns. `detach` = the lane runs in detached mode (`--external-executor --detach`): it writes the round's requests, counts nothing and ends. `halt` = the lane stops the round, naming the failing check, without
 falling back to the nested path. `gap-loop` = the item re-enters
 `round-orchestration.md` §6 (clarifications appended to the handoff, then one
 new single-item request through the caller, under the 3-iteration cap) rather
@@ -92,6 +92,15 @@ that fact and decides on it is.
    lenses itself and there is no second engine to route to. Inventing a new
    return mode, sending the correction to a fresh executor, or routing Layer 4
    to a multi-agent pass of any kind is a wrong answer.
+
+**Detached mode (fixtures under `fixtures/external-executor-detach/`, scored against this
+rubric).** Criterion 1 additionally requires: `--detach` is valid only as the third token
+after `--external-executor`, and without the flag the lane keeps counting each request it
+issues (dispatches 1, 2, 3 across three sessions) and stays for the results. Under `--detach`
+the lane calls `oss work_item_dispatched` in no session, the §5b gaps replacement included;
+the caller counts each execution, the first one included; and each lane session ends after
+invoking the procedure once, without running result validation, closing or merging. Counting
+under `--detach`, or ending the session without `--detach`, is a wrong answer.
 
 ## Output format
 `{"scores":{"mode_split":N,"round_sequencing":N,"result_validation":N,"gaps_routing":N,"correction_and_layer4":N},"pass":true|false,"notes":"<one sentence; where any criterion scores below 5, name the cause>"}`. Pass = all ≥4. JSON only.

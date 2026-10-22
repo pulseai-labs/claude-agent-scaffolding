@@ -1594,7 +1594,7 @@ for _pair in "$_RO|halt: spine_inventory could not read the spine" "$_RO|The cou
   _pin "$_r" "$(basename "$_f") does not state '$_lit' (1.14.0 re-entry)"
 done
 # 1.15.0 - the run-spine grammar rails moved with the body into the skill (Rule 2).
-for _lit in 'Exactly two command shapes are accepted' 'refuse before the spine-branch cut, naming' 'refuse rather than guess'; do
+for _lit in 'Exactly three command shapes are accepted' 'refuse before the spine-branch cut, naming' 'refuse rather than guess'; do
   _r=1; grep -Fq -- "$_lit" "$_RS" && _r=0
   _pin "$_r" "skills/run-spine/SKILL.md does not state '$_lit' (1.15.0 grammar rails)"
 done

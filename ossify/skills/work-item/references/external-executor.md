@@ -77,7 +77,8 @@ caller counts each execution the lane did not request** — a correction — wit
 the same verb, and checks the way the lane does: read `dispatches` first; at 3
 or more, offer halt only, never a fourth execution; otherwise call
 `work_item_dispatched`, then run the correction. The count lives in state, so a
-caller session that hands off mid-round does not reset it.
+caller session that hands off mid-round does not reset it. Under `--detach`
+the lane counts nothing; §2b says who does.
 
 **A staged result at request time.** On re-entry a request can name a worktree
 that already holds a staged result with its `report.md` at the handoff's report
@@ -97,6 +98,43 @@ any other result. A caller that predates this rule launches an implementer into
 a staged worktree, and the implementer's Gate 3 returns a well-formed
 `gaps-surfaced` naming the dirty tree. That costs one dispatch, never a wrong
 merge.
+
+---
+
+## 2b. Detached mode
+
+`/run-spine <spine-id> --external-executor --detach`. `--detach` is valid only
+as the third token, after `--external-executor`; anything else is a refusal
+before the spine-branch cut, exactly as `run-spine`'s closed grammar says.
+
+The lane runs §2 through §4 unchanged, builds the round's requests (§3 record,
+unchanged), invokes the caller-supplied procedure once, and **ends the
+session**. It does not wait for results, does not run §5a, §6 or §7, and does
+not close or merge any item.
+
+**Counting.** In this mode the lane counts no request, the §5b gaps replacement
+included; the caller counts each execution, the first one included, with §2a's
+check: read `dispatches`; at 3 or more, offer halt only; otherwise call
+`oss work_item_dispatched <wi-id>`, then execute. Under `--detach` the lane
+never calls `oss work_item_dispatched`.
+
+**Gaps.** The caller re-enters the lane with the item's §5b gaps record in
+scope. The lane validates it as §5b says, appends the clarifications to the
+handoff (`round-orchestration.md` §6), issues one replacement request, counts
+nothing, and ends.
+
+**Close belongs to the caller** (`/close <wi-id>`, with or without `--pr`). A
+`close-finished` row gets no request in this mode: the caller closes it.
+
+**The round barrier.** On re-entry, if round *R* holds items that are `active`
+with no request to issue (`close-finished`), the lane reports them and ends. It
+never halts for them.
+
+| Row on re-entry | Under `--detach` |
+|---|---|
+| a planned item | request issued, nothing counted; the lane ends |
+| a gaps record in scope | one replacement request, nothing counted; the lane ends |
+| `close-finished` | no request; reported; the caller closes it |
 
 ---
 
