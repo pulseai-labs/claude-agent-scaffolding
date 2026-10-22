@@ -243,11 +243,9 @@ class RunTick {
     await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}`);
   }
 
-  /** `scope` is the one the outcome's signals were read with (it carries `pr`). */
-  private async move(u: UnitState, o: Outcome, scope?: Scope): Promise<void> {
+  /** `note` is the outcome's notice, rendered by the caller before any side effect. */
+  private async move(u: UnitState, o: Outcome, note?: string): Promise<void> {
     if (o.to === "park") return this.park(u, "outcome");
-    // Rendered before anything is marked: a notice that cannot render leaves the unit where it was.
-    const note = o.notify === undefined ? undefined : render(o.notify, scope ?? this.scope(u));
     const from = u.stage;
     u.stage = o.to;
     this.entered.add(u.id);
@@ -288,10 +286,12 @@ class RunTick {
    * signal sets `pr` on it); "pending" when an undecided one comes first.
    */
   private async firstOutcome(u: UnitState, outcomes: Outcome[], cwd: string): Promise<{ o: Outcome; scope: Scope } | "pending" | null> {
-    const ctx: EvalCtx = {
-      run: this.run, unit: u, scope: this.scope(u), cwd, forge: this.opts.forge, prViews: this.prViews,
-    };
     for (const o of outcomes) {
+      // Each outcome reads on its own scope: a `pr` set by an outcome that did not match never
+      // reaches another outcome's signals, hooks or notice.
+      const ctx: EvalCtx = {
+        run: this.run, unit: u, scope: this.scope(u), cwd, forge: this.opts.forge, prViews: this.prViews,
+      };
       let pending = false;
       let matched = true;
       for (const sig of o.when) {
@@ -306,9 +306,12 @@ class RunTick {
   }
 
   private async takeOutcome(u: UnitState, m: { o: Outcome; scope: Scope }, hookCwd: string): Promise<void> {
+    // Rendered before any side effect: a notice that cannot render parks the unit with no hook
+    // run, its session still in place for the park to end, and no move.
+    const note = m.o.notify === undefined ? undefined : render(m.o.notify, m.scope);
     if (!this.hooks(m.o.run, m.scope, hookCwd)) return this.park(u, "run failed");
     await this.endSession(u);
-    await this.move(u, m.o, m.scope);
+    await this.move(u, m.o, note);
   }
 
   /** Per-unit guard: a host error stops the tick; anything else parks only this unit. */

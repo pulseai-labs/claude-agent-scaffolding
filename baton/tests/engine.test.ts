@@ -1259,6 +1259,45 @@ test("control: an outcome with no pr signal cannot render {pr.url}, and parks wh
   expect(count("transition")).toBe(0);
 });
 
+test("a pr read by an outcome that did not match never reaches the outcome that did", async () => {
+  await arm(recipe({
+    gate: {
+      kind: "wait",
+      outcomes: [
+        { when: [{ pr: { url: ["echo", PR], test: "open" } }], to: "done" }, // reads the PR, MERGED: no match
+        { when: [{ file: "{run.dir}/go" }], to: "done", run: [["touch", "{run.dir}/hook-{pr.head}"]], notify: "moved {pr.url}" },
+      ],
+    },
+  }, ["a"]));
+  host = new FakeHost({});
+  writeFileSync(join(runDir(), "go"), "ok");
+  await doTick({ forge: mergedForge() });
+  const u = runState().units.a;
+  expect(u.stage).toBe("gate");
+  expect(u.parked?.reason).toBe("error: no pr in scope");
+  expect(existsSync(join(runDir(), "hook-abc123"))).toBe(false);
+  expect(notifyLines().some((l) => l.includes(PR))).toBe(false);
+});
+
+test("a notice that cannot render parks before any hook runs or the session ends", async () => {
+  await arm(recipe({
+    work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "done", run: [["touch", "{run.dir}/hook"]], notify: "moved {pr.url}" }] }),
+  }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  const u = runState().units.a;
+  expect(u.stage).toBe("work");
+  expect(u.parked?.reason).toBe("error: no pr in scope");
+  expect(existsSync(join(runDir(), "hook"))).toBe(false);
+  expect(count("transition")).toBe(0);
+  // the park, not the outcome, ends the session: one release, the claim gone
+  expect(host.releases.length).toBe(1);
+  expect(claimFiles()).toEqual([]);
+});
+
 test("every unit done marks the run done and notifies once", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
