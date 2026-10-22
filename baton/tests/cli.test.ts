@@ -226,21 +226,28 @@ async function armedWithParkedUnit() {
   return st;
 }
 
-test("unpark refuses a unit with a live session; control: the same unit with none unparks", async () => {
+test("unpark refuses a running unit (session, not parked); control: a parked unit unparks even with a session record", async () => {
   const st = await armedWithParkedUnit();
   const run = runJson(st, "r1");
-  run.units.planner.session = { nonce: "r1/planner/planner/3", claim_nonce: "r1/planner/planner/3", launch_dir: "/tmp/x", thread_id: "t1", started: "t" };
+  const session = { nonce: "r1/planner/planner/3", claim_nonce: "r1/planner/planner/3", launch_dir: "/tmp/x", thread_id: "t1", started: "t" };
+  run.units.planner.session = session;
+  delete run.units.planner.parked;
   writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  const events = () => readFileSync(join(st, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n").length;
+  const before = events();
   for (const args of [["unpark", "r1", "planner"], ["unpark", "r1", "planner", "--to", "work"]]) {
     expect((await runIn(st, ...args)).rc).toBe(2);
     const u = runJson(st, "r1").units.planner;
     expect(u.stage).toBe("planner");
+    expect(u.stalls).toBe(3);
     expect(u.session?.nonce).toBe("r1/planner/planner/3");
   }
-  delete run.units.planner.session;
+  expect(events()).toBe(before);
+  // control: parked, with a session record left behind (older state, a hand edit) — not refused
+  run.units.planner.parked = { reason: "stalled", at: "t" };
   writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
-  expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
-  expect(runJson(st, "r1").units.planner.stage).toBe("work");
+  expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+  expect(runJson(st, "r1").units.planner.parked).toBeUndefined();
 });
 
 test("unpark resets the stage counters and logs an event", async () => {

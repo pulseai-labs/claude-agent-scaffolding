@@ -39,6 +39,9 @@ days and the re-approval is manual: `baton t3 token-status` shows the days left.
     baton t3 login | token-status | call <tool> <json-object>
     baton timer install|remove
 
+`unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
+with rc 2.
+
 ## State and config
 
 State lives in `${BATON_STATE_DIR:-~/.local/state/baton}`: `runs/<id>/run.json` and
