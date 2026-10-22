@@ -16,6 +16,8 @@ export type Session = {
   /** The project and cwd the stage rendered at launch; absent in older state (re-rendered then). */
   project?: string;
   cwd?: string;
+  /** The unit's vars at launch; a successor inherits them. Absent in older state (u.vars then). */
+  vars?: Record<string, string>;
   thread_id?: string;
   claim_key: string;
   launched_at: string;

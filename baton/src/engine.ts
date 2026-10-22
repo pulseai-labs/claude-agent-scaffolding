@@ -172,7 +172,9 @@ class RunTick {
   private scope(u: UnitState, extra: Partial<Scope> = {}): Scope {
     return {
       param: this.run.params,
-      unit: { id: u.id, group: String(u.group), order: u.order, vars: u.vars },
+      // A live session renders with the vars it launched with; a rewritten record applies from
+      // the next launch.
+      unit: { id: u.id, group: String(u.group), order: u.order, vars: u.session?.vars ?? u.vars },
       run: { id: this.run.id, dir: this.run.dir, group: String(this.group()) },
       attempt: own(u.launches, u.stage) ?? 0,
       ...extra,
@@ -606,7 +608,7 @@ class RunTick {
     const now = this.nowIso();
     const s: Session = {
       nonce: n, claim_nonce: old.claim_nonce, launch_dir: old.launch_dir, claim_key: old.claim_key,
-      ...this.launchedWith(stage, scope, old),
+      ...this.launchedWith(stage, scope, old), vars: old.vars,
       launched_at: now, last_progress_at: now, progress_mark: this.progressMark(stage, scope, ""), successor_of: old.nonce,
     };
     delete u.quiet_since;
@@ -779,6 +781,7 @@ class RunTick {
     const now = this.nowIso();
     const s: Session = {
       nonce: nn, claim_nonce: nn, launch_dir: dir, claim_key: key, project, cwd,
+      vars: Object.assign(Object.create(null), u.vars),
       launched_at: now, last_progress_at: now, progress_mark: this.progressMark(stage, scope, ""),
     };
     const req: LaunchRequest = {

@@ -3,7 +3,7 @@ import {
   chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { claimKey, claimPath, liveClaim } from "../src/claims.ts";
 import { main } from "../src/cli.ts";
 import { exitCode, tick, type TickReport } from "../src/engine.ts";
@@ -861,6 +861,7 @@ test("a successor after a record rewrite launches in the pinned project, and a r
   const s = runState().units.a.session!;
   expect(s.successor_of).toBe("r1/a/work/1");
   expect([s.project, s.cwd]).toEqual(["p1", join(root, "s1")]);
+  expect(s.vars).toEqual({ slug: "s1", project: "p1" }); // the successor inherits the launch's vars
   // a successor the host refuses releases the launched directory in the launched project
   host.advance();
   writeFileSync(join(runDir(), "h", "a"), `${iso(3)} handed-off /tmp/hand2 a.md\n`);
@@ -888,6 +889,67 @@ test("outcome signals of a rewritten record run in the cwd the session launched 
   expect(runState().units.a.stage).toBe("done");
 });
 
+function snapshotRecipe(to = "done") {
+  const rec = pinnedRecipe();
+  Object.assign(rec.stages.work as Record<string, unknown>, {
+    stop_file: "{run.dir}/stop/{unit.vars.slug}",
+    watch: ["{run.dir}/watch/{unit.vars.slug}"],
+    outcomes: [{ when: [{ file: "{run.dir}/out/{unit.vars.slug}.done" }], to }],
+  });
+  return rec;
+}
+async function launchedThenRewritten(rec: unknown, b: { ticks: number; end: "completed" }) {
+  await arm(rec);
+  for (const d of ["s1", "s2"]) mkdirSync(join(root, d), { recursive: true });
+  host = new FakeHost({ work: b });
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s1", project: "p1" });
+  await doTick();
+  record("a.json", { id: "a", group: 1, order: 1, slug: "s2", project: "p2" });
+}
+const put = (rel: string) => {
+  mkdirSync(dirname(join(runDir(), rel)), { recursive: true });
+  writeFileSync(join(runDir(), rel), "x");
+};
+
+test("a live session reads its stop file from the vars it launched with", async () => {
+  await launchedThenRewritten(snapshotRecipe(), { ticks: 100, end: "completed" });
+  at(1);
+  await doTick(); // reads the rewritten record
+  expect(runState().units.a.vars.slug).toBe("s2");
+  put("stop/s1");
+  at(2);
+  await doTick();
+  expect(runState().units.a.parked?.reason).toBe("stop");
+  expect(runState().units.a.session).toBeUndefined();
+});
+
+test("a live session reads its watch paths from the vars it launched with", async () => {
+  await launchedThenRewritten(snapshotRecipe(), { ticks: 100, end: "completed" });
+  host.advance();
+  at(1);
+  await doTick();
+  const before = runState().units.a.session!.last_progress_at;
+  put("watch/s1");
+  require("node:fs").utimesSync(join(runDir(), "watch", "s1"), new Date(T0 + 5 * 60_000), new Date(T0 + 5 * 60_000));
+  at(3);
+  await doTick();
+  expect(runState().units.a.session!.last_progress_at).not.toBe(before);
+  expect(runState().units.a.session!.last_progress_at).toBe(iso(3));
+});
+
+test("a live session reads its outcome file from the vars it launched with; the next launch takes the new vars", async () => {
+  await launchedThenRewritten(snapshotRecipe("work"), { ticks: 1, end: "completed" });
+  put("out/s1.done");
+  host.advance();
+  at(1);
+  await doTick();
+  expect(count("transition")).toBe(1);
+  at(2);
+  await doTick();
+  expect(host.launches.map((l) => [l.request.project, l.request.cwd])).toEqual([["p1", join(root, "s1")], ["p2", join(root, "s2")]]);
+  expect(runState().units.a.session!.vars).toEqual({ slug: "s2", project: "p2" });
+});
+
 test("a session from older state, without the pinned fields, re-renders project and cwd", async () => {
   await arm(pinnedRecipe());
   mkdirSync(join(root, "s1"), { recursive: true });
@@ -897,6 +959,7 @@ test("a session from older state, without the pinned fields, re-renders project 
   const run = runState();
   delete run.units.a.session!.project;
   delete run.units.a.session!.cwd;
+  delete run.units.a.session!.vars; // older state has no vars snapshot either: u.vars apply
   store().writeRun(run);
   host.advance();
   at(1);
