@@ -2,6 +2,18 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.6 — 2026-10-22
+
+- **Manual: an Agent SDK prompt is a message from the operator** (#774, operator ruling 2026-10-22). T3 Code
+  drives Claude Code through the Agent SDK, so every message the operator types reaches molt as an `sdk`
+  prompt. The manual count reset only on `composer` or `bridge`, so in T3 a session paused after two molts
+  and the operator's replies never resumed it. An `sdk` prompt now resets the count and lifts the pause.
+  A plugin prompt (a seed, a status turn) still does not.
+- **A pause reaches the agent and the operator.** A pause showed only in the band, a toast and the status
+  line, which an SDK host never draws. The agent now gets a context line at each prompt while paused: the
+  handoff did not happen, and the operator must send a message. A manual pause also rings the record's
+  bell, as an autopilot pause does, read by a new `recordBell` (`parseAutonomic` stays identical to seat-mods' copy).
+
 ## 0.3.5 — 2026-10-18
 
 - **Naming: the crew references say `crew`** (crew 0.3.0's rename, spec §4.6). The two README

@@ -26,6 +26,17 @@ export function parseLineage(text: string | undefined): Lineage | undefined {
 
 export type Autonomic = { mode: 'manual' | 'autopilot'; bell?: string }
 
+// The bell in autonomic's record, whatever the mode: a manual pause rings it too, for an operator
+// who may not be watching. parseAutonomic stays byte-identical to seat-mods' copy.
+export function recordBell(text: string | undefined): string | undefined {
+  try {
+    const v = JSON.parse(text ?? '') as { bell?: unknown }
+    return typeof v.bell === 'string' && v.bell.trim() !== '' ? v.bell : undefined
+  } catch {
+    return undefined
+  }
+}
+
 // The autonomic plugin's session record (spec §1). Anything unreadable is manual: the
 // fail direction gives the operator more asks, never fewer.
 export function parseAutonomic(text: string | undefined): Autonomic {

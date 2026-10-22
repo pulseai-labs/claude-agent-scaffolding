@@ -83,7 +83,8 @@ describe('a molt from a marker', () => {
     at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     await $.classic.SessionStart(CLEAR('s2'))
-    for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'sdk' } } as never)
+    w.rejectSeeds = false   // the seed is refused; the ticks after it are plugin prompts, not the operator
+    for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'plugin' } } as never)
     expect((w.notices.at(-1) as { tone?: string } | null)?.tone).toBe('warn')
   })
   test('a rejected seed leaves the warning, not "resumed"', async ($, on) => {
@@ -94,7 +95,8 @@ describe('a molt from a marker', () => {
     at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     await $.classic.SessionStart(CLEAR('s2'))
-    for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'sdk' } } as never)
+    w.rejectSeeds = false   // the seed is refused; the ticks after it are plugin prompts, not the operator
+    for (let i = 0; i < 5; i++) await $.prompt.submit({ text: 'tick', wait: false, origin: { kind: 'plugin' } } as never)
     expect((w.notices.at(-1) as { tone?: string } | null)?.tone).toBe('warn')
   })
   test('a staged edit of a markdown file past soft is not the handoff', async ($, on) => {
@@ -266,6 +268,56 @@ describe('loop guards', () => {
       await $.classic.SessionStart(CLEAR(`${id}x`))
     }
     expect(w.clears).toBe(3)
+  })
+  // T3 Code and other Agent SDK hosts deliver the operator's message as an `sdk` prompt: a
+  // count that reset only on `composer` or `bridge` paused such a session for good.
+  test('manual: an Agent SDK message resets the count and lifts a pause', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
+    at(w, 67)
+    for (const id of ['s1', 's2']) {
+      w.clearTo.push(`${id}x`)
+      w.session.id = id
+      await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+      await $.classic.SessionStart(CLEAR(`${id}x`))
+    }
+    w.session.id = 's3'
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(2)
+    w.clearTo.push('s3x')
+    await $.prompt.submit({ text: 'go on', wait: false, origin: { kind: 'sdk' } } as never)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(3)
+  })
+  test('manual: a plugin prompt does not reset the count (control)', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
+    at(w, 67)
+    for (const id of ['s1', 's2']) {
+      w.clearTo.push(`${id}x`)
+      w.session.id = id
+      await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+      await $.classic.SessionStart(CLEAR(`${id}x`))
+    }
+    w.session.id = 's3'
+    w.clearTo.push('s3x')
+    await $.prompt.submit({ text: 'status', wait: false, origin: { kind: 'plugin' } } as never)
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.clears).toBe(2)
+  })
+  test('manual: a pause rings the record\'s bell and tells the agent at its next prompt', async ($, on) => {
+    const w = world(on, { files: { [H]: '#', '/home/u/.claude/state/autonomic/sessions/s3.json': '{"mode":"manual","bell":"ring-me"}' } })
+    at(w, 67)
+    for (const id of ['s1', 's2']) {
+      w.clearTo.push(`${id}x`)
+      w.session.id = id
+      await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+      await $.classic.SessionStart(CLEAR(`${id}x`))
+    }
+    w.session.id = 's3'
+    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.bellRuns.length).toBe(1)
+    await $.prompt.submit({ text: 'status', wait: false, origin: { kind: 'plugin' } } as never)
+    expect(w.contexts.at(-1) ?? '').toContain('the handoff did not happen')
+    expect(w.contexts.at(-1) ?? '').toContain(H)
   })
   test('autopilot: a molt with no progress since the last one pauses and rings the bell', async ($, on) => {
     const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
