@@ -781,6 +781,44 @@ test("auth error notifies once per day", async () => {
   expect(notifyLines().length).toBe(2);
 });
 
+test("a launch whose request cannot render parks with nothing bound and no claim written", async () => {
+  for (const field of ["title", "instance", "model", "message"]) {
+    fresh();
+    await arm(recipe({ work: sess({ [field]: "x {pr.head}" }) }, ["a"]));
+    host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+    let binds = 0;
+    host.bindDir = (_p, cwd) => { binds++; return cwd; };
+    await doTick();
+    const u = runState().units.a;
+    expect(u.parked?.reason).toContain("no pr in scope");
+    expect(u.session).toBeUndefined();
+    expect(binds).toBe(0);
+    expect(claimFiles()).toEqual([]);
+    expect(host.launches).toHaveLength(0);
+  }
+  // a record lacking a var the message uses parks the same way
+  fresh();
+  const rec = sourced();
+  (rec.stages.work as { message: string }).message = "Do {unit.vars.task}";
+  await arm(rec);
+  mkdirSync(join(root, "w", "a"), { recursive: true });
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  let binds = 0;
+  host.bindDir = (_p, cwd) => { binds++; return cwd; };
+  record("a.json", { id: "a", group: 1, order: 1 });
+  await doTick();
+  expect(runState().units.a.parked?.reason).toContain('unknown unit var "task"');
+  expect(binds).toBe(0);
+  expect(claimFiles()).toEqual([]);
+  // control: with the var present it renders, binds, claims and launches
+  record("a.json", { id: "a", group: 1, order: 1, task: "t" });
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  await doTick();
+  expect(binds).toBe(1);
+  expect(claimFiles()).toHaveLength(1);
+  expect(host.launches.map((l) => l.request.message)).toEqual(["Do t"]);
+});
+
 // ---- sources -------------------------------------------------------------------------
 
 function sourced(waitOutcomes?: unknown[]) {

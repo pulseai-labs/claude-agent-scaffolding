@@ -718,6 +718,12 @@ class RunTick {
     const project = render(stage.project, scope);
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(stage.env)) env[k] = render(v, scope);
+    // Every request field renders before any side effect: a render failure parks with nothing
+    // bound and no claim written.
+    const title = render(stage.title, scope);
+    const instance = render(stage.instance, scope);
+    const model = render(stage.model, scope);
+    const text = render(stage.message, scope);
 
     const holder = this.cwdHolder(cwd);
     if (holder !== null) {
@@ -766,12 +772,12 @@ class RunTick {
     };
     const req: LaunchRequest = {
       nonce: nn,
-      title: threadTitle(render(stage.title, scope), nn),
+      title: threadTitle(title, nn),
       project,
-      instance: render(stage.instance, scope),
-      model: render(stage.model, scope),
+      instance,
+      model,
       cwd: dir,
-      message: render(stage.message, scope),
+      message: text,
     };
     if (!(await this.start(u, s, req))) return;
     if (!this.hooks(stage.after_launch, scope, this.existingDir(dir))) {
