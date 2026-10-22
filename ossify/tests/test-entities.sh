@@ -762,7 +762,7 @@ t_assert_eq "$SNAP" "$(_pr_snap)" "...leaving state byte-identical"
 oss_entity_set_work_item_exec "$S" "$WP" "work/$WP" "$TMP/.worktrees/$WP" "sha-pr" >/dev/null
 # bad URLs refuse; the good URL in the same test is the adjacent control.
 SNAP="$(_pr_snap)"
-for bad in "http://x/pull/7" "https://x/pulls/7" "https://x/pull/7 extra" "https://x/pull/7/files" "https://x/pull/"; do
+for bad in "http://x/pull/7" "https://x/pulls/7" "https://x/pull/7 extra" "https://x/pull/7/files" "https://x/pull/" $'https://x/pull/7\nevil' $'junk\nhttps://x/pull/7' $'https://x/pull/7\r'; do
   t_capture oss_entity_set_work_item_pr "$S" "$WP" "$bad"
   t_assert_rc 7 "work_item_pr refuses the URL '$bad'"
 done

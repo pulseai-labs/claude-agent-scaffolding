@@ -470,7 +470,8 @@ _oss_entity_guard_wi_pr() { # $1=state-file $2=payload ; 0 let through, 7 refuse
     *) echo "oss: work item '$wi' records no dispatch (branch, worktree_path or base_sha) - a PR comes from a dispatched round. Record the dispatch first, \"oss work_item_exec $wi <branch> <worktree_path> <base_sha>\" (work-item/references/round-orchestration.md §3)" >&2
        return 7 ;;
   esac
-  if ! printf '%s' "$url" | LC_ALL=C grep -Eq '^https://[^[:space:]]+/pull/[0-9]+$'; then
+  local re='^https://[^[:space:]]+/pull/[0-9]+$'  # whole-string match: grep is line-wise and passed an embedded newline
+  if ! [[ $url =~ $re ]]; then
     echo "oss: '$url' is not a pull-request URL - expected https://<host>/<owner>/<repo>/pull/<number>, with no whitespace. Pass the URL the PR-open command printed" >&2
     return 7
   fi
