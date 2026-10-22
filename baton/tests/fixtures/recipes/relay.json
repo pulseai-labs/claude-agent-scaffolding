@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "name": "relay",
+  "params": ["project", "repo"],
+  "slots": { "session": 2, "build": 1 },
+  "sources": [
+    {
+      "dir": "{run.dir}/queue",
+      "id_key": "id",
+      "group_key": "group",
+      "order_key": "order",
+      "vars": { "task": "task" },
+      "stage": "work"
+    }
+  ],
+  "seed": [{ "id": "planner", "stage": "plan" }],
+  "stages": {
+    "plan": {
+      "kind": "session",
+      "instance": "planner",
+      "model": "small",
+      "project": "{param.project}",
+      "cwd": "{param.project}",
+      "title": "plan {unit.id}",
+      "message": "Write one request file per task into {run.dir}/queue, then write {run.dir}/plan.done.",
+      "env": { "RELAY_ROLE": "planner" },
+      "handoff": null,
+      "outcomes": [
+        { "when": [{ "file": "{run.dir}/plan.done" }], "to": "barrier" }
+      ]
+    },
+    "barrier": {
+      "kind": "wait",
+      "outcomes": [
+        { "when": [{ "units": { "stages": ["work", "land"], "count": "none" } }], "to": "done" }
+      ]
+    },
+    "work": {
+      "kind": "session",
+      "instance": "worker",
+      "model": "small",
+      "project": "{param.project}",
+      "cwd": "{param.project}",
+      "title": "work {unit.id}",
+      "message": "Do {unit.vars.task}. Attempt {attempt}. Write {run.dir}/out/{unit.id}.done when finished.",
+      "env": { "RELAY_ROLE": "worker", "RELAY_UNIT": "{unit.id}" },
+      "handoff": null,
+      "watch": ["{run.dir}/out"],
+      "outcomes": [
+        { "when": [{ "file": "{run.dir}/out/{unit.id}.done" }], "to": "land" }
+      ]
+    },
+    "land": {
+      "kind": "merge",
+      "pr": ["cat", "{run.dir}/out/{unit.id}.pr"],
+      "base": "main",
+      "repo": "{param.repo}",
+      "ordered": true,
+      "outcomes": { "merged": "done", "red": "park", "conflict": "park" }
+    }
+  }
+}
