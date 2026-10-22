@@ -638,6 +638,75 @@ test("a failed thread counts the attempt and relaunches", async () => {
   expect(runState().units.a.launches.work).toBe(2);
 });
 
+/** `work` ends on its done file (removed by its hook) and goes to `cool`, which returns to `work` until `<run>/stop` exists. */
+function cycling(work: Record<string, unknown> = {}) {
+  return recipe({
+    work: sess({
+      outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "cool", run: [["rm", "-f", "{run.dir}/out/{unit.id}.done"]] }],
+      ...work,
+    }),
+    cool: { kind: "wait", outcomes: [{ when: [{ file: "{run.dir}/stop" }], to: "done" }, { when: [{ absent: "{run.dir}/stop" }], to: "work" }] },
+  }, ["a"]);
+}
+
+test("a stage re-entered starts a fresh launch count: a cycling recipe is not capped by earlier visits", async () => {
+  await arm(cycling({ max_launches: 1 }));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
+  for (let m = 0; m < 12 && host.launches.length < 4; m++) {
+    at(m);
+    await doTick();
+    host.advance();
+  }
+  const u = runState().units.a;
+  expect(u.parked).toBeUndefined();
+  expect(host.launches.length).toBe(4);
+  // control: the nonce sequence is never reset, so each visit's launch has a fresh nonce
+  expect(host.launches.map((l) => l.request.nonce)).toEqual(["r1/a/work/1", "r1/a/work/2", "r1/a/work/3", "r1/a/work/4"]);
+  expect(u.seq?.work).toBe(4);
+});
+
+test("control: within one visit the launch count still caps", async () => {
+  await arm(cycling({ max_launches: 2 }));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  for (let m = 0; m < 6; m++) {
+    at(m);
+    await doTick();
+    host.advance();
+  }
+  const u = runState().units.a;
+  expect(u.parked?.reason).toBe("thread failed");
+  expect(host.launches.length).toBe(2);
+});
+
+test("a stall in one stage does not count toward a stall in the next", async () => {
+  await arm(recipe({
+    one: sess({ stall_minutes: 1, outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.one" }], to: "two" }] }),
+    two: sess({ stall_minutes: 1 }),
+  }, ["a"]));
+  host = new FakeHost({ one: { ticks: 100, end: "completed" }, two: { ticks: 100, end: "completed" } });
+  await doTick(); // one: thread-1
+  at(1);
+  await doTick(); // first status sets the progress mark
+  at(3);
+  await doTick(); // stall 1 in one
+  expect(count("stall")).toBe(1);
+  host.script.one = { ticks: 1, end: "completed", writes: [{ path: join(runDir(), "out", "{unit}.one"), content: "ok" }] };
+  at(4);
+  await doTick(); // one relaunches: thread-2
+  host.advance();
+  at(5);
+  await doTick(); // one completes, moves to two
+  expect(runState().units.a.stage).toBe("two");
+  for (const m of [6, 7, 9]) {
+    at(m);
+    await doTick();
+  }
+  expect(count("stall")).toBe(2);
+  const u = runState().units.a;
+  expect(u.parked).toBeUndefined();
+  expect(u.stalls).toBe(1);
+});
+
 test("an interrupted thread keeps its claim and directory through the settle window, then counts one no-result", async () => {
   await arm(recipe({ work: sess({ settle_minutes: 10, watch: ["{run.dir}/out"] }) }, ["a"]));
   host = new FakeHost({ work: { ticks: 1, end: "interrupted" } });

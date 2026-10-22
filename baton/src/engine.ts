@@ -249,6 +249,10 @@ class RunTick {
     u.stage = o.to;
     this.entered.add(u.id);
     u.record_at_entry = u.record_seen;
+    // Launch and stall counts are per stage visit, so a recipe that cycles a stage is not capped
+    // by its earlier visits. The nonce sequence (seq) is never reset.
+    u.launches[o.to] = 0;
+    u.stalls = 0;
     delete u.cwd_busy;
     delete u.merge_failures;
     delete u.forge_failures;
