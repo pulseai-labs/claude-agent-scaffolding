@@ -70,6 +70,38 @@ export type Store = {
   listRuns(): string[];
 };
 
+/**
+ * Write all of `data` to `fd`. writeSync may write fewer bytes than asked without throwing (a
+ * file-size limit, a full disk): loop until the whole buffer is out, and treat a zero-byte write
+ * as an error rather than spin.
+ */
+export function writeAllSync(fd: number, data: string): void {
+  const buf = Buffer.from(data, "utf8");
+  let off = 0;
+  while (off < buf.length) {
+    const n = writeSync(fd, buf, off, buf.length - off);
+    if (n <= 0) throw new Error(`short write: ${off} of ${buf.length} bytes`);
+    off += n;
+  }
+}
+
+/** Write `data` to `tmp`, fsync, rename over `path`; on any failure the temp file is removed. */
+export function replaceFileSync(tmp: string, path: string, data: string): void {
+  try {
+    const fd = openSync(tmp, "w", 0o600);
+    try {
+      writeAllSync(fd, data);
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    renameSync(tmp, path);
+  } catch (e) {
+    try { unlinkSync(tmp); } catch { /* never created, or already gone */ }
+    throw e;
+  }
+}
+
 export function stateDir(): string {
   return process.env.BATON_STATE_DIR || join(homedir(), ".local", "state", "baton");
 }
@@ -186,14 +218,7 @@ export function openStore(dir: string = stateDir()): Store {
       const d = runDir(run.id);
       mkdirSync(d, { recursive: true, mode: 0o700 });
       const tmp = join(d, `run.json.${process.pid}.tmp`);
-      const fd = openSync(tmp, "w", 0o600);
-      try {
-        writeSync(fd, JSON.stringify(run, null, 2) + "\n");
-        fsyncSync(fd);
-      } finally {
-        closeSync(fd);
-      }
-      renameSync(tmp, join(d, "run.json"));
+      replaceFileSync(tmp, join(d, "run.json"), JSON.stringify(run, null, 2) + "\n");
     },
     event(runId: string, obj: Record<string, unknown>): void {
       const d = runDir(runId);

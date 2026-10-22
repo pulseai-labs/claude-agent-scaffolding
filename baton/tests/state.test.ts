@@ -126,3 +126,49 @@ test("the lock is created with the pid already in it", async () => {
   expect(await s.withLock(async () => readFileSync(join(dir, "lock"), "utf8"))).toBe(String(process.pid));
   expect(readdirSync(dir)).toEqual([]); // the temp file is gone, and release removed the lock
 });
+
+/** Run `code` in a child bun under a file-size limit of `kb` KiB (none when null). */
+function underLimit(kb: number | null, state: string, code: string): number {
+  const SRC = join(import.meta.dir, "..", "src");
+  const script = `const SRC = ${JSON.stringify(SRC)};\n${code}`;
+  const limit = kb === null ? "" : `ulimit -f ${kb}; `;
+  const p = Bun.spawnSync(["bash", "-c", `${limit}exec bun -e "$0"`, script], {
+    env: { ...process.env, BATON_STATE_DIR: state }, stdout: "pipe", stderr: "pipe",
+  });
+  return p.exitCode ?? -1;
+}
+
+test("a short write never replaces run.json: the old file survives and no temp file is left", () => {
+  const dir = tmp();
+  const s = openStore(dir);
+  s.writeRun(sample("r1"));
+  const before = readFileSync(join(s.runDir("r1"), "run.json"), "utf8");
+  const big = `const { openStore } = await import(SRC + "/state.ts");
+    const run = { id: "r1", dir: "", recipe_sha256: "x".repeat(20000), params: {}, armed_at: "a", status: "armed", units: {} };
+    openStore(process.env.BATON_STATE_DIR).writeRun(run);`;
+  // 4 KiB limit, a ~20 KB run: the first write is short (4096 bytes, no throw)
+  expect(underLimit(4, dir, big)).not.toBe(0);
+  expect(readFileSync(join(s.runDir("r1"), "run.json"), "utf8")).toBe(before);
+  expect(readdirSync(s.runDir("r1"))).toEqual(["run.json"]);
+  // adjacent control: with no limit the same write lands whole
+  expect(underLimit(null, dir, big)).toBe(0);
+  expect(s.readRun("r1").recipe_sha256).toBe("x".repeat(20000));
+  expect(readdirSync(s.runDir("r1"))).toEqual(["run.json"]);
+});
+
+test("a short write never replaces a claim: the old claim survives and no temp file is left", () => {
+  const dir = tmp();
+  const cwd = mkdtempSync(join(tmpdir(), "baton-claim-cwd-"));
+  const claim = (env: string) => `const { writeClaim } = await import(SRC + "/claims.ts");
+    writeClaim(${JSON.stringify(cwd)}, ${env}, "r1/a/work/1");`;
+  expect(underLimit(null, dir, claim(`{ K: "small" }`))).toBe(0);
+  const claims = join(dir, "claims");
+  const [file] = readdirSync(claims);
+  const before = readFileSync(join(claims, file), "utf8");
+  expect(underLimit(4, dir, claim(`{ K: "v".repeat(20000) }`))).not.toBe(0);
+  expect(readFileSync(join(claims, file), "utf8")).toBe(before);
+  expect(readdirSync(claims)).toEqual([file]);
+  // adjacent control: with no limit the large claim lands whole
+  expect(underLimit(null, dir, claim(`{ K: "v".repeat(20000) }`))).toBe(0);
+  expect(readFileSync(join(claims, file), "utf8")).toContain("v".repeat(20000));
+});

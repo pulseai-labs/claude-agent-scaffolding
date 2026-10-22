@@ -6,13 +6,12 @@
 
 import { createHash } from "node:crypto";
 import {
-  chmodSync, closeSync, fsyncSync, mkdirSync, openSync, readFileSync, realpathSync,
-  renameSync, unlinkSync, writeSync,
+  chmodSync, mkdirSync, readFileSync, realpathSync, unlinkSync,
 } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { ENV_DENYLIST, ENV_KEY_RE } from "./recipe.ts";
-import { stateDir } from "./state.ts";
+import { replaceFileSync, stateDir } from "./state.ts";
 
 export class ClaimBusy extends Error {
   constructor(key: string, held: string) {
@@ -65,14 +64,7 @@ export function writeClaim(cwd: string, env: Record<string, string>, nonce: stri
   const path = claimPath(key);
   const tmp = `${path}.${process.pid}.tmp`;
   const body = [`${HEADER}${nonce}`, ...Object.entries(env).map(([k, v]) => `${k}=${v}`)].join("\n") + "\n";
-  const fd = openSync(tmp, "w", 0o600);
-  try {
-    writeSync(fd, body);
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  renameSync(tmp, path);
+  replaceFileSync(tmp, path, body);
   return key;
 }
 
