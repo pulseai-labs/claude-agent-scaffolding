@@ -2168,6 +2168,8 @@ pin "$_CLP" '`/close <wi-id> --pr`' "close grammar: the work-item --pr shape is 
 pin "$_WCP" '## 4a. PR mode' "work-item-close.md has section 4a"
 pin "$_WCP" 'never a local merge' "4a: a missing remote leg halts, never a local merge (the #339 rule)"
 pin "$_WCP" 'ls-remote --exit-code origin' "4a: the spine branch is probed on the remote before the commit"
+pin "$_WCP" 'close: commit failed in $wt - nothing was pushed - halt' "4a: a failed commit halts before the push"
+pin "$_WCP" 'rev-list --count "$base_sha..HEAD"' "4a: HEAD must be past the recorded base before the push"
 pin "$_WCP" 'oss work_item_pr "$wi" "$pr_url"' "4a: the PR URL is recorded through the verb"
 pin "$_WCP" 'Do **not** set `complete`' "4a: the status stays active, the merge and status are the caller's"
 pin "$_WCP" 'never squash or rebase' "4a: the caller merges with a merge commit"

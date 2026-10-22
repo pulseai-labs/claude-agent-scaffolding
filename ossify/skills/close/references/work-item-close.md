@@ -341,7 +341,13 @@ origin_url="$(git -C "$repo_root" remote get-url origin)" \
 git -C "$repo_root" ls-remote --exit-code origin "refs/heads/$spine_branch" >/dev/null \
   || { echo "close: origin has no '$spine_branch' - push the spine branch first; PR mode merges nothing locally - halt"; exit 1; }
 
-git -C "$wt" commit -m "<message>"
+git -C "$wt" commit -m "<message>" \
+  || { echo "close: commit failed in $wt - nothing was pushed - halt"; exit 1; }
+base_sha="$(oss get ".work_items[] | select(.id==\"$wi\") | .base_sha")"
+[ -n "$base_sha" ] && [ "$base_sha" != "null" ] \
+  || { echo "close: no recorded base_sha for $wi - halt"; exit 1; }
+[ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ] \
+  || { echo "close: HEAD in $wt is not past base $base_sha - no commit to open a PR for - halt"; exit 1; }
 git -C "$wt" push -u origin "$wi_branch" \
   || { echo "close: push of '$wi_branch' failed - the commit landed; resume finishes the push, not the layer - halt"; exit 1; }
 gh_repo="$(printf '%s\n' "$origin_url" | sed -E 's#^(git@[^:]+:|ssh://[^/]+/|https?://[^/]+/)##; s#\.git$##')"
