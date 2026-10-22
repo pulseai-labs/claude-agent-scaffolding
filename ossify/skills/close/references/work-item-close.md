@@ -309,6 +309,68 @@ work.
 
 ---
 
+## 4a. PR mode — `/close <wi-id> --pr`
+
+Opt-in, for a caller that merges the item's PR itself. Steps 1-3 run unchanged
+(paths, the four-layer gate, the staging proof), and so do §4's `ai_workspace`
+and branch-from-state guards. What differs is the end: the commit is pushed and a
+PR opened into the spine branch, and **nothing is merged here**. The default
+`/close <id>` is §4, untouched.
+
+**The remote leg is checked before the commit.** `origin` must resolve and the
+spine branch must exist on it. Either failing halts, naming which one: **never a local merge** —
+the work would land on the spine without the PR the caller is
+waiting on (the #339 rule).
+
+```bash
+target_repo="$(oss get ".work_items[] | select(.id==\"$wi\") | .target_repo")"
+[ "$target_repo" != "ai_workspace" ] \
+  || { echo "close: $wi targets 'ai_workspace', which is the process workspace, not a hosting repo - halt"; exit 1; }
+repo_root="$(oss repo_root "$target_repo")" || { echo "close: $wi targets undeclared repo '$target_repo' - halt"; exit 1; }
+wi_branch="$(oss get ".work_items[] | select(.id==\"$wi\") | .branch")"
+[ -n "$wi_branch" ] && [ "$wi_branch" != "null" ] \
+  || { echo "close: no recorded branch for $wi - halt"; exit 1; }
+title="$(oss get ".work_items[] | select(.id==\"$wi\") | .title")"
+spine_branch="$(oss branch_name "$spine_id" "$spine_slug")"
+head_branch="$(git -C "$repo_root" symbolic-ref --short HEAD)"
+[ "$head_branch" = "$spine_branch" ] \
+  || { echo "close: $target_repo is on '$head_branch', not '$spine_branch' - halt"; exit 1; }
+
+origin_url="$(git -C "$repo_root" remote get-url origin)" \
+  || { echo "close: $target_repo has no 'origin' remote - PR mode needs one and merges nothing locally - halt"; exit 1; }
+git -C "$repo_root" ls-remote --exit-code origin "refs/heads/$spine_branch" >/dev/null \
+  || { echo "close: origin has no '$spine_branch' - push the spine branch first; PR mode merges nothing locally - halt"; exit 1; }
+
+git -C "$wt" commit -m "<message>"
+git -C "$wt" push -u origin "$wi_branch" \
+  || { echo "close: push of '$wi_branch' failed - the commit landed; resume finishes the push, not the layer - halt"; exit 1; }
+gh_repo="$(printf '%s\n' "$origin_url" | sed -E 's#^(git@[^:]+:|ssh://[^/]+/|https?://[^/]+/)##; s#\.git$##')"
+pr_url="$(gh pr create --repo "$gh_repo" --base "$spine_branch" --head "$wi_branch" \
+  --title "$wi: $title" \
+  --body "closed by ossify work-item close in PR mode; gate green; report at $report")" \
+  || { echo "close: gh pr create failed - the branch is pushed; resume finishes the PR, not the layer - halt"; exit 1; }
+oss work_item_pr "$wi" "$pr_url" || { echo "close: PR opened at $pr_url but state refused it - halt"; exit 1; }
+echo "close: $wi PR $pr_url"
+```
+
+`gh` prints the PR URL on stdout; that line is what `oss work_item_pr` records
+(rc 7 refuses anything that is not a `/pull/<n>` URL). Do **not** set `complete`:
+the item stays `active`, with one commit past base on `$wi_branch`, pushed, and
+`pr_url` recorded. Report the PR URL and end.
+
+**Resuming** a halt after the commit finishes this step (the push, the PR, the
+record), never the layer: the commit already landed, so a re-run halts at step 3
+with an empty index.
+
+**The merge and the status belong to the caller.** It merges the PR with a merge
+commit (never squash or rebase), fast-forwards the local spine branch from the
+remote, checks `git merge-base --is-ancestor <wi-commit> <spine-branch>`, and only
+then runs `oss work_item_status <wi-id> complete`. Merge commits are the rule
+because the ancestor check is the proof the work reached the spine, and a squash
+or rebase never makes the item's commit an ancestor.
+
+---
+
 ## 5. On any failure — halt
 
 Terminal, at every layer. No later step runs, no status is written, nothing is

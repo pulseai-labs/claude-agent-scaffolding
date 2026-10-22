@@ -1,6 +1,6 @@
 ---
 description: Run the ossify close ceremony on an id — context-routed to work item, spine, or release by the id's shape
-argument-hint: "<id>"
+argument-hint: "<id> [--pr]"
 allowed-tools: Bash(bash:*), Read, Write, Edit, Glob, Grep, Skill
 ---
 
@@ -23,7 +23,7 @@ scope; it is never asked) → the common pre-flight (a resolvable topology
 declaration, a green
 `oss doctor`, absolute paths and no `cd`) → the work-item layer (the four-layer
 gate, the staging proof, the commit in the worktree, the merge into the spine
-branch) → the spine layer → the release layer, and shells out to `oss` for all
+branch, or with `--pr` the item's PR) → the spine layer → the release layer, and shells out to `oss` for all
 state.
 
 With no id, the skill refuses and lists what is open rather than guessing a scope.

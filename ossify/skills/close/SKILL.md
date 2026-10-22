@@ -76,7 +76,7 @@ and whose remaining fields are the numeric components** — `r1.s2.w3` yields
 
 | `scope` | Go to |
 |---|---|
-| `work_item` | §4 |
+| `work_item` | §4 (`--pr`: §9) |
 | `spine` | §5 |
 | `release` | §6 |
 
@@ -196,8 +196,9 @@ Six steps, in **binding order**:
    branch that item's own target repo is parked on — reading the branch from `work_items[].branch`,
    never re-deriving it from a slug you do not have — halting on conflict
    (resolution discipline: `references/merge-conflict-resolution.md`), and set
-   the work item `complete` **last**, after the merge is verified landed. Spine close reads
-   `complete` as "this item's work is on the spine branch".
+   the work item `complete` **last**, after the merge is verified landed (spine close reads
+   `complete` as "this item's work is on the spine branch"). With `--pr` (§9) the
+   commit is pushed and the item's PR opened instead, the item stays `active`: `references/work-item-close.md` §4a.
 5. **On any failure: halt**, surface the source-tagged errors, present the
    recovery menu, and **stop — no auto-select.**
 6. **Worktree cleanup does not happen here.** It is the last step of spine close.
@@ -470,8 +471,7 @@ token in the invocation/request text. **Parse `$ARGUMENTS` in bash; never
 reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
 command bodies at template-render time and silently corrupts them.
 
-The only argument is the id. When it is missing, emit one line, list what is
-open, and stop (§2).
+The arguments are the id and, after a work-item id only, `--pr` (`/close <wi-id> --pr`). `--pr` applies to a work-item close only: on a spine or release id, twice, before the id, or with any other token, refuse with that sentence before §3's pre-flight. With no id, emit one line, list what is open, and stop (§2).
 
 ---
 

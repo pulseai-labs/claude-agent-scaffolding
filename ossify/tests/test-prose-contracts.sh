@@ -2154,4 +2154,24 @@ pin "$_PRW_WP" "the ask — or, under a standing order in the autopilot policy t
 pin "$_PRW_WP" "Never auto-merge." \
   "work-pr/SKILL.md's merge rail lost 'Never auto-merge' - a merge queue's auto-merge stays forbidden (#869 disposition 2)"
 
+# --- /close <wi-id> --pr: the work item's PR instead of a local merge --------------
+# Control first: the default path (section 4's local merge) is byte-for-byte what it
+# was. The new arm may not edit it, and the pin counts the line exactly once, so a
+# copy of it into section 4a would turn this red too.
+_WCP="$HERE/../skills/close/references/work-item-close.md"
+_CLP="$HERE/../skills/close/SKILL.md"
+_CMD="$HERE/../commands/close.md"
+pin "$_WCP" 'git -C "$repo_root" merge --no-ff "$wi_branch" -m "merge $wi" || { echo "close: merge conflict - halt"; exit 1; }' \
+  "control: close section 4's local merge line is unchanged (default /close <id> behaves as before)"
+pin "$_CLP" '`--pr` applies to a work-item close only' "close grammar: --pr on a spine or release id refuses"
+pin "$_CLP" '`/close <wi-id> --pr`' "close grammar: the work-item --pr shape is named"
+pin "$_WCP" '## 4a. PR mode' "work-item-close.md has section 4a"
+pin "$_WCP" 'never a local merge' "4a: a missing remote leg halts, never a local merge (the #339 rule)"
+pin "$_WCP" 'ls-remote --exit-code origin' "4a: the spine branch is probed on the remote before the commit"
+pin "$_WCP" 'oss work_item_pr "$wi" "$pr_url"' "4a: the PR URL is recorded through the verb"
+pin "$_WCP" 'Do **not** set `complete`' "4a: the status stays active, the merge and status are the caller's"
+pin "$_WCP" 'never squash or rebase' "4a: the caller merges with a merge commit"
+_ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$_CMD")"
+t_assert_eq '"<id> [--pr]"' "$_ah" "close.md argument-hint declares the optional flag"
+
 t_summary
