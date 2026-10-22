@@ -1,0 +1,15 @@
+{
+  "_captured": {
+    "date": "2026-10-22",
+    "t3": "T3 Code 0.1.0 (draco-desk)",
+    "how": "NOT live: the t3_thread_launch success schema read from the installed T3 0.1.0 server (threadId, projectId, modelSelection, runId, status), filled with spike 1 values; a live launch is Task 9"
+  },
+  "threadId": "mcp:7e0bc22a-34fe-4d59-87b9-3d7797d02a9c",
+  "projectId": "8f672ec2-47ef-4237-9ff2-a0d4366bc8c5",
+  "modelSelection": {
+    "instanceId": "OMP_Orchestrator_GLM",
+    "model": "default"
+  },
+  "runId": "run:thread:mcp%3A7e0bc22a-34fe-4d59-87b9-3d7797d02a9c:ordinal:1",
+  "status": "preparing"
+}

@@ -1,0 +1,55 @@
+{
+  "_captured": {
+    "date": "2026-10-22",
+    "t3": "T3 Code 0.1.0 (draco-desk)",
+    "how": "baton t3 call t3_project_list {} (live, read-only); 3 of 20 records kept, nextCursor set to null, paths scrubbed"
+  },
+  "projects": [
+    {
+      "id": "8f672ec2-47ef-4237-9ff2-a0d4366bc8c5",
+      "title": "pilot-fourseat",
+      "workspaceRoot": "/srv/fixture/pilot-fourseat",
+      "repositoryIdentity": null,
+      "faviconPath": null,
+      "projectIcon": null,
+      "defaultModelSelection": null,
+      "defaultThreadEnvMode": null,
+      "autoPull": false,
+      "scripts": [],
+      "createdAt": "2026-10-19T19:22:34.926Z",
+      "updatedAt": "2026-10-19T19:22:34.926Z",
+      "deletedAt": null
+    },
+    {
+      "id": "af8b818f-3ce2-49dd-8d2b-7521affa33fe",
+      "title": "repo",
+      "workspaceRoot": "/srv/fixture/scratch/repo",
+      "repositoryIdentity": null,
+      "faviconPath": null,
+      "projectIcon": null,
+      "defaultModelSelection": null,
+      "defaultThreadEnvMode": null,
+      "autoPull": false,
+      "scripts": [],
+      "createdAt": "2026-10-19T19:22:57.018Z",
+      "updatedAt": "2026-10-19T19:22:57.018Z",
+      "deletedAt": null
+    },
+    {
+      "id": "d2171ffb-d3fd-41e9-a499-cf1db73e88a0",
+      "title": "repo",
+      "workspaceRoot": "/srv/fixture/scratch/repo",
+      "repositoryIdentity": null,
+      "faviconPath": null,
+      "projectIcon": null,
+      "defaultModelSelection": null,
+      "defaultThreadEnvMode": null,
+      "autoPull": false,
+      "scripts": [],
+      "createdAt": "2026-10-19T19:23:04.004Z",
+      "updatedAt": "2026-10-19T19:23:04.004Z",
+      "deletedAt": null
+    }
+  ],
+  "nextCursor": null
+}
