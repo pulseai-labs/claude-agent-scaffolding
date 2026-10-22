@@ -11,12 +11,12 @@ import type { Handoff, Message } from './handoff'
 import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage } from './records'
 import type { Stage, Thresholds } from './measure'
-import { activePath, autonomicPath, logPath, parseAutonomic, progressPath, safeSessionId, stagePath } from './records'
+import { activePath, autonomicPath, logPath, parseAutonomic, progressPath, recordBell, safeSessionId, stagePath } from './records'
 import {
   SESSION_OFF, SESSION_ON, COMMAND_USAGE, STATUS_OFF, STATUS_PAUSED,
   HANDOFF_REQUIRED, HANDED_OFF, PARENT_HANDOFF, HANDING_OFF, RESUMED,
   SEED_REJECTED, CONFIG_PROBLEMS, SETTINGS_PROBLEMS, SESSION_STATUS, FILL_STATUS,
-  MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, MISSING_HANDOFF,
+  MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, PAUSED_AGENT, MISSING_HANDOFF,
   STATUS_METER, BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
   DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
   fill,
@@ -34,6 +34,7 @@ let stage: Stage = 'below'
 let lastPercent: number | undefined
 const off = new Set<string>()
 let paused: string | undefined
+let pausedText = ''                       // the pause's reason, told to the agent at each prompt it gets
 let seeded: { session: string; startPercent?: number } | undefined
 
 // One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
@@ -261,6 +262,7 @@ async function ring($: Engine, bell: string, message: string): Promise<void> {
 
 async function pause($: Engine, sessionId: string, text: string, bell: string | undefined): Promise<void> {
   paused = sessionId
+  pausedText = text
   await dropActive($, sessionId)
   await setNotice($, { text, tone: 'warn' })
   $.ui.toast(text)
@@ -297,10 +299,11 @@ async function fallbackBrief($: Engine, sessionId: string): Promise<string> {
 
 async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
   const h = await home($)
-  const record = parseAutonomic(await readText($, autonomicPath(h, sessionId)))
+  const recordText = await readText($, autonomicPath(h, sessionId))
+  const record = parseAutonomic(recordText)
   const own = parseLineage(await readText($, lineagePath(h, sessionId)))
   if (record.mode === 'manual' && unattended >= cfg.manualMaxMolts) {
-    return pause($, sessionId, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }), undefined)
+    return pause($, sessionId, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }), recordBell(recordText))
   }
   // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
   if (record.mode === 'autopilot' && own !== undefined && !forced.has(sessionId) && !(await hasProgress($, h, sessionId))) {
@@ -486,7 +489,8 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     try {
       const sessionId = await $.session.id()
-      if (e.origin.kind === 'composer' || e.origin.kind === 'bridge') {
+      // An Agent SDK host (T3 Code) delivers the operator's message as an `sdk` prompt.
+      if (e.origin.kind === 'composer' || e.origin.kind === 'bridge' || e.origin.kind === 'sdk') {
         unattended = 0
         if (paused === sessionId) paused = undefined
         try {
@@ -501,6 +505,13 @@ export const register: Register = (on, options) => {
     } catch (err) {
       await log($, `prompt.submit error ${String(err)}`)
     }
+    // A pause shows only in the band, a toast and the status line, which an SDK host never
+    // draws: the agent hears of it at every prompt it gets while paused, so it can say so.
+    let pauseNote: string | undefined
+    try {
+      if (paused === (await $.session.id())) pauseNote = fill(PAUSED_AGENT, { reason: pausedText })
+    } catch {}
+    if (pauseNote !== undefined) e = { ...e, context: [...(e.context ?? []), pauseNote] }
     let warning: { sessionId: string; due: 1 | 2; text: string } | undefined
     try {
       const sessionId = await $.session.id()

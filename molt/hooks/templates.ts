@@ -60,6 +60,7 @@ export const FILL_STATUS = "fill: {{percent}} — warnings {{warn}}% and {{warnA
 export const MODE_STATUS = "mode (autonomic's record): {{mode}}"
 export const WARNED = "warned {{percent}}"
 export const PAUSED_UNATTENDED = "molt paused: {{count}} molts in a row with no message from you. Send a message to resume; the handoff is at {{path}}."
+export const PAUSED_AGENT = "molt: the handoff did not happen. This session was not cleared, because molt is paused: {{reason}} Tell the operator to send any message to resume molt."
 export const PAUSED_NO_PROGRESS = "molt paused: no progress since the last molt (no Write, Edit or commit). Autopilot stops here; the handoff is at {{path}}."
 export const MISSING_HANDOFF = "molt: the MOLT-HANDOFF line names {{path}}, but {{path}} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>."
 export const STATUS_METER = "molt {{percent}}%/{{command}}%"
