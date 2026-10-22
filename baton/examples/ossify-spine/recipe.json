@@ -113,7 +113,7 @@
         {
           "when": [
             { "active": "none-in-group" },
-            { "units": { "group": "{run.group}", "stages": ["correct", "reclose"], "count": "none" } }
+            { "units": { "group": "{run.group}", "stages": ["implement", "regap", "correct", "reclose"], "count": "none" } }
           ],
           "to": "regap"
         }

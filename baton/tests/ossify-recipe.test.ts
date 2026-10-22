@@ -135,7 +135,9 @@ describe("ossify-spine recipe", () => {
     expect(w.outcomes[0].to).toBe("regap");
     expect(w.outcomes[0].when).toContainEqual({ active: "none-in-group" });
     expect(w.outcomes[0].when).toContainEqual({
-      units: { group: "{run.group}", stages: ["correct", "reclose"], count: "none" },
+      // a sibling in implement holds the gap even before its session starts (waiting on a slot,
+      // or just re-entered from its own regap); regap holds it so two re-entries never overlap
+      units: { group: "{run.group}", stages: ["implement", "regap", "correct", "reclose"], count: "none" },
     });
   });
 

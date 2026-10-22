@@ -353,6 +353,26 @@ test("a gap waits for a live sibling", async () => {
   expect(existsSync(out(W1, "gaps.json"))).toBe(false); // the answered gap went with the before hook
 });
 
+test("two gaps in a round re-enter one at a time", async () => {
+  await arm();
+  const host = newHost((_u, n) => {
+    if (n === 1) { queue(W1, 1, 1); queue(W2, 1, 2); put(out("lane", "lane.done"), "x"); }
+  }, {
+    implement: (u, n) => (n === 1 ? put(out(u, "gaps.json"), "{}") : put(workFile(u, "report.md"), "r")),
+  });
+  const r = rig(host);
+  await drive(r, 60, () => host.of(W2, "regap").length === 1 || unit(W2)?.parked !== undefined);
+
+  // w2's re-entry launched only after w1 re-entered, relaunched its implementer, and left implement:
+  // never in the tick w1's regap ended, when w1 sat in implement with no session yet.
+  const w1Closed = moved(W1, "implement", "close");
+  expect(w1Closed).toBeGreaterThan(-1); // -1 (never) would make the next comparison vacuous
+  expect(launchedEv(W2, "regap")).toBeGreaterThan(w1Closed);
+  expect(launchedEv(W1, "implement", 2)).toBeGreaterThan(moved(W1, "regap", "implement"));
+  expect(moves(W1).slice(0, 4)).toEqual(["implement>gap_wait", "gap_wait>regap", "regap>implement", "implement>close"]);
+  expect(moves(W2)).toEqual(["implement>gap_wait", "gap_wait>regap"]);
+});
+
 test("a gap with no sibling live re-enters on the next tick", async () => {
   await arm();
   const host = newHost((_u, n) => {
