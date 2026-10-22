@@ -23,7 +23,9 @@ with a caller-supplied execution procedure in scope. The lane cuts the spine bra
 the worktree, authors the handoff, builds the request and invokes the caller's procedure.
 
 The caller returns nothing usable: the session that was executing the item dies before it
-returns a result. The operator re-enters the lane twice more with the same command; each time
+returns a result, and each lane session, still waiting for it, is itself lost before any
+return arrives - no result, empty or otherwise, ever reaches the lane, so section 6 processes
+no return and nothing re-dispatches within a session. The operator re-enters the lane twice more with the same command; each time
 the item is `active`, its worktree is clean at `base_sha`, and no result is on hand.
 
 Describe, for each of the three lane sessions: whether the lane calls

@@ -1,7 +1,7 @@
 # Rubric: external-executor
 
 Score each 1-5 (5 criteria). Pass = all ≥4. `expected_outcome` vocabulary:
-`nested` | `external` | `halt` | `gap-loop`. `nested` = the lane dispatches its
+`nested` | `external` | `detach` | `halt` | `gap-loop`. `nested` = the lane dispatches its
 own `ossify:implementer-agent` per work item. `external` = the lane hands the
 round to the caller-supplied in-session procedure and processes the results it
 returns. `detach` = the lane runs in detached mode (`--external-executor --detach`): it writes the round's requests, counts nothing and ends. `halt` = the lane stops the round, naming the failing check, without
