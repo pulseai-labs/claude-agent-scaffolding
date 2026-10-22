@@ -2,9 +2,12 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
+import { exitCode, tick } from "./engine.ts";
+import type { Forge } from "./forge.ts";
 import { HostAuthError, HostDownError } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
-import { loadT3Config } from "./hosts/t3.ts";
+import { loadT3Config, T3Host } from "./hosts/t3.ts";
+import { notifyOnce } from "./notify.ts";
 import { RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
 import { openStore, type RunState, type UnitState } from "./state.ts";
 import { installTimer } from "./timer.ts";
@@ -16,6 +19,7 @@ const USAGE = [
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
   "       baton report <run>",
+  "       baton tick [--run <id>]",
   "       baton t3 call <tool> <json-object>",
   "       baton t3 token-status",
   "",
@@ -39,6 +43,7 @@ export async function main(argv: string[]): Promise<number> {
     case "disarm": return disarmCmd(rest);
     case "unpark": return unparkCmd(rest);
     case "report": return reportCmd(rest);
+    case "tick": return tickCmd(rest);
     case "t3": return t3Cmd(rest);
   }
   return usage();
@@ -262,6 +267,43 @@ function reportCmd(args: string[]): number {
   out.push(`wall_seconds ${wall}`);
   process.stdout.write(out.join("\n") + "\n");
   return 0;
+}
+
+// ---- tick -----------------------------------------------------------------------------
+// rc 0 done (a busy lock included), 3 host auth, 4 host down, 1 anything else.
+
+const DAY_MS = 86_400_000;
+
+/** Merge stages are not wired yet: any call is an error the tick reports. */
+const noForge: Forge = {
+  view: async () => { throw new Error("no forge configured: merge stages are not available in this build"); },
+  merge: async () => { throw new Error("no forge configured: merge stages are not available in this build"); },
+};
+
+async function tickCmd(args: string[]): Promise<number> {
+  let runId: string | undefined;
+  if (args.length === 2 && args[0] === "--run" && RUN_ID_RE.test(args[1])) runId = args[1];
+  else if (args.length !== 0) return usage();
+  try {
+    const cfg = loadT3Config();
+    // Only `expires_at` is read from the token here; the token itself stays inside the host.
+    let expiresAt: number | undefined;
+    try {
+      expiresAt = readToken(cfg.tokenFile).expires_at;
+    } catch { /* a missing or unreadable token surfaces as a host auth error when used */ }
+    if (expiresAt !== undefined && expiresAt * 1000 - Date.now() < 3 * DAY_MS) {
+      const day = new Date().toISOString().slice(0, 10);
+      await notifyOnce(`token/${day}`, `t3 token expires ${new Date(expiresAt * 1000).toISOString()} — run baton t3 login`);
+    }
+    const r = await tick({
+      store: openStore(), host: new T3Host(cfg), forge: noForge, notify: notifyOnce, now: () => new Date(), runId,
+    });
+    for (const e of r.errors) process.stderr.write(`baton tick: ${e}\n`);
+    return exitCode(r);
+  } catch (e) {
+    process.stderr.write(`baton tick: ${(e as Error).message}\n`);
+    return 1;
+  }
 }
 
 // ---- t3 -------------------------------------------------------------------------------

@@ -144,3 +144,13 @@ test("down=unreachable throws HostDownError, not HostAuthError", async () => {
   h.down = null;
   expect((await h.status("t")).state).toBe("gone");
 });
+
+test("{unit} in a write's path and content is the launching unit's id", async () => {
+  const h = new FakeHost({ build: { ticks: 1, writes: [{ path: join(base, "out", "{unit}.done"), content: "by {unit}" }], end: "completed" } });
+  const r = req("build");
+  await h.launch(r);
+  await h.launch({ ...r, title: threadTitle("t", nonce("r1", "u2", "build", 1)) });
+  h.advance();
+  expect(readFileSync(join(base, "out", "u1.done"), "utf8")).toBe("by u1");
+  expect(readFileSync(join(base, "out", "u2.done"), "utf8")).toBe("by u2");
+});

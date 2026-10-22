@@ -36,12 +36,13 @@ function readClaim(cwd: string): SeenClaim {
   return { nonce: lines[0].slice("# baton ".length), env };
 }
 
-/** The stage: the third `/` segment of the nonce inside the title's `[baton …]` tag. */
-function stageOf(title: string): string {
+/** The nonce segment `i` inside the title's `[baton …]` tag (1 = unit, 2 = stage). */
+function segment(title: string, i: number): string {
   const m = /\[baton ([^\]]*)\]\s*$/.exec(title);
   if (!m) throw new Error(`fake host: no [baton <nonce>] tag in title: ${title}`);
-  return m[1].split("/")[2] ?? "";
+  return m[1].split("/")[i] ?? "";
 }
+const stageOf = (title: string) => segment(title, 2);
 
 export class FakeHost implements Host {
   launches: Launch[] = [];
@@ -109,9 +110,13 @@ export class FakeHost implements Host {
       if (t.step >= b.ticks) continue;
       t.step++;
       if (t.step === b.ticks) {
+        // `{unit}` in a write's path or content is the launching unit's id, so one stage
+        // script can serve several units.
+        const unit = segment(t.launch.request.title, 1);
         for (const w of b.writes ?? []) {
-          mkdirSync(dirname(w.path), { recursive: true });
-          writeFileSync(w.path, w.content);
+          const path = w.path.replaceAll("{unit}", unit);
+          mkdirSync(dirname(path), { recursive: true });
+          writeFileSync(path, w.content.replaceAll("{unit}", unit));
         }
       }
     }
