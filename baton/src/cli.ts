@@ -9,7 +9,7 @@ import { callTool, readToken } from "./hosts/mcp.ts";
 import { loadT3Config, T3Host } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
-import { openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
+import { enterStage, openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
 import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
@@ -249,11 +249,15 @@ async function unparkCmd(args: string[]): Promise<number> {
       if (!Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
     }
     delete unit.parked;
-    unit.stalls = 0;
-    delete unit.merge_failures;
-    delete unit.forge_failures;
-    if (to !== undefined) unit.stage = to;
-    unit.launches[unit.stage] = 0; // the stage the unit resumes in: a capped target must not re-park at once
+    if (to !== undefined) {
+      enterStage(unit, to); // the same stage entry an outcome's move makes
+    } else {
+      // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
+      unit.stalls = 0;
+      delete unit.merge_failures;
+      delete unit.forge_failures;
+      unit.launches[unit.stage] = 0;
+    }
     store.writeRun(run);
     store.event(runId!, { kind: "unpark", unit: unitId, stage: unit.stage });
     return 0;

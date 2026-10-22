@@ -1298,6 +1298,30 @@ test("a notice that cannot render parks before any hook runs or the session ends
   expect(claimFiles()).toEqual([]);
 });
 
+test("unpark --to enters the stage as a move does: a record seen before the entry is not a change", async () => {
+  await arm(recipe({
+    work: sess(),
+    gate: { kind: "wait", outcomes: [{ when: [{ record_changed: true }], to: "done" }] },
+  }, ["a"]));
+  const run = runState();
+  Object.assign(run.units.a, { record_seen: "d2", record_at_entry: "d1", cwd_busy: "x", parked: { reason: "stop", at: "t" } });
+  store().writeRun(run);
+  expect(await main(["unpark", "r1", "a", "--to", "gate"])).toBe(0);
+  host = new FakeHost({});
+  await doTick();
+  await doTick();
+  const u = runState().units.a;
+  expect(u.stage).toBe("gate");
+  expect(u.record_at_entry).toBe("d2");
+  expect(u.cwd_busy).toBeUndefined();
+  // control: a record rewritten after the entry still reads as changed
+  const r2 = runState();
+  r2.units.a.record_seen = "d3";
+  store().writeRun(r2);
+  await doTick();
+  expect(runState().units.a.stage).toBe("done");
+});
+
 test("every unit done marks the run done and notifies once", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });

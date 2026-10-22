@@ -278,6 +278,34 @@ test("unpark --to resets the launch count of the stage the unit moves to", async
   expect(u.launches).toEqual({ planner: 2, work: 0 });
 });
 
+test("unpark --to applies the stage entry; plain unpark keeps the visit's entry record and busy note", async () => {
+  const entry = { record_seen: "d2", record_at_entry: "d1", cwd_busy: "x", merge_failures: 2, forge_failures: 1 };
+  let st = await armedWithParkedUnit();
+  let run = runJson(st, "r1");
+  Object.assign(run.units.planner, entry);
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  expect((await runIn(st, "unpark", "r1", "planner", "--to", "regap")).rc).toBe(0);
+  let u = runJson(st, "r1").units.planner;
+  expect(u.stage).toBe("regap");
+  expect(u.record_at_entry).toBe("d2");
+  expect(u.cwd_busy).toBeUndefined();
+  expect(u.merge_failures).toBeUndefined();
+  expect(u.forge_failures).toBeUndefined();
+  expect(u.stalls).toBe(0);
+  expect(u.launches).toEqual({ planner: 2, work: 1, regap: 0 });
+  // control: plain unpark resumes the same visit
+  st = await armedWithParkedUnit();
+  run = runJson(st, "r1");
+  Object.assign(run.units.planner, entry);
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+  u = runJson(st, "r1").units.planner;
+  expect(u.record_at_entry).toBe("d1");
+  expect(u.cwd_busy).toBe("x");
+  expect(u.merge_failures).toBeUndefined();
+  expect(u.launches).toEqual({ planner: 0, work: 1 });
+});
+
 test("unpark with no unit un-parks the run", async () => {
   const st = await armedWithParkedUnit();
   const run = runJson(st, "r1");

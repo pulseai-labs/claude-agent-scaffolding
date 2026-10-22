@@ -49,6 +49,20 @@ export type UnitState = {
   forge_failures?: number;
 };
 
+/**
+ * Enter `stage`: the state every stage visit starts with. Shared by an outcome's move and
+ * `unpark --to`. Launch and stall counts are per visit; the nonce sequence (seq) is never reset.
+ */
+export function enterStage(u: UnitState, stage: string): void {
+  u.stage = stage;
+  u.record_at_entry = u.record_seen;
+  u.launches[stage] = 0;
+  u.stalls = 0;
+  delete u.cwd_busy;
+  delete u.merge_failures;
+  delete u.forge_failures;
+}
+
 export type RunState = {
   id: string;
   dir: string;

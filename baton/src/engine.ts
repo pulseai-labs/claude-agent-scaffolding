@@ -16,7 +16,7 @@ import {
 } from "./recipe.ts";
 import { mergeUnit } from "./merge.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
-import type { RunState, Session, Store, UnitState } from "./state.ts";
+import { enterStage, type RunState, type Session, type Store, type UnitState } from "./state.ts";
 
 export type TickReport = {
   launched: string[];
@@ -247,16 +247,8 @@ class RunTick {
   private async move(u: UnitState, o: Outcome, note?: string): Promise<void> {
     if (o.to === "park") return this.park(u, "outcome");
     const from = u.stage;
-    u.stage = o.to;
+    enterStage(u, o.to);
     this.entered.add(u.id);
-    u.record_at_entry = u.record_seen;
-    // Launch and stall counts are per stage visit, so a recipe that cycles a stage is not capped
-    // by its earlier visits. The nonce sequence (seq) is never reset.
-    u.launches[o.to] = 0;
-    u.stalls = 0;
-    delete u.cwd_busy;
-    delete u.merge_failures;
-    delete u.forge_failures;
     this.save();
     this.ev("transition", { unit: u.id, from, to: o.to });
     this.report.transitioned.push(u.id);
