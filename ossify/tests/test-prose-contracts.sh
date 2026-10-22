@@ -1600,7 +1600,7 @@ for _pair in "$_RO|| \`in-flight\` | nothing, in every mode" "$_RO|an \`in-fligh
              "$_RO|| \`halt:pr-not-local\` — a \`complete\` item with a PR recorded" "$_RO|never merge the work branch locally — that forks the local spine branch from the remote" \
              "$_RO|An \`in-flight\` item gets no dispatch either, in every mode" "$_RO|An \`in-flight\` item (§2b) is not a" \
              "$_EX|item (its PR open, \`round-orchestration.md\` §2b) gets no request either" \
-             "$_EX|the lane ends only after issuing every" "$_EX|(\`close-finished\`, \`in-flight\`), it reports them and ends" \
+             "$_EX|the lane ends only after issuing every" "$_EX|(\`close-finished\`, \`in-flight\`, an unrepaired \`finish-merge\`), it reports them" \
              "$_EX|| \`in-flight\` | no request; reported with its PR; the caller merges it |"; do
   _f="${_pair%%|*}"; _lit="${_pair#*|}"
   _r=1; grep -Fq -- "$_lit" "$_f" && _r=0
@@ -2184,10 +2184,39 @@ pin "$_WCP" '## 4a. PR mode' "work-item-close.md has section 4a"
 pin "$_WCP" 'never a local merge' "4a: a missing remote leg halts, never a local merge (the #339 rule)"
 pin "$_WCP" 'ls-remote --exit-code origin' "4a: the spine branch is probed on the remote before the commit"
 pin "$_WCP" 'close: commit failed in $wt - nothing was pushed - halt' "4a: a failed commit halts before the push"
-pin "$_WCP" 'rev-list --count "$base_sha..HEAD"' "4a: HEAD must be past the recorded base before the push"
+pin "$_WCP" 'is not past base $base_sha - no commit to open a PR for; nothing was pushed - halt' "4a: HEAD must be past the recorded base before the push"
 pin "$_WCP" 'oss work_item_pr "$wi" "$pr_url"' "4a: the PR URL is recorded through the verb"
 pin "$_WCP" 'Do **not** set `complete`' "4a: the status stays active, the merge and status are the caller's"
 pin "$_WCP" 'never squash or rebase' "4a: the caller merges with a merge commit"
+# Final review I1: gh takes the origin URL itself as --repo; no sed strips the
+# host (an origin on a non-default host then resolved on gh's default). The
+# zero-count absence check carries its positive control beside it: both gh
+# calls name "$origin_url", so a deleted or renamed variable cannot leave the
+# absence vacuously green.
+_r=1; ! grep -Fq 'gh_repo=' "$_WCP" && ! grep -Fq "sed -E 's#^(git@" "$_WCP" && _r=0
+_pin "$_r" "4a: the origin URL is taken apart with sed to build gh's --repo (the host is lost - final review I1)"
+pin "$_WCP" 'pr_url="$(gh --repo "$origin_url" pr list --head "$wi_branch" --base "$spine_branch" --state open --json url' \
+  "4a control: the PR lookup passes the origin URL itself as --repo"
+pin "$_WCP" 'pr_url="$(gh --repo "$origin_url" pr create --base "$spine_branch" --head "$wi_branch"' \
+  "4a control: the PR create passes the origin URL itself as --repo"
+# Final review I2 / R6(a): section 4a resumes in place - an empty index with the
+# recorded branch past base skips the commit; an open PR for the branch is
+# reused, never re-created; the lookup runs before the create.
+pin "$_WCP" 'elif [ "$wt_branch" = "$wi_branch" ] && [ "$(git -C "$wt" rev-list --count "$base_sha..HEAD")" -ge 1 ]; then' \
+  "4a: an empty index with HEAD past base on the recorded branch is a resume, not a halt"
+pin "$_WCP" 'resuming after the commit' "4a: the resume says it skipped the commit"
+pin "$_WCP" "reusing it, not opening another" "4a: an open PR for the branch is reused"
+_r=1; _l="$(grep -nF 'pr list --head "$wi_branch"' "$_WCP" | cut -d: -f1)"; _c="$(grep -nF 'pr create --base "$spine_branch" --head "$wi_branch"' "$_WCP" | cut -d: -f1)"
+[ -n "$_l" ] && [ -n "$_c" ] && [ "$_l" -lt "$_c" ] && _r=0
+_pin "$_r" "4a: the existing-PR lookup does not run before gh pr create"
+pin "$_WCP" 'must not be re-entered over a half-done PR-mode close' "4a: a self-closing lane over a half-done PR-mode close is out of contract"
+# R6(b)(c): under --detach the lane never runs the finish-merge local merge; the
+# steps it runs are named, not "section 2 through 4".
+pin "$_EX" '**`finish-merge` is never repaired under `--detach`.**' "EXT 2b: finish-merge is never repaired under --detach"
+pin "$_EX" "| \`finish-merge\` | not repaired, nothing merged, no request; reported as awaiting the caller's close" \
+  "EXT 2b: the re-entry row table has the finish-merge row"
+_r=1; ! grep -Fq 'runs §2 through §4 unchanged' "$_EX" && grep -Fq 'The lane runs `round-orchestration.md` §2 (the fresh cut' "$_EX" && _r=0
+_pin "$_r" "EXT 2b: still says 'runs §2 through §4 unchanged' instead of naming the round-orchestration steps"
 _ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$_CMD")"
 t_assert_eq '"<id> [--pr]"' "$_ah" "close.md argument-hint declares the optional flag"
 

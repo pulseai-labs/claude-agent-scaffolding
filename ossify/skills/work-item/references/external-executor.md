@@ -109,10 +109,22 @@ merge.
 as the third token, after `--external-executor`; anything else is a refusal
 before the spine-branch cut, exactly as `run-spine`'s closed grammar says.
 
-The lane runs §2 through §4 unchanged, builds the round's requests (§3 record,
+The lane runs `round-orchestration.md` §2 (the fresh cut, or the re-entry
+arm's read-out, route mapping, repo repairs and step 4's item repairs — all
+but `finish-merge`, below), then that file's §3 and §4 for the round's items as
+§2 above says. It then builds the round's requests (this file's §3 record,
 unchanged), invokes the caller-supplied procedure once, and **ends the
-session**. It does not wait for results, does not run §5a, §6 or §7, and does
-not close or merge any item.
+session**. It does not run `round-orchestration.md` §5's own dispatch or §7
+(§6 only for a gaps record, as **Gaps** below says), nor this file's §5a, §6 or
+§7; it does not wait for results, and does not close or merge any item.
+
+**`finish-merge` is never repaired under `--detach`.** That repair is a local
+merge of the work branch (`round-orchestration.md` §2b step 4), and the row is
+also the shape a PR-mode close leaves when it halts after its commit
+(`close/references/work-item-close.md` §4a). The lane reports the row as
+awaiting the caller's close; the item gets no step in `round-orchestration.md`
+§3 or §4, no request, and no merge. The caller re-runs `/close <wi-id> --pr`,
+which resumes.
 
 **Counting.** In this mode the lane counts no request, the §5b gaps replacement
 included; the caller counts each execution, the first one included, with §2a's
@@ -130,8 +142,8 @@ nothing, and ends.
 
 **The round barrier.** On re-entry the lane ends only after issuing every
 request the round needs; if items then remain `active` with no request to issue
-(`close-finished`, `in-flight`), it reports them and ends. It never halts for
-them.
+(`close-finished`, `in-flight`, an unrepaired `finish-merge`), it reports them
+and ends. It never halts for them.
 
 | Row on re-entry | Under `--detach` |
 |---|---|
@@ -139,6 +151,7 @@ them.
 | a gaps record in scope | one replacement request, nothing counted; the lane ends |
 | `close-finished` | no request; reported; the caller closes it |
 | `in-flight` | no request; reported with its PR; the caller merges it |
+| `finish-merge` | not repaired, nothing merged, no request; reported as awaiting the caller's close (`/close <wi-id> --pr` resumes) |
 
 ---
 
