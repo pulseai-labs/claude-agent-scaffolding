@@ -98,6 +98,22 @@ describe("validate", () => {
     expect(validate(ok).ok).toBe(true);
   });
 
+  test("a stage named after a terminal (done, park) is refused", () => {
+    for (const t of ["done", "park"]) {
+      const r = relay();
+      r.stages[t] = r.stages.work;
+      r.seed[0].stage = t;
+      expectError(r, `stages.${t}: "${t}" is a terminal (done, park), not a stage name`);
+    }
+    // adjacent control: a name that only contains a terminal word is a stage like any other
+    for (const n of ["done_review", "parked"]) {
+      const ok = relay();
+      ok.stages[n] = ok.stages.work;
+      ok.seed[0].stage = n;
+      expect(validate(ok).ok).toBe(true);
+    }
+  });
+
   test("a seed or source naming no stage", () => {
     const s = relay();
     s.seed[0].stage = "ghost";

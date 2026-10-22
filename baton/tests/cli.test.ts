@@ -182,6 +182,8 @@ test("unpark clears the forge failure count", async () => {
 test("unpark --to moves the unit to a recipe stage; an unknown stage is rc 2", async () => {
   const st = await armedWithParkedUnit();
   expect((await runIn(st, "unpark", "r1", "planner", "--to", "nowhere")).rc).toBe(2);
+  // a terminal is never a stage (validate refuses a stage so named), so --to cannot name one
+  for (const t of ["done", "park"]) expect((await runIn(st, "unpark", "r1", "planner", "--to", t)).rc).toBe(2);
   expect(runJson(st, "r1").units.planner.parked).toBeDefined();
   expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
   expect(runJson(st, "r1").units.planner.stage).toBe("work");

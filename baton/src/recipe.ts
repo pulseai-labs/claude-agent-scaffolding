@@ -200,6 +200,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
   const stageNames = new Set(Object.keys(stages));
   for (const name of stageNames) {
     if (!STAGE_NAME_RE.test(name)) err(`stages.${name}`, "stage name must match ^[a-z0-9_-]+$");
+    else if (TERMINALS.includes(name)) err(`stages.${name}`, `"${name}" is a terminal (done, park), not a stage name`);
   }
   const target = (path: string, to: unknown) => {
     if (!isStr(to)) err(path, "must be a stage name, done or park");
