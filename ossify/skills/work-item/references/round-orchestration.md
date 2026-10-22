@@ -411,7 +411,8 @@ inventory gave it. `close-finished` skips dispatch entirely — default mode
 hands it to close Route A as a complete return with the recorded `report_path`,
 summary `recovered on resume: return lost with the prior session`, and
 `stage_status all_staged` (close's gate runs in full); external mode sends it
-in the round's request set (`external-executor.md` §2a). An item already
+in the round's request set (`external-executor.md` §2a), except under
+`--detach`, where it gets no request and the caller closes it (§2b). An item already
 `complete` — a `skip` row for a merged item, or a `finish-status` /
 `finish-merge` row §2b step 4 just repaired — gets nothing here: no worktree,
 no handoff, no request, no dispatch. §7 does not wait on it again (it is

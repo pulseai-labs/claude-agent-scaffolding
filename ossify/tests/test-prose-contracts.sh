@@ -2240,6 +2240,9 @@ pin "$_EX" "| \`finish-merge\` | not repaired, nothing merged, no request; repor
   "EXT 2b: the re-entry row table has the finish-merge row"
 _r=1; ! grep -Fq 'runs §2 through §4 unchanged' "$_EX" && grep -Fq 'The lane runs `round-orchestration.md` §2 (the fresh cut' "$_EX" && _r=0
 _pin "$_r" "EXT 2b: still says 'runs §2 through §4 unchanged' instead of naming the round-orchestration steps"
+# PR #889 round 1 N2: round-orchestration section 3's external-mode request for a
+# close-finished item yields to section 2b under --detach (no request; the caller closes).
+pin "$_RO" '`--detach`, where it gets no request and the caller closes it (§2b)' "RO 3 N2: close-finished under --detach gets no request, matching EXT 2b"
 _ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$_CMD")"
 t_assert_eq '"<id> [--pr]"' "$_ah" "close.md argument-hint declares the optional flag"
 
