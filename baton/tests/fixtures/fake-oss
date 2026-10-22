@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# A stand-in for ossify's `oss`, for the ossify-spine recipe tests. It reads and writes
+# $PWD/.ossify/project-state.json with jq and knows only the verbs the recipe calls;
+# any other verb exits 2, as the real `oss` does for a verb it does not know.
+set -euo pipefail
+
+sf="$PWD/.ossify/project-state.json"
+
+write() { # $1=jq program; the rest are jq args. Temp file, then mv.
+  local prog="$1"; shift
+  local tmp="$sf.tmp.$$"
+  jq "$@" "$prog" "$sf" > "$tmp"
+  mv "$tmp" "$sf"
+}
+
+verb="${1:-}"
+case "$verb" in
+  get)
+    [ "$#" -eq 2 ] || exit 2
+    jq -r "$2" "$sf"
+    ;;
+  work_item_dispatched)
+    [ "$#" -eq 2 ] || exit 2
+    write '(.work_items[] | select(.id == $w) | .dispatches) |= ((. // 0) + 1)' --arg w "$2"
+    ;;
+  work_item_status)
+    [ "$#" -eq 3 ] || exit 2
+    write '(.work_items[] | select(.id == $w) | .status) = $s' --arg w "$2" --arg s "$3"
+    ;;
+  work_item_pr)
+    [ "$#" -eq 3 ] || exit 2
+    write '(.work_items[] | select(.id == $w) | .pr_url) = $u' --arg w "$2" --arg u "$3"
+    ;;
+  *)
+    echo "fake-oss: unknown verb: $verb" >&2
+    exit 2
+    ;;
+esac

@@ -1,0 +1,3 @@
+# Close
+
+Run `skill://close <work item> --pr`. On any red gate, whichever layer halts, write ossify's `OSSIFY CORRECTION CONTINUATION v1` packet (`work-item/references/correction-continuation.md` §2) to the correction packet file and end: `handoff_path` and `work_item_id`; `expected_branch` the branch; `expected_head_sha` the base SHA (implementers never commit); `expected_tree_oid` from `git -C <worktree> write-tree` at the gate; `failures` every source-tagged finding. The dispatcher routes the correction. Any other halt — a merge conflict, an identity check, the remote leg — is a stop. Never pick a recovery option.
