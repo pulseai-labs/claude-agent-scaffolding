@@ -286,17 +286,19 @@ read-only `oss spine_inventory` — one row per hosting repo (`fresh`, `ok`,
 `finish-status`, `reattach`, `in-flight` (since 1.26.0), or a named halt, among them
 `halt:pr-not-local`); any halt row stops the lane
 having changed nothing, and the repairable rows are repaired before the resume
-round runs. Two optional state fields carry what a respawned session cannot
-recover from context, and both read as absent on a journal an earlier 1.x
+round runs. Optional state fields carry what a respawned session cannot
+recover from context, and each reads as absent on a journal an earlier 1.x
 wrote, so there is no schema bump: `spines[].bases`, recorded by the fresh arm
 at cut time with `oss spine_base_set` and read back with `oss spine_base_get`
 (a recorded base is validated — it must be a local branch that exists in that
 repo — and it is evidence: a different value refuses rc 7, with
 `oss spine_base_reset` named as the sanctioned operator correction, journaled
 as its own op; it is never re-derived from HEAD, which is the spine branch by
-then), and
+then),
 `work_items[].dispatches`, counted with `oss work_item_dispatched` before every
-dispatch, so the 3-dispatch cap survives a session loss. `oss worktree_reattach`
+dispatch, so the 3-dispatch cap survives a session loss, and (since 1.26.0)
+`work_items[].pr_url`, recorded by `/close <wi-id> --pr` with
+`oss work_item_pr`, which re-entry reads to route an item as `in-flight`. `oss worktree_reattach`
 re-attaches a work item's worktree whose directory was deleted but whose branch
 survives, refusing a branch that is live elsewhere, a locked registration, or a
 missing branch — and pruning nothing. On the external seam,
