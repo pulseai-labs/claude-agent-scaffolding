@@ -218,6 +218,10 @@ describe("render", () => {
   test("render refuses an unknown name at run time", () => {
     expect(() => render("{bogus}", scope)).toThrow();
     expect(() => render("{param.missing}", scope)).toThrow();
+    // a param is an own value only: nothing is read through the prototype chain
+    expect(() => render("{param.constructor}", scope)).toThrow('unknown param "constructor"');
+    const own = { ...scope, param: JSON.parse('{"constructor": "c", "__proto__": "p"}') };
+    expect(render("{param.constructor} {param.__proto__}", own)).toBe("c p");
     expect(() => render("{unit.vars.missing}", scope)).toThrow();
   });
 

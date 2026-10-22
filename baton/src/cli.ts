@@ -84,7 +84,8 @@ async function armCmd(args: string[]): Promise<number> {
   let file: string | undefined;
   let runId: string | undefined;
   let noTimer = false;
-  const given: Record<string, string> = {};
+  // Null prototype, own-property reads: a param named constructor or __proto__ is a param like any other.
+  const given: Record<string, string> = Object.create(null);
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === "--run") runId = args[++i];
@@ -117,7 +118,7 @@ async function armCmd(args: string[]): Promise<number> {
   const recipe = res.recipe;
 
   const declared = new Set(recipe.params);
-  const missing = recipe.params.filter((p) => !(p in given));
+  const missing = recipe.params.filter((p) => !Object.prototype.hasOwnProperty.call(given, p));
   const extra = Object.keys(given).filter((p) => !declared.has(p));
   if (missing.length) return fail(`missing param: ${missing.join(", ")}`);
   if (extra.length) return fail(`undeclared param: ${extra.join(", ")}`);

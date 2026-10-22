@@ -67,6 +67,29 @@ test("arm writes a frozen recipe and seed units", async () => {
   expect(ev.map((e) => e.kind)).toEqual(["armed"]);
 });
 
+test("arm checks params by own property: constructor and __proto__ are params like any other", async () => {
+  for (const name of ["constructor", "__proto__"]) {
+    const rec = JSON.parse(readFileSync(RELAY, "utf8"));
+    rec.params = [...rec.params, name];
+    const file = join(newState(), "r.json");
+    writeFileSync(file, JSON.stringify(rec));
+    const st = newState();
+    const missing = await runIn(st, "arm", file, "--run", "r1", ...PARAMS, "--no-timer");
+    expect(missing.rc).toBe(2);
+    expect(missing.err).toContain(`missing param: ${name}`);
+    // adjacent control: given, it arms and is stored as an own value
+    expect((await runIn(st, "arm", file, "--run", "r1", ...PARAMS, "--param", `${name}=v`, "--no-timer")).rc).toBe(0);
+    const params = runJson(st, "r1").params;
+    expect(Object.prototype.hasOwnProperty.call(params, name)).toBe(true);
+    expect(params[name]).toBe("v");
+    // undeclared, it is refused rather than dropped
+    const st2 = newState();
+    const extra = await runIn(st2, "arm", RELAY, "--run", "r1", ...PARAMS, "--param", `${name}=v`, "--no-timer");
+    expect(extra.rc).toBe(2);
+    expect(extra.err).toContain(`undeclared param: ${name}`);
+  }
+});
+
 test("arm refuses a reused run id and leaves state unchanged", async () => {
   const st = newState();
   expect((await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer")).rc).toBe(0);
