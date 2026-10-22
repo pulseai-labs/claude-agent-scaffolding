@@ -2,7 +2,7 @@
 // hands in what it owns (events, parking, stage moves, hooks); this file decides.
 
 import { existsSync } from "node:fs";
-import { landed, prUrl, type Forge, type PrView } from "./forge.ts";
+import { ForgeReadError, landed, prUrl, type Forge, type PrView } from "./forge.ts";
 import { render, type MergeStage, type Scope } from "./recipe.ts";
 import type { RunState, UnitState } from "./state.ts";
 
@@ -37,14 +37,16 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export async function mergeUnit(env: MergeEnv, u: UnitState, stage: MergeStage): Promise<void> {
   const base0 = env.scope(u);
-  const url = await prUrl(stage.pr.map((a) => render(a, base0)), env.run.dir); // a bad URL throws PrUrlError
+  // A bad URL throws PrUrlError (parks at once); a failed read throws ForgeReadError, which
+  // the engine counts and retries.
+  const url = await prUrl(stage.pr.map((a) => render(a, base0)), env.run.dir);
   let view: PrView;
   try {
     view = await viewOnce(env.forge, env.prViews, url);
   } catch (e) {
-    env.ev("view failed", { unit: u.id, pr: url, reason: message(e) });
-    return; // read again next tick
+    throw new ForgeReadError("pr view failed", `${url}: ${message(e)}`);
   }
+  if (view.state !== "MERGED") delete u.forge_failures; // a read that worked
   const scope = env.scope(u, { pr: { url, head: view.head } });
   const base = render(stage.base, scope);
   const repo = render(stage.repo, scope);
@@ -54,9 +56,9 @@ export async function mergeUnit(env: MergeEnv, u: UnitState, stage: MergeStage):
     try {
       ok = await landed(repo, base, view.head);
     } catch (e) {
-      env.ev("landed check failed", { unit: u.id, pr: url, reason: message(e) });
-      return; // the check could not run: read again next tick
+      throw new ForgeReadError("landed failed", `${url}: ${message(e)}`); // could not run: retried
     }
+    // A landed check that ran ends in a park or a move; the move's stage entry resets the count.
     if (!ok) {
       env.ev("not landed", { unit: u.id, pr: url, head: view.head, base });
       return env.park(u, "not landed");

@@ -2,7 +2,13 @@
 // baton's client: `initialize` (issuing a session id), `notifications/initialized`, `tools/call`,
 // and the closing `DELETE`. Nothing here talks to a real service.
 
-export type ToolReply = { result?: unknown; isError?: boolean; rpcError?: { code: number; message: string } };
+export type ToolReply = {
+  result?: unknown;
+  isError?: boolean;
+  rpcError?: { code: number; message: string };
+  /** Answer the tools/call with this exact response instead (an ambiguous reply). */
+  raw?: () => Response;
+};
 export type ToolHandler = (name: string, args: Record<string, unknown>) => ToolReply;
 export type Seen = { method: string; headers: Record<string, string>; body: any };
 
@@ -54,6 +60,7 @@ export function startStub(opts: StubOptions): Stub {
         const { name, arguments: args } = body.params;
         calls.push({ name, args });
         const r = opts.tools ? opts.tools(name, args) : { result: {} };
+        if (r.raw) return r.raw();
         if (r.rpcError) return reply({ jsonrpc: "2.0", id: body.id, error: r.rpcError });
         return reply({
           jsonrpc: "2.0",

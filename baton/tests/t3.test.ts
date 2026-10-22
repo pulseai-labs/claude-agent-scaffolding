@@ -196,6 +196,9 @@ describe("baton t3", () => {
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { LaunchError, type LaunchRequest } from "../src/host.ts";
+import { main } from "../src/cli.ts";
+import { tick } from "../src/engine.ts";
+import { openStore } from "../src/state.ts";
 import { T3Host } from "../src/hosts/t3.ts";
 
 const FIX = join(import.meta.dir, "fixtures", "t3");
@@ -285,9 +288,15 @@ describe("T3Host.status", () => {
     expect((await w.host.status("mcp:t1")).state).toBe("active");
   });
 
+  test("an interrupted run with no active run maps to interrupted, not failed", async () => {
+    const w = world();
+    w.tool.t3_thread_read = readReturning("thread-read-completed.json", (j) => (j.recentRuns[0].status = "interrupted"));
+    expect((await w.host.status("mcp:t1")).state).toBe("interrupted");
+  });
+
   test("each failure run status maps to failed", async () => {
     const w = world();
-    for (const st of ["failed", "interrupted", "cancelled", "rolled_back"]) {
+    for (const st of ["failed", "cancelled", "rolled_back"]) {
       w.tool.t3_thread_read = readReturning("thread-read-completed.json", (j) => (j.recentRuns[0].status = st));
       expect([st, (await w.host.status("mcp:t1")).state]).toEqual([st, "failed"]);
     }
@@ -444,6 +453,42 @@ describe("T3Host.bind and launch", () => {
   });
 });
 
+describe("T3Host.launch: a reply that is neither a success nor a refusal is an unknown outcome", () => {
+  const sse = (text: string) => () => new Response(text, { headers: { "content-type": "text/event-stream" } });
+  const ambiguous: [string, World["tool"][string] | (() => any), RegExp][] = [
+    ["a non-auth HTTP 4xx", () => ({ raw: () => new Response("busy", { status: 409 }) }), /outcome unknown: HTTP 409$/],
+    ["a body that is not JSON", () => ({ raw: () => new Response("<html>oops</html>", { headers: { "content-type": "application/json" } }) }), /outcome unknown: reply is not JSON$/],
+    ["a stream that ends without the reply", () => ({ raw: sse('event: message\ndata: {"jsonrpc":"2.0","method":"notifications/progress","params":{}}\n\n') }), /outcome unknown: no JSON-RPC reply with the request id$/],
+    ["a JSON-RPC error", () => ({ rpcError: { code: -32603, message: "internal error" } }), /outcome unknown: JSON-RPC error -32603: internal error$/],
+    ["a reply with no threadId", () => ({ result: { status: "accepted" } }), /outcome unknown: reply has no threadId$/],
+  ];
+  for (const [name, handler, why] of ambiguous) {
+    test(`${name} raises HostDownError naming the cause, never the token`, async () => {
+      const w = world();
+      w.tool.t3_thread_launch = handler as World["tool"][string];
+      const e = await thrown(w.host.launch(req(w.root)));
+      expect(e).toBeInstanceOf(HostDownError);
+      expect(e).not.toBeInstanceOf(LaunchError);
+      expect(e.message).toMatch(why);
+      expect(e.message).not.toContain(TOKEN);
+      expect(w.stub.calls.filter((c) => c.name === "t3_thread_launch").length).toBe(1);
+    });
+  }
+
+  test("control: a tool error result for the launch is still a LaunchError", async () => {
+    const w = world();
+    w.tool.t3_thread_launch = () => ({ isError: true, result: { code: "invalid_request", message: "no such instance" } });
+    const e = await thrown(w.host.launch(req(w.root)));
+    expect(e).toBeInstanceOf(LaunchError);
+    expect(e.message).toContain("no such instance");
+  });
+
+  test("control: a success with a threadId still launches", async () => {
+    const w = world();
+    expect(await w.host.launch(req(w.root))).toEqual({ threadId: fixture("launch.json").threadId });
+  });
+});
+
 describe("T3Host.release", () => {
   test("dir equal to cwd is a no-op", async () => {
     const w = world();
@@ -495,5 +540,66 @@ describe("T3Host.findByNonce and interrupt", () => {
     w.tool.t3_thread_read = () => ({ isError: true, result: fixture("thread-read-not-found.json").error });
     await w.host.interrupt("mcp:gone", "stop");
     expect(w.stub.calls.some((c) => c.name === "t3_thread_interrupt")).toBe(false);
+  });
+});
+
+// ---- the engine over T3Host: an unknown launch outcome is adopted, never relaunched ------
+
+describe("engine over T3Host", () => {
+  const savedConfig = process.env.BATON_CONFIG;
+  afterEach(() => {
+    if (savedConfig === undefined) delete process.env.BATON_CONFIG;
+    else process.env.BATON_CONFIG = savedConfig;
+  });
+
+  test("an ambiguous launch reply keeps session, claim and directory; the next tick adopts by nonce", async () => {
+    const w = world();
+    const base = realpathSync(mkdtempSync(join(tmpdir(), "baton-t3-eng-")));
+    process.env.BATON_CONFIG = join(base, "config.json"); // absent: defaults
+    const made: { threadId: string; title: string }[] = [];
+    w.tool.t3_thread_launch = (a) => {
+      made.push({ threadId: `th-${made.length + 1}`, title: a.title });
+      return { raw: () => new Response("<html>gateway</html>", { headers: { "content-type": "application/json" } }) } as any;
+    };
+    w.tool.t3_thread_list = (a) => ({
+      result: { threads: made.filter((t) => t.title.includes(a.titleContains)).map((t) => ({ threadId: t.threadId })), nextCursor: null },
+    });
+    const rec = {
+      version: 1, name: "rec", params: [], sources: [], seed: [{ id: "a", stage: "work" }],
+      stages: {
+        work: {
+          kind: "session", instance: "inst", model: "mod", project: "pilot-fourseat", cwd: w.root,
+          title: "t {unit.id}", message: "go", env: { K: "v" }, handoff: null,
+          outcomes: [{ when: [{ file: "{run.dir}/out.done" }], to: "done" }],
+        },
+      },
+    };
+    const file = join(base, "r.recipe.json");
+    writeFileSync(file, JSON.stringify(rec));
+    expect(await main(["arm", file, "--run", "r1", "--no-timer"])).toBe(0);
+    let clock = Date.parse("2026-10-22T10:00:00.000Z");
+    const t = () => tick({ store: openStore(w.state), host: w.host, forge: { view: async () => { throw new Error("x"); }, merge: async () => {} }, notify: () => {}, now: () => new Date(clock) });
+
+    const r1 = await t();
+    expect(r1.host).toBe("down");
+    const s1 = openStore(w.state).readRun("r1").units.a;
+    expect(s1.session?.thread_id).toBeUndefined();
+    expect(s1.launches.work ?? 0).toBe(0);
+    const dir = s1.session!.launch_dir;
+    expect(dir).toBe(join(w.state, "launch", "r1_a_work_1"));
+    expect(existsSync(dir)).toBe(true);
+    expect(existsSync(join(w.state, "claims"))).toBe(true);
+
+    clock += 60_000;
+    await t();
+    const s2 = openStore(w.state).readRun("r1").units.a;
+    expect(made.length).toBe(1);
+    expect(s2.session?.thread_id).toBe("th-1");
+    expect(s2.session?.launch_dir).toBe(dir);
+    expect(s2.launches.work).toBe(1);
+    expect(existsSync(dir)).toBe(true);
+    const evs = readFileSync(join(w.state, "runs", "r1", "events.jsonl"), "utf8");
+    expect(evs).toContain('"kind":"adopted"');
+    expect(evs).not.toContain('"kind":"launch failed"');
   });
 });

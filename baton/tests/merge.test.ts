@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
@@ -276,8 +276,150 @@ test("a view that fails is retried next tick without parking", async () => {
   await arm(mergeStage()); // no fake PR yet: view throws
   await doTick();
   expect(parkedOf("o1")).toBeUndefined();
-  expect(kinds()).toContain("view failed");
+  expect(kinds()).toContain("forge read failed");
   forge.views.set(URL1, green);
   await doTick();
   expect(forge.merges.length).toBe(1);
+});
+
+// ---- transient forge failures: one counter per unit, three in a row park ----------------
+
+const notices = () => {
+  const p = join(state, "notify.log");
+  return existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean) : [];
+};
+const failures = (u = "o1") => runState().units[u].forge_failures;
+const forgeEvents = () =>
+  readFileSync(join(state, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
+    .filter((e) => e.kind === "forge read failed");
+
+/** Ticks 1 and 2 wait with an event each; tick 3 parks `reason` and notifies. */
+async function threeStrikes(reason: string) {
+  await doTick();
+  expect([parkedOf("o1"), failures()]).toEqual([undefined, 1]);
+  await doTick();
+  expect([parkedOf("o1"), failures()]).toEqual([undefined, 2]);
+  expect(notices()).toEqual([]);
+  await doTick();
+  expect(parkedOf("o1")).toBe(reason);
+  expect(forgeEvents().map((e) => [e.what, e.failures])).toEqual([[reason, 1], [reason, 2], [reason, 3]]);
+  expect(notices().length).toBe(1);
+  expect(notices()[0]).toContain(`parked in ${stageOf("o1")}: ${reason}`);
+}
+
+test("merge stage: a view that fails 3 ticks running parks pr view failed and notifies", async () => {
+  forge.views.set(URL1, green);
+  forge.viewFails = 3;
+  await arm(mergeStage());
+  await threeStrikes("pr view failed");
+  expect(forge.merges).toEqual([]);
+});
+
+test("merge stage: a successful view resets the count", async () => {
+  forge.views.set(URL1, { ...green, checks: "pending" });
+  forge.viewFails = 2;
+  await arm(mergeStage());
+  await doTick();
+  await doTick();
+  expect(failures()).toBe(2);
+  await doTick(); // a read that works
+  expect(failures()).toBeUndefined();
+  forge.viewFails = 2;
+  await doTick();
+  await doTick();
+  expect([parkedOf("o1"), failures()]).toEqual([undefined, 2]);
+});
+
+const prArgv = () => ["sh", "-c", `[ -f "$1" ] && echo ${URL1} || exit 3`, "_", "{run.dir}/pr-ok"];
+
+test("merge stage: a pr argv that exits non-zero 3 ticks running parks pr url and notifies", async () => {
+  forge.views.set(URL1, green);
+  await arm(mergeStage({ pr: prArgv() }));
+  await threeStrikes("pr url");
+  expect(forge.viewCalls).toEqual([]);
+});
+
+test("merge stage: a pr argv that recovers resets the count and merges", async () => {
+  forge.views.set(URL1, green);
+  await arm(mergeStage({ pr: prArgv() }));
+  await doTick();
+  await doTick();
+  expect(failures()).toBe(2);
+  writeFileSync(join(state, "runs", "r1", "pr-ok"), "");
+  await doTick();
+  expect(failures()).toBeUndefined();
+  expect(forge.merges.length).toBe(1);
+});
+
+test("merge stage: a landed check that fails 3 ticks running parks landed failed and notifies", async () => {
+  const head = landPr("feat");
+  forge.views.set(URL1, { ...green, state: "MERGED", head });
+  const hidden = origin + ".away";
+  renameSync(origin, hidden); // fetch fails
+  await arm(mergeStage());
+  await threeStrikes("landed failed");
+  expect(stageOf("o1")).toBe("merge");
+});
+
+test("merge stage: a landed check that recovers resets the count and moves on", async () => {
+  const head = landPr("feat");
+  forge.views.set(URL1, { ...green, state: "MERGED", head });
+  const hidden = origin + ".away";
+  renameSync(origin, hidden);
+  await arm(mergeStage());
+  await doTick();
+  await doTick();
+  expect(failures()).toBe(2);
+  renameSync(hidden, origin);
+  await doTick();
+  expect(stageOf("o1")).toBe("done");
+  expect(failures()).toBeUndefined();
+});
+
+// A wait stage whose outcome reads a pr signal: the same counter, the same three strikes.
+const waitPr = (url: string[] = ["echo", URL1]) => ({
+  kind: "wait", outcomes: [{ when: [{ pr: { url, test: "merged" } }], to: "done" }],
+});
+
+test("pr signal: a view that fails 3 ticks running parks pr view failed and notifies", async () => {
+  forge.views.set(URL1, { ...green, state: "OPEN" });
+  forge.viewFails = 3;
+  await arm(waitPr());
+  await threeStrikes("pr view failed");
+});
+
+test("pr signal: a successful view resets the count", async () => {
+  forge.views.set(URL1, { ...green, state: "OPEN" });
+  forge.viewFails = 2;
+  await arm(waitPr());
+  await doTick();
+  await doTick();
+  expect(failures()).toBe(2);
+  await doTick();
+  expect(failures()).toBeUndefined();
+  expect(parkedOf("o1")).toBeUndefined();
+});
+
+test("pr signal: a pr argv that exits non-zero 3 ticks running parks pr url and notifies", async () => {
+  forge.views.set(URL1, { ...green, state: "MERGED" });
+  await arm(waitPr(prArgv()));
+  await threeStrikes("pr url");
+});
+
+test("pr signal: a pr argv that recovers resets the count and the outcome is taken", async () => {
+  forge.views.set(URL1, { ...green, state: "MERGED" });
+  await arm(waitPr(prArgv()));
+  await doTick();
+  await doTick();
+  writeFileSync(join(state, "runs", "r1", "pr-ok"), "");
+  await doTick();
+  expect(stageOf("o1")).toBe("done");
+  expect(failures()).toBeUndefined();
+});
+
+test("control: a pr argv that prints a non-PR URL still parks pr url at once", async () => {
+  await arm(waitPr(["echo", "https://github.com/o/r/pulls/1"]));
+  await doTick();
+  expect(parkedOf("o1")).toBe("pr url");
+  expect(forgeEvents()).toEqual([]);
 });

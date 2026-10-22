@@ -39,6 +39,8 @@ export type UnitState = {
   cwd_busy?: string;
   /** Consecutive failed `merge` calls in the current merge stage; three park the unit. */
   merge_failures?: number;
+  /** Consecutive failed forge reads (PR view, PR-URL argv, landed check); three park the unit. */
+  forge_failures?: number;
 };
 
 export type RunState = {

@@ -5,7 +5,7 @@ import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
 import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type ThreadStatus } from "../host.ts";
 import { stateDir } from "../state.ts";
-import { callTool, readToken } from "./mcp.ts";
+import { callTool, callToolClassified, readToken, type ToolCall } from "./mcp.ts";
 
 export type T3Config = { base: string; tokenFile: string };
 
@@ -40,7 +40,7 @@ export function loadT3Config(): T3Config {
 type Project = { id: string; title: string; workspaceRoot: string; deletedAt?: string | null };
 type ToolError = { error: { code?: string; message?: string } | unknown };
 
-const FAILED = new Set(["failed", "interrupted", "cancelled", "rolled_back"]);
+const FAILED = new Set(["failed", "cancelled", "rolled_back"]);
 
 const isToolError = (r: unknown): r is ToolError =>
   r !== null && typeof r === "object" && "error" in r && Object.keys(r as object).length === 1;
@@ -85,10 +85,14 @@ export class T3Host implements Host {
     return real(dir).startsWith(root + sep);
   }
 
-  private async call(name: string, args: Record<string, unknown>): Promise<unknown> {
+  private token(): string {
     const t = readToken(this.tokenFile);
     if (t.expires_at * 1000 <= Date.now()) throw new HostAuthError("token expired");
-    return callTool(this.base, t.access_token, name, args);
+    return t.access_token;
+  }
+
+  private async call(name: string, args: Record<string, unknown>): Promise<unknown> {
+    return callTool(this.base, this.token(), name, args);
   }
 
   /** The one live project titled `title`, across every page; else LaunchError. */
@@ -142,7 +146,7 @@ export class T3Host implements Host {
     if (head.out) strategy.branch = head.out;
     else if (!this.isLaunchDir(r.cwd)) throw new LaunchError(`detached HEAD in ${r.cwd}`);
     const p = await this.project(r.project);
-    const res = await this.call("t3_thread_launch", {
+    const res: ToolCall = await callToolClassified(this.base, this.token(), "t3_thread_launch", {
       projectId: p.id,
       title: r.title,
       modelSelection: { instanceId: r.instance, model: r.model },
@@ -150,9 +154,16 @@ export class T3Host implements Host {
       workspaceStrategy: strategy,
       message: r.message,
     });
-    if (isToolError(res)) throw new LaunchError(`t3_thread_launch: ${describe(res)}`);
-    const threadId = (res as { threadId?: unknown }).threadId;
-    if (typeof threadId !== "string" || !threadId) throw new LaunchError("t3_thread_launch returned no threadId");
+    // Only T3's own tool error for the launch is a refusal. Anything else that is not a
+    // success with a thread id may still have created the thread: the outcome is unknown, so
+    // the engine keeps session, claim and directory and step 0 finds the thread by nonce.
+    if (res.kind === "tool_error") throw new LaunchError(`t3_thread_launch: ${describe({ error: res.error })}`);
+    if (res.kind === "protocol") throw new HostDownError(`t3_thread_launch outcome unknown: ${res.cause}`);
+    if (res.kind === "rpc_error") {
+      throw new HostDownError(`t3_thread_launch outcome unknown: JSON-RPC error ${describe({ error: res.error })}`);
+    }
+    const threadId = (res.value as { threadId?: unknown } | null)?.threadId;
+    if (typeof threadId !== "string" || !threadId) throw new HostDownError("t3_thread_launch outcome unknown: reply has no threadId");
     return { threadId };
   }
 
@@ -175,6 +186,8 @@ export class T3Host implements Host {
     if (st === "completed" && r.thread?.activeRunId == null) return { state: "completed", activity };
     // A failure run is final only with no active run: run status alone never ends a thread.
     if (st !== undefined && FAILED.has(st) && r.thread?.activeRunId == null) return { state: "failed", activity };
+    // An interrupt is often an operator steering the thread: not a failure (see host.ts).
+    if (st === "interrupted" && r.thread?.activeRunId == null) return { state: "interrupted", activity };
     if (st === "waiting") return { state: "waiting", activity };
     return { state: "active", activity };
   }

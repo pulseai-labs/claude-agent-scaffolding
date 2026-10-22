@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { chmodSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { GhForge, prUrl, PrUrlError } from "../src/forge.ts";
+import { ForgeReadError, GhForge, prUrl, PrUrlError } from "../src/forge.ts";
 
 // A stub `gh` first on PATH: it logs its argv and replays fixture JSON. No test reaches GitHub.
 let dir: string;
@@ -99,7 +99,13 @@ test("prUrl refuses a non-PR URL", async () => {
   ]) {
     await expect(prUrl(["printf", "%s", bad])).rejects.toBeInstanceOf(PrUrlError);
   }
-  await expect(prUrl(["false"])).rejects.toBeInstanceOf(PrUrlError);
+});
+
+test("a pr argv that exits non-zero is a failed read to retry, not a bad URL", async () => {
+  const e = await prUrl(["false"]).catch((x) => x);
+  expect(e).toBeInstanceOf(ForgeReadError);
+  expect(e).not.toBeInstanceOf(PrUrlError);
+  expect((e as ForgeReadError).what).toBe("pr url");
 });
 
 test("control: prUrl accepts a PR URL, with trailing newline trimmed", async () => {

@@ -3,7 +3,7 @@
 // arm) a PR read through the forge. Nothing here judges a result.
 
 import { existsSync } from "node:fs";
-import { prUrl, type Forge, type PrView } from "./forge.ts";
+import { ForgeReadError, prUrl, type Forge, type PrView } from "./forge.ts";
 import { viewOnce } from "./merge.ts";
 import { render, type Scope, type Signal } from "./recipe.ts";
 import type { RunState, UnitState } from "./state.ts";
@@ -55,7 +55,13 @@ export async function evaluate(sig: Signal, ctx: EvalCtx): Promise<Verdict> {
   }
   if ("pr" in sig) {
     const url = await prUrl(sig.pr.url.map((a) => render(a, ctx.scope)), ctx.cwd);
-    const v = await viewOnce(ctx.forge, ctx.prViews, url);
+    let v: PrView;
+    try {
+      v = await viewOnce(ctx.forge, ctx.prViews, url);
+    } catch (e) {
+      throw new ForgeReadError("pr view failed", `${url}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    delete ctx.unit.forge_failures; // a read that worked
     ctx.scope.pr = { url, head: v.head };
     switch (sig.pr.test) {
       case "open": return verdict(v.state === "OPEN");

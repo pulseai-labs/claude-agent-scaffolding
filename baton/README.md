@@ -41,8 +41,26 @@ days and the re-approval is manual: `baton t3 token-status` shows the days left.
 
 State lives in `${BATON_STATE_DIR:-~/.local/state/baton}`: `runs/<id>/run.json` and
 `events.jsonl`, `claims/` (one env file per launch directory, plus `lookup.log`), `launch/`
-(per-launch worktrees), `notify.log`, and a `lock`. Config is the optional
-`${BATON_CONFIG:-~/.config/baton/config.json}`, whose `t3` block sets `base` and `tokenFile`.
+(per-launch worktrees), `notify.log`, and a `lock`.
+
+Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every key is optional:
+
+- `t3.base`: the T3 `/mcp` URL (default `https://draco-desk.tail71316d.ts.net:8445/mcp`).
+- `t3.tokenFile`: the token path, `~` expanded (default `~/.config/spine-autopilot/t3-token.json`).
+- `notify`: an argv run with no shell for each notice, `{message}` replaced by the notice text,
+  bounded at 30 s; its failure never fails a tick. Each notice is sent once per key and is always
+  appended to `<state>/notify.log`, which is the only sink when `notify` is unset.
+- `slots`: per-slot caps on concurrent sessions across all runs (positive integers), over the
+  recipe's `slots`, over the defaults `{"session": 2, "build": 1}`.
+
+```json
+{
+  "t3": { "base": "https://draco-desk.tail71316d.ts.net:8445/mcp" },
+  "notify": ["notify-send", "baton", "{message}"],
+  "slots": { "session": 3 }
+}
+```
+
 `bin/omp-t3-claim` is the launcher a T3 provider instance points at: it applies the claim for its
 working directory and then runs `omp-t3`; with no claim the instance is untouched.
 

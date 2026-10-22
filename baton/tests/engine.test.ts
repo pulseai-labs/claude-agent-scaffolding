@@ -600,6 +600,57 @@ test("a failed thread counts the attempt and relaunches", async () => {
   expect(runState().units.a.launches.work).toBe(2);
 });
 
+test("an interrupted thread keeps its claim and directory through the settle window, then counts one no-result", async () => {
+  await arm(recipe({ work: sess({ settle_minutes: 10, watch: ["{run.dir}/out"] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "interrupted" } });
+  host.bindDir = (_p, cwd, nonce) => {
+    const d = join(root, "launch", nonce.replaceAll("/", "_"));
+    mkdirSync(d, { recursive: true });
+    return d;
+  };
+  await doTick();
+  host.advance();
+  at(1);
+  const r1 = await doTick(); // interrupted, no outcome yet: quiet from here
+  expect(r1.launched).toEqual([]);
+  expect(count("thread failed")).toBe(0);
+  at(9);
+  await doTick();
+  expect(host.releases).toEqual([]);
+  expect(host.launches.length).toBe(1);
+  expect(claimFiles().length).toBe(1);
+  expect(runState().units.a.session?.thread_id).toBe("thread-1");
+  expect(count("no-result")).toBe(0);
+  at(11);
+  await doTick();
+  expect(count("no-result")).toBe(1);
+  expect(host.releases.length).toBe(1);
+  expect(host.launches.length).toBe(2);
+});
+
+test("an interrupted thread whose outcome is met moves on, like a completed one", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "interrupted", writes: [DONE_WRITE()] } });
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  expect(runState().units.a.stage).toBe("done");
+  expect(host.launches.length).toBe(1);
+});
+
+test("control: a failed thread with the same setup releases and relaunches at once", async () => {
+  await arm(recipe({ work: sess({ settle_minutes: 10, watch: ["{run.dir}/out"] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  expect(count("thread failed")).toBe(1);
+  expect(host.releases.length).toBe(1);
+  expect(host.launches.length).toBe(2);
+});
+
 test("claim removed on every exit path", async () => {
   const key = (u: string) => claimKey(join(root, "w", u));
   // outcome

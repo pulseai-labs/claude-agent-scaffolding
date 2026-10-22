@@ -21,11 +21,17 @@ export class FakeForge implements Forge {
   viewCalls: string[] = [];
   merges: { url: string; head: string }[] = [];
   mergeFails = 0;
+  /** The next `viewFails` views throw, as a transient `gh` failure would. */
+  viewFails = 0;
   /** When set, every view returns a fresh head `<prefix><n>`. */
   rotateHead: string | null = null;
   private n = 0;
   async view(url: string): Promise<PrView> {
     this.viewCalls.push(url);
+    if (this.viewFails > 0) {
+      this.viewFails--;
+      throw new Error("gh pr view failed: HTTP 502");
+    }
     const v = this.views.get(url);
     if (!v) throw new Error(`no fake PR ${url}`);
     return this.rotateHead === null ? { ...v } : { ...v, head: `${this.rotateHead}${++this.n}` };

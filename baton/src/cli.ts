@@ -241,6 +241,7 @@ async function unparkCmd(args: string[]): Promise<number> {
     delete unit.parked;
     unit.stalls = 0;
     delete unit.merge_failures;
+    delete unit.forge_failures;
     unit.launches[unit.stage] = 0;
     if (to !== undefined) unit.stage = to;
     store.writeRun(run);

@@ -13,7 +13,11 @@ export type LaunchRequest = {
 };
 
 export type ThreadStatus = {
-  state: "active" | "completed" | "failed" | "waiting" | "gone";
+  /**
+   * `interrupted`: the turn was stopped from outside (often an operator about to steer). The
+   * engine treats it like `completed`: outcomes, then the quiet window, never an immediate drop.
+   */
+  state: "active" | "completed" | "interrupted" | "failed" | "waiting" | "gone";
   /** Opaque mark that changes whenever the thread does. */
   activity: string;
 };
@@ -43,7 +47,9 @@ export class LaunchError extends Error {
 }
 
 // No host error other than HostAuthError and HostDownError reaches the engine as an
-// exception; anything else is a failed launch.
+// exception; LaunchError is a refusal the host is sure of. A launch whose outcome the host
+// cannot tell (the thread may exist) throws HostDownError, so the engine keeps the session
+// and finds the thread again by nonce.
 export interface Host {
   /** The directory the thread will start in. Stateless across ticks. */
   bind(project: string, cwd: string, nonce: string, mode: "worktree" | "root"): Promise<string>;

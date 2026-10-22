@@ -8,7 +8,7 @@ import { HostAuthError, HostDownError, type Host, type LaunchRequest, type Threa
 export type Behaviour = {
   ticks: number;
   writes?: { path: string; content: string }[];
-  end: "completed" | "failed" | "waiting";
+  end: "completed" | "failed" | "waiting" | "interrupted";
   handoffLine?: string;
   loseResponse?: boolean;
 };

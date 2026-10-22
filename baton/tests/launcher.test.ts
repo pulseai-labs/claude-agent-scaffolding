@@ -103,6 +103,34 @@ test("control: the same claim at mode 600 launches", () => {
   expect(r.json.env.A).toBe("1");
 });
 
+test("a directory at the claim path exits 78, logs invalid 0, and launches nothing", () => {
+  mkdirSync(claimFile(proj));
+  const r = run(proj);
+  expect(r.rc).toBe(78);
+  expect(r.out).toBe("");
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ invalid 0 cwd /);
+});
+
+test("a FIFO at the claim path exits 78, logs invalid 0, and does not hang", () => {
+  const f = claimFile(proj);
+  expect(Bun.spawnSync(["mkfifo", f]).exitCode).toBe(0);
+  const p = Bun.spawnSync(["timeout", "5", LAUNCHER], {
+    cwd: proj, stdout: "pipe", stderr: "pipe",
+    env: { ...process.env, HOME: home, BATON_STATE_DIR: state, BATON_OMP_T3: fake },
+  });
+  expect(p.exitCode).toBe(78);
+  expect(p.stdout.toString()).toBe("");
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ invalid 0 cwd /);
+});
+
+test("control: a regular claim file at the same path launches", () => {
+  writeFileSync(claimFile(proj), "# baton n1\nA=1\n");
+  const r = run(proj);
+  expect(r.rc).toBe(0);
+  expect(r.json.env.A).toBe("1");
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ n1 cwd /);
+});
+
 test("drop removes only the T3 extension pair", () => {
   writeFileSync(claimFile(proj), "# baton n1\nOMP_T3_DROP_T3_MCP=1\n");
   const a = run(proj, ["--extension", "/x/pi-t3-mcp-extension.ts", "--extension", "/y/other.ts", "--mode", "rpc"]);

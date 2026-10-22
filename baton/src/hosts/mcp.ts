@@ -36,6 +36,8 @@ export function readToken(path: string): Token {
 }
 
 type RpcReply = { id?: unknown; result?: any; error?: unknown };
+/** A reply that is no JSON-RPC answer at all: the server's outcome is unknown. */
+type Protocol = { protocol: string; error: unknown };
 
 async function post(base: string, token: string, body: object, session?: string): Promise<{ res: Response; session?: string }> {
   const headers: Record<string, string> = {
@@ -61,14 +63,14 @@ async function post(base: string, token: string, body: object, session?: string)
 }
 
 /** The JSON-RPC reply with `id`, from a JSON body or a `text/event-stream` body. */
-async function reply(res: Response, id: number): Promise<RpcReply> {
+async function reply(res: Response, id: number): Promise<RpcReply | Protocol> {
   let text: string;
   try {
     text = await res.text();
   } catch {
     throw new HostDownError("host reply was cut off");
   }
-  if (!res.ok) return { error: { http: res.status, body: text.slice(0, 200) } };
+  if (!res.ok) return { protocol: `HTTP ${res.status}`, error: { http: res.status, body: text.slice(0, 200) } };
   const type = res.headers.get("content-type") ?? "";
   const messages: unknown[] = [];
   if (type.includes("text/event-stream")) {
@@ -90,15 +92,15 @@ async function reply(res: Response, id: number): Promise<RpcReply> {
       const v = JSON.parse(text);
       messages.push(...(Array.isArray(v) ? v : [v]));
     } catch {
-      return { error: { message: "reply is not JSON" } };
+      return { protocol: "reply is not JSON", error: { message: "reply is not JSON" } };
     }
   }
   const mine = messages.find((m) => (m as RpcReply)?.id === id) as RpcReply | undefined;
-  return mine ?? { error: { message: "no JSON-RPC reply with the request id" } };
+  return mine ?? { protocol: "no JSON-RPC reply with the request id", error: { message: "no JSON-RPC reply with the request id" } };
 }
 
 /** The tool's own result: structured content when present, else its text parsed as JSON. */
-function toolResult(result: any): unknown {
+function toolResult(result: any): ToolCall {
   let value: unknown = result?.structuredContent;
   if (value === undefined) {
     const text = Array.isArray(result?.content) ? result.content.find((c: any) => c?.type === "text")?.text : undefined;
@@ -110,14 +112,36 @@ function toolResult(result: any): unknown {
       }
     } else value = result;
   }
-  return result?.isError ? { error: value } : value;
+  return result?.isError ? { kind: "tool_error", error: value } : { kind: "result", value };
 }
 
 /**
+ * One tool call, classified. `result` and `tool_error` are the tool's own answer; `rpc_error`
+ * is a JSON-RPC error object; `protocol` is a reply that answers nothing (an HTTP 4xx other
+ * than auth, a body that is not JSON, a stream with no reply to the request), so the server's
+ * outcome is unknown. `cause` never carries the token.
+ */
+export type ToolCall =
+  | { kind: "result"; value: unknown }
+  | { kind: "tool_error"; error: unknown }
+  | { kind: "rpc_error"; error: unknown }
+  | { kind: "protocol"; cause: string; error: unknown };
+
+const classify = (r: RpcReply | Protocol): ToolCall | null =>
+  "protocol" in r ? { kind: "protocol", cause: r.protocol, error: r.error }
+    : r.error !== undefined ? { kind: "rpc_error", error: r.error } : null;
+
+/**
  * Call one MCP tool. Auth failures throw `HostAuthError`, an unreachable or failing server
- * throws `HostDownError`; a JSON-RPC or tool error is returned as `{error}`.
+ * throws `HostDownError`; a JSON-RPC, tool or protocol error is returned as `{error}`.
  */
 export async function callTool(base: string, token: string, name: string, args: Record<string, unknown>): Promise<unknown> {
+  const r = await callToolClassified(base, token, name, args);
+  return r.kind === "result" ? r.value : { error: r.error };
+}
+
+/** `callTool`, with the kind of answer kept: a caller that must tell a refusal from an unknown outcome. */
+export async function callToolClassified(base: string, token: string, name: string, args: Record<string, unknown>): Promise<ToolCall> {
   const init = await post(base, token, {
     jsonrpc: "2.0",
     id: 1,
@@ -125,15 +149,15 @@ export async function callTool(base: string, token: string, name: string, args: 
     params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "baton", version: "0.1.0" } },
   });
   const hello = await reply(init.res, 1);
-  if (hello.error !== undefined) return { error: hello.error };
+  const bad = classify(hello);
+  if (bad) return bad;
   const session = init.session;
   try {
     const note = await post(base, token, { jsonrpc: "2.0", method: "notifications/initialized" }, session);
     await note.res.arrayBuffer().catch(() => undefined);
     const call = await post(base, token, { jsonrpc: "2.0", id: 2, method: "tools/call", params: { name, arguments: args } }, session);
     const r = await reply(call.res, 2);
-    if (r.error !== undefined) return { error: r.error };
-    return toolResult(r.result);
+    return classify(r) ?? toolResult((r as RpcReply).result);
   } finally {
     if (session) {
       // Best effort: a session the server keeps a little longer harms nothing.

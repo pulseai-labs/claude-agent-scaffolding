@@ -7,7 +7,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claims.ts";
-import { PrUrlError, type Forge, type PrView } from "./forge.ts";
+import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
 import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest } from "./host.ts";
 import { readConfig, type Config } from "./notify.ts";
 import {
@@ -240,6 +240,7 @@ class RunTick {
     u.record_at_entry = u.record_seen;
     delete u.cwd_busy;
     delete u.merge_failures;
+    delete u.forge_failures;
     this.save();
     this.ev("transition", { unit: u.id, from, to: o.to });
     this.report.transitioned.push(u.id);
@@ -297,6 +298,14 @@ class RunTick {
       await fn();
     } catch (e) {
       if (isHostError(e)) throw e;
+      if (e instanceof ForgeReadError) {
+        // Transient until proven otherwise: wait, and park only at the third in a row.
+        u.forge_failures = (u.forge_failures ?? 0) + 1;
+        this.ev("forge read failed", { unit: u.id, what: e.what, failures: u.forge_failures, reason: e.message });
+        this.save();
+        if (u.forge_failures >= FORGE_FAILURES_TO_PARK) await this.park(u, e.what);
+        return;
+      }
       if (e instanceof PrUrlError) {
         this.ev("pr url", { unit: u.id, reason: e.message });
         await this.park(u, "pr url");
@@ -522,7 +531,7 @@ class RunTick {
           else await this.endSession(u);
           return;
         }
-        // completed
+        // completed or interrupted: outcomes, then the quiet window; an interrupt never drops at once
         const o = await this.firstOutcome(u, stage.outcomes, this.existingDir(render(stage.cwd, scope)));
         if (o === "pending") return;
         if (o) return this.takeOutcome(u, o, this.existingDir(s.launch_dir, render(stage.cwd, scope)));

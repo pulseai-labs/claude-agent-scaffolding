@@ -22,6 +22,22 @@ export class PrUrlError extends Error {
   }
 }
 
+/** What a failed forge read was reading; also the park reason at the third failure in a row. */
+export type ForgeRead = "pr view failed" | "pr url" | "landed failed";
+
+/**
+ * A forge read that failed and may work next tick (a `gh` 502, a rate limit, a network blip).
+ * The engine counts these per unit; `FORGE_FAILURES_TO_PARK` in a row park it.
+ */
+export class ForgeReadError extends Error {
+  constructor(public what: ForgeRead, message: string) {
+    super(message);
+    this.name = "ForgeReadError";
+  }
+}
+
+export const FORGE_FAILURES_TO_PARK = 3;
+
 const PR_URL_RE = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/[0-9]+$/;
 const GH_TIMEOUT_MS = 120_000;
 
@@ -39,12 +55,13 @@ async function run(argv: string[], cwd?: string, timeoutMs = GH_TIMEOUT_MS): Pro
 }
 
 /**
- * Run the stage's `pr` argv (no shell) and return its output as a PR URL. The shape check is a
- * safety rail on open input: it only adds a stop, and approves nothing.
+ * Run the stage's `pr` argv (no shell) and return its output as a PR URL. A non-zero exit is a
+ * failed read (`ForgeReadError`, retried). The shape check is a safety rail on open input: it
+ * only adds a stop, and approves nothing.
  */
 export async function prUrl(argv: string[], cwd?: string): Promise<string> {
   const r = await run(argv, cwd, 60_000);
-  if (r.rc !== 0) throw new PrUrlError(`pr argv ${JSON.stringify(argv)} did not exit 0`);
+  if (r.rc !== 0) throw new ForgeReadError("pr url", `pr argv ${JSON.stringify(argv)} did not exit 0`);
   const url = r.out.trim();
   if (!PR_URL_RE.test(url)) throw new PrUrlError(`not a pull request URL: ${JSON.stringify(url.slice(0, 200))}`);
   return url;
