@@ -857,6 +857,23 @@ test("a record whose id names an Object.prototype member is an invalid record", 
   expect(Object.keys(runState().units)).toEqual(["toStrings"]);
 });
 
+test("a rewritten record updates a known unit's vars and keeps its group and order", async () => {
+  await arm(sourced([{ when: [{ file: "{run.dir}/never" }], to: "done" }]));
+  host = new FakeHost({});
+  record("a.json", { id: "a", group: 1, order: 1, task: "x" });
+  await doTick();
+  expect(runState().units.a.vars).toEqual({ task: "x" });
+  record("a.json", { id: "a", group: 5, order: 9, task: "x, answered" });
+  await doTick();
+  const u = runState().units.a;
+  expect(u.vars).toEqual({ task: "x, answered" });
+  expect(u.group).toBe(1);
+  expect(u.order).toBe(1);
+  // control: an unchanged record leaves vars as they are
+  await doTick();
+  expect(runState().units.a.vars).toEqual({ task: "x, answered" });
+});
+
 test("record_changed is true only after a new digest", async () => {
   await arm(sourced([{ when: [{ record_changed: true }], to: "done" }]));
   host = new FakeHost({});

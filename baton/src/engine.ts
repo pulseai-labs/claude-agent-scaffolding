@@ -435,6 +435,9 @@ class RunTick {
       const known = own(this.run.units, rec.id);
       if (known) {
         known.record_seen = rec.digest;
+        // vars follow the record on every read (a rewrite is how the planner answers a gap);
+        // group and order stay as first seen, because merge order and group counts key on them.
+        known.vars = rec.vars;
         continue;
       }
       this.run.units[rec.id] = {

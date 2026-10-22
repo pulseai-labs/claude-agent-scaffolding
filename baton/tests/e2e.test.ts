@@ -172,6 +172,10 @@ test("relay with a gap re-enters through the planner", async () => {
   expect(existsSync(join(runDir, "out", "a.gaps"))).toBe(false); // the gap outcome's hook consumed it
   expect(workLaunches(host, "a")).toHaveLength(2);
   expect(workLaunches(host, "b")).toHaveLength(1);
+  // The answer reaches the worker: a's second launch carries the rewritten task, its first the original.
+  expect(workLaunches(host, "a")[0].request.message).toContain("task a");
+  expect(workLaunches(host, "a")[0].request.message).not.toContain("gap answered");
+  expect(workLaunches(host, "a")[1].request.message).toContain("task a, gap answered");
   expect(host.launches.filter((l) => l.request.title.startsWith("plan "))).toHaveLength(3);
   // The answering planner is not relaunched while a is still in regap; a reworks before the final planner.
   expect(course()).toEqual([
