@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
 import { exitCode, tick } from "./engine.ts";
-import type { Forge } from "./forge.ts";
+import { GhForge } from "./forge.ts";
 import { HostAuthError, HostDownError } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
 import { loadT3Config, T3Host } from "./hosts/t3.ts";
@@ -274,12 +274,6 @@ function reportCmd(args: string[]): number {
 
 const DAY_MS = 86_400_000;
 
-/** Merge stages are not wired yet: any call is an error the tick reports. */
-const noForge: Forge = {
-  view: async () => { throw new Error("no forge configured: merge stages are not available in this build"); },
-  merge: async () => { throw new Error("no forge configured: merge stages are not available in this build"); },
-};
-
 async function tickCmd(args: string[]): Promise<number> {
   let runId: string | undefined;
   if (args.length === 2 && args[0] === "--run" && RUN_ID_RE.test(args[1])) runId = args[1];
@@ -296,7 +290,7 @@ async function tickCmd(args: string[]): Promise<number> {
       await notifyOnce(`token/${day}`, `t3 token expires ${new Date(expiresAt * 1000).toISOString()} — run baton t3 login`);
     }
     const r = await tick({
-      store: openStore(), host: new T3Host(cfg), forge: noForge, notify: notifyOnce, now: () => new Date(), runId,
+      store: openStore(), host: new T3Host(cfg), forge: new GhForge(), notify: notifyOnce, now: () => new Date(), runId,
     });
     for (const e of r.errors) process.stderr.write(`baton tick: ${e}\n`);
     return exitCode(r);

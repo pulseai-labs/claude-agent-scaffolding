@@ -7,13 +7,14 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claims.ts";
-import type { Forge, PrView } from "./forge.ts";
+import { PrUrlError, type Forge, type PrView } from "./forge.ts";
 import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest } from "./host.ts";
 import { readConfig, type Config } from "./notify.ts";
 import {
   DEFAULT_SLOTS, DEFAULT_STAGE_SLOTS, nonce as launchNonce, render, threadTitle, UNIT_ID_RE,
-  type MergeStage, type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type WaitStage,
+  type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type WaitStage,
 } from "./recipe.ts";
+import { mergeUnit } from "./merge.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
 import type { RunState, Session, Store, UnitState } from "./state.ts";
 
@@ -235,6 +236,7 @@ class RunTick {
     u.stage = o.to;
     u.record_at_entry = u.record_seen;
     delete u.cwd_busy;
+    delete u.merge_failures;
     this.save();
     this.ev("transition", { unit: u.id, from, to: o.to });
     this.report.transitioned.push(u.id);
@@ -292,6 +294,11 @@ class RunTick {
       await fn();
     } catch (e) {
       if (isHostError(e)) throw e;
+      if (e instanceof PrUrlError) {
+        this.ev("pr url", { unit: u.id, reason: e.message });
+        await this.park(u, "pr url");
+        return;
+      }
       if (e instanceof Exit0Error) {
         this.ev("exit0 error", { unit: u.id, reason: e.message });
         await this.park(u, "exit0 error");
@@ -635,17 +642,22 @@ class RunTick {
     }
   }
 
-  /** Step 5: merge stages. The forge-backed merge arm plugs in here; until then they wait. */
+  /** Step 5: merge stages, decided by the recipe's rule in merge.ts. */
   private async merges(): Promise<void> {
     for (const u of this.ordered()) {
       const stage = this.recipe.stages[u.stage];
       if (u.parked || stage?.kind !== "merge") continue;
-      await this.mergeUnit(u, stage);
+      await this.guard(u, () => mergeUnit({
+        run: this.run, forge: this.opts.forge, prViews: this.prViews,
+        scope: (x, extra) => this.scope(x, extra),
+        ev: (k, o) => this.ev(k, o),
+        park: (x, reason) => this.park(x, reason),
+        move: (x, to) => this.move(x, { when: [], to }),
+        hooks: (list, scope, cwd) => this.hooks(list, scope, cwd),
+        save: () => this.save(),
+        merged: (x) => { this.report.merged.push(x.id); },
+      }, u, stage));
     }
-  }
-
-  private async mergeUnit(_u: UnitState, _stage: MergeStage): Promise<void> {
-    // left untouched until the merge arm lands
   }
 
   /** The nonce of a live claim on `cwd`, or null; a directory that does not exist yet holds none. */

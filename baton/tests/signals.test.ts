@@ -4,9 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
 import { tick } from "../src/engine.ts";
-import type { Forge } from "../src/forge.ts";
+import type { Forge, PrView } from "../src/forge.ts";
 import { notifyOnce } from "../src/notify.ts";
-import type { Scope, Signal } from "../src/recipe.ts";
+import type { PrTest, Scope, Signal } from "../src/recipe.ts";
 import { evaluate, Exit0Error, type EvalCtx } from "../src/signals.ts";
 import { openStore, type RunState, type UnitState } from "../src/state.ts";
 import { FakeHost } from "./fake-host.ts";
@@ -137,7 +137,49 @@ test("record_changed compares the seen digest with the one at stage entry", asyn
   expect(await evaluate({ record_changed: true }, ctx([], unit("s", 0, "w")))).toBe("false");
 });
 
-test("pr reads pending until the merge arm lands", async () => {
-  expect(await evaluate({ pr: { url: ["echo", "x"], test: "open" } }, ctx([], lane))).toBe("pending");
-  expect(existsSync(join(dir, "x"))).toBe(false);
+function prForge(v: Partial<PrView>, views: string[] = []): Forge {
+  return {
+    view: async (url) => {
+      views.push(url);
+      return { state: "OPEN", head: "abc123", base: "main", mergeable: "MERGEABLE", checks: "green", ...v };
+    },
+    merge: async () => { throw new Error("signals never merge"); },
+  };
+}
+const PR = "https://github.com/o/r/pull/7";
+const prSig = (test: PrTest) => ({ pr: { url: ["echo", PR], test } });
+const prCtx = (v: Partial<PrView>, views: string[] = []) => ({ ...ctx([], lane), forge: prForge(v, views) });
+
+test("pr maps the forge read onto each test and sets pr in scope", async () => {
+  const table: [PrTest, Partial<PrView>, string][] = [
+    ["open", { state: "OPEN" }, "true"], ["open", { state: "MERGED" }, "false"],
+    ["merged", { state: "MERGED" }, "true"], ["merged", { state: "OPEN" }, "false"],
+    ["closed", { state: "CLOSED" }, "true"], ["closed", { state: "OPEN" }, "false"],
+    ["checks_green", { checks: "green" }, "true"], ["checks_green", { checks: "red" }, "false"],
+    ["checks_green", { checks: "pending" }, "pending"], ["checks_green", { checks: "none" }, "false"],
+    ["checks_red", { checks: "red" }, "true"], ["checks_red", { checks: "green" }, "false"],
+    ["checks_red", { checks: "pending" }, "pending"],
+    ["mergeable", { mergeable: "MERGEABLE" }, "true"], ["mergeable", { mergeable: "CONFLICTING" }, "false"],
+    ["mergeable", { mergeable: "UNKNOWN" }, "pending"],
+    ["conflict", { mergeable: "CONFLICTING" }, "true"], ["conflict", { mergeable: "MERGEABLE" }, "false"],
+    ["conflict", { mergeable: "UNKNOWN" }, "pending"],
+  ];
+  for (const [test, v, want] of table) {
+    const c = prCtx(v);
+    expect([test, JSON.stringify(v), await evaluate(prSig(test), c)]).toEqual([test, JSON.stringify(v), want]);
+    expect(c.scope.pr).toEqual({ url: PR, head: "abc123" });
+  }
+});
+
+test("pr reads the forge once per URL per tick", async () => {
+  const views: string[] = [];
+  const c = prCtx({}, views);
+  await evaluate(prSig("open"), c);
+  await evaluate(prSig("checks_green"), c);
+  expect(views).toEqual([PR]);
+});
+
+test("pr with a URL that is not a pull request throws PrUrlError", async () => {
+  const c = prCtx({});
+  await expect(evaluate({ pr: { url: ["echo", "x"], test: "open" } }, c)).rejects.toThrow("not a pull request URL");
 });

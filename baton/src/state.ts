@@ -37,6 +37,8 @@ export type UnitState = {
   quiet_since?: string;
   /** The claim nonce last reported holding this unit's cwd, so `cwd busy` is logged once. */
   cwd_busy?: string;
+  /** Consecutive failed `merge` calls in the current merge stage; three park the unit. */
+  merge_failures?: number;
 };
 
 export type RunState = {

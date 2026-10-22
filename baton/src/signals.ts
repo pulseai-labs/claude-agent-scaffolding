@@ -3,7 +3,8 @@
 // arm) a PR read through the forge. Nothing here judges a result.
 
 import { existsSync } from "node:fs";
-import type { Forge, PrView } from "./forge.ts";
+import { prUrl, type Forge, type PrView } from "./forge.ts";
+import { viewOnce } from "./merge.ts";
 import { render, type Scope, type Signal } from "./recipe.ts";
 import type { RunState, UnitState } from "./state.ts";
 
@@ -53,8 +54,18 @@ export async function evaluate(sig: Signal, ctx: EvalCtx): Promise<Verdict> {
     throw new Exit0Error(`exit0 ${JSON.stringify(argv)}: ${rc === null ? "did not run to an exit" : `rc ${rc}`}`);
   }
   if ("pr" in sig) {
-    // The forge-backed read arrives with the merge arm; until then a PR is never decided.
-    return "pending";
+    const url = await prUrl(sig.pr.url.map((a) => render(a, ctx.scope)), ctx.cwd);
+    const v = await viewOnce(ctx.forge, ctx.prViews, url);
+    ctx.scope.pr = { url, head: v.head };
+    switch (sig.pr.test) {
+      case "open": return verdict(v.state === "OPEN");
+      case "merged": return verdict(v.state === "MERGED");
+      case "closed": return verdict(v.state === "CLOSED");
+      case "checks_green": return v.checks === "pending" ? "pending" : verdict(v.checks === "green");
+      case "checks_red": return v.checks === "pending" ? "pending" : verdict(v.checks === "red");
+      case "mergeable": return v.mergeable === "UNKNOWN" ? "pending" : verdict(v.mergeable === "MERGEABLE");
+      case "conflict": return v.mergeable === "UNKNOWN" ? "pending" : verdict(v.mergeable === "CONFLICTING");
+    }
   }
   if ("units" in sig) {
     const { group, stages, count } = sig.units;

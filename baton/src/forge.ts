@@ -1,5 +1,5 @@
-// The forge seam: what the engine reads about a pull request and how it merges one.
-// The `gh` implementation and the merge arm of the tick arrive with merge stages.
+// The forge seam: what the engine reads about a pull request and how it merges one. `GhForge`
+// is the `gh` implementation. Merges are always a merge commit, pinned to the head that was read.
 
 export type PrView = {
   state: "OPEN" | "MERGED" | "CLOSED";
@@ -12,4 +12,94 @@ export type PrView = {
 export interface Forge {
   view(url: string): Promise<PrView>;
   merge(url: string, headOid: string): Promise<void>;
+}
+
+/** A `pr` argv whose output is not a pull-request URL: the unit parks `pr url`. */
+export class PrUrlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "PrUrlError";
+  }
+}
+
+const PR_URL_RE = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/[0-9]+$/;
+const GH_TIMEOUT_MS = 120_000;
+
+type Run = { rc: number | null; out: string; err: string };
+
+async function run(argv: string[], cwd?: string, timeoutMs = GH_TIMEOUT_MS): Promise<Run> {
+  try {
+    const p = Bun.spawn(argv, { cwd, env: process.env, stdin: "ignore", stdout: "pipe", stderr: "pipe", timeout: timeoutMs });
+    const [out, err] = await Promise.all([new Response(p.stdout).text(), new Response(p.stderr).text()]);
+    await p.exited;
+    return { rc: p.signalCode ? null : p.exitCode, out, err };
+  } catch (e) {
+    return { rc: null, out: "", err: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/**
+ * Run the stage's `pr` argv (no shell) and return its output as a PR URL. The shape check is a
+ * safety rail on open input: it only adds a stop, and approves nothing.
+ */
+export async function prUrl(argv: string[], cwd?: string): Promise<string> {
+  const r = await run(argv, cwd, 60_000);
+  if (r.rc !== 0) throw new PrUrlError(`pr argv ${JSON.stringify(argv)} did not exit 0`);
+  const url = r.out.trim();
+  if (!PR_URL_RE.test(url)) throw new PrUrlError(`not a pull request URL: ${JSON.stringify(url.slice(0, 200))}`);
+  return url;
+}
+
+type Entry = { __typename?: string; status?: string; conclusion?: string; state?: string };
+const RED_CONCLUSIONS = new Set(["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
+
+/** Fold a `statusCheckRollup` into one word: red beats pending beats green; an empty rollup is none. */
+export function rollup(entries: Entry[]): PrView["checks"] {
+  if (entries.length === 0) return "none";
+  const isContext = (e: Entry) => e.__typename === "StatusContext" || (e.status === undefined && e.state !== undefined);
+  if (entries.some((e) => (isContext(e) ? e.state === "FAILURE" || e.state === "ERROR" : RED_CONCLUSIONS.has(e.conclusion ?? "")))) {
+    return "red";
+  }
+  if (entries.some((e) => (isContext(e) ? e.state === "PENDING" || e.state === "EXPECTED" : e.status !== "COMPLETED"))) {
+    return "pending";
+  }
+  return "green";
+}
+
+export class GhForge implements Forge {
+  async view(url: string): Promise<PrView> {
+    const r = await run(["gh", "pr", "view", url, "--json", "state,headRefOid,baseRefName,mergeable,statusCheckRollup"]);
+    if (r.rc !== 0) throw new Error(`gh pr view failed: ${r.err.trim().slice(0, 300)}`);
+    const j = JSON.parse(r.out) as {
+      state: string; headRefOid: string; baseRefName: string; mergeable: string; statusCheckRollup: Entry[] | null;
+    };
+    if (j.state !== "OPEN" && j.state !== "MERGED" && j.state !== "CLOSED") throw new Error(`gh pr view: unknown state ${j.state}`);
+    return {
+      state: j.state,
+      head: j.headRefOid,
+      base: j.baseRefName,
+      mergeable: j.mergeable === "MERGEABLE" || j.mergeable === "CONFLICTING" ? j.mergeable : "UNKNOWN",
+      checks: rollup(j.statusCheckRollup ?? []),
+    };
+  }
+
+  async merge(url: string, headOid: string): Promise<void> {
+    const r = await run(["gh", "pr", "merge", url, "--merge", "--match-head-commit", headOid]);
+    if (r.rc !== 0) throw new Error(`gh pr merge failed: ${r.err.trim().slice(0, 300)}`);
+  }
+}
+
+/**
+ * Is `oid` on `origin/<base>` of the checkout at `repo`? Fixed git arguments, no shell. A failed
+ * fetch or an unusable repo throws; only "not an ancestor" is false.
+ */
+export async function landed(repo: string, base: string, oid: string): Promise<boolean> {
+  const f = await run(["git", "-C", repo, "fetch", "origin", base]);
+  if (f.rc !== 0) throw new Error(`git fetch origin ${base} failed: ${f.err.trim().slice(0, 300)}`);
+  const m = await run(["git", "-C", repo, "merge-base", "--is-ancestor", oid, `origin/${base}`]);
+  if (m.rc === 0) return true;
+  // rc 1: not an ancestor. rc 128: the oid is not in this checkout at all (a head that never
+  // reached origin/<base>); it cannot be on the base either.
+  if (m.rc === 1 || m.rc === 128) return false;
+  throw new Error(`git merge-base failed: ${m.err.trim().slice(0, 300)}`);
 }
