@@ -381,11 +381,27 @@ describe("T3Host.bind and launch", () => {
     });
   });
 
+  test("nonces that differ only in where / and _ fall bind different directories", async () => {
+    const w = world();
+    const a = await w.host.bind("pilot-fourseat", w.root, "r1/a_b/c/1", "worktree");
+    const b = await w.host.bind("pilot-fourseat", w.root, "r1/a/b_c/1", "worktree");
+    expect(a).not.toBe(b);
+    expect(a).toBe(join(w.state, "launch", "r1%2Fa_b%2Fc%2F1"));
+    expect(b).toBe(join(w.state, "launch", "r1%2Fa%2Fb_c%2F1"));
+    const list = git(w.root, "worktree", "list", "--porcelain");
+    expect(list).toContain(`worktree ${a}\n`);
+    expect(list).toContain(`worktree ${b}\n`);
+    // release still accepts both as launch directories and removes only the one it is given
+    await w.host.release("pilot-fourseat", w.root, a);
+    expect(existsSync(a)).toBe(false);
+    expect(existsSync(b)).toBe(true);
+  });
+
   test("root cwd binds a per-launch worktree", async () => {
     const w = world();
     const nonce = "r1/u1/plan/2";
     const dir = await w.host.bind("pilot-fourseat", w.root, nonce, "worktree");
-    expect(dir).toBe(join(w.state, "launch", "r1_u1_plan_2"));
+    expect(dir).toBe(join(w.state, "launch", "r1%2Fu1%2Fplan%2F2"));
     expect(git(w.root, "worktree", "list", "--porcelain")).toContain(`worktree ${dir}\n`);
     await w.host.launch(req(dir, nonce));
     const sent = w.stub.calls.find((c) => c.name === "t3_thread_launch")!.args as any;
@@ -586,7 +602,7 @@ describe("engine over T3Host", () => {
     expect(s1.session?.thread_id).toBeUndefined();
     expect(s1.launches.work ?? 0).toBe(0);
     const dir = s1.session!.launch_dir;
-    expect(dir).toBe(join(w.state, "launch", "r1_a_work_1"));
+    expect(dir).toBe(join(w.state, "launch", "r1%2Fa%2Fwork%2F1"));
     expect(existsSync(dir)).toBe(true);
     expect(existsSync(join(w.state, "claims"))).toBe(true);
 

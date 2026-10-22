@@ -119,7 +119,9 @@ export class T3Host implements Host {
     const p = await this.project(project);
     if (real(cwd) !== real(p.workspaceRoot)) return cwd;
     if (mode === "root") return cwd;
-    const dir = join(this.launchRoot(), nonce.replaceAll("/", "_"));
+    // encodeURIComponent is injective and keeps the name readable: "/" becomes "%2F", and "_",
+    // which every nonce segment may contain, is left alone - flattening "/" to "_" was not.
+    const dir = join(this.launchRoot(), encodeURIComponent(nonce));
     const listed = () => git(p.workspaceRoot, "worktree", "list", "--porcelain").out.split("\n").includes(`worktree ${real(dir)}`);
     if (existsSync(dir)) {
       if (listed()) return dir;

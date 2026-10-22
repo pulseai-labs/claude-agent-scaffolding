@@ -208,14 +208,14 @@ test("an orphan dropped at 2 minutes relaunches with a new nonce and a new direc
   await doTick();
   const first = runState().units.a.session!;
   expect(first.nonce).toBe("r1/a/work/1");
-  expect(first.launch_dir).toBe(join(state, "launch", "r1_a_work_1"));
+  expect(first.launch_dir).toBe(join(state, "launch", "r1%2Fa%2Fwork%2F1"));
   at(3);
   await doTick();
   expect(host.releases.map((r) => r.dir)).toEqual([first.launch_dir]);
   expect(host.launches.length).toBe(1);
   const l = host.launches[0];
   expect(l.request.nonce).toBe("r1/a/work/2");
-  expect(l.request.cwd).toBe(join(state, "launch", "r1_a_work_2"));
+  expect(l.request.cwd).toBe(join(state, "launch", "r1%2Fa%2Fwork%2F2"));
   expect(l.request.cwd).not.toBe(first.launch_dir);
   const u = runState().units.a;
   expect(u.launches.work).toBe(2); // the dropped orphan counts one attempt (final re-review ruling)
@@ -398,7 +398,7 @@ test("slots cap concurrent sessions", async () => {
 function t3LikeBind(projRoot: string) {
   host.bindDir = (_p, cwd, nonceText, mode) => {
     if (cwd !== projRoot || mode === "root") return cwd;
-    const dir = join(state, "launch", nonceText.replaceAll("/", "_"));
+    const dir = join(state, "launch", encodeURIComponent(nonceText));
     mkdirSync(dir, { recursive: true });
     return dir;
   };
@@ -411,7 +411,7 @@ test("default root cwd still binds a per-launch worktree", async () => {
   host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
   t3LikeBind(projRoot);
   await doTick();
-  const dir = join(state, "launch", "r1_a_work_1");
+  const dir = join(state, "launch", "r1%2Fa%2Fwork%2F1");
   expect(host.launches[0].request.cwd).toBe(dir);
   expect(runState().units.a.session?.claim_key).toBe(claimKey(dir));
   expect(liveClaim(claimKey(dir))).toBe("r1/a/work/1");
