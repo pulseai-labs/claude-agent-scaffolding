@@ -75,8 +75,8 @@ export type Store = {
  * file-size limit, a full disk): loop until the whole buffer is out, and treat a zero-byte write
  * as an error rather than spin.
  */
-export function writeAllSync(fd: number, data: string): void {
-  const buf = Buffer.from(data, "utf8");
+export function writeAllSync(fd: number, data: string | Uint8Array): void {
+  const buf = typeof data === "string" ? Buffer.from(data, "utf8") : data;
   let off = 0;
   while (off < buf.length) {
     const n = writeSync(fd, buf, off, buf.length - off);
@@ -86,7 +86,7 @@ export function writeAllSync(fd: number, data: string): void {
 }
 
 /** Write `data` to `tmp`, fsync, rename over `path`; on any failure the temp file is removed. */
-export function replaceFileSync(tmp: string, path: string, data: string): void {
+export function replaceFileSync(tmp: string, path: string, data: string | Uint8Array): void {
   try {
     const fd = openSync(tmp, "w", 0o600);
     try {

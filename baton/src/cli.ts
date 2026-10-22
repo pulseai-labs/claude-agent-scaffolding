@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
 import { exitCode, tick } from "./engine.ts";
@@ -9,7 +9,7 @@ import { callTool, readToken } from "./hosts/mcp.ts";
 import { loadT3Config, T3Host } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
-import { openStore, type RunState, type UnitState } from "./state.ts";
+import { openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
 import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
@@ -128,26 +128,32 @@ async function armCmd(args: string[]): Promise<number> {
     const store = openStore();
     const dir = store.runDir(runId);
     if (existsSync(dir)) return fail(`run "${runId}" already exists`);
-    mkdirSync(dir, { recursive: true, mode: 0o700 });
-    writeFileSync(join(dir, "recipe.json"), bytes, { mode: 0o600 });
-    const now = new Date().toISOString();
-    const units: Record<string, UnitState> = {};
-    recipe.seed.forEach((s, index) => {
-      units[s.id] = {
-        id: s.id, group: 0, order: index, vars: Object.assign(Object.create(null), s.vars), stage: s.stage, launches: {}, stalls: 0,
+    // All or nothing: a failed write leaves no run directory behind to block a retry.
+    try {
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      replaceFileSync(join(dir, `recipe.json.${process.pid}.tmp`), join(dir, "recipe.json"), bytes);
+      const now = new Date().toISOString();
+      const units: Record<string, UnitState> = {};
+      recipe.seed.forEach((s, index) => {
+        units[s.id] = {
+          id: s.id, group: 0, order: index, vars: Object.assign(Object.create(null), s.vars), stage: s.stage, launches: {}, stalls: 0,
+        };
+      });
+      const run: RunState = {
+        id: runId,
+        dir,
+        recipe_sha256: createHash("sha256").update(bytes).digest("hex"),
+        params: given,
+        armed_at: now,
+        status: "armed",
+        units,
       };
-    });
-    const run: RunState = {
-      id: runId,
-      dir,
-      recipe_sha256: createHash("sha256").update(bytes).digest("hex"),
-      params: given,
-      armed_at: now,
-      status: "armed",
-      units,
-    };
-    store.writeRun(run);
-    store.event(runId, { kind: "armed", recipe: recipe.name });
+      store.writeRun(run);
+      store.event(runId, { kind: "armed", recipe: recipe.name });
+    } catch (e) {
+      rmSync(dir, { recursive: true, force: true });
+      return fail(`arm ${runId} failed: ${(e as Error).message.split("\n")[0]}`);
+    }
     return 0;
   });
   if (rc !== 0) return rc;

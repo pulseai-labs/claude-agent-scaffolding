@@ -114,6 +114,38 @@ test("an Object.prototype member is refused as a run id, an unpark unit or an un
   expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
 });
 
+/** `baton <args>` in a child under a file-size limit of `kb` KiB. */
+function underLimit(kb: number, state: string, ...args: string[]) {
+  const p = Bun.spawnSync(["bash", "-c", `ulimit -f ${kb}; exec "$@"`, "-", BIN, ...args], {
+    env: { ...process.env, BATON_STATE_DIR: state }, stdout: "pipe", stderr: "pipe",
+  });
+  return { rc: p.exitCode, err: p.stderr.toString() };
+}
+
+test("arm is all or nothing: a failed write leaves no run directory, and a retry arms", async () => {
+  // a recipe.json too large for the limit, and a run.json too large for it (a long param)
+  const rec = JSON.parse(readFileSync(RELAY, "utf8"));
+  rec.stages.work.message = "x".repeat(20000);
+  const bigRecipe = join(newState(), "big.json");
+  writeFileSync(bigRecipe, JSON.stringify(rec));
+  const cases: [string, string[]][] = [
+    [bigRecipe, PARAMS],
+    [RELAY, ["--param", `project=/${"p".repeat(20000)}`, "--param", "repo=o/r"]],
+  ];
+  for (const [file, params] of cases) {
+    const st = newState();
+    const r = underLimit(4, st, "arm", file, "--run", "r1", ...params, "--no-timer");
+    expect(r.rc).toBe(2);
+    expect(r.err.trim().split("\n")).toHaveLength(1);
+    expect(r.err).toContain("arm r1 failed: ");
+    expect(existsSync(join(st, "runs", "r1"))).toBe(false);
+    // the retry with no limit arms
+    expect((await runIn(st, "arm", file, "--run", "r1", ...params, "--no-timer")).rc).toBe(0);
+    expect(runJson(st, "r1").status).toBe("armed");
+    expect(readFileSync(join(st, "runs", "r1", "recipe.json"))).toEqual(readFileSync(file));
+  }
+});
+
 test("arm refuses a reused run id and leaves state unchanged", async () => {
   const st = newState();
   expect((await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer")).rc).toBe(0);
