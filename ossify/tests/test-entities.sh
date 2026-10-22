@@ -745,6 +745,44 @@ t_assert_eq "$N" "$(_n22)" "335: ...and none of the refusals journaled"
 t_capture oss_state_replay "$S22"
 t_assert_rc 0 "335: replay is clean across the renames"
 
+# --- work_item_pr (1.26.0): record an active, dispatched item's PR -----------
+_pr_wi() { oss_entity_add_work_item "$S" r0.s1 "$1"; }
+_pr_snap() { cat "$S"; }
+PRU="https://github.com/o/r/pull/7"
+WP="$(_pr_wi "pr item")"
+t_capture oss_entity_set_work_item_pr "$S" "$WP" "$PRU"
+t_assert_rc 7 "work_item_pr refuses a PLANNED item"
+t_assert_contains "$T_OUT" "work_item_status $WP active" "...naming the repair"
+oss_entity_set_work_item_status "$S" "$WP" active >/dev/null
+SNAP="$(_pr_snap)"
+t_capture oss_entity_set_work_item_pr "$S" "$WP" "$PRU"
+t_assert_rc 7 "work_item_pr refuses an ACTIVE item that records no dispatch"
+t_assert_contains "$T_OUT" "work_item_exec $WP" "...naming the repair"
+t_assert_eq "$SNAP" "$(_pr_snap)" "...leaving state byte-identical"
+oss_entity_set_work_item_exec "$S" "$WP" "work/$WP" "$TMP/.worktrees/$WP" "sha-pr" >/dev/null
+# bad URLs refuse; the good URL in the same test is the adjacent control.
+SNAP="$(_pr_snap)"
+for bad in "http://x/pull/7" "https://x/pulls/7" "https://x/pull/7 extra" "https://x/pull/7/files" "https://x/pull/"; do
+  t_capture oss_entity_set_work_item_pr "$S" "$WP" "$bad"
+  t_assert_rc 7 "work_item_pr refuses the URL '$bad'"
+done
+t_assert_eq "$SNAP" "$(_pr_snap)" "...leaving state byte-identical across the bad URLs"
+t_capture oss_entity_set_work_item_pr "$S" "$WP" "$PRU"
+t_assert_rc 0 "CONTROL: a well-formed PR URL on the same item records"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WP\") | .pr_url"
+t_assert_eq "$PRU" "$T_OUT" "...as .work_items[].pr_url"
+t_capture oss_entity_set_work_item_pr "$S" "$WP" "$PRU"
+t_assert_rc 0 "re-recording the same URL is idempotent"
+t_capture oss_entity_set_work_item_pr "$S" "$WP" "https://github.com/o/r/pull/9"
+t_assert_rc 0 "a different URL replaces it (a re-opened PR)"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WP\") | .pr_url"
+t_assert_eq "https://github.com/o/r/pull/9" "$T_OUT" "...and the new URL is what is recorded"
+t_capture oss_entity_set_work_item_pr "$S" "r0.s1.w999" "$PRU"
+t_assert_rc 7 "work_item_pr refuses an unknown item"
+oss_entity_set_work_item_status "$S" "$WP" complete >/dev/null
+t_capture oss_entity_set_work_item_pr "$S" "$WP" "$PRU"
+t_assert_rc 7 "work_item_pr refuses a COMPLETE item (not active)"
+
 cd "$HERE"
 rm -rf "$TMP"
 t_summary

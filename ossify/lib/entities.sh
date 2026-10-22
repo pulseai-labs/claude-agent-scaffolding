@@ -444,6 +444,46 @@ oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path
     "" _oss_entity_guard_wi_exec
 }
 
+# 1.26.0: `work_item_pr` records the PR an item's round opened, so a reader
+# (spine inventory) can tell "dispatched, PR open" from "dispatched, no PR yet".
+# The guard runs INSIDE oss_state_mutate's lock (the `$5` slot). It refuses, at
+# rc 7, an item that does not exist (or whose id is duplicated), is not `active`,
+# records no dispatch (the same field classification the `complete` guard reads),
+# or a URL that is not a pull-request URL. Re-recording the same URL is
+# idempotent and a different URL replaces it (a re-opened PR): a PR url is not
+# evidence the way a spine base is, so there is no overwrite refusal.
+_oss_entity_guard_wi_pr() { # $1=state-file $2=payload ; 0 let through, 7 refuse
+  local sf="$1" wi url st cls
+  wi="$(printf '%s' "$2" | jq -r '.work_item // ""')" || return 4
+  url="$(printf '%s' "$2" | jq -r '.pr_url // ""')" || return 4
+  _oss_entity_require_single "$sf" '.work_items[] | select(.id == $v)' "work item" "$wi" || return $?
+  st="$(jq -r --arg w "$wi" '([.work_items[] | select(.id == $w)] | first // {}) | .status // "" | tostring' "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  if [ "$st" != "active" ]; then
+    echo "oss: work item '$wi' is '${st:-<none>}', not active - a PR is recorded for a round in flight. Mark it active first: \"oss work_item_status $wi active\" (after its dispatch is recorded)" >&2
+    return 7
+  fi
+  cls="$(jq -r --arg w "$wi" "([.work_items[] | select(.id == \$w)] | first // {}) | ${_OSS_DISPATCH_CLS_JQ}" "$sf" 2>/dev/null)" || {
+    echo "oss: cannot read work item '$wi' from $sf" >&2; return 2; }
+  case "$cls" in
+    *set*) ;;
+    *) echo "oss: work item '$wi' records no dispatch (branch, worktree_path or base_sha) - a PR comes from a dispatched round. Record the dispatch first, \"oss work_item_exec $wi <branch> <worktree_path> <base_sha>\" (work-item/references/round-orchestration.md §3)" >&2
+       return 7 ;;
+  esac
+  if ! printf '%s' "$url" | LC_ALL=C grep -Eq '^https://[^[:space:]]+/pull/[0-9]+$'; then
+    echo "oss: '$url' is not a pull-request URL - expected https://<host>/<owner>/<repo>/pull/<number>, with no whitespace. Pass the URL the PR-open command printed" >&2
+    return 7
+  fi
+  return 0
+}
+
+oss_entity_set_work_item_pr() { # $1=state $2=wi-id $3=pr-url
+  local sf="$1" wi="$2" url="$3"
+  oss_state_mutate "$sf" set_work_item_pr \
+    "$(jq -n --arg w "$wi" --arg u "$url" '{work_item:$w,pr_url:$u}')" \
+    "" _oss_entity_guard_wi_pr
+}
+
 # #133: spines[].bases. The guard runs INSIDE oss_state_mutate's lock (the `$5`
 # slot), so two sessions recording different bases for one repo cannot both win.
 # A recorded base is evidence of what the lane actually cut from - overwriting it
