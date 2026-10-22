@@ -79,6 +79,7 @@ close. The briefs it names are prose; `common.md` is read first by every seat.
 Copy the example outside the plugin cache first, and pass that copy's `briefs` path: a plugin
 update moves the cache, and a run armed on the old path would lose its briefs.
 
+    mkdir -p ~/baton-recipes
     cp -r <plugin root>/examples/ossify-spine ~/baton-recipes/ossify-spine
     baton arm ~/baton-recipes/ossify-spine/recipe.json --run r0-s6 \
       --param spine=r0.s6 \
