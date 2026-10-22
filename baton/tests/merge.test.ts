@@ -102,6 +102,23 @@ test("merges in declared order", async () => {
   expect(forge.merges).toEqual([{ url: URL1, head: "h1" }, { url: URL2, head: "h2" }]);
 });
 
+test("a unit that entered the merge stage this tick is merged on the next tick", async () => {
+  forge.views.set(URL1, { ...green, head: "h1" });
+  const rec = {
+    version: 1, name: "rec", params: ["root", "repo"], sources: [],
+    seed: [{ id: "o1", stage: "pre", vars: { n: "1" } }],
+    stages: { pre: { kind: "wait", outcomes: [{ when: [{ file: "{param.root}" }], to: "merge" }] }, merge: mergeStage(), fixing },
+  };
+  const file = join(root, "r1.recipe.json");
+  writeFileSync(file, JSON.stringify(rec));
+  expect(await main(["arm", file, "--run", "r1", "--param", `root=${root}`, "--param", `repo=${repo}`, "--no-timer"])).toBe(0);
+  await doTick(); // step 4 moves o1 into merge; step 5 does not read it again this tick
+  expect(stageOf("o1")).toBe("merge");
+  expect(forge.merges).toEqual([]);
+  await doTick(); // control: the next tick merges
+  expect(forge.merges).toEqual([{ url: URL1, head: "h1" }]);
+});
+
 test("unordered stages merge every ready unit", async () => {
   forge.views.set(URL1, { ...green, head: "h1" });
   forge.views.set(URL2, { ...green, head: "h2" });

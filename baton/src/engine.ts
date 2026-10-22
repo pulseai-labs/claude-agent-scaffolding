@@ -126,6 +126,8 @@ class RunTick {
   private saved: string;
   private held = new Set<string>();
   private prViews = new Map<string, PrView>();
+  /** Units that entered a stage this tick: steps 4 and 5 read them again next tick, not now. */
+  private entered = new Set<string>();
 
   constructor(
     private opts: TickOpts,
@@ -234,6 +236,7 @@ class RunTick {
     if (o.to === "park") return this.park(u, "outcome");
     const from = u.stage;
     u.stage = o.to;
+    this.entered.add(u.id);
     u.record_at_entry = u.record_seen;
     delete u.cwd_busy;
     delete u.merge_failures;
@@ -634,7 +637,7 @@ class RunTick {
   private async waits(): Promise<void> {
     for (const u of this.ordered()) {
       const stage = this.recipe.stages[u.stage];
-      if (u.parked || stage?.kind !== "wait") continue;
+      if (u.parked || stage?.kind !== "wait" || this.entered.has(u.id)) continue;
       await this.guard(u, async () => {
         const o = await this.firstOutcome(u, (stage as WaitStage).outcomes, this.run.dir);
         if (o && o !== "pending") await this.takeOutcome(u, o, this.run.dir);
@@ -646,7 +649,7 @@ class RunTick {
   private async merges(): Promise<void> {
     for (const u of this.ordered()) {
       const stage = this.recipe.stages[u.stage];
-      if (u.parked || stage?.kind !== "merge") continue;
+      if (u.parked || stage?.kind !== "merge" || this.entered.has(u.id)) continue;
       await this.guard(u, () => mergeUnit({
         run: this.run, forge: this.opts.forge, prViews: this.prViews,
         scope: (x, extra) => this.scope(x, extra),

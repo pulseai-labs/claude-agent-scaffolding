@@ -173,6 +173,13 @@ test("relay with a gap re-enters through the planner", async () => {
   expect(workLaunches(host, "a")).toHaveLength(2);
   expect(workLaunches(host, "b")).toHaveLength(1);
   expect(host.launches.filter((l) => l.request.title.startsWith("plan "))).toHaveLength(3);
+  // The answering planner is not relaunched while a is still in regap; a reworks before the final planner.
+  expect(course()).toEqual([
+    "launched planner", "launched a", "launched b", "launched planner", "launched a",
+    "merged a", "merged b", "launched planner", "done",
+  ]);
+  const moves = events().filter((e) => e.kind === "transition" && e.unit === "a").map((e) => `${e.from}>${e.to}`);
+  expect(moves).toEqual(["work>regap", "regap>work", "work>land", "land>done"]);
   expect(JSON.parse(readFileSync(join(runDir, "queue", "a.json"), "utf8")).task).toBe("task a, gap answered");
   expect(mergeCommits()).toEqual(["merge a", "merge b"]);
   expect(readdirSync(join(state, "claims"))).toEqual([]);

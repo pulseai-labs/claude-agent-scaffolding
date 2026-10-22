@@ -783,6 +783,21 @@ test("run.group is the highest group seen", async () => {
   expect(host.launches.map((l) => l.request.title)).toEqual(["g3 [baton r1/b/work/1]", "g3 [baton r1/a/work/1]"]);
 });
 
+test("a unit enters one stage per tick: a wait whose outcome already matches reads next tick", async () => {
+  await arm(recipe({
+    work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "gate" }] }),
+    gate: { kind: "wait", outcomes: [{ when: [{ file: "{run.dir}/go" }], to: "done" }] },
+  }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
+  writeFileSync(join(runDir(), "go"), "ok"); // the gate's outcome matches before the unit reaches it
+  await doTick();
+  host.advance();
+  await doTick(); // step 3 moves a into gate; step 4 does not read it again this tick
+  expect(runState().units.a.stage).toBe("gate");
+  await doTick(); // control: the next tick reads it
+  expect(runState().units.a.stage).toBe("done");
+});
+
 test("every unit done marks the run done and notifies once", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
