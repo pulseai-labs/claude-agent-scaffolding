@@ -123,6 +123,9 @@ jobs:
       - name: baton suite
         run: bash baton/run-tests.sh
 
+      - name: bot-on-telegram suite
+        run: bash bot-on-telegram/run-tests.sh
+
       - name: OMP bin-path module and loader (bun test)
         run: bun test omp/
 
