@@ -271,6 +271,8 @@ test("show on a parked unit with a full park event, then the notice buttons come
   );
   const restored = lastEdit().reply_markup;
   expect(lastEdit().text).toBe(NOTICE);
+  expect(cbButtons(restored).map((b) => b.text)).toEqual(["Unpark", "Unpark to stage…", "Show question", "Disarm"]);
+  for (const b of cbButtons(restored)) expect(cbButtons(k).map((o) => o.callback_data)).not.toContain(b.callback_data);
   await handleUpdate(press(byText(restored, "Unpark")), ctx());
   expect(runs).toEqual([["baton", "unpark", "r1", "u1"]]);
 });
@@ -286,4 +288,21 @@ test("a typed message from a stranger gets no reply", async () => {
   await handleUpdate({ update_id: 8, message: { chat: { id: 999 }, from: { id: 999 }, text: "hi" } }, ctx());
   expect(fake.calls).toHaveLength(0);
   expect(pressLog()).toEqual([expect.objectContaining({ update_id: 8, result: "foreign" })]);
+});
+
+test("disarm-no on a unit-move notice restores Merge, Open PR, Disarm; the restored Disarm confirms", async () => {
+  const text = "baton r1/u2 moved to spine_ack";
+  const k = keyboardFor({ kind: "unit-move", run: "r1", unit: "u2", stage: "spine_ack" }, T0)!;
+  setMessageId(cbButtons(k).map((b) => b.callback_data), MSG);
+  await handleUpdate(press(byText(k, "Disarm"), { text }), ctx());
+  expect(lastEdit().text).toBe(`${text}\n\nDisarm run r1?`);
+  await handleUpdate(press(byText(lastEdit().reply_markup, "No"), { text: lastEdit().text as string }), ctx());
+  expect(runs).toHaveLength(0);
+  const restored = lastEdit().reply_markup as Keyboard;
+  expect(lastEdit().text).toBe(text);
+  expect(restored.inline_keyboard.flat().map((b) => b.text)).toEqual(["Merge", "Open PR", "Disarm"]);
+  await handleUpdate(press(byText(restored, "Disarm"), { text }), ctx());
+  expect(lastEdit().text).toBe(`${text}\n\nDisarm run r1?`);
+  expect(cbButtons(lastEdit().reply_markup).map((b) => b.text)).toEqual(["Yes", "No"]);
+  expect(runs).toHaveLength(0);
 });

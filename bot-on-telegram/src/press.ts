@@ -130,7 +130,13 @@ async function handlePress(
     await edit(notice, keyboardFor(originalNotice(rec), now));
     return "restored";
   };
-  const base = { run: rec.run, ...(rec.unit !== undefined ? { unit: rec.unit } : {}) };
+  // Every record minted after a press carries the notice the pressed record belongs to (R3b).
+  const base = {
+    run: rec.run,
+    ...(rec.unit !== undefined ? { unit: rec.unit } : {}),
+    ...(rec.notice_kind !== undefined ? { notice_kind: rec.notice_kind } : {}),
+    ...(rec.stage !== undefined ? { stage: rec.stage } : {}),
+  };
 
   switch (rec.action) {
     case "merge": {
@@ -197,8 +203,15 @@ async function handlePress(
   }
 }
 
-// R3: the notice a pressed record came from, to rebuild its original buttons.
+// R3b: the notice a pressed record came from, to rebuild its original buttons.
+// A record with no notice_kind falls back to the R3 guess from unit and pr_url.
 function originalNotice(rec: ButtonRec): Notice {
+  if (rec.notice_kind === "run-park") return { kind: "run-park", run: rec.run };
+  if (rec.notice_kind !== undefined && rec.unit !== undefined) {
+    if (rec.notice_kind === "unit-park") return { kind: "unit-park", run: rec.run, unit: rec.unit };
+    const stage = rec.stage ?? readUnit(rec.run, rec.unit)?.stage ?? "";
+    return { kind: "unit-move", run: rec.run, unit: rec.unit, stage };
+  }
   if (rec.unit === undefined) return { kind: "run-park", run: rec.run };
   if (rec.pr_url) {
     const u = readUnit(rec.run, rec.unit);

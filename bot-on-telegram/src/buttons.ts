@@ -18,6 +18,7 @@ export type ButtonRec = {
   pr_url?: string;
   head_sha?: string;
   stage?: string;
+  notice_kind?: "unit-park" | "unit-move" | "run-park"; // the notice this button belongs to
   minted_at: string;
   message_id?: number;
   used_at?: string;
@@ -99,12 +100,12 @@ export function keyboardFor(n: Notice, now: Date): Keyboard | undefined {
   switch (n.kind) {
     case "run-park": {
       if (!runReadable(n.run)) return undefined;
-      return { inline_keyboard: [[btn("Disarm", { action: "disarm", run: n.run })]] };
+      return { inline_keyboard: [[btn("Disarm", { action: "disarm", run: n.run, notice_kind: "run-park" })]] };
     }
     case "unit-park": {
       const u = readUnit(n.run, n.unit);
       if (!u) return undefined;
-      const base = { run: n.run, unit: n.unit };
+      const base = { run: n.run, unit: n.unit, notice_kind: "unit-park" as const };
       return {
         inline_keyboard: [
           [btn("Unpark", { action: "unpark", ...base }), btn("Unpark to stage…", { action: "unpark-to", ...base })],
@@ -115,7 +116,7 @@ export function keyboardFor(n: Notice, now: Date): Keyboard | undefined {
     case "unit-move": {
       const u = readUnit(n.run, n.unit);
       if (!u) return undefined;
-      const base = { run: n.run, unit: n.unit };
+      const base = { run: n.run, unit: n.unit, notice_kind: "unit-move" as const, stage: n.stage };
       const row: Keyboard["inline_keyboard"][number] = [];
       if (u.pr_url) {
         const head = reviewedHead(n.run, n.unit);
