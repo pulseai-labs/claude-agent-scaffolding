@@ -276,9 +276,9 @@ class RunTick {
   }
 
   private async park(
-    u: UnitState, reason: string, o: { interrupt?: string; release?: boolean; questions?: unknown[] } = {},
+    u: UnitState, reason: string, o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string } = {},
   ): Promise<void> {
-    const thread = u.session?.thread_id; // endSession deletes the session
+    const thread = u.session?.thread_id ?? o.thread; // endSession deletes the session; a caller that ended it first passes it
     await this.endSession(u, o);
     const at = this.nowIso();
     u.parked = { reason, at };
@@ -293,8 +293,8 @@ class RunTick {
   }
 
   /** `note` is the outcome's notice, rendered by the caller before any side effect. */
-  private async move(u: UnitState, o: Outcome, note?: string): Promise<void> {
-    if (o.to === "park") return this.park(u, "outcome");
+  private async move(u: UnitState, o: Outcome, note?: string, thread?: string): Promise<void> {
+    if (o.to === "park") return this.park(u, "outcome", { thread });
     const from = u.stage;
     enterStage(u, o.to, triageNote(this.run, this.recipe, u));
     this.entered.add(u.id);
@@ -351,8 +351,9 @@ class RunTick {
     // run, its session still in place for the park to end, and no move.
     const note = m.o.notify === undefined ? undefined : render(m.o.notify, m.scope);
     if (!this.hooks(m.o.run, m.scope, hookCwd)) return this.park(u, "run failed");
+    const thread = u.session?.thread_id; // endSession deletes the session; a park by outcome still records it
     await this.endSession(u);
-    await this.move(u, m.o, note);
+    await this.move(u, m.o, note, thread);
   }
 
   /** Per-unit guard: a host error stops the tick; anything else parks only this unit. */

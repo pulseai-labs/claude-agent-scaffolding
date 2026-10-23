@@ -8,7 +8,7 @@ All notable changes to the `baton` plugin.
   `<run>/<unit>/park/<at>`), alongside `{message}`.
 - The `park` event now carries `thread` (the parked seat's thread id, when it had a session) and,
   for the `second prompt` and `triage gave no answer` parks, `questions` (the pending request's
-  questions as a JSON string, the form `{pending.questions}` takes). Both are absent when unknown.
+  questions, as a JSON string). Both are absent when unknown.
 
 ## 0.3.0 - 2026-10-23
 

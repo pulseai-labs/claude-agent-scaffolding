@@ -713,6 +713,19 @@ test("a stall park records the thread and no questions", async () => {
   expect("questions" in e).toBe(false);
 });
 
+test("a session stage whose outcome moves to park records the session's thread", async () => {
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "park" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  await doTick();
+  put(join(runDir(), "out", "a.done"), "ok");
+  host.finish("thread-1", "completed");
+  at(1);
+  await doTick();
+  const e = lastPark();
+  expect(e.reason).toBe("outcome");
+  expect(e.thread).toMatch(/^thread-\d+$/);
+});
+
 test("a park with no session records neither", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 5, end: "completed" } });
