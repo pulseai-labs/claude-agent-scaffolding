@@ -1,0 +1,5 @@
+{"at":"t1","kind":"park","unit":"u1","stage":"build","reason":"first","thread":"th-1"}
+{"at":"t1b","kind":"park","unit":"u2","stage":"build","reason":"other"}
+garbage line
+{"at":"t2","kind":"park","unit":"u1","stage":"build","reason":"second prompt","thread":"th-2","questions":"which db?"}
+{"at":"t3","kind":"move","unit":"u1"}

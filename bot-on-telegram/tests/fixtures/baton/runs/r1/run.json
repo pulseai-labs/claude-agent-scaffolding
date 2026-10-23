@@ -1,0 +1,6 @@
+{"units":[
+{"id":"u1","stage":"build","parked":{"reason":"second prompt","at":"2026-10-23T10:00:00Z"},"vars":{}},
+{"id":"u2","stage":"spine_ack","vars":{"pr_url":"https://github.com/o/r/pull/7"}},
+{"id":"u3","stage":"spine_ack","vars":{"pr_url":"https://github.com/o/r/pull/8"}},
+{"id":"u4","stage":"build","vars":{}}
+]}
