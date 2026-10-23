@@ -12,6 +12,7 @@ export class FakeTelegram {
   drops = 0; // drop the next N connections
   failures: Scripted[] = []; // answer the next calls with these ok:false replies
   dropped = 0;
+  updates: { update_id: number }[] = []; // what getUpdates serves; like Telegram, ids below `offset` are confirmed and dropped
   private nextMessageId = 100;
   private server: Server = createServer((req, res) => {
     let raw = "";
@@ -33,6 +34,12 @@ export class FakeTelegram {
         return;
       }
       res.writeHead(200, { "content-type": "application/json" });
+      if (m?.[2] === "getUpdates") {
+        const off = typeof body.offset === "number" ? body.offset : 0;
+        this.updates = this.updates.filter((u) => u.update_id >= off);
+        res.end(JSON.stringify({ ok: true, result: this.updates }));
+        return;
+      }
       res.end(JSON.stringify({ ok: true, result: { message_id: this.nextMessageId++ } }));
     });
   });
