@@ -154,3 +154,33 @@ test("{unit} in a write's path and content is the launching unit's id", async ()
   expect(readFileSync(join(base, "out", "u1.done"), "utf8")).toBe("by u1");
   expect(readFileSync(join(base, "out", "u2.done"), "utf8")).toBe("by u2");
 });
+
+test("pending shows from atStep until answer, then the thread finishes", async () => {
+  const request = { id: "req-1", questions: [{ id: "q", header: "H", question: "Which?", options: [{ label: "a" }] }] };
+  const h = new FakeHost({ build: { ticks: 3, end: "completed", pending: { atStep: 1, request } } });
+  const { threadId } = await h.launch(req("build"));
+  expect((await h.status(threadId)).pending).toBeUndefined();
+  h.advance();
+  const s1 = await h.status(threadId);
+  expect(s1).toEqual({ state: "active", activity: s1.activity, pending: request });
+  h.advance(); // frozen while pending
+  expect(await h.status(threadId)).toEqual(s1);
+  const other = { id: "req-2", questions: [] };
+  h.raise(threadId, other);
+  expect((await h.status(threadId)).pending).toEqual(other);
+  h.answer(threadId);
+  expect((await h.status(threadId)).pending).toBeUndefined();
+  h.advance();
+  h.advance();
+  expect((await h.status(threadId)).state).toBe("completed");
+});
+
+test("finish ends any thread; drop makes it gone", async () => {
+  const h = new FakeHost({ build: { ticks: 100, end: "completed" } });
+  const a = (await h.launch(req("build"))).threadId;
+  const b = (await h.launch(req("build", "t", 2))).threadId;
+  h.finish(a, "interrupted");
+  h.drop(b);
+  expect((await h.status(a)).state).toBe("interrupted");
+  expect((await h.status(b)).state).toBe("gone");
+});

@@ -238,6 +238,8 @@ function world(): World {
     t3_thread_read: () => ({ result: fixture("thread-read-completed.json") }),
     t3_thread_list: () => ({ result: { projectId: "p", currentThreadId: null, threads: [], nextCursor: null, total: 0 } }),
     t3_thread_interrupt: (a) => ({ result: { threadId: a.threadId, runId: null, status: "interrupt_requested" } }),
+    t3_pending_request_list: () => ({ result: fixture("pending-list-omp.json") }),
+    t3_pending_request_read: () => ({ result: fixture("pending-read-omp.json") }),
   };
   const s = stub({
     token: TOKEN,
@@ -358,6 +360,76 @@ describe("T3Host.status", () => {
     const e = await thrown(h.status("mcp:t1"));
     expect(e).toBeInstanceOf(HostAuthError);
     expect(w.stub.seen.length).toBe(0);
+  });
+});
+
+describe("T3Host.status pending request", () => {
+  const withPending = (w: World, count: number) => {
+    w.tool.t3_thread_read = readReturning("thread-read-running.json", (j) => (j.thread.pendingRequestCount = count));
+  };
+  const names = (w: World) => w.stub.calls.map((c) => c.name);
+
+  test("status reports a pending OMP picker", async () => {
+    const w = world();
+    withPending(w, 1);
+    const st = await w.host.status("mcp:t1");
+    const id = fixture("pending-list-omp.json").requestIds[0];
+    expect(st.state).toBe("active");
+    expect(st.pending?.id).toBe(id);
+    expect(st.pending?.questions).toHaveLength(1);
+    const q = st.pending!.questions[0];
+    expect([q.id, q.header, q.question]).toEqual(["15b13b37a9ec3b5b", "Review Mode", "Review Mode"]);
+    expect(q.options).toHaveLength(5);
+    // `value` is dropped; only label and description are kept.
+    expect(q.options[0]).toEqual({ label: "1. Review against a base branch (PR Style)", description: "1. Review against a base branch (PR Style)" });
+    expect(q.multiSelect).toBeUndefined();
+    expect(w.stub.calls.filter((c) => c.name.startsWith("t3_pending")).map((c) => [c.name, c.args])).toEqual([
+      ["t3_pending_request_list", { threadId: "mcp:t1" }],
+      ["t3_pending_request_read", { threadId: "mcp:t1", requestId: id }],
+    ]);
+  });
+
+  test("status reports a pending Claude question", async () => {
+    const w = world();
+    withPending(w, 1);
+    w.tool.t3_pending_request_read = () => ({ result: fixture("pending-read-claude.json") });
+    const q = (await w.host.status("mcp:t1")).pending!.questions[0];
+    expect(q.id).toBe(q.question);
+    expect(q.id).toBe("Which word should I print?");
+    expect(q.multiSelect).toBe(false);
+    expect(q.options.map((o) => o.label)).toEqual(["alpha", "beta"]);
+  });
+
+  test("no pending request, no extra calls", async () => {
+    const w = world();
+    withPending(w, 0);
+    const st = await w.host.status("mcp:t1");
+    expect(st.pending).toBeUndefined();
+    expect(names(w)).toEqual(["t3_thread_read"]);
+  });
+
+  test("pending list empty despite count", async () => {
+    const w = world();
+    withPending(w, 1);
+    w.tool.t3_pending_request_list = () => ({ result: { requestIds: [] } });
+    const st = await w.host.status("mcp:t1");
+    expect(st.pending).toBeUndefined();
+    expect(st.state).toBe("active");
+    expect(names(w)).toEqual(["t3_thread_read", "t3_pending_request_list"]);
+  });
+
+  test("pending read fails", async () => {
+    const w = world();
+    withPending(w, 1);
+    w.tool.t3_pending_request_read = () => ({ isError: true, result: { code: "unavailable", message: "x" } });
+    expect(await thrown(w.host.status("mcp:t1"))).toBeInstanceOf(HostDownError);
+  });
+
+  test("pending list fails", async () => {
+    const w = world();
+    withPending(w, 1);
+    w.tool.t3_pending_request_list = () => ({ isError: true, result: { code: "unavailable", message: "x" } });
+    expect(await thrown(w.host.status("mcp:t1"))).toBeInstanceOf(HostDownError);
   });
 });
 

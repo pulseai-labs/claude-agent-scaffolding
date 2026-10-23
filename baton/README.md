@@ -42,6 +42,36 @@ days and the re-approval is manual: `baton t3 token-status` shows the days left.
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
 with rc 2.
 
+## Triage
+
+A seat can stop on a prompt no one answers, such as an OMP `/review` picker. The T3 host reports
+the thread's pending request. Without a `triage` stage in the recipe, baton logs one `pending`
+event per request and the stall clock runs as before. With one, the clock pauses and baton
+launches a single triage session per request id per stage visit (`triage` event). The recipe's
+`triage` stage takes the launch fields plus `note_file` and `stall_minutes` (default 10); its
+message may use `{pending.thread}`, `{pending.request}`, `{pending.questions}` and
+`{pending.stage}` (`note_file` may not). `stop_file`, `watch`, `before` and `after_launch` are
+accepted there and ignored; no other stage may then be named `triage`. The triage session does one of three things:
+
+- **Answers** the prompt through T3: the seat goes on (`triage answered`).
+- **Writes the note file**: baton relaunches the seat (`triage relaunch`) and the brief tells it
+  to read the note first. A relaunch counts toward the two-stall park, but is logged as
+  `triage relaunch`, so `report`'s `stall` count leaves it out.
+- **Writes the stop file**: the unit parks `stop`, as for any stop.
+
+Parks and how to clear them:
+
+- **`second prompt`**: the seat asked again after its triage. Read the thread, decide, then
+  `baton unpark <run> <unit>`. A plain unpark keeps the unit's triaged request ids, so the
+  relaunched seat's next prompt parks `second prompt` again. Use
+  `baton unpark <run> <unit> --to <stage>` to start a fresh stage visit with a fresh triage.
+- **`triage gave no answer`**: the triage ended with no answer, note or stop. Check its thread,
+  then unpark the same way.
+- **`stop` written by triage**: handle it as any stop (see the runbook below).
+
+`unpark --to` and `disarm` clear a live triage and release its claim. `baton report` counts
+`triage`, `triage answered` and `triage relaunch`.
+
 ## State and config
 
 State lives in `${BATON_STATE_DIR:-~/.local/state/baton}`: `runs/<id>/run.json` and

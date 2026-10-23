@@ -256,6 +256,76 @@ describe("validate", () => {
   });
 });
 
+describe("triage stage", () => {
+  const triage = () => ({
+    kind: "triage", instance: "triager", model: "small", project: "{param.project}", cwd: "{param.project}",
+    title: "triage {pending.stage}",
+    message: "Thread {pending.thread} request {pending.request}: {pending.questions}. Write {run.dir}/note.",
+    env: { TRIAGE_ROLE: "triage" }, note_file: "{run.dir}/note", stall_minutes: 5,
+    stop_file: "{run.dir}/stop/triage", watch: ["{run.dir}/out"], before: [["true"]], after_launch: [["true"]],
+    launch_dir: "root",
+  });
+  const withTriage = (t: unknown = triage()) => ({ ...relay(), triage: t });
+
+  test("a recipe with a triage stage validates", () => {
+    const res = validate(withTriage());
+    expect(res.ok).toBe(true);
+  });
+
+  test("a recipe without triage still validates", () => {
+    const res = validate(relay());
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.recipe.triage).toBeUndefined();
+  });
+
+  test("triage stage rejects outcomes, handoff, slots, max_launches and settle_minutes", () => {
+    const extra: Record<string, unknown> = {
+      outcomes: [], handoff: null, slots: ["session"], max_launches: 2, settle_minutes: 1,
+    };
+    for (const [k, v] of Object.entries(extra)) {
+      expectError(withTriage({ ...triage(), [k]: v }), `triage.${k}: not allowed on a triage stage`);
+    }
+  });
+
+  test("triage stage needs note_file and kind triage", () => {
+    const t: Record<string, unknown> = triage();
+    delete t.note_file;
+    expectError(withTriage(t), "triage.note_file: must be a string");
+    expectError(withTriage({ ...triage(), kind: "session" }), 'triage.kind: must be "triage"');
+  });
+
+  test("triage launch fields validate as a session stage's do", () => {
+    expectError(withTriage({ ...triage(), env: { PATH: "x" } }), "triage.env.PATH: denied key");
+    expectError(withTriage({ ...triage(), stall_minutes: 0 }), "triage.stall_minutes: must be a positive number");
+    expectError(withTriage({ ...triage(), watch: "x" }), "triage.watch: must be a list of strings");
+    expectError(withTriage({ ...triage(), cwd: 3 }), "triage.cwd: must be a string");
+  });
+
+  test("pending placeholders are valid in triage only", () => {
+    expectError(withTriage({ ...triage(), message: "{pending.nope}" }), 'unknown placeholder "{pending.nope}"');
+    const r = relay();
+    r.stages.work.message = "{pending.thread}";
+    expectError(r, 'stages.work.message: unknown placeholder "{pending.thread}"');
+  });
+
+  test("pending placeholders are refused in note_file", () => {
+    // note_file renders with the unit's own scope, which has no pending request
+    expectError(withTriage({ ...triage(), note_file: "{pending.thread}/x" }),
+      'triage.note_file: unknown placeholder "{pending.thread}"');
+  });
+
+  test("a stage named triage is refused when the recipe has a triage stage", () => {
+    for (const from of ["work", "planner_wait", "land"]) {
+      const r = withTriage();
+      r.stages.triage = r.stages[from];
+      expectError(r, "stages.triage: ");
+      const plain = relay();
+      plain.stages.triage = plain.stages[from];
+      expect(validate(plain).ok).toBe(true);
+    }
+  });
+});
+
 describe("render", () => {
   test("render substitutes every scope name", () => {
     const tpl =
@@ -279,5 +349,13 @@ describe("render", () => {
     const { pr: _pr, ...rest } = scope;
     expect(() => render("{pr.url}", rest as Scope)).toThrow("no pr in scope");
     expect(() => render("{pr.head}", rest as Scope)).toThrow("no pr in scope");
+  });
+
+  test("pending placeholders render in a triage scope and throw outside it", () => {
+    const pending = { thread: "th-1", request: "rq-9", questions: '[{"q":"ok?"}]', stage: "work" };
+    const tpl = "{pending.thread}|{pending.request}|{pending.questions}|{pending.stage}";
+    expect(render(tpl, { ...scope, pending })).toBe('th-1|rq-9|[{"q":"ok?"}]|work');
+    expect(() => render("{pending.thread}", scope)).toThrow("no pending in scope");
+    expect(() => render("{pending.stage}", scope)).toThrow("no pending in scope");
   });
 });

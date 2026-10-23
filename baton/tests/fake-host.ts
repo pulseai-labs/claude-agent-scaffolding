@@ -3,7 +3,9 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { claimKey, claimPath } from "../src/claims.ts";
-import { HostAuthError, HostDownError, type Host, type LaunchRequest, type ThreadStatus } from "../src/host.ts";
+import {
+  HostAuthError, HostDownError, type Host, type LaunchRequest, type PendingRequest, type ThreadStatus,
+} from "../src/host.ts";
 
 export type Behaviour = {
   ticks: number;
@@ -11,12 +13,24 @@ export type Behaviour = {
   end: "completed" | "failed" | "waiting" | "interrupted";
   handoffLine?: string;
   loseResponse?: boolean;
+  /** From step `atStep` the thread is `active` with `request` pending, and does not advance, until `answer`. */
+  pending?: { atStep: number; request: PendingRequest };
 };
 
 export type SeenClaim = { nonce: string; env: Record<string, string> } | null;
 export type Launch = { request: LaunchRequest; claim: SeenClaim; behaviour: Behaviour };
 
-type Thread = { id: string; launch: Launch; step: number };
+type Thread = {
+  id: string;
+  launch: Launch;
+  step: number;
+  /** The behaviour's pending request was answered. */
+  answered?: boolean;
+  /** A request raised by the test, replacing any other. */
+  raised?: PendingRequest;
+  /** Ended by the test (`finish`) or gone (`drop`). */
+  forced?: ThreadStatus["state"];
+};
 
 /** The claim the launcher would read for `cwd`, or null when there is none. */
 function readClaim(cwd: string): SeenClaim {
@@ -87,8 +101,47 @@ export class FakeHost implements Host {
     this.check();
     const t = this.threads.find((x) => x.id === threadId);
     if (!t) return { state: "gone", activity: "" };
+    if (t.forced === "gone") return { state: "gone", activity: "" };
+    const activity = `${t.id}:${t.step}`;
+    if (t.forced) return { state: t.forced, activity };
+    const pending = this.pendingOf(t);
+    if (pending) return { state: "active", activity, pending };
     const done = t.step >= t.launch.behaviour.ticks;
-    return { state: done ? t.launch.behaviour.end : "active", activity: `${t.id}:${t.step}` };
+    return { state: done ? t.launch.behaviour.end : "active", activity };
+  }
+
+  private pendingOf(t: Thread): PendingRequest | undefined {
+    if (t.raised) return t.raised;
+    const p = t.launch.behaviour.pending;
+    return p && !t.answered && t.step >= p.atStep ? p.request : undefined;
+  }
+
+  private thread(threadId: string): Thread {
+    const t = this.threads.find((x) => x.id === threadId);
+    if (!t) throw new Error(`fake host: no thread ${threadId}`);
+    return t;
+  }
+
+  /** Answer the thread's pending request: it clears, and the thread goes on with its steps. */
+  answer(threadId: string): void {
+    const t = this.thread(threadId);
+    t.answered = true;
+    delete t.raised;
+  }
+
+  /** Make `request` the thread's pending request, replacing any other. */
+  raise(threadId: string, request: PendingRequest): void {
+    this.thread(threadId).raised = request;
+  }
+
+  /** End the thread now with `end`. */
+  finish(threadId: string, end: "completed" | "failed" | "interrupted"): void {
+    this.thread(threadId).forced = end;
+  }
+
+  /** The thread is gone. */
+  drop(threadId: string): void {
+    this.thread(threadId).forced = "gone";
   }
 
   async interrupt(threadId: string, reason: string): Promise<void> {
@@ -107,7 +160,7 @@ export class FakeHost implements Host {
   advance(): void {
     for (const t of this.threads) {
       const b = t.launch.behaviour;
-      if (t.step >= b.ticks) continue;
+      if (t.step >= b.ticks || t.forced || this.pendingOf(t)) continue;
       t.step++;
       if (t.step === b.ticks) {
         // `{unit}` in a write's path or content is the launching unit's id, so one stage

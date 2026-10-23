@@ -3,7 +3,7 @@
 import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve, sep } from "node:path";
-import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type ThreadStatus } from "../host.ts";
+import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type PendingQuestion, type PendingRequest, type ThreadStatus } from "../host.ts";
 import { stateDir } from "../state.ts";
 import { callTool, callToolClassified, readToken, type ToolCall } from "./mcp.ts";
 
@@ -181,6 +181,34 @@ export class T3Host implements Host {
   async status(threadId: string): Promise<ThreadStatus> {
     const r = await this.read(threadId);
     if (r === "gone") return { state: "gone", activity: "" };
+    const st = this.mapState(r);
+    if (!(r.thread?.pendingRequestCount > 0)) return st;
+    const pending = await this.pendingRequest(threadId);
+    return pending ? { ...st, pending } : st;
+  }
+
+  /** The thread's first pending request; undefined when the list is empty (a race, not an error). */
+  private async pendingRequest(threadId: string): Promise<PendingRequest | undefined> {
+    const list = await this.call("t3_pending_request_list", { threadId });
+    if (isToolError(list)) throw new HostDownError(`t3_pending_request_list: ${describe(list)}`);
+    const requestId = (list as { requestIds?: string[] }).requestIds?.[0];
+    if (!requestId) return undefined;
+    const read = await this.call("t3_pending_request_read", { threadId, requestId });
+    if (isToolError(read)) throw new HostDownError(`t3_pending_request_read: ${describe(read)}`);
+    const questions = ((read as { questions?: any[] }).questions ?? []).map((q) => {
+      const out: PendingQuestion = {
+        id: q.id,
+        header: q.header,
+        question: q.question,
+        options: (q.options ?? []).map((o: any) => (o.description === undefined ? { label: o.label } : { label: o.label, description: o.description })),
+      };
+      if (q.multiSelect !== undefined) out.multiSelect = q.multiSelect;
+      return out;
+    });
+    return { id: requestId, questions };
+  }
+
+  private mapState(r: any): ThreadStatus {
     const run = r.recentRuns?.[0];
     const activity = `${r.thread?.updatedAt ?? ""} ${run?.runId ?? ""}`;
     const st: string | undefined = run?.status;

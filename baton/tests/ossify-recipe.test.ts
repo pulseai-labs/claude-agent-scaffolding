@@ -334,4 +334,100 @@ describe("ossify-spine briefs", () => {
     const msg = (loadRecipe().stages.spine_review as SessionStage).message;
     expect(msg.split(/[ \t]+/).slice(0, 2)).toEqual(["/review", "{unit.vars.pr_url}"]);
   });
+  test("common's ledger line does not tell seats to start the entry with >>", () => {
+    const c = brief("common.md");
+    expect(c).toContain("append the line with the shell's `>>` operator; the line itself starts with `- `");
+    expect(c).not.toContain("with a single `>>`");
+  });
+
+  test("spine_finish pushes the AI workspace commit the close made", () => {
+    expect(brief("spine-finish.md")).toContain("git push");
+  });
+
+  test("common tells a relaunched seat to read the triage note first", () => {
+    expect(brief("common.md")).toContain("<your OUT>/triage-note.md");
+  });
+
+  test("every session stage names its OUT, where common.md puts the triage note", () => {
+    for (const [name, s] of sessions(loadRecipe())) {
+      expect([name, s.message.includes(`OUT: ${OUT}.`)]).toEqual([name, true]);
+    }
+  });
+});
+
+describe("ossify-spine triage", () => {
+  const triage = () => loadRecipe().triage!;
+  const NOTE = "{run.dir}/out/{unit.id}/triage-note.md";
+
+  test("triage stage keeps T3 tools", () => {
+    expect(triage().env.OMP_T3_DROP_T3_MCP).toBeUndefined();
+    expect(triage().env.OMP_T3_SEAT).toBe("worker");
+    for (const [name, s] of sessions(loadRecipe())) {
+      expect([name, s.env.OMP_T3_DROP_T3_MCP]).toEqual([name, "1"]);
+    }
+  });
+
+  test("triage env carries stop file and ledger", () => {
+    const t = triage();
+    expect(t.env.SPINE_STOP_FILE).toBe(`${OUT}/stop`);
+    expect(t.env.SPINE_LEDGER).toBe("{param.spine_dir}/autopilot-ledger.md");
+    expect(t.env.SEAT_MODS_ALLOW).toBe(OUT);
+    expect(t.env.SEAT_MODS_ROLE).toBe("orchestrator");
+    expect(t.env.OMP_T3_VIA).toBe("{param.via}");
+  });
+
+  test("triage launch fields and note file", () => {
+    const t = triage();
+    expect([t.kind, t.instance, t.model, t.project, t.cwd, t.launch_dir, t.title, t.stall_minutes]).toEqual(
+      ["triage", "OMP_Seat", "default", "{param.ai_project}", "{param.ai_root}", "worktree", "triage {unit.id}", 10],
+    );
+    // the engine renders note_file outside a triage scope, so it names no {pending.*}
+    expect(t.note_file).toBe(NOTE);
+    expect(t.message).toContain(`Note file: ${NOTE}.`);
+    expect(t.message).toContain(`Stop file: ${OUT}/stop.`);
+    for (const k of ["stop_file", "watch", "before", "after_launch"]) expect(k in t).toBe(false);
+    for (const ph of ["{pending.thread}", "{pending.stage}", "{pending.request}", "{pending.questions}"]) {
+      expect([ph, t.message.includes(ph)]).toEqual([ph, true]);
+    }
+    expect(t.message).toContain("{param.briefs}/triage.md");
+  });
+
+  test("triage brief checks the stop rule before answering", () => {
+    const b = brief("triage.md");
+    expect(b).toContain("checking in this order and stopping at the first that applies");
+    const at = (h: string) => b.indexOf(h);
+    expect(at("1. **Stop**")).toBeGreaterThan(-1);
+    expect(at("1. **Stop**")).toBeLessThan(at("2. **Answer**"));
+    expect(at("2. **Answer**")).toBeLessThan(at("3. **Correct**"));
+    expect(b).toContain("answerable from the brief but touches an ADR, a bone or the skeleton is still a stop");
+  });
+
+  test("triage brief appends the ledger entry before the action", () => {
+    // the engine may end the triage as soon as the stop file, the note or the answer lands
+    const b = brief("triage.md");
+    const ledger = b.indexOf("append one ledger entry to `$SPINE_LEDGER`");
+    expect(ledger).toBeGreaterThan(-1);
+    expect(ledger).toBeLessThan(b.indexOf("then take the action"));
+    expect(b.indexOf("then take the action")).toBeLessThan(b.indexOf("then end the turn"));
+  });
+
+  test("triage brief maps every session stage to the brief its message names", () => {
+    const b = brief("triage.md");
+    expect(b).toContain("`_` written as `-`");
+    expect(b).toContain("`reclose` reads `close.md`");
+    for (const [name, s] of sessions(loadRecipe())) {
+      const file = name === "reclose" ? "close.md" : `${name.replaceAll("_", "-")}.md`;
+      expect([name, s.message.includes(`{param.briefs}/${file}`)]).toEqual([name, true]);
+    }
+  });
+
+  test("triage brief names the three actions and the answer shape", () => {
+    const b = brief("triage.md");
+    for (const pin of [
+      "t3_pending_request_respond", "keyed by the question id", "triage-note.md", "$SPINE_STOP_FILE",
+      "never approve a merge", "{ threadId, requestId, answers }", "exactly",
+    ]) {
+      expect([pin, b.includes(pin)]).toEqual([pin, true]);
+    }
+  });
 });
