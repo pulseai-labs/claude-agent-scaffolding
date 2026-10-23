@@ -2,6 +2,14 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.2.1 - 2026-10-23
+
+- Example recipe `ossify-spine`: `spine_review`'s message now puts a space, not a newline,
+  after the PR URL. OMP splits a slash command's arguments on spaces and tabs only, so the
+  newline joined the URL to the next word, `/review` failed to parse it, and the seat opened its
+  interactive Review Mode picker under T3 and stalled (#894). A recipe test pins the URL as
+  `/review`'s own argument. The MCP `clientInfo.version` string now reads 0.2.1.
+
 ## 0.2.0 - 2026-10-23
 
 - Example recipe `examples/ossify-spine/`: runs an ossify feature spine end to end on T3 — the
