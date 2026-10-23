@@ -347,6 +347,12 @@ describe("ossify-spine briefs", () => {
   test("common tells a relaunched seat to read the triage note first", () => {
     expect(brief("common.md")).toContain("<your OUT>/triage-note.md");
   });
+
+  test("every session stage names its OUT, where common.md puts the triage note", () => {
+    for (const [name, s] of sessions(loadRecipe())) {
+      expect([name, s.message.includes(`OUT: ${OUT}.`)]).toEqual([name, true]);
+    }
+  });
 });
 
 describe("ossify-spine triage", () => {
@@ -394,6 +400,25 @@ describe("ossify-spine triage", () => {
     expect(at("1. **Stop**")).toBeLessThan(at("2. **Answer**"));
     expect(at("2. **Answer**")).toBeLessThan(at("3. **Correct**"));
     expect(b).toContain("answerable from the brief but touches an ADR, a bone or the skeleton is still a stop");
+  });
+
+  test("triage brief appends the ledger entry before the action", () => {
+    // the engine may end the triage as soon as the stop file, the note or the answer lands
+    const b = brief("triage.md");
+    const ledger = b.indexOf("append one ledger entry to `$SPINE_LEDGER`");
+    expect(ledger).toBeGreaterThan(-1);
+    expect(ledger).toBeLessThan(b.indexOf("then take the action"));
+    expect(b.indexOf("then take the action")).toBeLessThan(b.indexOf("then end the turn"));
+  });
+
+  test("triage brief maps every session stage to the brief its message names", () => {
+    const b = brief("triage.md");
+    expect(b).toContain("`_` written as `-`");
+    expect(b).toContain("`reclose` reads `close.md`");
+    for (const [name, s] of sessions(loadRecipe())) {
+      const file = name === "reclose" ? "close.md" : `${name.replaceAll("_", "-")}.md`;
+      expect([name, s.message.includes(`{param.briefs}/${file}`)]).toEqual([name, true]);
+    }
   });
 
   test("triage brief names the three actions and the answer shape", () => {
