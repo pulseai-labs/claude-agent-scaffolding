@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { idsOnMessage } from "../src/buttons.ts";
 import { drainSpool } from "../src/send.ts";
 import { spoolNotice } from "../src/spool.ts";
@@ -73,4 +73,35 @@ test("a notice whose run dir is absent goes out with no reply_markup, and the dr
   expect(await drainSpool(api(), 42, now)).toEqual({ sent: 2, failed: 0 });
   expect("reply_markup" in fake.calls[0]!.body).toBe(false);
   expect(fake.calls.map((c) => c.body.text)).toEqual(["orphan", "second"]);
+});
+
+test("a permanent 400 moves that item to spool-failed/ and the drain goes on", async () => {
+  const p1 = spoolNotice("plain-1", "first");
+  const p2 = spoolNotice("plain-2", "second");
+  fake.failures = [{ error_code: 400, description: "Bad Request: message is too long" }];
+  const errs: string[] = [];
+  const orig = console.error;
+  console.error = (...a: unknown[]) => void errs.push(a.join(" "));
+  try {
+    expect(await drainSpool(api(), 42, now)).toEqual({ sent: 1, failed: 1 });
+  } finally {
+    console.error = orig;
+  }
+  expect(existsSync(p1)).toBe(false);
+  expect(existsSync(join(dir, "spool-failed", basename(p1)))).toBe(true);
+  expect(existsSync(p2)).toBe(false);
+  expect(fake.calls.map((c) => c.body.text)).toEqual(["first", "second"]);
+  expect(errs).toEqual(["bot-on-telegram: dropped notice plain-1: Bad Request: message is too long"]);
+});
+
+test("a state-dir write error from keyboardFor counts as a failed item, not a rejection", async () => {
+  spoolNotice("r1/u1/park/2026-10-23T11:00:00Z", "parked");
+  writeFileSync(join(dir, "buttons.jsonl"), "");
+  chmodSync(join(dir, "buttons.jsonl"), 0o444);
+  try {
+    if (process.getuid?.() === 0) return; // root ignores modes
+    expect(await drainSpool(api(), 42, now)).toEqual({ sent: 0, failed: 1 });
+  } finally {
+    chmodSync(join(dir, "buttons.jsonl"), 0o644);
+  }
 });

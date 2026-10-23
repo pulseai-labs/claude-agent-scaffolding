@@ -2,7 +2,7 @@ export type Api = { call<T>(method: string, body: Record<string, unknown>): Prom
 
 // Messages are our own text: never the URL (it carries the token) and never a raw fetch error.
 export class TelegramError extends Error {
-  constructor(readonly method: string, description: string) {
+  constructor(readonly method: string, readonly description: string, readonly status?: number) {
     super(`telegram ${method}: ${description}`);
     this.name = "TelegramError";
   }
@@ -47,7 +47,7 @@ export function makeApi(
           const code = reply.error_code ?? res.status;
           last = `${code} ${reply.description ?? "no description"}`;
           const retryable = code === 429 || code >= 500;
-          if (!retryable) throw new TelegramError(method, last);
+          if (!retryable) throw new TelegramError(method, reply.description ?? "no description", code);
           const after = reply.parameters?.retry_after;
           if (code === 429 && typeof after === "number") wait = Math.max(wait, after * 1000);
         } catch (e) {
