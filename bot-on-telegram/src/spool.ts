@@ -47,6 +47,8 @@ export function listSpool(): { path: string; item: SpoolItem }[] {
     } catch {
       mkdirSync(badDir(), { recursive: true });
       renameSync(path, join(badDir(), name));
+      // The name only: the content is whatever was malformed, and may hold anything.
+      process.stderr.write(`bot-on-telegram: set aside malformed spool file ${name}\n`);
     }
   }
   return out;
