@@ -386,6 +386,16 @@ describe("ossify-spine triage", () => {
     expect(t.message).toContain("{param.briefs}/triage.md");
   });
 
+  test("triage brief checks the stop rule before answering", () => {
+    const b = brief("triage.md");
+    expect(b).toContain("checking in this order and stopping at the first that applies");
+    const at = (h: string) => b.indexOf(h);
+    expect(at("1. **Stop**")).toBeGreaterThan(-1);
+    expect(at("1. **Stop**")).toBeLessThan(at("2. **Answer**"));
+    expect(at("2. **Answer**")).toBeLessThan(at("3. **Correct**"));
+    expect(b).toContain("answerable from the brief but touches an ADR, a bone or the skeleton is still a stop");
+  });
+
   test("triage brief names the three actions and the answer shape", () => {
     const b = brief("triage.md");
     for (const pin of [
