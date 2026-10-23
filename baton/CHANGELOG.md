@@ -10,8 +10,9 @@ All notable changes to the `baton` plugin.
   clock and, when the recipe has a top-level `triage` stage, launches one triage session per
   request id per stage visit. The stage takes the launch fields plus `note_file` and
   `stall_minutes` (default 10); its message may use `{pending.thread}`, `{pending.request}`,
-  `{pending.questions}` and `{pending.stage}`. `stop_file`, `watch`, `before` and `after_launch`
-  are accepted and ignored there.
+  `{pending.questions}` and `{pending.stage}` (`note_file` may not). `stop_file`, `watch`,
+  `before` and `after_launch` are accepted and ignored there; no other stage may then be named
+  `triage`.
 - New events: `triage`, `triage answered`, `triage relaunch` (the triage left a note, so the seat
   is relaunched and counts toward the two-stall park), `triage dropped`, and `pending` (a request
   seen by a recipe with no triage stage). New parks: `second prompt` (another request after the

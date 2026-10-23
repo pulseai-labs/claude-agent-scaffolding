@@ -307,6 +307,23 @@ describe("triage stage", () => {
     r.stages.work.message = "{pending.thread}";
     expectError(r, 'stages.work.message: unknown placeholder "{pending.thread}"');
   });
+
+  test("pending placeholders are refused in note_file", () => {
+    // note_file renders with the unit's own scope, which has no pending request
+    expectError(withTriage({ ...triage(), note_file: "{pending.thread}/x" }),
+      'triage.note_file: unknown placeholder "{pending.thread}"');
+  });
+
+  test("a stage named triage is refused when the recipe has a triage stage", () => {
+    for (const from of ["work", "planner_wait", "land"]) {
+      const r = withTriage();
+      r.stages.triage = r.stages[from];
+      expectError(r, "stages.triage: ");
+      const plain = relay();
+      plain.stages.triage = plain.stages[from];
+      expect(validate(plain).ok).toBe(true);
+    }
+  });
 });
 
 describe("render", () => {

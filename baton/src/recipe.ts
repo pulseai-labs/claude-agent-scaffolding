@@ -372,6 +372,8 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       }
       if (!isStr(t.note_file)) err("triage.note_file", "must be a string");
       launchFields("triage", t);
+      // A stage named triage would share the triage launches' seq key and nonce segment.
+      if (stageNames.has("triage")) err("stages.triage", "a recipe with a triage stage cannot name a stage triage");
     }
   }
 
@@ -424,7 +426,12 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     else if (isObj(v)) for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`, inTriage);
   };
   walk(r.stages, "stages");
-  walk(r.triage, "triage", true);
+  if (isObj(r.triage)) {
+    // note_file renders with the unit's own scope: no pending request there.
+    const { note_file, ...launch } = r.triage;
+    walk(launch, "triage", true);
+    walk(note_file, "triage.note_file");
+  }
   walk(r.sources, "sources");
   walk(r.seed, "seed");
 

@@ -50,8 +50,8 @@ event per request and the stall clock runs as before. With one, the clock pauses
 launches a single triage session per request id per stage visit (`triage` event). The recipe's
 `triage` stage takes the launch fields plus `note_file` and `stall_minutes` (default 10); its
 message may use `{pending.thread}`, `{pending.request}`, `{pending.questions}` and
-`{pending.stage}`. `stop_file`, `watch`, `before` and `after_launch` are accepted there and
-ignored. The triage session does one of three things:
+`{pending.stage}` (`note_file` may not). `stop_file`, `watch`, `before` and `after_launch` are
+accepted there and ignored; no other stage may then be named `triage`. The triage session does one of three things:
 
 - **Answers** the prompt through T3: the seat goes on (`triage answered`).
 - **Writes the note file**: baton relaunches the seat (`triage relaunch`) and the brief tells it

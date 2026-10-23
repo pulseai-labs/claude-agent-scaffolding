@@ -658,7 +658,8 @@ class RunTick {
    * unit; false sends the session on along the ordinary path, where its stall clock runs.
    */
   private async prompt(u: UnitState, s: Session, st: ThreadStatus): Promise<boolean> {
-    const p = st.pending;
+    // A request is live only while its thread is at work: one read on an ended thread is stale.
+    const p = atWork(st) ? st.pending : undefined;
     const triage = this.recipe.triage;
     const seen = u.triaged ?? [];
     if (!triage) {

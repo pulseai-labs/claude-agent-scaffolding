@@ -8,7 +8,7 @@ import { claimKey, liveClaim } from "../src/claims.ts";
 import { main } from "../src/cli.ts";
 import { tick, type TickReport } from "../src/engine.ts";
 import type { Forge } from "../src/forge.ts";
-import { HostDownError, type LaunchRequest } from "../src/host.ts";
+import { HostDownError, LaunchError, type LaunchRequest, type ThreadStatus } from "../src/host.ts";
 import { notifyOnce } from "../src/notify.ts";
 import { openStore, type RunState } from "../src/state.ts";
 import { FakeHost, type Behaviour } from "./fake-host.ts";
@@ -508,4 +508,175 @@ test("no triage stage", async () => {
   expect(seatLaunches().length).toBe(2);
   expect(count("pending")).toBe(1);
   expect(triageLaunches().length).toBe(0);
+});
+
+// ---- the seat's state gates its pending request --------------------------------------------
+
+/** Make `threadId` report `state` with REQ still pending (a stale read). */
+function staleRead(threadId: string, state: ThreadStatus["state"]) {
+  const orig = host.status.bind(host);
+  host.status = async (id: string) => {
+    const st = await orig(id);
+    return id === threadId ? { ...st, state, pending: REQ } : st;
+  };
+}
+
+for (const end of ["completed", "interrupted"] as const) {
+  test(`${end}: a seat with a stale pending request takes its outcome`, async () => {
+    await arm(recipe({ work: sess() }, ["a"]));
+    host = new FakeHost({ work: { ticks: 100, end: "completed" }, triage: TRIAGE });
+    await doTick();
+    staleRead("thread-1", end);
+    put(join(runDir(), "out", "a.done"), "ok");
+    at(1);
+    await doTick();
+    const u = runState().units.a;
+    expect(u.stage).toBe("done");
+    expect(u.parked).toBeUndefined();
+    expect(triageLaunches().length).toBe(0);
+    expect(count("triage")).toBe(0);
+  });
+}
+
+test("a waiting seat with a pending request is triaged", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" }, triage: TRIAGE });
+  await doTick();
+  staleRead("thread-1", "waiting");
+  at(1);
+  await doTick();
+  expect(triageLaunches().length).toBe(1);
+  expect(runState().units.a.triage?.request_id).toBe("req-1");
+});
+
+// ---- each triage branch, pinned ----------------------------------------------------------
+
+test("a host error at triage bind unmarks the request and the seq: a later tick triages once", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: pendingSeat(), triage: TRIAGE });
+  await doTick();
+  let failed = false;
+  host.bindDir = (_p, cwd, nonce) => {
+    if (nonce.includes("/triage/") && !failed) {
+      failed = true;
+      throw new HostDownError("at bind");
+    }
+    return cwd;
+  };
+  at(1);
+  expect((await doTick()).host).toBe("down");
+  let u = runState().units.a;
+  expect(u.triaged).toBeUndefined();
+  expect(u.seq?.triage).toBeUndefined();
+  expect(u.triage).toBeUndefined();
+  at(2);
+  await doTick();
+  at(3);
+  await doTick();
+  u = runState().units.a;
+  expect(triageLaunches().map((l) => l.request.nonce)).toEqual(["r1/a/triage/1"]);
+  expect(u.triaged).toEqual(["req-1"]);
+  expect(u.parked).toBeUndefined();
+});
+
+test("a triage nonce that finds two threads parks ambiguous nonce", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: pendingSeat(), triage: { ...TRIAGE, loseResponse: true } });
+  await doTick();
+  at(1);
+  await doTick();
+  expect(runState().units.a.triage?.session.thread_id).toBeUndefined();
+  host.findByNonce = async (_p: string, nonce: string) => (nonce.includes("/triage/") ? ["thread-2", "thread-9"] : []);
+  at(2); // inside the orphan window
+  await doTick();
+  const u = runState().units.a;
+  expect(u.parked?.reason).toBe("ambiguous nonce");
+  expect(u.triage).toBeUndefined();
+  expect(count("ambiguous nonce")).toBe(1);
+  expect(liveClaim(claimKey(triageCwd()))).toBeNull();
+  // the directory may hold a live thread: it is kept
+  expect(host.releases.map((r) => r.dir)).not.toContain(triageCwd());
+  expect(host.interrupts).toEqual([{ threadId: "thread-1", reason: "stop" }]);
+});
+
+test("disarm removes a live triage claim", async () => {
+  await triaged();
+  expect(liveClaim(claimKey(triageCwd()))).toBe("r1/a/triage/1");
+  expect(await main(["disarm", "r1"])).toBe(0);
+  expect(liveClaim(claimKey(triageCwd()))).toBeNull();
+  expect(liveClaim(claimKey(seatCwd()))).toBeNull();
+});
+
+test("a handoff successor ends a live triage", async () => {
+  const handoff = { file: "{run.dir}/h/{unit.id}", token: "handed-off", message: "resume from {handoff_path}" };
+  await triaged(recipe({ work: sess({ handoff }) }, ["a"]), pendingSeat({ writes: [] }));
+  host.answer("thread-1");
+  for (let i = 0; i < 3; i++) host.advance(); // the seat completes with no result; the triage runs on
+  put(join(runDir(), "h", "a"), `${new Date(T0 + 60_000 * 2).toISOString()} handed-off /tmp/hand.md\n`);
+  at(3);
+  await doTick();
+  const u = runState().units.a;
+  expect(count("successor")).toBe(1);
+  expect(u.triage).toBeUndefined();
+  expect(count("triage dropped")).toBe(1);
+  expect(host.interrupts).toEqual([{ threadId: "thread-2", reason: "stop" }]);
+  expect(liveClaim(claimKey(triageCwd()))).toBeNull();
+  expect(host.releases.map((r) => r.dir)).toContain(triageCwd());
+});
+
+test("a triage claim that cannot be written releases the triage launch dir", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: pendingSeat(), triage: TRIAGE });
+  await doTick();
+  const missing = join(root, "t", "a-wt"); // never created: the claim cannot resolve it
+  host.bindDir = (_p, cwd, nonce) => (nonce.includes("/triage/") ? missing : cwd);
+  at(1);
+  await doTick();
+  const u = runState().units.a;
+  expect(triageLaunches().length).toBe(0);
+  expect(u.triage).toBeUndefined();
+  expect(u.triaged).toEqual(["req-1"]);
+  expect(host.releases.map((r) => r.dir)).toEqual([missing]);
+  expect(events().filter((e) => e.kind === "launch failed")).toEqual([
+    expect.objectContaining({ unit: "a", nonce: "r1/a/triage/1", reason: expect.stringContaining("claim:") }),
+  ]);
+});
+
+test("a triage LaunchError ends the triage and keeps the request recorded", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: pendingSeat(), triage: TRIAGE });
+  await doTick();
+  const orig = host.launch.bind(host);
+  host.launch = async (r: LaunchRequest) => {
+    if (r.nonce.includes("/triage/")) throw new LaunchError("refused");
+    return orig(r);
+  };
+  at(1);
+  await doTick();
+  let u = runState().units.a;
+  expect(u.triage).toBeUndefined();
+  expect(u.triaged).toEqual(["req-1"]);
+  expect(liveClaim(claimKey(triageCwd()))).toBeNull();
+  expect(host.releases.map((r) => r.dir)).toContain(triageCwd());
+  expect(count("launch failed")).toBe(1);
+  at(2);
+  await doTick(); // already acted on: no second try
+  u = runState().units.a;
+  expect(count("launch failed")).toBe(1);
+  expect(u.parked).toBeUndefined();
+});
+
+test("the triage launch tick stamps the seat's stall clock", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" }, triage: TRIAGE });
+  await doTick();
+  at(1);
+  await doTick(); // the seat's first activity: its clock starts here
+  expect(runState().units.a.session?.last_progress_at).toBe(new Date(T0 + 60_000).toISOString());
+  host.raise("thread-1", REQ); // no step taken: the progress mark does not move
+  at(5);
+  await doTick();
+  const u = runState().units.a;
+  expect(triageLaunches().length).toBe(1);
+  expect(u.session?.last_progress_at).toBe(new Date(T0 + 5 * 60_000).toISOString());
 });
