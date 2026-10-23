@@ -105,3 +105,71 @@ test("a state-dir write error from keyboardFor counts as a failed item, not a re
     chmodSync(join(dir, "buttons.jsonl"), 0o644);
   }
 });
+
+for (const code of [401, 403, 404]) {
+  test(`a ${code} on the first of two notices stops the drain: both stay in spool/, nothing set aside`, async () => {
+    const p1 = spoolNotice("plain-1", "first");
+    const p2 = spoolNotice("plain-2", "second");
+    fake.failures = [{ error_code: code, description: "Unauthorized" }];
+    expect(await drainSpool(api(), 42, now)).toEqual({ sent: 0, failed: 1 });
+    expect(existsSync(p1) && existsSync(p2)).toBe(true);
+    expect(existsSync(join(dir, "spool-failed"))).toBe(false);
+    expect(fake.calls).toHaveLength(1);
+  });
+}
+
+test("adjacent control: a 400 on the same shape is still set aside", async () => {
+  const p1 = spoolNotice("plain-1", "first");
+  fake.failures = [{ error_code: 400, description: "Bad Request: chat not found" }];
+  const orig = console.error;
+  console.error = () => {};
+  try {
+    expect(await drainSpool(api(), 42, now)).toEqual({ sent: 0, failed: 1 });
+  } finally {
+    console.error = orig;
+  }
+  expect(existsSync(join(dir, "spool-failed", basename(p1)))).toBe(true);
+});
+
+test("a 400 on a send with buttons is retried once without reply_markup and delivered buttonless", async () => {
+  const p1 = spoolNotice("r1/u1/park/2026-10-23T11:00:00Z", "parked");
+  fake.failures = [{ error_code: 400, description: "Bad Request: BUTTON_DATA_INVALID" }];
+  expect(await drainSpool(api(), 42, now)).toEqual({ sent: 1, failed: 0 });
+  expect(fake.calls).toHaveLength(2);
+  expect("reply_markup" in fake.calls[0]!.body).toBe(true);
+  expect("reply_markup" in fake.calls[1]!.body).toBe(false);
+  expect(fake.calls[1]!.body.text).toBe("parked");
+  expect(existsSync(p1)).toBe(false);
+  expect(existsSync(join(dir, "spool-failed"))).toBe(false);
+  expect(idsOnMessage(100)).toEqual([]); // the unsent buttons are bound to no message
+});
+
+test("a 400 on the buttonless retry too: set aside after two tries", async () => {
+  const p1 = spoolNotice("r1/u1/park/2026-10-23T11:00:00Z", "parked");
+  fake.failures = [
+    { error_code: 400, description: "Bad Request: BUTTON_DATA_INVALID" },
+    { error_code: 400, description: "Bad Request: message is too long" },
+  ];
+  const orig = console.error;
+  console.error = () => {};
+  try {
+    expect(await drainSpool(api(), 42, now)).toEqual({ sent: 0, failed: 1 });
+  } finally {
+    console.error = orig;
+  }
+  expect(fake.calls).toHaveLength(2);
+  expect(existsSync(join(dir, "spool-failed", basename(p1)))).toBe(true);
+});
+
+test("a 400 on a send with no buttons is not retried", async () => {
+  spoolNotice("plain-1", "first");
+  fake.failures = [{ error_code: 400, description: "Bad Request: message is too long" }];
+  const orig = console.error;
+  console.error = () => {};
+  try {
+    await drainSpool(api(), 42, now);
+  } finally {
+    console.error = orig;
+  }
+  expect(fake.calls).toHaveLength(1);
+});

@@ -91,3 +91,50 @@ test("a fetch error that quotes the URL (with token) never reaches the thrown er
     expect(s).not.toContain("example.invalid");
   }
 });
+
+test("a call that never answers is aborted by its timeout and retried as a network error", async () => {
+  fake.hangs = 1;
+  const api = makeApi(TOKEN, { base, backoffMs: 1, timeoutMs: 100, pollTimeoutMs: 60_000 });
+  const t0 = Date.now();
+  const r = await api.call<{ message_id: number }>("sendMessage", { chat_id: 1, text: "hi" });
+  expect(Date.now() - t0).toBeLessThan(5_000);
+  expect(fake.hung).toBe(1);
+  expect(r.message_id).toBe(100);
+});
+
+test("every try timing out gives up with a token-free network error", async () => {
+  fake.hangs = 2;
+  const api = makeApi(TOKEN, { base, backoffMs: 1, retries: 2, timeoutMs: 100, pollTimeoutMs: 60_000 });
+  const err = await api.call("sendMessage", {}).catch((e) => e);
+  expect(err).toBeInstanceOf(TelegramError);
+  expect(err.message).toBe("telegram sendMessage: gave up after 2 tries (network error)");
+  for (const s of [String(err), err.stack ?? "", String(err.cause ?? "")]) {
+    expect(s).not.toContain("FIXTURE-TOKEN");
+    expect(s).not.toContain(base);
+  }
+  expect(fake.hung).toBe(2);
+});
+
+test("a body with a numeric timeout (long poll) gets the long-poll timeout, not the short one", async () => {
+  fake.hangs = 1;
+  const api = makeApi(TOKEN, { base, backoffMs: 1, timeoutMs: 60_000, pollTimeoutMs: 100 });
+  const t0 = Date.now();
+  await api.call("getUpdates", { offset: 0, timeout: 25 });
+  expect(Date.now() - t0).toBeLessThan(5_000);
+  expect(fake.hung).toBe(1);
+});
+
+test("the default timeouts are 15 000 ms, and 40 000 ms for a long poll", async () => {
+  const seen: number[] = [];
+  const orig = AbortSignal.timeout;
+  AbortSignal.timeout = (ms: number) => (seen.push(ms), orig.call(AbortSignal, ms));
+  try {
+    const api = makeApi(TOKEN, { base, backoffMs: 1 });
+    await api.call("sendMessage", { chat_id: 1, text: "x" });
+    await api.call("getUpdates", { offset: 0, timeout: 25 });
+    await api.call("getUpdates", { offset: 0, timeout: "25" });
+  } finally {
+    AbortSignal.timeout = orig;
+  }
+  expect(seen).toEqual([15_000, 40_000, 15_000]);
+});

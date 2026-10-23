@@ -18,12 +18,22 @@ type Reply = {
 
 export function makeApi(
   token: string,
-  opts: { base?: string; retries?: number; backoffMs?: number; fetch?: typeof fetch } = {},
+  opts: {
+    base?: string;
+    retries?: number;
+    backoffMs?: number;
+    fetch?: typeof fetch;
+    timeoutMs?: number;
+    pollTimeoutMs?: number;
+  } = {},
 ): Api {
   const base = opts.base ?? process.env.BOT_ON_TELEGRAM_API_BASE ?? "https://api.telegram.org";
   const tries = opts.retries ?? 5;
   const backoff = opts.backoffMs ?? 500;
   const doFetch = opts.fetch ?? fetch;
+  // A long poll (a numeric `timeout` in the body) is held open by Telegram, so it gets the longer cap.
+  const shortCap = opts.timeoutMs ?? 15_000;
+  const pollCap = opts.pollTimeoutMs ?? 40_000;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   return {
@@ -36,6 +46,7 @@ export function makeApi(
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify(body),
+            signal: AbortSignal.timeout(typeof body.timeout === "number" ? pollCap : shortCap),
           });
           let reply: Reply = {};
           try {
@@ -52,7 +63,7 @@ export function makeApi(
           if (code === 429 && typeof after === "number") wait = Math.max(wait, after * 1000);
         } catch (e) {
           if (e instanceof TelegramError) throw e;
-          last = "network error"; // the raw error may quote the URL, so it is dropped
+          last = "network error"; // an abort too; the raw error may quote the URL, so it is dropped
         }
         if (attempt < tries) await sleep(wait);
       }

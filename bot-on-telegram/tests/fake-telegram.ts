@@ -12,6 +12,9 @@ export class FakeTelegram {
   drops = 0; // drop the next N connections
   failures: Scripted[] = []; // answer the next calls with these ok:false replies
   dropped = 0;
+  hangs = 0; // never answer the next N connections (the client's timeout must end them)
+  hung = 0;
+  failOn: Record<string, Scripted[]> = {}; // per-method ok:false replies, checked before `failures`
   updates: { update_id: number }[] = []; // what getUpdates serves; like Telegram, ids below `offset` are confirmed and dropped
   private nextMessageId = 100;
   private server: Server = createServer((req, res) => {
@@ -24,10 +27,15 @@ export class FakeTelegram {
         req.socket.destroy();
         return;
       }
+      if (this.hangs > 0) {
+        this.hangs--;
+        this.hung++;
+        return;
+      }
       const m = /^\/bot([^/]+)\/([A-Za-z]+)$/.exec(req.url ?? "");
       const body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
       this.calls.push({ method: m?.[2] ?? "", body, token: m?.[1] ?? "" });
-      const f = this.failures.shift();
+      const f = this.failOn[m?.[2] ?? ""]?.shift() ?? this.failures.shift();
       if (f) {
         res.writeHead(f.status ?? (f.error_code >= 500 || f.error_code === 429 ? f.error_code : 400), { "content-type": "application/json" });
         res.end(JSON.stringify({ ok: false, error_code: f.error_code, description: f.description, parameters: f.parameters }));
