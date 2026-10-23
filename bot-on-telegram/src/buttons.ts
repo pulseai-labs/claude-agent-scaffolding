@@ -1,8 +1,8 @@
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readUnit, reviewedHead } from "./baton-state.ts";
+import { readUnit, reviewedHead, runReadable } from "./baton-state.ts";
 import type { Notice } from "./notice.ts";
-import { batonStateDir, stateDir } from "./paths.ts";
+import { stateDir } from "./paths.ts";
 
 export type Action =
   | "merge" | "merge-yes" | "merge-no"
@@ -69,7 +69,8 @@ export function lookup(id: string, now: Date): ButtonRec | "unknown" | "expired"
   const rec = latest().get(id);
   if (!rec) return "unknown";
   if (rec.used_at) return "used";
-  if (now.getTime() - Date.parse(rec.minted_at) > TTL_MS) return "expired";
+  const age = now.getTime() - Date.parse(rec.minted_at);
+  if (!(age <= TTL_MS)) return "expired"; // NaN minted_at is expired too
   return rec;
 }
 
@@ -126,14 +127,5 @@ export function keyboardFor(n: Notice, now: Date): Keyboard | undefined {
     }
     default:
       return undefined;
-  }
-}
-
-function runReadable(run: string): boolean {
-  try {
-    JSON.parse(readFileSync(join(batonStateDir(), "runs", run, "run.json"), "utf8"));
-    return true;
-  } catch {
-    return false;
   }
 }

@@ -43,3 +43,10 @@ test("newestPark is the last park event for the unit, skipping garbage", () => {
   expect(newestPark("r1", "u4")).toBeNull();
   expect(newestPark("nope", "u1")).toBeNull();
 });
+
+test("units is an object keyed by id: a unit is found by key, not by array search", () => {
+  // a prototype-ish name must not resolve, and a null `parked` is not parked
+  expect(readUnit("r1", "constructor")).toBeNull();
+  expect(readUnit("r1", "u4")).toEqual({ stage: "build" });
+  expect(readUnit("r2", "u1")).toBeNull();
+});

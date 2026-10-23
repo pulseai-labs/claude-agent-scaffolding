@@ -17,10 +17,16 @@ function readJson(path: string): unknown {
 const isObj = (v: unknown): v is Record<string, unknown> =>
   typeof v === "object" && v !== null && !Array.isArray(v);
 
+// True when the run's run.json exists and parses as JSON.
+export function runReadable(run: string): boolean {
+  return readJson(join(runDir(run), "run.json")) !== null;
+}
+
+// run.json keeps `units` as an object keyed by unit id; `parked` is null when not parked.
 export function readUnit(run: string, unit: string): UnitView | null {
   const doc = readJson(join(runDir(run), "run.json"));
-  if (!isObj(doc) || !Array.isArray(doc.units)) return null;
-  const u = doc.units.find((x) => isObj(x) && x.id === unit);
+  if (!isObj(doc) || !isObj(doc.units) || !Object.hasOwn(doc.units, unit)) return null;
+  const u = doc.units[unit];
   if (!isObj(u) || typeof u.stage !== "string") return null;
   const view: UnitView = { stage: u.stage };
   if (isObj(u.parked) && typeof u.parked.reason === "string" && typeof u.parked.at === "string") {

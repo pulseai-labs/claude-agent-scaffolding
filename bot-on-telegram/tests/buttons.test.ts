@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -79,7 +79,7 @@ test("unit-move with pr_url and a reviewed head: Merge, Open PR, Disarm", () => 
 
 test("unit-move with pr_url and no reviewed head: Open PR, Disarm only", () => {
   expect(texts(keyboardFor({ kind: "unit-move", run: "r1", unit: "u3", stage: "spine_ack" }, now))).toEqual(["Open PR", "Disarm"]);
-  expect(texts(keyboardFor({ kind: "unit-move", run: "r1", unit: "u2x", stage: "s" }, now))).toEqual([]);
+  expect(keyboardFor({ kind: "unit-move", run: "r1", unit: "no-such-unit", stage: "s" }, now)).toBeUndefined();
 });
 
 test("unit-move with no pr_url, and run-park: Disarm only", () => {
@@ -100,4 +100,17 @@ test("lookup of an id never minted is unknown, with and without a log file", () 
   expect(lookup("neverminted", now)).toBe("unknown");
   mint({ action: "disarm", run: "r1" }, now);
   expect(lookup("neverminted", now)).toBe("unknown");
+});
+
+test("undefined for a missing unit in an existing run, and for a garbage run.json", () => {
+  expect(keyboardFor({ kind: "unit-park", run: "r1", unit: "no-such-unit" }, now)).toBeUndefined();
+  expect(keyboardFor({ kind: "unit-park", run: "r3", unit: "u1" }, now)).toBeUndefined();
+  expect(keyboardFor({ kind: "run-park", run: "r3" }, now)).toBeUndefined();
+});
+
+test("a NaN minted_at is expired", () => {
+  const r = mint({ action: "disarm", run: "r1" }, now);
+  const log = join(dir, "buttons.jsonl");
+  writeFileSync(log, JSON.stringify({ ...r, minted_at: "garbage" }) + "\n");
+  expect(lookup(r.id, now)).toBe("expired");
 });
