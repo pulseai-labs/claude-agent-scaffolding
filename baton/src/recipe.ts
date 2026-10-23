@@ -48,6 +48,14 @@ export type MergeStage = {
   outcomes: { merged: string; red: string; conflict: string };
   run_after?: string[][];
 };
+/** The recipe's one triage session: launched for a unit stuck on a prompt. The engine ignores the
+ *  SessionStage fields stop_file, watch, before and after_launch for it; they validate as for a session. `stall_minutes` is the
+ *  triage session's own time limit (default 10, applied by the engine). */
+export type TriageStage = Omit<SessionStage, "kind" | "outcomes" | "handoff" | "slots" | "max_launches" | "settle_minutes"> & {
+  kind: "triage";
+  /** File the triage session writes to ask for a relaunch with a correction note. */
+  note_file: string;
+};
 export type Stage = SessionStage | WaitStage | MergeStage;
 
 export type Source = {
@@ -67,6 +75,7 @@ export type Recipe = {
   sources: Source[];
   seed: { id: string; stage: string; vars?: Record<string, string> }[];
   stages: Record<string, Stage>;
+  triage?: TriageStage;
 };
 
 export type Scope = {
@@ -76,6 +85,7 @@ export type Scope = {
   attempt: number;
   handoff_path?: string;
   pr?: { url: string; head: string };
+  pending?: { thread: string; request: string; questions: string; stage: string };
 };
 
 // ---- names -------------------------------------------------------------------------
@@ -119,10 +129,13 @@ const VAR_NAME_RE = /^[A-Za-z0-9_]+$/;
 const FIXED_NAMES = new Set([
   "unit.id", "run.id", "run.dir", "run.group", "attempt", "handoff_path", "pr.url", "pr.head",
 ]);
+// Usable only in the triage stage: the stuck unit's pending request.
+const PENDING_NAMES = new Set(["pending.thread", "pending.request", "pending.questions", "pending.stage"]);
 
 /** Is `name` (the text between braces) a placeholder the recipe may use? Returns a reason or null. */
-function placeholderProblem(name: string, params: Set<string>): string | null {
+function placeholderProblem(name: string, params: Set<string>, inTriage = false): string | null {
   if (FIXED_NAMES.has(name)) return null;
+  if (inTriage && PENDING_NAMES.has(name)) return null;
   if (name.startsWith("param.")) {
     const p = name.slice(6);
     return params.has(p) ? null : `undeclared param "${p}"`;
@@ -148,6 +161,12 @@ export function render(tpl: string, scope: Scope): string {
       case "pr.head":
         if (!scope.pr) throw new Error("no pr in scope");
         return name === "pr.url" ? scope.pr.url : scope.pr.head;
+      case "pending.thread":
+      case "pending.request":
+      case "pending.questions":
+      case "pending.stage":
+        if (!scope.pending) throw new Error("no pending in scope");
+        return scope.pending[name.slice(8) as "thread" | "request" | "questions" | "stage"];
     }
     if (name.startsWith("param.")) {
       const k = name.slice(6);
@@ -274,20 +293,34 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     });
   };
 
+  // The launch fields a session stage and the triage stage share.
+  const launchFields = (p: string, st: Obj) => {
+    for (const f of ["instance", "model", "project", "cwd", "title", "message"]) {
+      if (!isStr(st[f])) err(`${p}.${f}`, "must be a string");
+    }
+    if (!isObj(st.env)) err(`${p}.env`, "must be an object of string values");
+    else {
+      for (const [k, v] of Object.entries(st.env)) {
+        if (!ENV_KEY_RE.test(k) || ENV_DENYLIST.includes(k)) err(`${p}.env.${k}`, "denied key");
+        if (!isStr(v)) err(`${p}.env.${k}`, "must be a string");
+      }
+    }
+    if (st.launch_dir !== undefined && st.launch_dir !== "worktree" && st.launch_dir !== "root") {
+      err(`${p}.launch_dir`, 'must be "worktree" or "root"');
+    }
+    hooks(`${p}.before`, st.before);
+    hooks(`${p}.after_launch`, st.after_launch);
+    if (st.stop_file !== undefined && !isStr(st.stop_file)) err(`${p}.stop_file`, "must be a string");
+    if (st.watch !== undefined && !isStrArr(st.watch)) err(`${p}.watch`, "must be a list of strings");
+    if (st.stall_minutes !== undefined && (typeof st.stall_minutes !== "number" || !(st.stall_minutes > 0))) {
+      err(`${p}.stall_minutes`, "must be a positive number");
+    }
+  };
+
   for (const [name, st] of Object.entries(stages)) {
     const p = `stages.${name}`;
     if (!isObj(st)) { err(p, "must be an object"); continue; }
     if (st.kind === "session") {
-      for (const f of ["instance", "model", "project", "cwd", "title", "message"]) {
-        if (!isStr(st[f])) err(`${p}.${f}`, "must be a string");
-      }
-      if (!isObj(st.env)) err(`${p}.env`, "must be an object of string values");
-      else {
-        for (const [k, v] of Object.entries(st.env)) {
-          if (!ENV_KEY_RE.test(k) || ENV_DENYLIST.includes(k)) err(`${p}.env.${k}`, "denied key");
-          if (!isStr(v)) err(`${p}.env.${k}`, "must be a string");
-        }
-      }
       if (!("handoff" in st)) err(`${p}.handoff`, "required: an object or null");
       else if (st.handoff !== null) {
         const h = st.handoff;
@@ -295,15 +328,9 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
           err(`${p}.handoff`, "must be null or {file, token, message} strings");
         }
       }
-      if (st.launch_dir !== undefined && st.launch_dir !== "worktree" && st.launch_dir !== "root") {
-        err(`${p}.launch_dir`, 'must be "worktree" or "root"');
-      }
-      hooks(`${p}.before`, st.before);
-      hooks(`${p}.after_launch`, st.after_launch);
+      launchFields(p, st);
       outcomes(`${p}.outcomes`, st.outcomes);
-      if (st.stop_file !== undefined && !isStr(st.stop_file)) err(`${p}.stop_file`, "must be a string");
-      if (st.watch !== undefined && !isStrArr(st.watch)) err(`${p}.watch`, "must be a list of strings");
-      for (const f of ["max_launches", "stall_minutes", "settle_minutes"]) {
+      for (const f of ["max_launches", "settle_minutes"]) {
         const v = st[f];
         if (v !== undefined && (typeof v !== "number" || !(v > 0))) err(`${p}.${f}`, "must be a positive number");
       }
@@ -332,6 +359,19 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       hooks(`${p}.run_after`, st.run_after);
     } else {
       err(`${p}.kind`, 'must be "session", "wait" or "merge"');
+    }
+  }
+
+  if (r.triage !== undefined) {
+    const t = r.triage;
+    if (!isObj(t)) err("triage", "must be an object");
+    else {
+      if (t.kind !== "triage") err("triage.kind", 'must be "triage"');
+      for (const k of ["outcomes", "handoff", "slots", "max_launches", "settle_minutes"]) {
+        if (k in t) err(`triage.${k}`, "not allowed on a triage stage");
+      }
+      if (!isStr(t.note_file)) err("triage.note_file", "must be a string");
+      launchFields("triage", t);
     }
   }
 
@@ -374,16 +414,17 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
   }
 
   // Placeholders: every string in the recipe may use only the closed set, and params must be declared.
-  const walk = (v: unknown, path: string) => {
+  const walk = (v: unknown, path: string, inTriage = false) => {
     if (isStr(v)) {
       for (const m of v.matchAll(PLACEHOLDER_RE)) {
-        const problem = placeholderProblem(m[1], params);
+        const problem = placeholderProblem(m[1], params, inTriage);
         if (problem) err(path, problem);
       }
-    } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`));
-    else if (isObj(v)) for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`);
+    } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`, inTriage));
+    else if (isObj(v)) for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`, inTriage);
   };
   walk(r.stages, "stages");
+  walk(r.triage, "triage", true);
   walk(r.sources, "sources");
   walk(r.seed, "seed");
 
