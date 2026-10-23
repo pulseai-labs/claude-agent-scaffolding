@@ -77,6 +77,12 @@
       "description": "A recipe-driven engine that launches model sessions on a host when a unit is due, waits on closed signals at no token cost, and merges pull requests only by the recipe's rule. Ships an example recipe that runs an ossify spine. A CLI, a claim launcher and a systemd timer; no skill.",
       "category": "workflow",
       "source": "./baton"
+    },
+    {
+      "name": "bot-on-telegram",
+      "description": "Sends baton notices to one Telegram chat, with buttons, and turns button presses into baton actions. A CLI and a service; no skill.",
+      "category": "workflow",
+      "source": "./bot-on-telegram"
     }
   ]
 }
