@@ -326,4 +326,12 @@ describe("ossify-spine briefs", () => {
     expect(r).toContain("verdict: block");
     expect(r).toContain("head: ");
   });
+
+  // OMP splits a slash command's arguments on spaces and tabs only. A newline after the URL
+  // joins it to the next word, the PR parse fails, and /review opens its interactive Review
+  // Mode picker, which no DAG seat answers (#894).
+  test("spine_review passes the PR URL as /review's own argument", () => {
+    const msg = (loadRecipe().stages.spine_review as SessionStage).message;
+    expect(msg.split(/[ \t]+/).slice(0, 2)).toEqual(["/review", "{unit.vars.pr_url}"]);
+  });
 });

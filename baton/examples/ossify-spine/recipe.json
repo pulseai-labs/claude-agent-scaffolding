@@ -302,7 +302,7 @@
       "cwd": "{param.repo}",
       "launch_dir": "worktree",
       "title": "spine review {param.spine}",
-      "message": "/review {unit.vars.pr_url}\nThen read {param.briefs}/common.md and {param.briefs}/spine-review.md, and write {run.dir}/out/{unit.id}/review.md whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA, then the findings. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "/review {unit.vars.pr_url} Then read {param.briefs}/common.md and {param.briefs}/spine-review.md, and write {run.dir}/out/{unit.id}/review.md whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA, then the findings. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "reviewer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
