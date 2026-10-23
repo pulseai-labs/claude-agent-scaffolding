@@ -41,6 +41,9 @@ const firstLine = (s: string): string => s.split("\n").map((l) => l.trim()).find
 
 const failure = (rc: number, stderr: string): string => firstLine(stderr) || `exit ${rc}`;
 
+const SHOW_MAX = 3500;
+const cut = (s: string): string => (s.length > SHOW_MAX ? `${s.slice(0, SHOW_MAX)}…` : s);
+
 export async function handleUpdate(u: Update, ctx: PressCtx): Promise<void> {
   const cq = u.callback_query;
   const line: LogLine = { at: ctx.now().toISOString(), update_id: u.update_id, result: "crashed" };
@@ -103,9 +106,10 @@ async function handlePress(
   for (const id of toSpend) {
     if (lookup(id, now) !== "used") spend(id, now);
   }
+  // Answered once, before any command or edit; best-effort, since the press is already spent.
+  await api.call("answerCallbackQuery", { callback_query_id: queryId }).catch(() => {});
 
   const notice = firstLine(message.text ?? "");
-  const answer = () => api.call("answerCallbackQuery", { callback_query_id: queryId });
   const edit = async (text: string, keyboard?: Keyboard) => {
     const body: Record<string, unknown> = { chat_id: ctx.chatId, message_id: message.message_id, text };
     if (keyboard) {
@@ -115,18 +119,20 @@ async function handlePress(
     }
     await api.call("editMessageText", body);
   };
+  // The result goes on the log line before any edit, so a failed edit still logs what the command did.
+  // A failure keeps the notice as the first line (R4) and brings its buttons back fresh.
   const outcome = async (res: { rc: number; stderr: string }): Promise<string> => {
-    await answer();
     if (res.rc === 0) {
-      await edit(`${notice} — done`);
+      line.result = "done";
+      await edit(`${notice} — done`, openPrOnly(rec));
       return "done";
     }
-    await edit(`${notice} — failed: ${failure(res.rc, res.stderr)}`);
+    line.result = "failed";
+    await edit(`${notice}\n\nfailed: ${failure(res.rc, res.stderr)}`, keyboardFor(originalNotice(rec), now));
     return "failed";
   };
   const btn = (text: string, r: Omit<ButtonRec, "id" | "minted_at">) => ({ text, callback_data: mint(r, now).id });
   const restore = async (): Promise<string> => {
-    await answer();
     await edit(notice, keyboardFor(originalNotice(rec), now));
     return "restored";
   };
@@ -146,7 +152,6 @@ async function handlePress(
       const pr = parsePrView(view.stdout);
       if (!pr) return outcome({ rc: 1, stderr: "gh pr view gave no PR number and base" });
       const carry = { ...base, pr_url: rec.pr_url, head_sha: rec.head_sha };
-      await answer();
       await edit(`${notice}\n\nMerge PR #${pr.number} (head ${rec.head_sha.slice(0, 7)}) into ${pr.base}?`, {
         inline_keyboard: [[btn("Yes", { action: "merge-yes", ...carry }), btn("No", { action: "merge-no", ...carry })]],
       });
@@ -162,7 +167,6 @@ async function handlePress(
       if (rec.unit === undefined) return outcome({ rc: 1, stderr: "button carries no unit" });
       const rows = stageNames(rec.run).map((stage) => [btn(stage, { action: "unpark-stage", ...base, stage })]);
       rows.push([btn("Cancel", { action: "cancel", ...base })]);
-      await answer();
       await edit(`${notice}\n\nUnpark to which stage?`, { inline_keyboard: rows });
       return "picker";
     }
@@ -170,7 +174,6 @@ async function handlePress(
       if (rec.unit === undefined || !rec.stage) return outcome({ rc: 1, stderr: "button carries no stage" });
       return outcome(await unparkTo(rec.run, rec.unit, rec.stage, runner));
     case "disarm":
-      await answer();
       await edit(`${notice}\n\nDisarm run ${rec.run}?`, {
         inline_keyboard: [[btn("Yes", { action: "disarm-yes", ...base }), btn("No", { action: "disarm-no", ...base })]],
       });
@@ -186,25 +189,28 @@ async function handlePress(
       const unit = readUnit(rec.run, rec.unit);
       const park = newestPark(rec.run, rec.unit);
       const nr = "not recorded";
-      await api.call("sendMessage", {
-        chat_id: ctx.chatId,
-        text: [
-          `${rec.run}/${rec.unit}`,
-          `stage: ${unit?.stage ?? nr}`,
-          `reason: ${unit?.parked?.reason ?? nr}`,
-          `questions: ${park?.questions ?? nr}`,
-          `thread: ${park?.thread ?? nr}`,
-        ].join("\n"),
-      });
-      // Spending the siblings above killed this notice's buttons; bring them back fresh.
-      await restore();
+      try {
+        await api.call("sendMessage", {
+          chat_id: ctx.chatId,
+          text: cut([
+            `${rec.run}/${rec.unit}`,
+            `stage: ${unit?.stage ?? nr}`,
+            `reason: ${unit?.parked?.reason ?? nr}`,
+            `questions: ${park?.questions ?? nr}`,
+            `thread: ${park?.thread ?? nr}`,
+          ].join("\n")),
+        });
+      } finally {
+        // Spending the siblings above killed this notice's buttons; bring them back fresh, even if the reply failed.
+        await restore();
+      }
       return "shown";
     }
   }
 }
 
 // R3b: the notice a pressed record came from, to rebuild its original buttons.
-// A record with no notice_kind falls back to the R3 guess from unit and pr_url.
+// A record with no notice_kind restores no buttons.
 function originalNotice(rec: ButtonRec): Notice {
   if (rec.notice_kind === "run-park") return { kind: "run-park", run: rec.run };
   if (rec.notice_kind !== undefined && rec.unit !== undefined) {
@@ -212,12 +218,14 @@ function originalNotice(rec: ButtonRec): Notice {
     const stage = rec.stage ?? readUnit(rec.run, rec.unit)?.stage ?? "";
     return { kind: "unit-move", run: rec.run, unit: rec.unit, stage };
   }
-  if (rec.unit === undefined) return { kind: "run-park", run: rec.run };
-  if (rec.pr_url) {
-    const u = readUnit(rec.run, rec.unit);
-    return { kind: "unit-move", run: rec.run, unit: rec.unit, stage: u?.stage ?? "" };
-  }
-  return { kind: "unit-park", run: rec.run, unit: rec.unit };
+  return { kind: "plain" };
+}
+
+// After a success only the notice's Open PR link stays; a unit-move notice has one when its unit has a PR.
+function openPrOnly(rec: ButtonRec): Keyboard | undefined {
+  if (rec.notice_kind !== "unit-move" || rec.unit === undefined) return undefined;
+  const url = rec.pr_url ?? readUnit(rec.run, rec.unit)?.pr_url;
+  return url ? { inline_keyboard: [[{ text: "Open PR", url }]] } : undefined;
 }
 
 function parsePrView(stdout: string): { number: number; base: string } | null {

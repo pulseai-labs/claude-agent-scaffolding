@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Runner } from "../src/actions.ts";
@@ -109,8 +109,8 @@ test("merge: gh pr view with fixed argv, then the confirm copy with Yes / No", a
   expect(cbButtons(e.reply_markup).map((b) => b.text)).toEqual(["Yes", "No"]);
 });
 
-test("merge-yes runs gh pr merge with the reviewed head; a moved head shows gh's refusal", async () => {
-  const m = mint({ action: "merge", run: "r1", unit: "u2", pr_url: PR, head_sha: HEAD }, T0);
+test("merge-yes runs gh pr merge with the reviewed head; a moved head shows gh's refusal and fresh buttons", async () => {
+  const m = mint({ action: "merge", run: "r1", unit: "u2", pr_url: PR, head_sha: HEAD, notice_kind: "unit-move", stage: "spine_ack" }, T0);
   setMessageId([m.id], MSG);
   reply = () => ({ rc: 0, stdout: '{"number":38,"baseRefName":"main"}', stderr: "" });
   await handleUpdate(press(m.id), ctx());
@@ -118,22 +118,32 @@ test("merge-yes runs gh pr merge with the reviewed head; a moved head shows gh's
   reply = () => ({ rc: 1, stdout: "", stderr: "head branch was modified\nmore detail\n" });
   await handleUpdate(press(yes), ctx());
   expect(runs[1]).toEqual(["gh", "pr", "merge", PR, "--merge", "--match-head-commit", HEAD]);
-  expect(lastEdit().text).toBe(`${NOTICE} — failed: head branch was modified`);
-  expect("reply_markup" in lastEdit()).toBe(false);
+  expect(lastEdit().text).toBe(`${NOTICE}\n\nfailed: head branch was modified`);
+  expect((lastEdit().reply_markup as Keyboard).inline_keyboard.flat().map((b) => b.text)).toEqual(["Merge", "Open PR", "Disarm"]);
 });
 
-test("merge: a failing gh pr view shows the failure and no confirm", async () => {
-  const m = mint({ action: "merge", run: "r1", unit: "u2", pr_url: PR, head_sha: HEAD }, T0);
-  setMessageId([m.id], MSG);
+test("merge: a failing gh pr view shows the failure and no confirm; fresh buttons come back and Merge works again", async () => {
+  const text = "baton r1/u2 moved to spine_ack";
+  const k = keyboardFor({ kind: "unit-move", run: "r1", unit: "u2", stage: "spine_ack" }, T0)!;
+  setMessageId(cbButtons(k).map((b) => b.callback_data), MSG);
   reply = () => ({ rc: 1, stdout: "", stderr: "could not resolve to a PullRequest\n" });
-  await handleUpdate(press(m.id), ctx());
+  await handleUpdate(press(byText(k, "Merge"), { text }), ctx());
   expect(runs).toHaveLength(1);
-  expect(lastEdit().text).toBe(`${NOTICE} — failed: could not resolve to a PullRequest`);
-  expect("reply_markup" in lastEdit()).toBe(false);
+  expect(lastEdit().text).toBe(`${text}\n\nfailed: could not resolve to a PullRequest`);
+  const fresh = lastEdit().reply_markup as Keyboard;
+  expect(fresh.inline_keyboard.flat().map((b) => b.text)).toEqual(["Merge", "Open PR", "Disarm"]);
+  for (const b of cbButtons(fresh)) expect(cbButtons(k).map((o) => o.callback_data)).not.toContain(b.callback_data);
+  reply = () => ({ rc: 0, stdout: '{"number":7,"baseRefName":"main"}', stderr: "" });
+  await handleUpdate(press(byText(fresh, "Merge"), { text: lastEdit().text as string }), ctx());
+  expect(runs).toEqual([
+    ["gh", "pr", "view", "https://github.com/o/r/pull/7", "--json", "number,baseRefName"],
+    ["gh", "pr", "view", "https://github.com/o/r/pull/7", "--json", "number,baseRefName"],
+  ]);
+  expect(lastEdit().text).toBe(`${text}\n\nMerge PR #7 (head aaaaaaa) into main?`);
 });
 
 test("merge-no shows the original buttons again with new ids", async () => {
-  const m = mint({ action: "merge", run: "r1", unit: "u2", pr_url: "https://github.com/o/r/pull/7", head_sha: HEAD }, T0);
+  const m = mint({ action: "merge", run: "r1", unit: "u2", pr_url: "https://github.com/o/r/pull/7", head_sha: HEAD, notice_kind: "unit-move", stage: "spine_ack" }, T0);
   setMessageId([m.id], MSG);
   reply = () => ({ rc: 0, stdout: '{"number":7,"baseRefName":"main"}', stderr: "" });
   await handleUpdate(press(m.id, { text: "baton r1/u2 moved to spine_ack" }), ctx());
@@ -178,7 +188,8 @@ test("baton refusing an unpark shows its first stderr line", async () => {
   const k = sendParkNotice();
   reply = () => ({ rc: 2, stdout: "", stderr: "not parked\n" });
   await handleUpdate(press(byText(k, "Unpark")), ctx());
-  expect(lastEdit().text).toBe(`${NOTICE} — failed: not parked`);
+  expect(lastEdit().text).toBe(`${NOTICE}\n\nfailed: not parked`);
+  expect(cbButtons(lastEdit().reply_markup).map((b) => b.text)).toEqual(["Unpark", "Unpark to stage…", "Show question", "Disarm"]);
 });
 
 test("unpark-to shows the recipe's sorted stages plus Cancel; a pick runs unpark --to", async () => {
@@ -238,7 +249,7 @@ test("a runner crash mid-command: the same update again runs nothing and is alre
   await expect(handleUpdate(u, ctx(crashing))).rejects.toThrow("killed mid-command");
   await handleUpdate(u, ctx(crashing));
   expect(runs).toEqual([["baton", "unpark", "r1", "u1"]]);
-  expect(answers()).toEqual(["already done"]);
+  expect(answers()).toEqual([undefined, "already done"]); // the first press was answered before the command
   expect(pressLog().map((l) => l.result)).toEqual(["crashed", "used"]);
 });
 
@@ -305,4 +316,169 @@ test("disarm-no on a unit-move notice restores Merge, Open PR, Disarm; the resto
   expect(lastEdit().text).toBe(`${text}\n\nDisarm run r1?`);
   expect(cbButtons(lastEdit().reply_markup).map((b) => b.text)).toEqual(["Yes", "No"]);
   expect(runs).toHaveLength(0);
+});
+
+test("disarm-yes failing on a run-park notice: the failure paragraph and a fresh Disarm", async () => {
+  const k = keyboardFor({ kind: "run-park", run: "r1" }, T0)!;
+  setMessageId(cbButtons(k).map((b) => b.callback_data), MSG);
+  const text = "baton run r1 parked";
+  await handleUpdate(press(byText(k, "Disarm"), { text }), ctx());
+  reply = () => ({ rc: 1, stdout: "", stderr: "" });
+  await handleUpdate(press(byText(lastEdit().reply_markup, "Yes"), { text: lastEdit().text as string }), ctx());
+  expect(lastEdit().text).toBe(`${text}\n\nfailed: exit 1`);
+  expect(cbButtons(lastEdit().reply_markup).map((b) => b.text)).toEqual(["Disarm"]);
+});
+
+test("unpark-stage failing: fresh unit-park buttons come back", async () => {
+  const k = sendParkNotice();
+  await handleUpdate(press(byText(k, "Unpark to stage…")), ctx());
+  reply = () => ({ rc: 2, stdout: "", stderr: "no such stage\n" });
+  await handleUpdate(press(byText(lastEdit().reply_markup, "review")), ctx());
+  expect(lastEdit().text).toBe(`${NOTICE}\n\nfailed: no such stage`);
+  expect(cbButtons(lastEdit().reply_markup).map((b) => b.text)).toEqual(["Unpark", "Unpark to stage…", "Show question", "Disarm"]);
+});
+
+test("a record with no notice_kind restores no buttons", async () => {
+  const m = mint({ action: "merge", run: "r1", unit: "u2", pr_url: PR, head_sha: HEAD }, T0);
+  setMessageId([m.id], MSG);
+  reply = () => ({ rc: 1, stdout: "", stderr: "boom\n" });
+  await handleUpdate(press(m.id), ctx());
+  expect(lastEdit().text).toBe(`${NOTICE}\n\nfailed: boom`);
+  expect("reply_markup" in lastEdit()).toBe(false);
+});
+
+test("the press is answered exactly once, before the runner is called", async () => {
+  const k = sendParkNotice();
+  let seenAtRun: string[] = [];
+  const watching: Runner = async (argv) => {
+    seenAtRun = fake.calls.map((c) => c.method);
+    return runner(argv);
+  };
+  await handleUpdate(press(byText(k, "Unpark")), ctx(watching));
+  expect(seenAtRun).toEqual(["answerCallbackQuery"]);
+  expect(fake.calls.map((c) => c.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+});
+
+test("confirm, picker, restore and show presses are each answered exactly once", async () => {
+  const k = sendParkNotice();
+  await handleUpdate(press(byText(k, "Disarm")), ctx());
+  expect(calls("answerCallbackQuery")).toHaveLength(1);
+  await handleUpdate(press(byText(lastEdit().reply_markup, "No")), ctx());
+  expect(calls("answerCallbackQuery")).toHaveLength(2);
+  await handleUpdate(press(byText(lastEdit().reply_markup, "Unpark to stage…")), ctx());
+  expect(calls("answerCallbackQuery")).toHaveLength(3);
+  await handleUpdate(press(byText(lastEdit().reply_markup, "Cancel")), ctx());
+  expect(calls("answerCallbackQuery")).toHaveLength(4);
+  await handleUpdate(press(byText(lastEdit().reply_markup, "Show question")), ctx());
+  expect(calls("answerCallbackQuery")).toHaveLength(5);
+  reply = () => ({ rc: 1, stdout: "", stderr: "x\n" });
+  await handleUpdate(press(byText(lastEdit().reply_markup, "Unpark")), ctx());
+  expect(calls("answerCallbackQuery")).toHaveLength(6);
+});
+
+test("answerCallbackQuery rejected: the command still runs, the outcome edit still happens, the log shows done", async () => {
+  const k = sendParkNotice();
+  fake.failOn.answerCallbackQuery = [{ error_code: 400, description: "Bad Request: query is too old" }];
+  await handleUpdate(press(byText(k, "Unpark")), ctx());
+  expect(runs).toEqual([["baton", "unpark", "r1", "u1"]]);
+  expect(lastEdit().text).toBe(`${NOTICE} — done`);
+  expect(pressLog().map((l) => l.result)).toEqual(["done"]);
+});
+
+test("the outcome edit failing after rc 0 logs the command's result, not crashed", async () => {
+  const k = sendParkNotice();
+  fake.failOn.editMessageText = [{ error_code: 400, description: "Bad Request: message to edit not found" }];
+  await expect(handleUpdate(press(byText(k, "Unpark")), ctx())).rejects.toThrow("message to edit not found");
+  expect(runs).toHaveLength(1);
+  expect(pressLog().map((l) => l.result)).toEqual(["done"]);
+});
+
+test("the outcome edit failing after a failed command logs failed, not crashed", async () => {
+  const k = sendParkNotice();
+  reply = () => ({ rc: 2, stdout: "", stderr: "not parked\n" });
+  fake.failOn.editMessageText = [{ error_code: 400, description: "Bad Request: message to edit not found" }];
+  await expect(handleUpdate(press(byText(k, "Unpark")), ctx())).rejects.toThrow();
+  expect(pressLog().map((l) => l.result)).toEqual(["failed"]);
+});
+
+function longQuestionBaton(): string {
+  const root = join(dir, "baton");
+  mkdirSync(join(root, "runs", "r9"), { recursive: true });
+  writeFileSync(join(root, "runs", "r9", "run.json"), JSON.stringify({
+    units: { u1: { stage: "build", parked: { reason: "long", at: "2026-10-23T10:00:00Z" } } },
+  }));
+  writeFileSync(join(root, "runs", "r9", "events.jsonl"),
+    JSON.stringify({ kind: "park", unit: "u1", reason: "long", thread: "th-9", questions: "q".repeat(10_000) }) + "\n");
+  return root;
+}
+
+test("show with a 10 000-char questions field: the reply is cut to 3500 chars plus an ellipsis; buttons come back", async () => {
+  process.env.BATON_STATE_DIR = longQuestionBaton();
+  const k = keyboardFor({ kind: "unit-park", run: "r9", unit: "u1" }, T0)!;
+  setMessageId(cbButtons(k).map((b) => b.callback_data), MSG);
+  await handleUpdate(press(byText(k, "Show question")), ctx());
+  const text = calls("sendMessage")[0]!.body.text as string;
+  expect(text.length).toBe(3501);
+  expect(text.endsWith("q…")).toBe(true);
+  expect(text.startsWith("r9/u1\nstage: build\nreason: long\nquestions: qqq")).toBe(true);
+  expect(cbButtons(lastEdit().reply_markup).map((b) => b.text)).toEqual(["Unpark", "Unpark to stage…", "Show question", "Disarm"]);
+});
+
+test("show with a reply of exactly 3500 chars is not cut", async () => {
+  const root = longQuestionBaton();
+  const head = "r9/u1\nstage: build\nreason: long\nquestions: ";
+  const tail = "\nthread: th-9";
+  writeFileSync(join(root, "runs", "r9", "events.jsonl"),
+    JSON.stringify({ kind: "park", unit: "u1", reason: "long", thread: "th-9", questions: "q".repeat(3500 - head.length - tail.length) }) + "\n");
+  process.env.BATON_STATE_DIR = root;
+  const m = mint({ action: "show", run: "r9", unit: "u1", notice_kind: "unit-park" }, T0);
+  setMessageId([m.id], MSG);
+  await handleUpdate(press(m.id), ctx());
+  const text = calls("sendMessage")[0]!.body.text as string;
+  expect(text.length).toBe(3500);
+  expect(text.endsWith("thread: th-9")).toBe(true);
+});
+
+test("show: sendMessage rejected still restores the notice's buttons", async () => {
+  const k = sendParkNotice();
+  fake.failOn.sendMessage = [{ error_code: 400, description: "Bad Request: message is too long" }];
+  await expect(handleUpdate(press(byText(k, "Show question")), ctx())).rejects.toThrow("message is too long");
+  expect(lastEdit().text).toBe(NOTICE);
+  const restored = lastEdit().reply_markup;
+  expect(cbButtons(restored).map((b) => b.text)).toEqual(["Unpark", "Unpark to stage…", "Show question", "Disarm"]);
+  await handleUpdate(press(byText(restored, "Unpark")), ctx());
+  expect(runs).toEqual([["baton", "unpark", "r1", "u1"]]);
+});
+
+test("merge-yes success keeps only the Open PR link", async () => {
+  const m = mint({ action: "merge-yes", run: "r1", unit: "u2", pr_url: PR, head_sha: HEAD, notice_kind: "unit-move", stage: "spine_ack" }, T0);
+  setMessageId([m.id], MSG);
+  await handleUpdate(press(m.id), ctx());
+  expect(lastEdit().text).toBe(`${NOTICE} — done`);
+  expect(lastEdit().reply_markup).toEqual({ inline_keyboard: [[{ text: "Open PR", url: PR }]] });
+});
+
+test("disarm-yes success on a unit-move notice keeps the Open PR link from the unit", async () => {
+  const text = "baton r1/u2 moved to spine_ack";
+  const k = keyboardFor({ kind: "unit-move", run: "r1", unit: "u2", stage: "spine_ack" }, T0)!;
+  setMessageId(cbButtons(k).map((b) => b.callback_data), MSG);
+  await handleUpdate(press(byText(k, "Disarm"), { text }), ctx());
+  await handleUpdate(press(byText(lastEdit().reply_markup, "Yes"), { text: lastEdit().text as string }), ctx());
+  expect(lastEdit().text).toBe(`${text} — done`);
+  expect(lastEdit().reply_markup).toEqual({ inline_keyboard: [[{ text: "Open PR", url: "https://github.com/o/r/pull/7" }]] });
+});
+
+test("a success on a notice with no PR link leaves no buttons", async () => {
+  const k = sendParkNotice();
+  await handleUpdate(press(byText(k, "Unpark")), ctx());
+  expect(lastEdit().text).toBe(`${NOTICE} — done`);
+  expect("reply_markup" in lastEdit()).toBe(false);
+});
+
+test("a success on a record with no notice_kind keeps no Open PR link", async () => {
+  const m = mint({ action: "merge-yes", run: "r1", unit: "u2", pr_url: PR, head_sha: HEAD }, T0);
+  setMessageId([m.id], MSG);
+  await handleUpdate(press(m.id), ctx());
+  expect(lastEdit().text).toBe(`${NOTICE} — done`);
+  expect("reply_markup" in lastEdit()).toBe(false);
 });
