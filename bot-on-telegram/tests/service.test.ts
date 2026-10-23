@@ -59,6 +59,29 @@ test("remove disables, deletes the unit and reloads", async () => {
   expect(calls).toEqual([["--user", "disable", "--now", "bot-on-telegram.service"], ["--user", "daemon-reload"]]);
 });
 
+test("remove before install (no unit file) skips disable and succeeds; a second remove does too", async () => {
+  const calls: string[][] = [];
+  // A real systemctl refuses to disable a unit that has no file; this fake does the same.
+  const run = (a: string[]) => (calls.push(a), { status: a[1] === "disable" ? 1 : 0, stderr: "Unit file does not exist" });
+  await removeService({ dir, run });
+  await removeService({ dir, run });
+  expect(calls).toEqual([["--user", "daemon-reload"], ["--user", "daemon-reload"]]);
+});
+
+test("the CLI's service remove before any install exits 0", () => {
+  const log = join(dir, "log");
+  const fakeCtl = join(dir, "ctl");
+  writeFileSync(fakeCtl, `#!/bin/sh
+echo "$@" >> ${log}
+case "$2" in disable) exit 1;; esac
+`);
+  chmodSync(fakeCtl, 0o755);
+  const env = { ...process.env, BOT_ON_TELEGRAM_SYSTEMCTL: fakeCtl, BOT_ON_TELEGRAM_SYSTEMD_DIR: join(dir, "units") };
+  const p = Bun.spawnSync([BIN, "service", "remove"], { env });
+  expect(p.exitCode).toBe(0);
+  expect(readFileSync(log, "utf8")).toBe("--user daemon-reload\n");
+});
+
 test("a failing systemctl is an error naming the command", async () => {
   await expect(installService({ dir, binPath: "/x/b", run: () => ({ status: 1, stderr: "boom" }) })).rejects.toThrow(/systemctl --user daemon-reload failed \(1\): boom/);
 });

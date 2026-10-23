@@ -2,7 +2,7 @@
 // (`~/.local/bin/bot-on-telegram`), never a versioned cache path, so a plugin update needs no reinstall.
 // The idea is baton's timer.ts; it is copied, not imported, across plugins.
 
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -77,8 +77,10 @@ export async function installService(opts: ServiceOptions = {}): Promise<void> {
 export async function removeService(opts: ServiceOptions = {}): Promise<void> {
   const dir = opts.dir ?? defaultDir();
   const run = opts.run ?? defaultRun;
-  systemctl(run, "disable", "--now", UNIT_NAME);
-  rmSync(join(dir, UNIT_NAME), { force: true });
+  const unit = join(dir, UNIT_NAME);
+  // Never installed, or already removed: systemctl would refuse to disable a unit with no file.
+  if (existsSync(unit)) systemctl(run, "disable", "--now", UNIT_NAME);
+  rmSync(unit, { force: true });
   systemctl(run, "daemon-reload");
 }
 
