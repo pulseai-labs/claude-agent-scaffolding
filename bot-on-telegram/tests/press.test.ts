@@ -274,11 +274,13 @@ test("show replies with stage, reason, questions and thread; absent fields are n
   );
 });
 
+// The r1/u1 fixture's park event carries questions as baton writes them: JSON.stringify of the
+// host's PendingQuestion[] (baton/src/engine.ts park(), element shape in baton/src/host.ts).
 test("show on a parked unit with a full park event, then the notice buttons come back fresh", async () => {
   const k = sendParkNotice();
   await handleUpdate(press(byText(k, "Show question")), ctx());
   expect(calls("sendMessage")[0]!.body.text).toBe(
-    "r1/u1\nstage: build\nreason: second prompt\nquestions: which db?\nthread: th-2",
+    "r1/u1\nstage: build\nreason: second prompt\nquestions:\n- which db?\n- run migrations now?\nthread: th-2",
   );
   const restored = lastEdit().reply_markup;
   expect(lastEdit().text).toBe(NOTICE);
@@ -481,4 +483,86 @@ test("a success on a record with no notice_kind keeps no Open PR link", async ()
   await handleUpdate(press(m.id), ctx());
   expect(lastEdit().text).toBe(`${NOTICE} — done`);
   expect("reply_markup" in lastEdit()).toBe(false);
+});
+
+function questionsBaton(questions: string): string {
+  const root = join(dir, "baton");
+  mkdirSync(join(root, "runs", "r8"), { recursive: true });
+  writeFileSync(join(root, "runs", "r8", "run.json"), JSON.stringify({
+    units: { u1: { stage: "build", parked: { reason: "asked", at: "2026-10-23T10:00:00Z" } } },
+  }));
+  writeFileSync(join(root, "runs", "r8", "events.jsonl"),
+    JSON.stringify({ kind: "park", unit: "u1", reason: "asked", thread: "th-8", questions }) + "\n");
+  return root;
+}
+
+async function showR8(questions: string): Promise<string> {
+  process.env.BATON_STATE_DIR = questionsBaton(questions);
+  const m = mint({ action: "show", run: "r8", unit: "u1", notice_kind: "unit-park" }, T0);
+  setMessageId([m.id], MSG);
+  await handleUpdate(press(m.id), ctx());
+  return calls("sendMessage")[0]!.body.text as string;
+}
+
+test("show decodes each question element: question, then text, then header, a bare string, else its JSON", async () => {
+  const encoded = JSON.stringify([
+    { question: "q-field", text: "not this", header: "nor this" },
+    { text: "text-field", header: "not this" },
+    { header: "header-field" },
+    "bare string",
+    { question: "two\nlines" },
+    7,
+  ]);
+  expect(await showR8(encoded)).toBe(
+    "r8/u1\nstage: build\nreason: asked\nquestions:\n- q-field\n- text-field\n- header-field\n- bare string\n- two lines\n- 7\nthread: th-8",
+  );
+});
+
+test("show prints a questions string that does not decode to an array raw", async () => {
+  expect(await showR8('[{"question": "cut off')).toBe(
+    'r8/u1\nstage: build\nreason: asked\nquestions: [{"question": "cut off\nthread: th-8',
+  );
+});
+
+test("show prints JSON that is not an array raw, adjacent to the decoded case", async () => {
+  expect(await showR8('{"question":"which db?"}')).toBe(
+    'r8/u1\nstage: build\nreason: asked\nquestions: {"question":"which db?"}\nthread: th-8',
+  );
+});
+
+test("a failure with a 10 000-char stderr line edits to the notice plus a cut failure, under Telegram's 4096", async () => {
+  const k = sendParkNotice();
+  reply = () => ({ rc: 1, stdout: "", stderr: "x".repeat(10_000) + "\n" });
+  await handleUpdate(press(byText(k, "Unpark")), ctx());
+  const text = lastEdit().text as string;
+  expect(text.length).toBe(3501);
+  expect(text.startsWith(`${NOTICE}\n\nfailed: xxx`)).toBe(true);
+  expect(text.endsWith("x…")).toBe(true);
+  expect(cbButtons(lastEdit().reply_markup).map((b) => b.text)).toEqual(["Unpark", "Unpark to stage…", "Show question", "Disarm"]);
+});
+
+for (const bad of [
+  "https://github.com/o/r/pull/38/files",
+  "https://github.com/o/r/pull/38 --admin",
+  "http://github.com/o/r/pull/38",
+  "https://github.com.evil/o/r/pull/38",
+  "https://github.com/o/r/issues/38",
+  "--admin",
+]) {
+  for (const action of ["merge", "merge-yes"] as const) {
+    test(`${action} with pr_url ${JSON.stringify(bad)}: failed: not a PR URL, nothing runs`, async () => {
+      const m = mint({ action, run: "r1", unit: "u2", pr_url: bad, head_sha: HEAD }, T0);
+      setMessageId([m.id], MSG);
+      await handleUpdate(press(m.id), ctx());
+      expect(runs).toHaveLength(0);
+      expect(lastEdit().text).toBe(`${NOTICE}\n\nfailed: not a PR URL`);
+    });
+  }
+}
+
+test("merge-yes with a well-formed PR URL runs gh (the control beside the refusals)", async () => {
+  const m = mint({ action: "merge-yes", run: "r1", unit: "u2", pr_url: PR, head_sha: HEAD }, T0);
+  setMessageId([m.id], MSG);
+  await handleUpdate(press(m.id), ctx());
+  expect(runs).toEqual([["gh", "pr", "merge", PR, "--merge", "--match-head-commit", HEAD]]);
 });

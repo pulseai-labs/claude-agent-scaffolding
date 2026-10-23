@@ -44,6 +44,33 @@ const failure = (rc: number, stderr: string): string => firstLine(stderr) || `ex
 const SHOW_MAX = 3500;
 const cut = (s: string): string => (s.length > SHOW_MAX ? `${s.slice(0, SHOW_MAX)}…` : s);
 
+// The shape baton's forge accepts; anything else never reaches gh.
+const PR_URL_RE = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/[0-9]+$/;
+
+// baton records a park's questions as JSON.stringify(PendingQuestion[]) (baton/src/host.ts).
+// An array renders one "\n- " line per question; a string that does not decode to one is shown raw,
+// after a space. Either way the result follows "questions:" directly.
+export function renderQuestions(raw: string): string {
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return ` ${raw}`;
+  }
+  if (!Array.isArray(v) || v.length === 0) return ` ${raw}`;
+  const text = (q: unknown): string => {
+    if (typeof q === "string") return q;
+    if (typeof q === "object" && q !== null) {
+      for (const k of ["question", "text", "header"]) {
+        const f = (q as Record<string, unknown>)[k];
+        if (typeof f === "string" && f !== "") return f;
+      }
+    }
+    return JSON.stringify(q);
+  };
+  return v.map((q) => `\n- ${text(q).replace(/\s*\n\s*/g, " ")}`).join("");
+}
+
 export async function handleUpdate(u: Update, ctx: PressCtx): Promise<void> {
   const cq = u.callback_query;
   const line: LogLine = { at: ctx.now().toISOString(), update_id: u.update_id, result: "crashed" };
@@ -128,7 +155,7 @@ async function handlePress(
       return "done";
     }
     line.result = "failed";
-    await edit(`${notice}\n\nfailed: ${failure(res.rc, res.stderr)}`, keyboardFor(originalNotice(rec), now));
+    await edit(cut(`${notice}\n\nfailed: ${failure(res.rc, res.stderr)}`), keyboardFor(originalNotice(rec), now));
     return "failed";
   };
   const btn = (text: string, r: Omit<ButtonRec, "id" | "minted_at">) => ({ text, callback_data: mint(r, now).id });
@@ -147,6 +174,7 @@ async function handlePress(
   switch (rec.action) {
     case "merge": {
       if (!rec.pr_url || !rec.head_sha) return outcome({ rc: 1, stderr: "button carries no PR" });
+      if (!PR_URL_RE.test(rec.pr_url)) return outcome({ rc: 1, stderr: "not a PR URL" });
       const view = await prView(rec.pr_url, runner);
       if (view.rc !== 0) return outcome(view);
       const pr = parsePrView(view.stdout);
@@ -159,6 +187,7 @@ async function handlePress(
     }
     case "merge-yes":
       if (!rec.pr_url || !rec.head_sha) return outcome({ rc: 1, stderr: "button carries no PR" });
+      if (!PR_URL_RE.test(rec.pr_url)) return outcome({ rc: 1, stderr: "not a PR URL" });
       return outcome(await merge(rec.pr_url, rec.head_sha, runner));
     case "unpark":
       if (rec.unit === undefined) return outcome({ rc: 1, stderr: "button carries no unit" });
@@ -196,7 +225,7 @@ async function handlePress(
             `${rec.run}/${rec.unit}`,
             `stage: ${unit?.stage ?? nr}`,
             `reason: ${unit?.parked?.reason ?? nr}`,
-            `questions: ${park?.questions ?? nr}`,
+            `questions:${park?.questions !== undefined ? renderQuestions(park.questions) : ` ${nr}`}`,
             `thread: ${park?.thread ?? nr}`,
           ].join("\n")),
         });

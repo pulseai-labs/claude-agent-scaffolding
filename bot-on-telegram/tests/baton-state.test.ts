@@ -37,7 +37,8 @@ test("reviewedHead accepts only a full 40-hex sha on line 2", () => {
 
 test("newestPark is the last park event for the unit, skipping garbage", () => {
   expect(newestPark("r1", "u1")).toEqual({
-    reason: "second prompt", thread: "th-2", questions: "which db?",
+    reason: "second prompt", thread: "th-2",
+    questions: expect.stringMatching(/^\[\{"id":"q1","header":"Database","question":"which db\?"/),
   });
   expect(newestPark("r1", "u2")).toEqual({ reason: "other" });
   expect(newestPark("r1", "u4")).toBeNull();
