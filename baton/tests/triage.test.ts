@@ -726,3 +726,25 @@ test("a park with no session records neither", async () => {
   expect("thread" in e).toBe(false);
   expect("questions" in e).toBe(false);
 });
+
+test("a second request while the triage is out records its questions", async () => {
+  await triaged();
+  host.raise("thread-1", OTHER);
+  at(2);
+  await doTick();
+  const e = lastPark();
+  expect(e.reason).toBe("second prompt");
+  expect(e.thread).toBe("thread-1");
+  expect(JSON.parse(e.questions)).toEqual(OTHER.questions);
+});
+
+test("a second request seen as the triage ends records its questions", async () => {
+  await triaged();
+  host.finish("thread-2", "completed");
+  host.raise("thread-1", OTHER);
+  at(2);
+  await doTick();
+  const e = lastPark();
+  expect(e.reason).toBe("second prompt");
+  expect(JSON.parse(e.questions)).toEqual(OTHER.questions);
+});
