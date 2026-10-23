@@ -366,7 +366,7 @@ test("report counts events by kind", async () => {
   const r = await runIn(st, "report", "r9");
   expect(r.rc).toBe(0);
   expect(r.out).toBe(
-    "launched 3\nsuccessor 1\nstall 2\npark 1\nunpark 1\nmerged 2\nwall_seconds 3600\n",
+    "launched 3\nsuccessor 1\nstall 2\npark 1\nunpark 1\nmerged 2\ntriage 0\ntriage answered 0\ntriage relaunch 0\nwall_seconds 3600\n",
   );
   expect((await runIn(st, "report", "nope")).rc).toBe(2);
 });

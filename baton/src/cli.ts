@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
-import { exitCode, tick } from "./engine.ts";
+import { exitCode, tick, triageNote } from "./engine.ts";
 import { GhForge } from "./forge.ts";
 import { HostAuthError, HostDownError } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
@@ -200,6 +200,7 @@ async function disarmCmd(args: string[]): Promise<number> {
       return fail(`no such run: ${id}`);
     }
     for (const u of Object.values(run.units)) {
+      if (u.triage) removeClaim(u.triage.session.claim_key, u.triage.session.claim_nonce);
       if (!u.session) continue;
       removeClaim(u.session.claim_key, u.session.claim_nonce);
     }
@@ -248,13 +249,14 @@ async function unparkCmd(args: string[]): Promise<number> {
     // running: moving or resetting it here would leave that session bound to state it was not
     // launched in. A parked unit is never refused, whatever its record holds.
     if (unit.session && !unit.parked) return fail(`unit ${unitId} is running (live session) and not parked; nothing to unpark`);
+    let recipe: Recipe | undefined;
     if (to !== undefined) {
-      const recipe = loadRecipe(run.dir);
+      recipe = loadRecipe(run.dir);
       if (!Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
     }
     delete unit.parked;
     if (to !== undefined) {
-      enterStage(unit, to); // the same stage entry an outcome's move makes
+      enterStage(unit, to, triageNote(run, recipe!, unit)); // the same stage entry an outcome's move makes
     } else {
       // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
       unit.stalls = 0;
@@ -274,7 +276,10 @@ function reportCmd(args: string[]): number {
   const store = openStore();
   const path = join(store.runDir(id), "events.jsonl");
   if (!existsSync(path)) return fail(`no such run: ${id}`);
-  const counts: Record<string, number> = { launched: 0, successor: 0, stall: 0, park: 0, unpark: 0, merged: 0 };
+  const counts: Record<string, number> = {
+    launched: 0, successor: 0, stall: 0, park: 0, unpark: 0, merged: 0,
+    triage: 0, "triage answered": 0, "triage relaunch": 0,
+  };
   let armed: number | undefined;
   let last: number | undefined;
   for (const line of readFileSync(path, "utf8").split("\n")) {
