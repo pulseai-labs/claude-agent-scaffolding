@@ -2,6 +2,14 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.3.1 - 2026-10-23
+
+- The `notify` argv now also renders `{key}`, the notice's one-line key (for a park,
+  `<run>/<unit>/park/<at>`), alongside `{message}`.
+- The `park` event now carries `thread` (the parked seat's thread id, when it had a session) and,
+  for the `second prompt` and `triage gave no answer` parks, `questions` (the pending request's
+  questions as a JSON string, the form `{pending.questions}` takes). Both are absent when unknown.
+
 ## 0.3.0 - 2026-10-23
 
 - Triage: a seat that waits on a prompt no one will answer (an OMP `/review` picker, a question

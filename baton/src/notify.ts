@@ -1,6 +1,6 @@
 // Notifications and the config file. A notice is sent at most once per key: it is appended
 // to `notify.log` in the state dir and handed to the config's `notify` argv, if any, with
-// `{message}` rendered. The argv runs with no shell; its failure never fails the tick.
+// `{message}` and `{key}` rendered. The argv runs with no shell; its failure never fails the tick.
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -59,7 +59,7 @@ export async function notifyOnce(key: string, message: string): Promise<void> {
   }
   if (!argv) return;
   try {
-    Bun.spawnSync(argv.map((a) => a.replaceAll("{message}", msg)), {
+    Bun.spawnSync(argv.map((a) => a.replace(/\{(message|key)\}/g, (_, n) => (n === "key" ? k : msg))), {
       stdout: "ignore", stderr: "ignore", timeout: NOTIFY_TIMEOUT_MS,
     });
   } catch {

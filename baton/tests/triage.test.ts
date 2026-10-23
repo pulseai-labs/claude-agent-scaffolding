@@ -350,6 +350,7 @@ test("no answer parks", async () => {
   await doTick();
   const u = runState().units.a;
   expect(u.parked?.reason).toBe("triage gave no answer");
+  expect(JSON.parse(lastPark().questions)).toEqual(REQ.questions);
   expect(u.session).toBeUndefined();
   expect(host.interrupts).toEqual([{ threadId: "thread-1", reason: "stop" }]);
   expect(liveClaim(claimKey(seatCwd()))).toBeNull();
@@ -679,4 +680,49 @@ test("the triage launch tick stamps the seat's stall clock", async () => {
   const u = runState().units.a;
   expect(triageLaunches().length).toBe(1);
   expect(u.session?.last_progress_at).toBe(new Date(T0 + 5 * 60_000).toISOString());
+});
+
+const lastPark = () => events().filter((e) => e.kind === "park").at(-1);
+
+test("a second-prompt park records the thread and the questions", async () => {
+  await triaged(undefined, pendingSeat({ ticks: 100 }));
+  host.answer("thread-1");
+  host.finish("thread-2", "completed");
+  at(2);
+  await doTick();
+  host.raise("thread-1", OTHER);
+  at(3);
+  await doTick();
+  const e = lastPark();
+  expect(e.reason).toBe("second prompt");
+  expect(e.thread).toBe("thread-1");
+  expect(JSON.parse(e.questions)).toEqual(OTHER.questions);
+});
+
+test("a stall park records the thread and no questions", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1000, end: "completed" } });
+  await doTick();
+  for (let m = 1; m <= 200 && !runState().units.a.parked; m += 10) {
+    at(m);
+    await doTick();
+  }
+  const e = lastPark();
+  expect(e.reason).toBe("stalled");
+  expect(e.thread).toMatch(/^thread-\d+$/);
+  expect("questions" in e).toBe(false);
+});
+
+test("a park with no session records neither", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 5, end: "completed" } });
+  host.launch = async () => { throw new HostDownError("t3_thread_launch outcome unknown: JSON-RPC error -32602: bad model"); };
+  for (let i = 0; i < 12 && !runState().units.a.parked; i++) {
+    at(i * 1.5);
+    await doTick();
+  }
+  const e = lastPark();
+  expect(e.reason).toBe("cap");
+  expect("thread" in e).toBe(false);
+  expect("questions" in e).toBe(false);
 });

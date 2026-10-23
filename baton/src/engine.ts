@@ -275,12 +275,19 @@ class RunTick {
     }
   }
 
-  private async park(u: UnitState, reason: string, o: { interrupt?: string; release?: boolean } = {}): Promise<void> {
+  private async park(
+    u: UnitState, reason: string, o: { interrupt?: string; release?: boolean; questions?: unknown[] } = {},
+  ): Promise<void> {
+    const thread = u.session?.thread_id; // endSession deletes the session
     await this.endSession(u, o);
     const at = this.nowIso();
     u.parked = { reason, at };
     this.save();
-    this.ev("park", { unit: u.id, stage: u.stage, reason });
+    this.ev("park", {
+      unit: u.id, stage: u.stage, reason,
+      ...(thread ? { thread } : {}),
+      ...(o.questions ? { questions: JSON.stringify(o.questions) } : {}),
+    });
     this.report.parked.push(u.id);
     await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}`);
   }
@@ -680,7 +687,7 @@ class RunTick {
           return true;
         }
         if (p) {
-          await this.park(u, "second prompt", { interrupt: "stop" });
+          await this.park(u, "second prompt", { interrupt: "stop", questions: p.questions });
           return true;
         }
         return false; // the answer landed; the triage's end names the event
@@ -690,20 +697,20 @@ class RunTick {
       await this.endTriage(u);
       if (p?.id === t.request_id) {
         if (noted) await this.stall(u, s, "triage relaunch");
-        else await this.park(u, "triage gave no answer", { interrupt: "stop" });
+        else await this.park(u, "triage gave no answer", { interrupt: "stop", questions: p.questions });
         return true;
       }
       if (!p) {
         this.ev("triage answered", { unit: u.id, nonce: t.session.nonce, request: t.request_id });
         return false;
       }
-      await this.park(u, "second prompt", { interrupt: "stop" });
+      await this.park(u, "second prompt", { interrupt: "stop", questions: p.questions });
       return true;
     }
     // C: a request and no triage out. D: no request.
     if (!p || seen.includes(p.id)) return false;
     if (seen.length > 0) {
-      await this.park(u, "second prompt", { interrupt: "stop" });
+      await this.park(u, "second prompt", { interrupt: "stop", questions: p.questions });
       return true;
     }
     await this.launchTriage(u, s, p, triage);

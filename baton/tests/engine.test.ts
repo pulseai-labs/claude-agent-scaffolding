@@ -1377,3 +1377,20 @@ test("baton tick: busy is rc 0, and a token near expiry notifies once per day", 
   expect((await cli("tick")).rc).toBe(0);
   expect((await cli("tick", "--run")).rc).toBe(64);
 });
+
+test("notify argv renders {key} and {message}", async () => {
+  const out = join(root, "argv.json");
+  const script = join(root, "fake-notify.sh");
+  writeFileSync(script, `#!/bin/sh\nprintf '%s\\n%s\\n' "$1" "$2" > "${out}"\n`, { mode: 0o755 });
+  writeFileSync(join(root, "config.json"), JSON.stringify({ notify: [script, "{key}", "{message}"] }));
+  await arm(recipe({ work: sess() }, ["u1"]));
+  host = new FakeHost({ work: { ticks: 5, end: "completed" } });
+  host.launch = async () => { throw new HostDownError("t3_thread_launch outcome unknown: JSON-RPC error -32602: bad model"); };
+  for (let i = 0; i < 12 && !runState().units.u1.parked; i++) {
+    at(i * 1.5);
+    await doTick();
+  }
+  const [key, msg] = readFileSync(out, "utf8").trim().split("\n");
+  expect(key).toMatch(/^r1\/u1\/park\/\d{4}-/);
+  expect(msg).toBe("baton r1/u1 parked in work: cap");
+});

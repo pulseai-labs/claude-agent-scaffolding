@@ -82,11 +82,15 @@ Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every
 
 - `t3.base`: the T3 `/mcp` URL (default `https://draco-desk.tail71316d.ts.net:8445/mcp`).
 - `t3.tokenFile`: the token path, `~` expanded (default `~/.config/spine-autopilot/t3-token.json`).
-- `notify`: an argv run with no shell for each notice, `{message}` replaced by the notice text,
-  bounded at 30 s; its failure never fails a tick. Each notice is sent once per key and is always
-  appended to `<state>/notify.log`, which is the only sink when `notify` is unset.
+- `notify`: an argv run with no shell for each notice, `{message}` replaced by the notice text
+  and `{key}` by the notice's one-line key (a park's is `<run>/<unit>/park/<at>`), bounded at 30 s; its failure never fails a
+  tick. Each notice is sent once per key and is always appended to `<state>/notify.log`, which is the only sink when `notify` is unset.
 - `slots`: per-slot caps on concurrent sessions across all runs (positive integers), over the
   recipe's `slots`, over the defaults `{"session": 2, "build": 1}`.
+
+The `park` event in `events.jsonl` is `{kind, unit, stage, reason}` plus `thread` (the seat's
+thread id, when the unit had a session) and, on `second prompt` and `triage gave no answer`,
+`questions` (the pending request's questions, JSON-stringified).
 
 ```json
 {
