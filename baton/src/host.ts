@@ -12,6 +12,11 @@ export type LaunchRequest = {
   message: string;
 };
 
+export type PendingOption = { label: string; description?: string };
+export type PendingQuestion = { id: string; header: string; question: string; options: PendingOption[]; multiSelect?: boolean };
+/** A user-input request a thread has raised and is blocked on. */
+export type PendingRequest = { id: string; questions: PendingQuestion[] };
+
 export type ThreadStatus = {
   /**
    * `interrupted`: the turn was stopped from outside (often an operator about to steer). The
@@ -20,6 +25,8 @@ export type ThreadStatus = {
   state: "active" | "completed" | "interrupted" | "failed" | "waiting" | "gone";
   /** Opaque mark that changes whenever the thread does. */
   activity: string;
+  /** Set only when the host saw a pending request and could read it; `state` is unaffected. */
+  pending?: PendingRequest;
 };
 
 /** The host refused the credentials. */
