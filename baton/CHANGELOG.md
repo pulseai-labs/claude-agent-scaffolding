@@ -2,6 +2,13 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.3.2 - 2026-10-24
+
+- A merge-stage park by the `red` or `conflict` outcome names its PR. The `park` event carries `pr`
+  (the URL), `pr_state` (`red` or `conflict`) and, for red, `failing` (the red checks by name: a check
+  run's `name`, a status context's `context`, once each). The notice ends with
+  `— red: <checks> — <PR URL>` or `— conflict — <PR URL>`. Every other park is unchanged.
+
 ## 0.3.1 - 2026-10-23
 
 - The `notify` argv now also renders `{key}`, the notice's one-line key (for a park,

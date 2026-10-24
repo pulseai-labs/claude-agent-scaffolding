@@ -80,6 +80,20 @@ test("rollup mapping", async () => {
   }
 });
 
+test("view names the red checks: a run's name, a status's context, once each", async () => {
+  fixture([
+    { ...run("FAILURE"), name: "test" }, { ...run("SUCCESS"), name: "lint" },
+    { ...ctxState("ERROR"), context: "ci/legacy" }, { ...run("CANCELLED"), name: "test" }, run("TIMED_OUT"),
+  ]);
+  const v = await new GhForge().view(URL_);
+  expect([v.checks, v.failing]).toEqual(["red", ["test", "ci/legacy", "unnamed check"]]);
+});
+
+test("control: a view with no red check carries no failing list", async () => {
+  fixture([{ ...run("SUCCESS"), name: "test" }, { ...run("", "IN_PROGRESS"), name: "lint" }]);
+  expect((await new GhForge().view(URL_)).failing).toBeUndefined();
+});
+
 test("merge passes --merge and the head oid", async () => {
   await new GhForge().merge(URL_, "abc123");
   expect(argvLog()).toEqual([`pr merge ${URL_} --merge --match-head-commit abc123`]);

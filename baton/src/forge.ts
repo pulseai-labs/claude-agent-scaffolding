@@ -7,6 +7,8 @@ export type PrView = {
   base: string;
   mergeable: "MERGEABLE" | "CONFLICTING" | "UNKNOWN";
   checks: "green" | "red" | "pending" | "none";
+  /** The names of the red checks, when `checks` is red; absent when the forge read none. */
+  failing?: string[];
 };
 
 export interface Forge {
@@ -67,16 +69,22 @@ export async function prUrl(argv: string[], cwd?: string): Promise<string> {
   return url;
 }
 
-type Entry = { __typename?: string; status?: string; conclusion?: string; state?: string };
+type Entry = { __typename?: string; status?: string; conclusion?: string; state?: string; name?: string; context?: string };
 const RED_CONCLUSIONS = new Set(["FAILURE", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
+
+const isContext = (e: Entry) => e.__typename === "StatusContext" || (e.status === undefined && e.state !== undefined);
+const isRed = (e: Entry) => (isContext(e) ? e.state === "FAILURE" || e.state === "ERROR" : RED_CONCLUSIONS.has(e.conclusion ?? ""));
+
+/** The names of the red entries, for a park's notice: a check run's `name`, a status's `context`. */
+export function failingChecks(entries: Entry[]): string[] {
+  const names = entries.filter(isRed).map((e) => (isContext(e) ? e.context : e.name) ?? "unnamed check");
+  return [...new Set(names)];
+}
 
 /** Fold a `statusCheckRollup` into one word: red beats pending beats green; an empty rollup is none. */
 export function rollup(entries: Entry[]): PrView["checks"] {
   if (entries.length === 0) return "none";
-  const isContext = (e: Entry) => e.__typename === "StatusContext" || (e.status === undefined && e.state !== undefined);
-  if (entries.some((e) => (isContext(e) ? e.state === "FAILURE" || e.state === "ERROR" : RED_CONCLUSIONS.has(e.conclusion ?? "")))) {
-    return "red";
-  }
+  if (entries.some(isRed)) return "red";
   // Green is a whitelist: anything neither red nor on it (STALE, a null or unknown conclusion,
   // an unrecognised state) is not yet green and reads pending.
   const isGreen = (e: Entry) =>
@@ -93,12 +101,14 @@ export class GhForge implements Forge {
       state: string; headRefOid: string; baseRefName: string; mergeable: string; statusCheckRollup: Entry[] | null;
     };
     if (j.state !== "OPEN" && j.state !== "MERGED" && j.state !== "CLOSED") throw new Error(`gh pr view: unknown state ${j.state}`);
+    const failing = failingChecks(j.statusCheckRollup ?? []);
     return {
       state: j.state,
       head: j.headRefOid,
       base: j.baseRefName,
       mergeable: j.mergeable === "MERGEABLE" || j.mergeable === "CONFLICTING" ? j.mergeable : "UNKNOWN",
       checks: rollup(j.statusCheckRollup ?? []),
+      ...(failing.length ? { failing } : {}),
     };
   }
 

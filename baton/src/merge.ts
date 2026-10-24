@@ -8,6 +8,9 @@ import type { RunState, UnitState } from "./state.ts";
 
 export const MERGE_FAILURES_TO_PARK = 3;
 
+/** The PR a merge-stage park is about: its URL, why it stopped, and the red checks by name. */
+export type ParkPr = { url: string; why: "red" | "conflict"; failing?: string[] };
+
 export type MergeEnv = {
   run: RunState;
   forge: Forge;
@@ -16,7 +19,8 @@ export type MergeEnv = {
   scope(u: UnitState, extra?: Partial<Scope>): Scope;
   ev(kind: string, obj?: Record<string, unknown>): void;
   park(u: UnitState, reason: string): Promise<void>;
-  move(u: UnitState, to: string): Promise<void>;
+  /** `pr` is what a park by this move records and names in its notice. */
+  move(u: UnitState, to: string, pr?: ParkPr): Promise<void>;
   /** Run hook argvs in order with no shell; false at the first non-zero. */
   hooks(list: string[][] | undefined, scope: Scope, cwd: string): boolean;
   save(): void;
@@ -74,8 +78,10 @@ export async function mergeUnit(env: MergeEnv, u: UnitState, stage: MergeStage):
     env.ev("wrong base", { unit: u.id, pr: url, base: view.base, expected: base });
     return env.park(u, "wrong base");
   }
-  if (view.mergeable === "CONFLICTING") return env.move(u, stage.outcomes.conflict);
-  if (view.checks === "red") return env.move(u, stage.outcomes.red);
+  if (view.mergeable === "CONFLICTING") return env.move(u, stage.outcomes.conflict, { url, why: "conflict" });
+  if (view.checks === "red") {
+    return env.move(u, stage.outcomes.red, { url, why: "red", ...(view.failing?.length ? { failing: view.failing } : {}) });
+  }
   if (view.checks === "pending" || view.mergeable === "UNKNOWN") return;
   if (view.checks === "none" && stage.checks !== "none-required") return;
   if (stage.ordered) {
