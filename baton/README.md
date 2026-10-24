@@ -3,6 +3,7 @@
 A recipe-driven engine. On a systemd timer it launches model sessions on a host when a unit is
 due, waits on closed signals (a done-file, a thread's turn end, a PR's checks) at no token cost,
 merges a pull request only by the recipe's rule, and notifies on parks, stalls and a host outage.
+A merge-stage park on red checks or a conflict names the PR and the failing checks in its notice.
 It judges nothing: anything that needs judgment is a session the recipe launches. It ships a CLI,
 a claim launcher and a timer, and no skill, so Codex has nothing to load. Needs `bun`.
 

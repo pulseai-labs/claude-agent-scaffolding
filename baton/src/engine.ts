@@ -17,7 +17,7 @@ import {
   DEFAULT_SLOTS, DEFAULT_STAGE_SLOTS, isProtoName, nonce as launchNonce, own, render, threadTitle, UNIT_ID_RE,
   type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type TriageStage, type WaitStage,
 } from "./recipe.ts";
-import { mergeUnit } from "./merge.ts";
+import { mergeUnit, type ParkPr } from "./merge.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
 import { enterStage, type RunState, type Session, type Store, type UnitState } from "./state.ts";
 
@@ -276,7 +276,8 @@ class RunTick {
   }
 
   private async park(
-    u: UnitState, reason: string, o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string } = {},
+    u: UnitState, reason: string,
+    o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr } = {},
   ): Promise<void> {
     const thread = u.session?.thread_id ?? o.thread; // endSession deletes the session; a caller that ended it first passes it
     await this.endSession(u, o);
@@ -287,14 +288,18 @@ class RunTick {
       unit: u.id, stage: u.stage, reason,
       ...(thread ? { thread } : {}),
       ...(o.questions ? { questions: JSON.stringify(o.questions) } : {}),
+      ...(o.pr ? { pr: o.pr.url, pr_state: o.pr.why, ...(o.pr.failing ? { failing: o.pr.failing } : {}) } : {}),
     });
     this.report.parked.push(u.id);
-    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}`);
+    // A merge-stage park names its PR and what stopped it, so the notice alone says where to look.
+    const about = o.pr === undefined ? ""
+      : ` — ${o.pr.why === "conflict" ? "conflict" : `red${o.pr.failing ? `: ${o.pr.failing.join(", ")}` : ""}`} — ${o.pr.url}`;
+    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}${about}`);
   }
 
   /** `note` is the outcome's notice, rendered by the caller before any side effect. */
-  private async move(u: UnitState, o: Outcome, note?: string, thread?: string): Promise<void> {
-    if (o.to === "park") return this.park(u, "outcome", { thread });
+  private async move(u: UnitState, o: Outcome, note?: string, thread?: string, pr?: ParkPr): Promise<void> {
+    if (o.to === "park") return this.park(u, "outcome", { thread, pr });
     const from = u.stage;
     enterStage(u, o.to, triageNote(this.run, this.recipe, u));
     this.entered.add(u.id);
@@ -940,7 +945,7 @@ class RunTick {
         scope: (x, extra) => this.scope(x, extra),
         ev: (k, o) => this.ev(k, o),
         park: (x, reason) => this.park(x, reason),
-        move: (x, to) => this.move(x, { when: [], to }),
+        move: (x, to, pr) => this.move(x, { when: [], to }, undefined, undefined, pr),
         hooks: (list, scope, cwd) => this.hooks(list, scope, cwd),
         save: () => this.save(),
         merged: (x) => { this.report.merged.push(x.id); },

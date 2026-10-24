@@ -83,6 +83,10 @@ const doTick = (): Promise<TickReport> =>
 const runState = (): RunState => openStore(state).readRun("r1");
 const stageOf = (u: string) => runState().units[u].stage;
 const parkedOf = (u: string) => runState().units[u].parked?.reason;
+const noticeLines = () => {
+  const p = join(state, "notify.log");
+  return existsSync(p) ? readFileSync(p, "utf8").trim().split("\n").filter(Boolean) : [];
+};
 const kinds = () =>
   readFileSync(join(state, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l).kind as string);
 
@@ -174,6 +178,47 @@ test("red checks follow the red outcome", async () => {
   await doTick();
   expect(stageOf("o1")).toBe("fixing");
   expect(forge.merges).toEqual([]);
+});
+
+// A merge-stage park names its PR and the red checks, in the event and in the notice.
+const parkEvent = () =>
+  readFileSync(join(state, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l))
+    .filter((e) => e.kind === "park").at(-1);
+
+test("red checks that park: the event and the notice carry the PR and the failing checks", async () => {
+  forge.views.set(URL1, { ...green, checks: "red", failing: ["test", "lint"] });
+  await arm(mergeStage({ outcomes: { merged: "done", red: "park", conflict: "done" } }));
+  await doTick();
+  expect(parkedOf("o1")).toBe("outcome");
+  expect(parkEvent()).toMatchObject({ reason: "outcome", pr: URL1, pr_state: "red", failing: ["test", "lint"] });
+  expect(noticeLines().at(-1)).toContain(`parked in ${stageOf("o1")}: outcome — red: test, lint — ${URL1}`);
+});
+
+test("a conflict that parks: the notice names the conflict and the PR", async () => {
+  forge.views.set(URL1, { ...green, mergeable: "CONFLICTING" });
+  await arm(mergeStage({ outcomes: { merged: "done", red: "done", conflict: "park" } }));
+  await doTick();
+  expect(parkEvent()).toMatchObject({ pr: URL1, pr_state: "conflict" });
+  expect(parkEvent().failing).toBeUndefined();
+  expect(noticeLines().at(-1)).toContain(`: outcome — conflict — ${URL1}`);
+});
+
+test("red with no check names read: the notice still names the PR", async () => {
+  forge.views.set(URL1, { ...green, checks: "red" });
+  await arm(mergeStage({ outcomes: { merged: "done", red: "park", conflict: "done" } }));
+  await doTick();
+  expect(parkEvent().failing).toBeUndefined();
+  expect(noticeLines().at(-1)).toMatch(new RegExp(`: outcome — red — ${URL1.replace(/[/.]/g, "\\$&")}$`));
+});
+
+// Control: a park that is not about the PR keeps the old notice, with no PR fields.
+test("a park not made by a red or conflict outcome carries no PR fields", async () => {
+  forge.views.set(URL1, { ...green, state: "CLOSED" });
+  await arm(mergeStage());
+  await doTick();
+  expect(parkedOf("o1")).toBe("pr closed");
+  expect(parkEvent().pr).toBeUndefined();
+  expect(noticeLines().at(-1)).toMatch(/parked in \S+: pr closed$/);
 });
 
 test("head read this tick is the one merged, from one view per URL", async () => {
