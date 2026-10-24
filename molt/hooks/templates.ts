@@ -26,6 +26,7 @@ MOLT-HANDOFF: <absolute path of the handoff file>`
 export const DEFAULT_WARNING = `Context is at {{percent}}% of the window. This is molt's {{stage}} warning; its handoff threshold is {{command}}%. Keep working, and find a good point to hand off: the end of the step or unit in hand. Hand off there, before {{command}}%: write a session handoff and end that reply with MOLT-HANDOFF: <absolute path of the handoff file>.`
 
 export const ROOT_NOTE = 'molt then clears this session and resumes it from that file in the same pane.'
+export const SDK_NOTE = 'molt does not clear this session: an Agent SDK host (T3 Code) would later resume the session from before the handoff. End your reply by telling the operator to start a new thread and resume it from that file.'
 export const CHILD_NOTE = 'molt does not clear a child session: return the handoff to your parent as your brief says, then stop.'
 export const CHILD_WARNING = 'Your parent dispatched you: tell your parent now, as your brief says, and hand off at the point your brief names.'
 
@@ -63,4 +64,6 @@ export const PAUSED_UNATTENDED = "molt paused: {{count}} molts in a row with no 
 export const PAUSED_AGENT = "molt: the handoff did not happen. This session was not cleared, because molt is paused: {{reason}} Tell the operator to send any message to resume molt."
 export const PAUSED_NO_PROGRESS = "molt paused: no progress since the last molt (no Write, Edit or commit). Autopilot stops here; the handoff is at {{path}}."
 export const MISSING_HANDOFF = "molt: the MOLT-HANDOFF line names {{path}}, but {{path}} does not exist or is not a readable file. Write the handoff file, then end your reply with MOLT-HANDOFF: <its absolute path>."
+export const SDK_HANDED_OFF = "molt: this session handed off at {{path}} and was not cleared, because its host (an Agent SDK host, such as T3 Code) would later resume the session from before the handoff. Start no new work here. Tell the operator to start a new thread and resume it from {{path}}."
+export const STALE_SESSION = "molt: STALE SESSION. This session molted into {{successor}} at {{at}}, from the handoff at {{handoff}}. The host resumed the session from before that handoff, so this context is out of date and the successor may have done more work since. Do not act on this context: only Read, Grep and Glob run. Tell the operator to start a new thread and resume it from the newest handoff of this line ({{handoff}} or a later one). To use this session anyway, the operator runs /molt on here."
 export const STATUS_METER = "molt {{percent}}%/{{command}}%"
