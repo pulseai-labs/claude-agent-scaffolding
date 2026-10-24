@@ -9,15 +9,15 @@ import { markerPath } from './handoff'
 import { briefPrompt, extractFacts, factsBrief, isUsableSummary, pickHandoff, resolvePath } from './handoff'
 import type { Handoff, Message } from './handoff'
 import { fallbackPath, lineagePath, parseLineage } from './records'
-import type { Lineage } from './records'
+import type { Lineage, Successor } from './records'
 import type { Stage, Thresholds } from './measure'
-import { activePath, autonomicPath, logPath, parseAutonomic, progressPath, recordBell, safeSessionId, stagePath } from './records'
+import { activePath, autonomicPath, logPath, parseSuccessor, successorPath, parseAutonomic, progressPath, recordBell, safeSessionId, stagePath } from './records'
 import {
   SESSION_OFF, SESSION_ON, COMMAND_USAGE, STATUS_OFF, STATUS_PAUSED,
   HANDOFF_REQUIRED, HANDED_OFF, PARENT_HANDOFF, HANDING_OFF, RESUMED,
   SEED_REJECTED, CONFIG_PROBLEMS, SETTINGS_PROBLEMS, SESSION_STATUS, FILL_STATUS,
   MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, PAUSED_AGENT, MISSING_HANDOFF,
-  STATUS_METER, BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
+  STATUS_METER, BLOCK_NOTE, CHILD_NOTE, SDK_NOTE, SDK_HANDED_OFF, STALE_SESSION, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
   DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
   fill,
 } from './templates'
@@ -56,6 +56,10 @@ const warned = new Map<string, number>()   // warnings delivered per session: 0,
 const handedOff = new Set<string>()        // child sessions that have named their handoff
 const commandNoted = new Set<string>()     // child sessions whose status file says HANDOFF_REQUIRED
 let statusFailed = false                   // the status-file failure is logged once per process
+const sdkHandoffs = new Map<string, string>()      // root sessions an SDK host keeps: their handoff path
+const stale = new Map<string, Successor | null>()  // a session's successor record, read once per process
+// What a stale session may still run: reads, so it can find the newest handoff for the operator.
+const STALE_TOOLS = new Set(['Read', 'Grep', 'Glob'])
 
 async function home($: Engine): Promise<string> {
   return (await $.env.get('HOME')) ?? ''
@@ -181,7 +185,7 @@ async function instruction($: Engine, sessionId: string): Promise<string> {
     percent: Math.round(lastPercent ?? t.command), command: Math.round(t.command), block: Math.round(t.block),
     soft: Math.round(t.command), hard: Math.round(t.block),   // 0.1.0 template names (plan decision 5)
   }
-  const text = `${fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)}\n\n${noteFor(await isChild($))}`
+  const text = `${fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)}\n\n${await noteFor($)}`
   return atLeast(stage, 'block') ? `${text}\n\n${fill(BLOCK_NOTE, values)}` : text
 }
 
@@ -189,8 +193,29 @@ async function isChild($: Engine): Promise<boolean> {
   return ((await $.env.get('MOLT_HANDOFF')) ?? '').trim() === 'parent'
 }
 
-function noteFor(child: boolean): string {
-  return child ? CHILD_NOTE : ROOT_NOTE
+// An Agent SDK library (the TypeScript or Python SDK) sets this. Such a host keeps the
+// session id it started and resumes that id later, so a root cleared in place would come
+// back as its pre-handoff self (#901). `sdk-cli` (`claude -p`) is not matched.
+async function isSdkHost($: Engine): Promise<boolean> {
+  const v = ((await $.env.get('CLAUDE_CODE_ENTRYPOINT')) ?? '').trim()
+  return v === 'sdk-ts' || v === 'sdk-py'
+}
+
+async function noteFor($: Engine): Promise<string> {
+  if (await isChild($)) return CHILD_NOTE
+  return (await isSdkHost($)) ? SDK_NOTE : ROOT_NOTE
+}
+
+// The session's successor record, if it already molted into another session. Read once
+// per process; a file that cannot be read or parsed counts as none.
+async function staleRecord($: Engine, sessionId: string): Promise<Successor | undefined> {
+  if (!safeSessionId(sessionId)) return undefined
+  if (!stale.has(sessionId)) stale.set(sessionId, parseSuccessor(await readText($, successorPath(await home($), sessionId))) ?? null)
+  return stale.get(sessionId) ?? undefined
+}
+
+function staleText(r: Successor): string {
+  return fill(STALE_SESSION, { successor: r.successor, at: r.at, handoff: r.handoff })
 }
 
 // The warning this session is owed at its current stage, if any. Past the command the
@@ -244,7 +269,17 @@ async function warningText($: Engine, sessionId: string, which: 1 | 2): Promise<
   const t = currentThresholds(sessionId)
   const values = { percent: Math.round(lastPercent ?? t.warn), stage: which === 1 ? 'first' : 'second', command: Math.round(t.command) }
   const text = fill(await template($, cfg.warningTemplate, DEFAULT_WARNING), values)
-  return (await isChild($)) ? `${text}\n\n${CHILD_WARNING}` : text
+  if (await isChild($)) return `${text}\n\n${CHILD_WARNING}`
+  return (await isSdkHost($)) ? `${text}\n\n${SDK_NOTE}` : text
+}
+
+// A root under an Agent SDK host is never cleared (#901): it stops pushing, as a child
+// does, and each later prompt tells the agent to send the operator to a new thread.
+async function sdkHandOff($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
+  handedOff.add(sessionId)
+  sdkHandoffs.set(sessionId, handoff.path)
+  try { await setNotice($, { text: fill(SDK_HANDED_OFF, { path: handoff.path }), tone: 'warn' }) } catch {}
+  await log($, `handed off to operator session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent} host=sdk`)
 }
 
 // Rung once and left to finish: the bell never gates the hook that paused the session. A bell
@@ -368,6 +403,13 @@ async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>
   } catch (err) {
     await log($, `lineage write failed session=${sessionId} ${String(err)}`)
   }
+  // Keyed by the session that molted: a host that resumes it later finds it stale (#901).
+  if (safeSessionId(p.oldSession)) try {
+    const record: Successor = { successor: sessionId, handoff: p.handoff, at: new Date().toISOString() }
+    await $.fs.write(successorPath(await home($), p.oldSession), `${JSON.stringify(record, null, 2)}\n`)
+  } catch (err) {
+    await log($, `successor write failed session=${p.oldSession} ${String(err)}`)
+  }
   await log($, `seeded session=${sessionId} from=${p.oldSession} depth=${p.depth}`)
 }
 
@@ -437,6 +479,11 @@ export const register: Register = (on, options) => {
       await touchActive($, sessionId)
       showStatus($, sessionId)
       if (cfg.problems.length) $.ui.toast(fill(CONFIG_PROBLEMS, { problems: cfg.problems.join('; ') }))
+      const r = await staleRecord($, sessionId)
+      if (r !== undefined) {
+        $.ui.toast(staleText(r))
+        await log($, `stale session started session=${sessionId} successor=${r.successor}`)
+      }
     } catch (err) {
       await log($, `session.start error ${String(err)}`)
     }
@@ -512,6 +559,17 @@ export const register: Register = (on, options) => {
       if (paused === (await $.session.id())) pauseNote = fill(PAUSED_AGENT, { reason: pausedText })
     } catch {}
     if (pauseNote !== undefined) e = { ...e, context: [...(e.context ?? []), pauseNote] }
+    let hostNote: string | undefined
+    try {
+      const sessionId = await $.session.id()
+      const r = await staleRecord($, sessionId)
+      const kept = sdkHandoffs.get(sessionId)
+      if (r !== undefined) hostNote = staleText(r)
+      else if (kept !== undefined) hostNote = fill(SDK_HANDED_OFF, { path: kept })
+    } catch (err) {
+      await log($, `prompt.submit stale check error ${String(err)}`)
+    }
+    if (hostNote !== undefined) e = { ...e, context: [...(e.context ?? []), hostNote] }
     let warning: { sessionId: string; due: 1 | 2; text: string } | undefined
     try {
       const sessionId = await $.session.id()
@@ -542,6 +600,12 @@ export const register: Register = (on, options) => {
     let sessionId = ''
     try {
       sessionId = await $.session.id()
+      // Before every other rule, /molt off included: a stale session acts on old state.
+      const r = await staleRecord($, sessionId)
+      if (r !== undefined && !STALE_TOOLS.has(e.tool)) {
+        await log($, `stale denied session=${sessionId} tool=${e.tool}`)
+        return { deny: staleText(r) }
+      }
       if (!off.has(sessionId) && !inFlight) {
         await measure($, sessionId)
         if (atLeast(stage, 'block') && !gateAllows(e.tool, args)) {
@@ -675,6 +739,7 @@ export const register: Register = (on, options) => {
         handoff = { path: await fallbackBrief($, sessionId), source: 'fallback' }
       }
       if (await isChild($)) await handOff($, sessionId, handoff)
+      else if (await isSdkHost($)) await sdkHandOff($, sessionId, handoff)
       else await molt($, sessionId, handoff)
     } catch (err) {
       await log($, `turn.complete error ${String(err)}`)
@@ -694,6 +759,12 @@ export const register: Register = (on, options) => {
     }
     if (arg === 'on') {
       off.delete(sessionId)
+      // The operator's word that this stale session may act: the record goes.
+      if (await staleRecord($, sessionId) !== undefined) {
+        try { await $.process.run(['rm', '-f', successorPath(await home($), sessionId)]) } catch {}
+        stale.set(sessionId, null)
+        await log($, `stale guard lifted session=${sessionId}`)
+      }
       await touchActive($, sessionId)
       await publishStage($, sessionId)
       showStatus($, sessionId)

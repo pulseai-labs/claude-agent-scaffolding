@@ -80,6 +80,22 @@ warning or the handoff goes ahead regardless. The child itself never writes this
 appends are its own file writes, not tool calls. Who the parent is, how the child tells it, and
 how it is replaced are the launcher's and the crew's business, never molt's.
 
+## Under an Agent SDK host (T3 Code)
+
+An Agent SDK host keeps the session id it started and resumes that id when it restarts the
+process. A root cleared in place would come back later as its pre-handoff self (#901). So when
+`CLAUDE_CODE_ENTRYPOINT` is `sdk-ts` or `sdk-py`, a root hands off as a child does: no `/clear`
+and no seed, no more warnings or Stop asks, and the block stays. The warnings and the handoff
+command tell the agent to end its reply by sending the operator to a new thread that resumes from
+the handoff, and every later prompt in the session repeats that. `cli` and `sdk-cli` (`claude -p`)
+clear in place as before. A child is a child on every host.
+
+**The stale-resume guard** works on every host. Each seed records the successor under the session
+that molted (`successor/<id>.json`). If that session ever runs again — a host or a `claude --resume`
+that brings back the pre-molt id — molt toasts and logs it at start, adds a STALE SESSION line to
+every prompt, and refuses every tool call except Read, Grep and Glob, even under `/molt off`.
+`/molt on` in that session lifts the guard and removes the record.
+
 ## Settings
 
 Set them in `/config` → molt (the plugin's `userConfig`).
@@ -127,6 +143,7 @@ All under `~/.claude/state/molt/`, keyed by session id:
 | `active/<id>` | The active marker: written at start, after a clear, on every prompt, every turn end, and by `/molt now` and `/molt on`; removed at session end, by `/molt off`, and while the session is paused. The crew hooks read it. |
 | `lineage/<id>.json` | Written for each seeded session: `{ from, chain, depth, handoff }` — the session it came from, the first session of the chain, how many molts deep it is, and the handoff it resumed from. `autonomic` reads it to carry its mode across a molt. |
 | `briefs/<id>.md` | A fallback brief, when molt wrote one. |
+| `successor/<id>.json` | Written at each seed for the session that molted: `{ successor, handoff, at }`. The stale-resume guard reads it; `/molt on` in that session removes it. |
 | `stage/<id>` | The stage file (0.2.1): `{ stage, percent?, command, block, fallback, at }` — see below. |
 | `molt.log` | One line per molt, handoff, pause, refusal and error. |
 
@@ -149,7 +166,7 @@ to the default text.
 |---|---|
 | `/molt now` | Treats the session as past the handoff command whatever the fill, and puts the handoff instruction in the prompt box: press Enter to send it. Where the session has no prompt box, the next prompt you send carries it. It also lifts a pause and `/molt off`, and brings the active marker back in the same command. |
 | `/molt off` | molt stops measuring, warning, blocking, gating and molting in this session, and removes the active marker, so the crew context-ceiling hooks speak again here. |
-| `/molt on` | Turns it back on. |
+| `/molt on` | Turns it back on. In a stale session it also lifts the stale-resume guard and removes the successor record. |
 | `/molt status` | The fill and the ladder, the mode `autonomic` records, any settings problem, and whether auto-compact runs above the block threshold. |
 
 `/molt now` cannot submit the prompt itself: Claude Code refuses a prompt submitted from a
@@ -204,6 +221,10 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   root session therefore resets the manual pause count at each prompt, as a worker's ping does
   below; such a loop is bounded only by minimum room. The OMP extension keeps its own count and
   is unchanged (#774).
+- **The SDK host check reads one variable.** A session started from a shell that inherited
+  `CLAUDE_CODE_ENTRYPOINT=sdk-ts` reads as an SDK host and is not cleared. A molt made before
+  0.3.7 wrote no successor record, so its pre-molt session is not guarded. The OMP extension has
+  neither change.
 - **A worker's ping is a message from you, to molt.** A ping a crew worker types into a top's
   pane (`herdr agent prompt`) reaches molt as a `composer` prompt, so it resets the manual pause
   count; a looping root top is then bounded only by minimum room (#668).

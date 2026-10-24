@@ -2,6 +2,20 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.7 — 2026-10-24
+
+- **Under an Agent SDK host a root is not cleared** (#901). T3 Code drives Claude Code through the Agent SDK
+  and stores the session id it started. After molt's `/clear` the thread showed the new session, but when T3
+  later restarted the process (after an idle gap) it resumed the original id, so the operator talked to the
+  context from before the handoff. With `CLAUDE_CODE_ENTRYPOINT` set to `sdk-ts` or `sdk-py`, a root now hands
+  off as a child does: no clear and no seed, no more warnings or Stop asks, the block stays. The warnings and the
+  handoff command tell the agent to send the operator to a new thread with the handoff, and each later prompt
+  repeats it. `cli` and `sdk-cli` (`claude -p`) still clear in place; a child is still a child.
+- **A resumed session that already molted is stale** (#901). Each seed writes
+  `~/.claude/state/molt/successor/<old id>.json` (`{ successor, handoff, at }`). When that session runs again,
+  molt toasts and logs it at start, adds a STALE SESSION line to every prompt, and refuses every tool call but
+  Read, Grep and Glob, `/molt off` or not. `/molt on` in that session lifts the guard and removes the record.
+
 ## 0.3.6 — 2026-10-22
 
 - **Manual: an Agent SDK prompt is a message from the operator** (#774, operator ruling 2026-10-22). T3 Code
