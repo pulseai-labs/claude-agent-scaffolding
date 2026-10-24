@@ -9,6 +9,7 @@ export const stagePath = (home: string, id: string) => `${home}/${STATE}/molt/st
 export const progressPath = (home: string, id: string) => `${home}/${STATE}/molt/progress/${id}`
 export const fallbackPath = (home: string, id: string) => `${home}/${STATE}/molt/briefs/${id}.md`
 export const successorPath = (home: string, id: string) => `${home}/${STATE}/molt/successor/${id}.json`
+export const sdkHandoffPath = (home: string, id: string) => `${home}/${STATE}/molt/sdk-handoff/${id}`
 export const logPath = (home: string) => `${home}/${STATE}/molt/molt.log`
 export const autonomicPath = (home: string, id: string) => `${home}/${STATE}/autonomic/sessions/${id}.json`
 

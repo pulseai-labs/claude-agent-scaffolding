@@ -11,7 +11,7 @@ import type { Handoff, Message } from './handoff'
 import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage, Successor } from './records'
 import type { Stage, Thresholds } from './measure'
-import { activePath, autonomicPath, logPath, parseSuccessor, successorPath, parseAutonomic, progressPath, recordBell, safeSessionId, stagePath } from './records'
+import { activePath, autonomicPath, logPath, parseSuccessor, sdkHandoffPath, successorPath, parseAutonomic, progressPath, recordBell, safeSessionId, stagePath } from './records'
 import {
   SESSION_OFF, SESSION_ON, COMMAND_USAGE, STATUS_OFF, STATUS_PAUSED,
   HANDOFF_REQUIRED, HANDED_OFF, PARENT_HANDOFF, HANDING_OFF, RESUMED,
@@ -56,7 +56,7 @@ const warned = new Map<string, number>()   // warnings delivered per session: 0,
 const handedOff = new Set<string>()        // child sessions that have named their handoff
 const commandNoted = new Set<string>()     // child sessions whose status file says HANDOFF_REQUIRED
 let statusFailed = false                   // the status-file failure is logged once per process
-const sdkHandoffs = new Map<string, string>()      // root sessions an SDK host keeps: their handoff path
+const sdkHandoffs = new Map<string, string | null>()  // root sessions an SDK host keeps: their handoff path, also on disk
 const stale = new Map<string, Successor | null>()  // a session's successor record, read once per process
 // What a stale session may still run: reads, so it can find the newest handoff for the operator.
 const STALE_TOOLS = new Set(['Read', 'Grep', 'Glob'])
@@ -214,6 +214,18 @@ async function staleRecord($: Engine, sessionId: string): Promise<Successor | un
   return stale.get(sessionId) ?? undefined
 }
 
+// An SDK host may restart the process and resume this same session: the handoff it
+// made is read back from its file, once per process, so it is not lost (#902 review).
+async function sdkHandoff($: Engine, sessionId: string): Promise<string | undefined> {
+  if (!safeSessionId(sessionId)) return undefined
+  if (!sdkHandoffs.has(sessionId)) {
+    const path = (await readText($, sdkHandoffPath(await home($), sessionId)))?.trim()
+    sdkHandoffs.set(sessionId, path ? path : null)
+    if (path) handedOff.add(sessionId)
+  }
+  return sdkHandoffs.get(sessionId) ?? undefined
+}
+
 function staleText(r: Successor): string {
   return fill(STALE_SESSION, { successor: r.successor, at: r.at, handoff: r.handoff })
 }
@@ -278,6 +290,11 @@ async function warningText($: Engine, sessionId: string, which: 1 | 2): Promise<
 async function sdkHandOff($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
   handedOff.add(sessionId)
   sdkHandoffs.set(sessionId, handoff.path)
+  if (safeSessionId(sessionId)) try {
+    await $.fs.write(sdkHandoffPath(await home($), sessionId), `${handoff.path}\n`)
+  } catch (err) {
+    await log($, `sdk handoff write failed session=${sessionId} ${String(err)}`)
+  }
   try { await setNotice($, { text: fill(SDK_HANDED_OFF, { path: handoff.path }), tone: 'warn' }) } catch {}
   await log($, `handed off to operator session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent} host=sdk`)
 }
@@ -479,6 +496,7 @@ export const register: Register = (on, options) => {
       await touchActive($, sessionId)
       showStatus($, sessionId)
       if (cfg.problems.length) $.ui.toast(fill(CONFIG_PROBLEMS, { problems: cfg.problems.join('; ') }))
+      await sdkHandoff($, sessionId)
       const r = await staleRecord($, sessionId)
       if (r !== undefined) {
         $.ui.toast(staleText(r))
@@ -563,7 +581,7 @@ export const register: Register = (on, options) => {
     try {
       const sessionId = await $.session.id()
       const r = await staleRecord($, sessionId)
-      const kept = sdkHandoffs.get(sessionId)
+      const kept = await sdkHandoff($, sessionId)
       if (r !== undefined) hostNote = staleText(r)
       else if (kept !== undefined) hostNote = fill(SDK_HANDED_OFF, { path: kept })
     } catch (err) {
@@ -608,7 +626,8 @@ export const register: Register = (on, options) => {
       }
       if (!off.has(sessionId) && !inFlight) {
         await measure($, sessionId)
-        if (atLeast(stage, 'block') && !gateAllows(e.tool, args)) {
+        // A stale session's reads passed the stale rule above; the block does not refuse them.
+        if (atLeast(stage, 'block') && r === undefined && !gateAllows(e.tool, args)) {
           await log($, `gate denied session=${sessionId} tool=${e.tool} percent=${lastPercent}`)
           return { deny: await instruction($, sessionId) }
         }
@@ -761,7 +780,9 @@ export const register: Register = (on, options) => {
       off.delete(sessionId)
       // The operator's word that this stale session may act: the record goes.
       if (await staleRecord($, sessionId) !== undefined) {
-        try { await $.process.run(['rm', '-f', successorPath(await home($), sessionId)]) } catch {}
+        try { await $.process.run(['rm', '-f', successorPath(await home($), sessionId)]) } catch (err) {
+          await log($, `successor remove failed session=${sessionId} ${String(err)}`)
+        }
         stale.set(sessionId, null)
         await log($, `stale guard lifted session=${sessionId}`)
       }

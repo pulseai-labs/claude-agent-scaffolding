@@ -87,13 +87,15 @@ process. A root cleared in place would come back later as its pre-handoff self (
 `CLAUDE_CODE_ENTRYPOINT` is `sdk-ts` or `sdk-py`, a root hands off as a child does: no `/clear`
 and no seed, no more warnings or Stop asks, and the block stays. The warnings and the handoff
 command tell the agent to end its reply by sending the operator to a new thread that resumes from
-the handoff, and every later prompt in the session repeats that. `cli` and `sdk-cli` (`claude -p`)
+the handoff, and every later prompt in the session repeats that — after a process restart too,
+because the handoff path is kept in `sdk-handoff/<id>`. `cli` and `sdk-cli` (`claude -p`)
 clear in place as before. A child is a child on every host.
 
 **The stale-resume guard** works on every host. Each seed records the successor under the session
 that molted (`successor/<id>.json`). If that session ever runs again — a host or a `claude --resume`
 that brings back the pre-molt id — molt toasts and logs it at start, adds a STALE SESSION line to
 every prompt, and refuses every tool call except Read, Grep and Glob, even under `/molt off`.
+Past the block threshold those reads still run, so the session can find the newest handoff.
 `/molt on` in that session lifts the guard and removes the record.
 
 ## Settings
@@ -143,6 +145,7 @@ All under `~/.claude/state/molt/`, keyed by session id:
 | `active/<id>` | The active marker: written at start, after a clear, on every prompt, every turn end, and by `/molt now` and `/molt on`; removed at session end, by `/molt off`, and while the session is paused. The crew hooks read it. |
 | `lineage/<id>.json` | Written for each seeded session: `{ from, chain, depth, handoff }` — the session it came from, the first session of the chain, how many molts deep it is, and the handoff it resumed from. `autonomic` reads it to carry its mode across a molt. |
 | `briefs/<id>.md` | A fallback brief, when molt wrote one. |
+| `sdk-handoff/<id>` | Written when a root under an Agent SDK host hands off: the handoff path. A restarted process that resumes the same session reads it, so the session stays handed off. |
 | `successor/<id>.json` | Written at each seed for the session that molted: `{ successor, handoff, at }`. The stale-resume guard reads it; `/molt on` in that session removes it. |
 | `stage/<id>` | The stage file (0.2.1): `{ stage, percent?, command, block, fallback, at }` — see below. |
 | `molt.log` | One line per molt, handoff, pause, refusal and error. |

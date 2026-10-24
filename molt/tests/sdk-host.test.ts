@@ -12,6 +12,7 @@ const RUN = (args: string) =>
 const H = '/repo/docs/handoff.md'
 const T3 = { CLAUDE_CODE_ENTRYPOINT: 'sdk-ts' }
 // The record's own path, written out: the tests pin the file the seed writes and the guard reads.
+const KEPT = (id: string) => `/home/u/.claude/state/molt/sdk-handoff/${id}`
 const SUCC = (id: string) => `/home/u/.claude/state/molt/successor/${id}.json`
 const RECORD = JSON.stringify({ successor: 's2', handoff: H, at: '2026-10-23T16:13:01.567Z' })
 
@@ -57,6 +58,26 @@ describe('a root under an Agent SDK host (#901)', () => {
     at(w, 67); await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(0)
   })
+  test('the handoff is on disk for a restarted process', async ($, on) => {
+    const w = world(on, { env: T3, files: { [H]: '#' } })
+    at(w, 67); await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+    expect(w.files.get(KEPT('s1'))?.trim()).toBe(H)
+  })
+  // A restart: a fresh module, the same session id, the file the earlier process wrote (#902 review).
+  test('a restarted SDK session still hands off: the note at each prompt, no Stop ask', async ($, on) => {
+    const w = world(on, { env: T3, files: { [H]: '#', [KEPT('s1')]: `${H}\n` } })
+    await $.session.start({ cwd: '/repo' } as never)
+    at(w, 67)
+    expect((await $.classic.Stop(STOP)).block).toBeUndefined()
+    await $.prompt.submit(PROMPT())
+    expect(w.contexts.join('\n')).toContain(`resume it from ${H}`)
+  })
+  test('no handoff file: a restarted SDK session is asked at Stop as before (control)', async ($, on) => {
+    const w = world(on, { env: T3, files: { [H]: '#' } })
+    await $.session.start({ cwd: '/repo' } as never)
+    at(w, 67)
+    expect((await $.classic.Stop(STOP)).block).toBeDefined()
+  })
   test('a child under an SDK host is still a child', async ($, on) => {
     const S = '/run/status'
     const w = world(on, { env: { ...T3, MOLT_HANDOFF: 'parent', MOLT_STATUS_PATH: S }, files: { [H]: '#' } })
@@ -91,6 +112,17 @@ describe('the stale-resume guard (#901)', () => {
     expect((await $.tool.call({ tool: 'Write', file_path: '/r/a.md', content: 'x' } as never)).deny).toContain('STALE SESSION')
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
     expect((await $.tool.call({ tool: 'Grep', pattern: 'x' } as never)).deny).toBeUndefined()
+  })
+  test('past the block a stale session still reads, and is told it is stale', async ($, on) => {
+    const w = world(on, { files: { [SUCC('s1')]: RECORD } })
+    at(w, 80)
+    expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Write', file_path: '/r/a.md', content: 'x' } as never)).deny).toContain('STALE SESSION')
+  })
+  test('past the block a session that is not stale has its reads refused (control)', async ($, on) => {
+    const w = world(on)
+    at(w, 80)
+    expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeDefined()
   })
   test('/molt on lifts the guard and removes the record', async ($, on) => {
     const w = world(on, { files: { [SUCC('s1')]: RECORD } })
