@@ -89,8 +89,9 @@ const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 // quotes after one of those on its line (the `"$(cat <<'EOF' … )"` commit form); any other
 // `<<` in quotes is text, as in Bash. A `<<` in arithmetic opens nothing, and a `#` that
 // starts a word begins a comment, which runs no command: it is dropped here, quotes and
-// all (#724 A11, #702 B3).
-function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) => string): string {
+// all (#724 A11, #702 B3). `keep` also gets where the piece's two parts lie in `command`:
+// `at`..`upto` (the opener, and in the 0.9.0 reading the rest of its line) and `body`..`end`.
+function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, region: { at: number; upto: number; body: number; end: number }) => string): string {
   const opens: Array<{ at: number; end: number; quote: string; delimiter: string; strip: boolean; quoted: boolean }> = []
   let out = ''
   let from = 0
@@ -119,7 +120,7 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
           line = next + 1
         }
         const upto = older ? i : open.end
-        out += command.slice(from, open.at) + keep(command.slice(open.at, upto) + command.slice(body, end), open.quoted)
+        out += command.slice(from, open.at) + keep(command.slice(open.at, upto) + command.slice(body, end), open.quoted, { at: open.at, upto, body, end })
         from = upto
         body = end
       }
@@ -405,43 +406,42 @@ export const SUBSTITUTION_TOO_DEEP = '\u0000substitution nested more than 8 deep
 
 // The command text of every `$(…)` and backtick span Bash would run: unquoted, in double quotes,
 // on a heredoc's opener line and in an unquoted heredoc body; never in single quotes or a quoted
-// body (#724 A1, A2). Each span is read again on its own, as Bash reads it, for the spans nested
-// in it, which follow it in the list.
+// body (#724 A1, A2). The spans are found in a copy of the command with each heredoc's opener
+// (with the rest of its line in the 0.9.0 reading) and body blanked, and each is sliced from the
+// command itself, so its text is in Bash's order (Task 3 review C1). Each is read again on its
+// own, as Bash reads it, for the spans nested in it, which follow it in the list.
 export function substitutionsOf(command: string): string[] {
   const found: string[] = []
   const read = (command: string, level: number): void => {
-    const pieces: Array<{ piece: string; quoted: boolean }> = []
-    const text = blankHeredocs(command, (piece, quoted) => `\u0000${pieces.push({ piece, quoted }) - 1}\u0000`)
-    const spans: string[] = []
-    // `raw` text is a heredoc's own slice of the command: it holds no markers.
-    const take = (part: string, mode: 'command' | 'body', raw: boolean): void => {
-      const restore = (span: string) => raw ? span : span.replace(/\u0000(\d+)\u0000/g, (_: string, n: string) => pieces[Number(n)]?.piece ?? '')
-      let from = 0
-      for (const span of substitutionSpans(part, mode)) {
-        if (!raw) heredocsIn(part.slice(from, span.at))
-        const inner = restore(part.slice(span.from, span.to))
-        spans.push(span.tick ? inner.replace(/\\([\\`$])/g, '$1') : inner)
-        from = span.end
-      }
-      if (!raw) heredocsIn(part.slice(from))
-    }
-    // A heredoc outside every span: the rest of its opener line, which the older layout keeps
-    // in the piece, is command text; an unquoted body is read for spans.
-    const heredocsIn = (gap: string): void => {
-      for (const [, n] of gap.matchAll(/\u0000(\d+)\u0000/g)) {
-        const { piece, quoted } = pieces[Number(n)] ?? { piece: '', quoted: true }
-        HEREDOC.lastIndex = 0
-        const opener = HEREDOC.exec(piece)?.[0].length ?? 0
-        const line = piece.indexOf('\n')
-        take(piece.slice(opener, line < 0 ? piece.length : line), 'command', true)
-        if (!quoted && line >= 0) take(piece.slice(line + 1), 'body', true)
+    const heredocs: Array<{ quoted: boolean; at: number; upto: number; body: number; end: number }> = []
+    blankHeredocs(command, (_, quoted, region) => { heredocs.push({ quoted, ...region }); return '' })
+    let view = command
+    for (const { at, upto, body, end } of heredocs)
+      for (const [from, to] of [[at, upto], [body, end]] as const)
+        view = view.slice(0, from) + ' '.repeat(to - from) + view.slice(to)
+    const spans: Array<{ at: number; end: number; text: string }> = []
+    // The spans of `text`, which stands at `offset` in the command.
+    const take = (text: string, offset: number, mode: 'command' | 'body'): void => {
+      for (const span of substitutionSpans(text, mode)) {
+        const inner = command.slice(offset + span.from, offset + span.to)
+        spans.push({ at: offset + span.at, end: offset + span.end, text: span.tick ? inner.replace(/\\([\\`$])/g, '$1') : inner })
       }
     }
-    take(text, 'command', false)
-    for (const span of spans) {
+    take(view, 0, 'command')
+    // A heredoc outside every span: the rest of its opener line in the 0.9.0 reading is command
+    // text, and an unquoted body is read for spans.
+    const outer = [...spans]
+    for (const { quoted, at, upto, body, end } of heredocs) {
+      if (outer.some(span => span.at <= at && at < span.end)) continue
+      HEREDOC.lastIndex = at
+      const word = HEREDOC.exec(command) === null ? at : HEREDOC.lastIndex
+      if (upto > word) take(command.slice(word, upto), word, 'command')
+      if (!quoted) take(command.slice(body, end), body, 'body')
+    }
+    for (const span of spans.sort((a, b) => a.at - b.at)) {
       if (level > 8) { if (!found.includes(SUBSTITUTION_TOO_DEEP)) found.push(SUBSTITUTION_TOO_DEEP); return }
-      found.push(span)
-      read(span, level + 1)
+      found.push(span.text)
+      read(span.text, level + 1)
     }
   }
   read(command, 1)

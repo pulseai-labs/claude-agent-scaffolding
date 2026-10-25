@@ -461,6 +461,35 @@ describe('batch 5: substitutions', () => {
     expect(bash('git commit -m "$(echo "a;b")" && cat \'huge.log\'')).toBe(false)
     expect(bash('git commit -m "$(echo a # it\'s )\ncat huge.log)"')).toBe(false)
   })
+  test('a span holding a heredoc keeps its opener line before the body (Task 3 review C1)', () => {
+    expect(bash("git commit -m `cat <<'EOF' ; cat huge.log\nhandoff\nEOF\n`")).toBe(false)
+    expect(bash("git commit -m `cat <<EOF | cat huge.log\nhandoff\nEOF\n`")).toBe(false)
+    // control
+    expect(bash("git commit -m `cat <<'EOF'\nhandoff\nEOF\n`")).toBe(true)
+  })
+  test('an opener line kept whole in the 0.9.0 reading is read inside a substitution (Ruling 18b)', () => {
+    expect(bash("git commit -m \"$(cat <<'EOF' $(date); cat huge.log\nhandoff\nEOF\n)\"")).toBe(false)
+    expect(bash("git commit -m `cat <<'EOF' $(date) ; cat huge.log\nhandoff\nEOF\n`")).toBe(false)
+    expect(bash("git commit -m \"$(cat <<'EOF'; echo \"$(date)\"; cat huge.log\nhandoff\nEOF\n)\"")).toBe(false)
+    // control: the line runs only what the inner rule allows
+    expect(bash("git commit -m \"$(cat <<'EOF'; echo \"$(date)\"\nhandoff\nEOF\n)\"")).toBe(true)
+    // the line keeps its command: echo's argument is an argument, head's is a read
+    expect(bash("git commit -m \"$(echo <<'EOF' \"$(date)\"\nx\nEOF\n)\"")).toBe(true)
+    expect(bash("git commit -m \"$(head <<'EOF' \"$(date)\"\nx\nEOF\n)\"")).toBe(false)
+  })
+  test('$(<file) is Bash\'s own read of the file (Task 3 review I2)', () => {
+    for (const read of ['"$(<huge.log)"', '"$(< huge.log)"', '`<huge.log`', '"$(echo $(<huge.log))"'])
+      expect(bash(`git commit -m ${read}`)).toBe(false)
+    // control: a redirection that only writes reads nothing
+    expect(bash('git commit -m "$(echo handoff 2>/dev/null)"')).toBe(true)
+  })
+  test('date -f reads a file: refused in each spelling (Ruling 17)', () => {
+    for (const read of ['-f huge.log', '-fhuge.log', '--file=huge.log', '--file huge.log', '-uf huge.log', '--fi=huge.log', '"-f" huge.log'])
+      expect(bash(`git commit -m "$(date ${read})"`)).toBe(false)
+    // controls: date with a format, -u, or a -d value that holds an f
+    for (const ok of ['+%F', '-u +%F', '-dfriday +%F', '-d friday'])
+      expect(bash(`git commit -m "$(date ${ok})"`)).toBe(true)
+  })
   test('an unquoted $(…) is still split by the parentheses, so its command is a segment of its own', () => {
     // as at 0.3.7: the gate reads `date` as a segment, which is not git add or git commit
     expect(bash('git commit -m $(date +%F)')).toBe(false)

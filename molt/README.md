@@ -215,6 +215,10 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   four characters per token to the last measured fill.
 - **Auto-compact must sit above the block.** molt does not turn auto-compact off; it stays the
   backstop. If it runs at or below the block threshold, it acts first. `/molt status` checks.
+- **Past the hard threshold, a heredoc opener line holding a `$(…)`, a backtick or a `${…}` after
+  its word keeps the 0.3.7 reading.** The commands after the substitution on that line are not
+  read (`git commit -F - <<EOF $(date); cat huge.log`). Inside a substitution such a line is
+  read, and so are the substitutions on it.
 - **A Bash write is not progress unless it commits.** The autopilot loop guard counts Write,
   Edit, NotebookEdit and `git commit`; `sed -i` or `cat >` alone reads as no progress. A
   `git commit` counts only bare, or behind `time`: a `{ … }` segment cannot be told from a

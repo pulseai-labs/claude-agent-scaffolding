@@ -225,7 +225,7 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
   subcommands or flags (`git "merge"`). A trailer that opens an `-m` message, comes from
   `--trailer`, or follows a backslash-newline inside single
   quotes, also passes.
-- A command inside `$(…)` or backticks is read as a command of its own wherever Bash runs it, but a `case` pattern's `)` ends the substitution early for the reader, and the rest of that substitution is not read.
+- A command inside `$(…)` or backticks is read as a command of its own when the substitution stands unquoted, in double quotes, on a heredoc opener line or in an unquoted heredoc body, except as the next lines of this list say. A `case` pattern's `)` ends a substitution early for the reader, and the rest of that substitution is not read.
 - Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
 - An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.

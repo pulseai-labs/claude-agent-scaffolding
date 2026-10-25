@@ -15,6 +15,9 @@ const GIT_ALLOWED = new Set(['add', 'commit'])
 // (`-` or no operand; a heredoc is stdin), date, printf and echo. A command word reached by a
 // relative path may be any local program, and a span nested too deep is never allowed.
 const INNER_OK = new Set(['date', 'printf', 'echo'])
+// `date -f FILE` prints the file's lines, so date refuses it in each spelling the reader sees:
+// `-f x`, `-fx`, `-uf x` and `--file`, `--file=x` or a prefix such as `--fi=x` (Ruling 17).
+const DATE_READS = /^(?:--f(?:i(?:le?)?)?(?:=|$)|-[^-dIrs]*f)/
 
 function innerOk(substitution: string): boolean {
   if (substitution === SUBSTITUTION_TOO_DEEP) return false
@@ -22,6 +25,7 @@ function innerOk(substitution: string): boolean {
     if (command === undefined || command.local) return false
     if (command.name === 'git') return command.sub !== undefined && GIT_ALLOWED.has(command.sub)
     if (command.name === 'cat') return !command.input && command.args.every(arg => arg === '-')
+    if (command.name === 'date') return !command.plain.some(arg => DATE_READS.test(arg))
     return INNER_OK.has(command.name)
   })
 }

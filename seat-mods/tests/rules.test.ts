@@ -1,6 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText } from '../hooks/rules'
-import * as rules from '../hooks/rules'
+import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText, substitutionsOf, SUBSTITUTION_TOO_DEEP } from '../hooks/rules'
 
 describe('parseRole', () => {
   test('unset and empty default to the guarded implementer', () => {
@@ -1002,12 +1001,8 @@ describe('batch 5: an opener line holding a substitution reads as in 0.9.0', () 
 })
 
 // Batch 5, C1 (#724 A1, A2): a `$(…)` or backtick span is a command of its own, read wherever
-// Bash runs it (unquoted, in double quotes, in an unquoted heredoc body) and nowhere else. The
-// new exports are read through a lookup so this file still loads on a tree without them.
+// Bash runs it (unquoted, in double quotes, in an unquoted heredoc body) and nowhere else.
 describe('batch 5: substitutions', () => {
-  const reader = rules as unknown as { substitutionsOf?: (command: string) => string[]; SUBSTITUTION_TOO_DEEP?: string }
-  const substitutionsOf = (command: string) => reader.substitutionsOf?.(command)
-  const SUBSTITUTION_TOO_DEEP = reader.SUBSTITUTION_TOO_DEEP
   const RULED = 'git push --force origin main'
   const nest = (n: number, inner: string) => 'echo ' + '$('.repeat(n) + inner + ')'.repeat(n)
   test('substitutionsOf: the command text of each span Bash runs', () => {
@@ -1127,6 +1122,31 @@ describe('batch 5: substitutions', () => {
     // an inner string is text, as in Bash; a command beside it in the span is still read
     expect(bashRules(`git commit -m "$(echo "a; ${RULED}")"`)).toEqual(['commit'])
     expect(bashRules(`git commit -m "$(echo "a"; ${RULED})"`)).toContain('force-push')
+  })
+  test('a span holding a heredoc is sliced from the command in Bash\'s order (Task 3 review C1)', () => {
+    // the opener line's text stays before the body, so the next reading still runs it
+    expect(substitutionsOf(`echo \`cat <<'EOF' ; ${RULED}\nbody\nEOF\n\``)).toEqual([`cat <<'EOF' ; ${RULED}\nbody\nEOF\n`])
+    for (const open of ['echo `', 'x=`', 'echo $(echo `']) {
+      const close = open.endsWith('`') ? (open.includes('$(') ? '`)' : '`') : ')'
+      expect(bashRules(`${open}cat <<'EOF' ; ${RULED}\nbody\nEOF\n${close}`)).toContain('force-push')
+      expect(bashRules(`${open}cat <<EOF | ${RULED}\nbody\nEOF\n${close}`)).toContain('force-push')
+      // control: the body is text
+      expect(bashRules(`${open}cat <<'EOF'\n${RULED}\nEOF\n${close}`)).toEqual([])
+    }
+    expect(rmTargets('x=`cat <<EOF && rm -rf /etc/x\nbody\nEOF\n`')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('echo `cat <<EOF ; git commit -n -m x\nbody\nEOF\n`')).toContain('no-verify')
+    // two openers on the line: both bodies follow it, in order
+    expect(substitutionsOf(`echo \`cat <<A <<'B' ; ${RULED}\na\nA\nb\nB\n\``)).toEqual([`cat <<A <<'B' ; ${RULED}\na\nA\nb\nB\n`])
+    expect(bashRules(`echo \`cat <<A <<'B' ; ${RULED}\na\nA\nb\nB\n\``)).toContain('force-push')
+    // control
+    expect(rmTargets("x=`cat <<'EOF'\nrm -rf /etc/x\nEOF\n`")).toEqual([])
+    // a heredoc inside a span is read with the span, once, at the next level
+    expect(substitutionsOf('echo "$(cat <<EOF\n$(date)\nEOF\n)"')).toEqual(['cat <<EOF\n$(date)\nEOF\n', 'date'])
+    // the delimiter word is not command text, even on a line read in the 0.9.0 layout
+    expect(bashRules(`cat <<"$(${RULED})" "$(date)"\nbody\n$(${RULED})`)).toEqual([])
+    // every shell's grammar runs the command after the second `;` here; Bash 5.3.9 alone drops
+    // that `;` (zsh, dash and busybox sh run it), and a rail that adds stops reads it
+    expect(bashRules(`echo "$(cat <<EOF ; echo x ; ${RULED}\nbody\nEOF\n)"`)).toContain('force-push')
   })
   test('C5 row 724-A12: a backtick inside ${…} no longer ends the expansion early (Ruling 15)', () => {
     // Bash: the `}` in the backticks does not close `${`, so the & is in the word and no git runs
