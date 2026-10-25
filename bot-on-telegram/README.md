@@ -106,6 +106,10 @@ Only one `serve` runs at a time; a second exits with code 3.
 - Merge appears only when the unit has a PR and the ossify-spine `review.md` head line says which
   commit was reviewed.
 - Delivery is at least once: a crash between a send and the spool delete sends that one notice again.
+- A notice is not sent again when its bookkeeping fails after Telegram took it (`open-actions.jsonl`
+  or `buttons.jsonl` cannot be written): one stderr line names it. Without the
+  buttons' record a press does not spend that message's other buttons; an action with no record
+  never settles.
 - A notice Telegram rejects permanently (a 4xx other than 401, 403, 404 and 429) is set aside in
   `spool-failed/`; a wrong `chat_id` (400 "chat not found") sets every notice aside there. A 400 on a
   notice with buttons is first retried once without them.

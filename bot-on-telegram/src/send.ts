@@ -35,12 +35,23 @@ export async function drainSpool(
         keyboard = undefined;
         msg = await api.call<{ message_id: number }>("sendMessage", body);
       }
+      // Telegram has the message: from here the spool item always goes, or the next drain sends it
+      // again and every later notice waits behind it. The bookkeeping is best-effort.
+      const messageId = msg.message_id;
+      const bestEffort = (what: string, f: () => void) => {
+        try {
+          f();
+        } catch (e) {
+          console.error(`bot-on-telegram: sent notice ${item.key} but could not record its ${what}: ${(e as Error).message}`);
+        }
+      };
       if (keyboard) {
         const ids = keyboard.inline_keyboard.flat().flatMap((b) => ("callback_data" in b ? [b.callback_data] : []));
-        setMessageId(ids, msg.message_id);
+        bestEffort("buttons", () => setMessageId(ids, messageId));
       }
       if (notice.kind === "unit-park") {
-        recordOpen({ message_id: msg.message_id, run: notice.run, unit: notice.unit, park_at: notice.at, text });
+        bestEffort("action", () =>
+          recordOpen({ message_id: messageId, run: notice.run, unit: notice.unit, park_at: notice.at, text }));
       }
       removeSpool(path);
       sent++;

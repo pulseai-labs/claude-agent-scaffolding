@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { idsOnMessage } from "../src/buttons.ts";
@@ -221,4 +221,23 @@ test("a run-done summary that fits is sent unchanged", async () => {
   spoolNotice("r1/done", msg);
   await drainSpool(api(), 42, now);
   expect(fake.calls[0]!.body.text).toBe(msg);
+});
+
+test("a record that cannot be written after a delivered send: the notice is not sent again, the next one is", async () => {
+  mkdirSync(join(dir, "open-actions.jsonl")); // appendFileSync now fails (EISDIR)
+  const errors: string[] = [];
+  const spy = spyOn(console, "error").mockImplementation((...a: unknown[]) => { errors.push(a.join(" ")); });
+  try {
+    const p1 = spoolNotice("r1/u1/park/2026-10-23T11:00:00Z", "parked");
+    const p2 = spoolNotice("plain-2", "second");
+    expect(await drainSpool(api(), 42, now)).toEqual({ sent: 2, failed: 0 });
+    expect(await drainSpool(api(), 42, now)).toEqual({ sent: 0, failed: 0 });
+    const sends = fake.calls.filter((c) => c.method === "sendMessage").map((c) => c.body.text);
+    expect(sends).toEqual(["🔴 ACTION — parked", "🔴 ACTION — second"]);
+    expect(existsSync(p1) || existsSync(p2)).toBe(false);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("r1/u1/park/2026-10-23T11:00:00Z");
+  } finally {
+    spy.mockRestore();
+  }
 });
