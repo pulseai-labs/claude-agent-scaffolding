@@ -733,6 +733,9 @@ describe('batch 5: command word', () => {
     // Every member of the dropped class, and a word that starts like a reserved word (`\do`).
     expect(commitMessageFiles('git commit -F \\/w\\/m\\_\\1\\.\\-\\a\\Z')).toEqual(['/w/m_1.-aZ'])
     expect(commitMessageFiles('git commit -F /w/\\dos\\fi.txt')).toEqual(['/w/dosfi.txt'])
+    // A reserved word at the very end of the command is still not unescaped (the value keeps
+    // its backslash, as every kept escape does; it shows the word was not read as syntax).
+    expect(commitMessageFiles('git commit -F \\do')).toEqual(['\\do'])
     // control: a character outside the class keeps its escape, which the path then carries
     expect(commitMessageFiles('git commit -F /w/m\\*')).toEqual(['/w/m\\*'])
   })

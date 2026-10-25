@@ -73,11 +73,9 @@ describe('shared shell reader pins (#702 item 4)', () => {
     expect(gitSubcommands(heredoc)).toEqual(['add'])
     expect(bash(heredoc)).toBe(true)
   })
-  test('path-qualified wrapper is not the bare wrapper: it may be any local program (batch 5 B7)', () => {
-    // Until batch 5 these two rows read ['add'] and true: the shared reader skipped the
-    // wrapper by its basename. molt now refuses a wrapper reached by a path.
-    expect(gitSubcommands('/usr/bin/env git add h.md')).toEqual([undefined])
-    expect(bash('/usr/bin/env git add h.md')).toBe(false)
+  test('path-qualified wrapper matches bare wrapper beside a non-git command', () => {
+    expect(gitSubcommands('/usr/bin/env git add h.md')).toEqual(['add'])
+    expect(bash('/usr/bin/env git add h.md')).toBe(true)
     expect(gitSubcommands('env git add h.md')).toEqual(['add'])
     expect(bash('env git add h.md')).toBe(true)
     expect(gitSubcommands('/usr/bin/env cat huge.log')).toEqual([undefined])
@@ -228,18 +226,23 @@ describe('batch 5: command word', () => {
     expect(bash('git add f; \\fi')).toBe(false)
     expect(bash('if git add f; then git commit -m m; fi')).toBe(true)
   })
-  test('a wrapper reached by a path may be any local program: not git', () => {
+  test('a wrapper reached by a relative path may be any local program: not git', () => {
     expect(bash('./env git add f')).toBe(false)
     expect(gitSubcommands('./env git add f')).toEqual([undefined])
+    expect(bash('bin/env git add f')).toBe(false)
+    expect(gitSubcommands('bin/env git add f')).toEqual([undefined])
     expect(gitSubcommands('FOO=1 ./sudo git commit -m m')).toEqual([undefined])
     expect(walked.gitSubcommandsThatRun?.('./env git commit -m m')).toEqual([undefined])
     expect(isProgress('Bash', { command: './env git commit -m m' })).toBe(false)
     // the path counts wherever it stands among the wrappers
     expect(gitSubcommands('./env env git add f')).toEqual([undefined])
     expect(gitSubcommands('env ./env git add f')).toEqual([undefined])
-    // controls: the bare wrapper, a slash in an assignment, and a path-qualified git itself, still read as git
+    // controls: the bare wrapper, an absolute path to it, a slash in an assignment, and a
+    // path-qualified git itself, still read as git
     expect(gitSubcommands('FOO=./x env git add f')).toEqual(['add'])
     expect(bash('env git add f')).toBe(true)
+    expect(gitSubcommands('/usr/bin/env git add f')).toEqual(['add'])
+    expect(walked.gitSubcommandsThatRun?.('/usr/bin/env git commit -m m')).toEqual(['commit'])
     expect(gitSubcommands('/usr/bin/git add f')).toEqual(['add'])
     expect(walked.gitSubcommandsThatRun?.('env git commit -m m')).toEqual(['commit'])
     expect(isProgress('Bash', { command: 'env git commit -m m' })).toBe(true)
@@ -253,6 +256,13 @@ describe('batch 5: command word', () => {
     expect(bash('{log}>/tmp/f cat huge.log')).toBe(false)
     expect(bash('> /tmp/f cat huge.log')).toBe(false)
     expect(bash('{log}>/tmp/f git push origin main')).toBe(false)
+  })
+  test('a segment of only a redirection names no command; one that names a command is still judged', () => {
+    expect(bash('git add f; > out')).toBe(true)
+    expect(gitSubcommands('git add f; > out')).toEqual(['add'])
+    // control
+    expect(bash('git add f; cat out')).toBe(false)
+    expect(bash('git add f; > out cat out')).toBe(false)
   })
   test('a redirection glued to the subcommand is cut off it', () => {
     expect(bash('git add f 2>&1')).toBe(true)

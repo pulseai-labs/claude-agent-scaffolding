@@ -179,8 +179,9 @@ function expand(text: string, pieces: readonly string[], seen: readonly string[]
 
 // The command word and its arguments: leading VAR=value assignments and wrapper
 // words are skipped, and a path such as /usr/bin/git names git. `viaPath` says a skipped
-// wrapper carried a `/`: `./env` may be any local program (#702 B7), so a reader that
-// approves must not take it for the system one.
+// wrapper was named by a relative path (`./env`, `bin/env`): that may be any local program
+// (#702 B7), so a reader that approves must not take it for the system one. An absolute
+// path (`/usr/bin/env`) reads as the bare word.
 function commandOf(tokens: readonly string[]): { name: string; args: string[]; viaPath: boolean } | undefined {
   let i = 0
   let viaPath = false
@@ -188,7 +189,7 @@ function commandOf(tokens: readonly string[]): { name: string; args: string[]; v
     const token = tokens[i]
     if (token === undefined) return undefined
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) i += 1
-    else if (WRAPPERS.has(token.replace(/^.*\//, ''))) { viaPath = viaPath || token.includes('/'); i += 1 }
+    else if (WRAPPERS.has(token.replace(/^.*\//, ''))) { viaPath = viaPath || (token.includes('/') && !token.startsWith('/')); i += 1 }
     else return { name: token.replace(/^.*\//, ''), args: tokens.slice(i + 1), viaPath }
   }
 }
