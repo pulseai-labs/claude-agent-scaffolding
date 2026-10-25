@@ -370,3 +370,77 @@ test("report counts events by kind", async () => {
   );
   expect((await runIn(st, "report", "nope")).rc).toBe(2);
 });
+
+// ---- unparkUnit: stop file consumed, driver dropped -------------------------------------
+
+import { liveClaim, writeClaim } from "../src/claims.ts";
+
+async function parkedAtWork(reason: string) {
+  const st = await armedWithParkedUnit();
+  const run = runJson(st, "r1");
+  run.units.planner.stage = "work";
+  run.units.planner.parked = { reason, at: "t" };
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  const stop = join(st, "runs", "r1", "stop", "planner");
+  mkdirSync(join(st, "runs", "r1", "stop"), { recursive: true });
+  writeFileSync(stop, "halt now\n");
+  return { st, stop };
+}
+
+test("unpark consumes a stop file", async () => {
+  const { st, stop } = await parkedAtWork("stop");
+  expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+  expect(existsSync(stop)).toBe(false);
+  const ev = readFileSync(join(st, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  const consumed = ev[ev.length - 1].consumed as string;
+  expect(consumed).toMatch(new RegExp(`^${stop.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\.consumed-\\d{4}-`));
+  expect(readFileSync(consumed, "utf8")).toBe("halt now\n");
+});
+
+test("unpark --to consumes the stop file of the stage it parked in", async () => {
+  const { st, stop } = await parkedAtWork("stop");
+  expect((await runIn(st, "unpark", "r1", "planner", "--to", "planner")).rc).toBe(0);
+  expect(existsSync(stop)).toBe(false);
+  expect(runJson(st, "r1").units.planner.stage).toBe("planner");
+});
+
+test("unpark of a non-stop park leaves the stop path alone", async () => {
+  const { st, stop } = await parkedAtWork("cap");
+  expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+  expect(existsSync(stop)).toBe(true);
+  const ev = readFileSync(join(st, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
+  expect(ev[ev.length - 1].consumed).toBeUndefined();
+});
+
+test("unpark drops a running driver", async () => {
+  const st = await armedWithParkedUnit();
+  const cwd = mkdtempSync(join(tmpdir(), "baton-drv-cwd-"));
+  const prev = process.env.BATON_STATE_DIR;
+  process.env.BATON_STATE_DIR = st;
+  let key: string;
+  try {
+    key = writeClaim(cwd, {}, "r1/planner/driver/1");
+    expect(liveClaim(key)).toBe("r1/planner/driver/1");
+    const run = runJson(st, "r1");
+    run.units.planner.driver = {
+      key: "planner/stalled",
+      session: { nonce: "r1/planner/driver/1", claim_nonce: "r1/planner/driver/1", claim_key: key, launch_dir: cwd, launched_at: "t", last_progress_at: "t", progress_mark: "" },
+    };
+    writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+    expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+    expect(runJson(st, "r1").units.planner.driver).toBeUndefined();
+    expect(liveClaim(key)).toBeNull();
+  } finally {
+    if (prev === undefined) delete process.env.BATON_STATE_DIR;
+    else process.env.BATON_STATE_DIR = prev;
+  }
+});
+
+test("unpark keeps drivers", async () => {
+  const st = await armedWithParkedUnit();
+  const run = runJson(st, "r1");
+  run.units.planner.drivers = ["land/outcome"];
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
+  expect(runJson(st, "r1").units.planner.drivers).toEqual(["land/outcome"]);
+});

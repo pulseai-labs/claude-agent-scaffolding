@@ -5,7 +5,7 @@
 // session waiting on a pending request: wait, triage it once, act on the triage's result.
 
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claims.ts";
 import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
@@ -86,6 +86,44 @@ export function unitScope(run: RunState, u: UnitState, extra: Partial<Scope> = {
     attempt: own(u.launches, u.stage) ?? 0,
     ...extra,
   };
+}
+
+/** Unpark `u` in place (`to` undefined) or into stage `to`. A `stop` park's stop file is renamed
+ *  to `<path>.consumed-<nowIso>`. A live driver's claim is removed and `u.driver` deleted.
+ *  Returns the stage the unit is now in and the consumed path, if any. Caller holds the lock and saves. */
+export function unparkUnit(run: RunState, recipe: Recipe, u: UnitState, to: string | undefined, nowIso: string):
+  { stage: string; consumed?: string } {
+  let consumed: string | undefined;
+  if (u.parked?.reason === "stop") {
+    // Rendered before any stage move: the park stage's stop_file is the one that blocks.
+    const stage = own(recipe.stages, u.stage);
+    if (stage?.kind === "session" && stage.stop_file !== undefined) {
+      try {
+        const path = render(stage.stop_file, unitScope(run, u));
+        if (existsSync(path)) {
+          consumed = `${path}.consumed-${nowIso}`;
+          renameSync(path, consumed);
+        }
+      } catch {
+        consumed = undefined; // a path that cannot render or move: the park still ends
+      }
+    }
+  }
+  if (u.driver) {
+    removeClaim(u.driver.session.claim_key, u.driver.session.claim_nonce);
+    delete u.driver;
+  }
+  delete u.parked;
+  if (to !== undefined) {
+    enterStage(u, to, triageNote(run, recipe, u)); // the same stage entry an outcome's move makes
+  } else {
+    // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
+    u.stalls = 0;
+    delete u.merge_failures;
+    delete u.forge_failures;
+    u.launches[u.stage] = 0;
+  }
+  return consumed === undefined ? { stage: u.stage } : { stage: u.stage, consumed };
 }
 
 /** The unit's rendered triage note path; undefined with no triage stage or a path that cannot render. */

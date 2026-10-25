@@ -2,14 +2,14 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
-import { exitCode, tick, triageNote } from "./engine.ts";
+import { exitCode, tick, unparkUnit } from "./engine.ts";
 import { GhForge } from "./forge.ts";
 import { HostAuthError, HostDownError } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
 import { loadT3Config, T3Host } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
-import { enterStage, openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
+import { openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
 import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
@@ -249,23 +249,16 @@ async function unparkCmd(args: string[]): Promise<number> {
     // running: moving or resetting it here would leave that session bound to state it was not
     // launched in. A parked unit is never refused, whatever its record holds.
     if (unit.session && !unit.parked) return fail(`unit ${unitId} is running (live session) and not parked; nothing to unpark`);
-    let recipe: Recipe | undefined;
-    if (to !== undefined) {
+    let recipe: Recipe;
+    try {
       recipe = loadRecipe(run.dir);
-      if (!Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
+    } catch {
+      return fail(`no readable recipe for run ${runId}`);
     }
-    delete unit.parked;
-    if (to !== undefined) {
-      enterStage(unit, to, triageNote(run, recipe!, unit)); // the same stage entry an outcome's move makes
-    } else {
-      // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
-      unit.stalls = 0;
-      delete unit.merge_failures;
-      delete unit.forge_failures;
-      unit.launches[unit.stage] = 0;
-    }
+    if (to !== undefined && !Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
+    const { stage, consumed } = unparkUnit(run, recipe, unit, to, new Date().toISOString());
     store.writeRun(run);
-    store.event(runId!, { kind: "unpark", unit: unitId, stage: unit.stage });
+    store.event(runId!, { kind: "unpark", unit: unitId, stage, ...(consumed !== undefined ? { consumed } : {}) });
     return 0;
   });
 }

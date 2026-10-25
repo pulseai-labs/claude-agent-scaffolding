@@ -39,7 +39,11 @@ export type UnitState = {
   seq?: Record<string, number>;
   stalls: number;
   session?: Session;
-  parked?: { reason: string; at: string };
+  parked?: { reason: string; at: string; escalated?: true };
+  /** The live driver for the current park. `lost`: step 0 found no thread for its nonce. */
+  driver?: { key: string; session: Session; lost?: true };
+  /** Guard keys `<stage>/<reason>` a driver resumed; per run, never reset by enterStage. */
+  drivers?: string[];
   quiet_since?: string;
   /** The claim nonce last reported holding this unit's cwd, so `cwd busy` is logged once. */
   cwd_busy?: string;
