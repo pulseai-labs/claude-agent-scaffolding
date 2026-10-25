@@ -367,6 +367,28 @@ export function parseAllow(value: string | undefined): string[] {
     .filter(dir => dir.startsWith('/'))
 }
 
+// The scratch places every guarded seat may write beside the SEAT_MODS_ALLOW directories: /tmp, and $TMPDIR when it is an
+// absolute directory below the root (a relative one, and `/`, name no scratch place; `/` would put every path inside). A
+// seat may write and remove what lies below them; removalOf still protects each one's own path and its ancestors.
+export function scratchDirs(tmpdir: string | undefined): string[] {
+  const own = (tmpdir ?? '').replace(/\/+$/, '')
+  return own.startsWith('/') && own !== '/tmp' ? ['/tmp', own] : ['/tmp']
+}
+
+// What both glues append to the SEAT_MODS_ALLOW list: each scratch directory as given and as its realpath resolved it
+// (macOS: /tmp is a link to /private/tmp, so a target is inside by either spelling). A directory that does not resolve adds
+// nothing. Neither does one that holds the worktree: placeOf lets an allow directory outrank the worktree, so /tmp would
+// hand a reviewer the worktree of a seat whose tree lives under /tmp. That seat keeps the refusals it has today.
+export function scratchAllow(scratch: readonly string[], resolved: readonly (string | undefined)[], root: string | undefined): string[] {
+  const kept = scratch.flatMap((dir, i) => {
+    const real = resolved[i]
+    if (real === undefined) return []
+    const holdsRoot = root !== undefined && (root === real || root.startsWith(real.replace(/\/$/, '') + '/'))
+    return holdsRoot ? [] : [dir, real]
+  })
+  return [...new Set(kept)]
+}
+
 // A segment's words, less its redirections: a word that is one (`2>&1`, `{fd}>f`, `&>f`)
 // is dropped, with the next word when the operator ends its word (`> f`), and a redirection
 // glued to a word (`--force>&2`) is cut off it (#724 A10, #702 B2).

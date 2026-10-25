@@ -9,7 +9,7 @@ import { STATUS_CONTEXT, STATUS_WARNING, rewriteReason, IDLE_REASON, IDLE_WARNIN
 // call that reaches it answers `ran`; a denied call resolves with { deny }
 // carrying the deny text. A mocked call answers { value }, or { deny } for a
 // missing path, as the kit requires.
-const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports', '/reports/sub', '/w/build', '/w/seat-mods/sub', '/w/seat-mods/build', '/tmp', '/home', '/home/seat', '/home/u', '/home/u/scratch'])
+const DIRS = new Set(['/', '/w', '/w/seat-mods', '/w/seat x', '/etc', '/var', '/reports', '/reports/sub', '/w/build', '/w/seat-mods/sub', '/w/seat-mods/build', '/tmp', '/tmp/wt', '/private', '/private/tmp', '/private/tmp/wt', '/home', '/home/seat', '/home/u', '/home/u/scratch'])
 // A dangling symbolic link: it exists, but resolving it fails.
 const LINKS = new Set(['/w/link'])
 const FILES = new Map<string, string>([
@@ -34,7 +34,7 @@ function normal(path: string): string | undefined {
 
 // Extra files and a bell for the #873 tests: the autonomic record's text under its path,
 // the session id the record is keyed by, and the exit a bell command answers with.
-type WorldExtra = { files?: Record<string, string>; sessionId?: string; bellExit?: number }
+type WorldExtra = { files?: Record<string, string>; sessionId?: string; bellExit?: number; links?: Record<string, string> }
 
 function world(on: On, env: Record<string, string>, gitRepo = true, cwd = '/w/seat-mods', cwdFailure = false, extra: WorldExtra = {}) {
   const runs: string[][] = []
@@ -59,7 +59,7 @@ function world(on: On, env: Record<string, string>, gitRepo = true, cwd = '/w/se
   })
   on('fs.stat', (_$, e) => {
     let path = normal(e.path)
-    const targets: Record<string, string> = { '/w/outside': '/var', '/w/inside': '/w/build', '/var/inside': '/w/build' }
+    const targets: Record<string, string> = { '/w/outside': '/var', '/w/inside': '/w/build', '/var/inside': '/w/build', ...extra.links }
     const link = Object.keys(targets).find(link => path === link || path?.startsWith(link + '/'))
     if (link !== undefined && path === link && !e.resolve)
       return { value: { kind: 'other', size: 0, mtimeMs: 0, isLink: true } } as never
@@ -237,9 +237,9 @@ describe('rm placement: R1-R7', () => {
       ['quoted backticks', 'rm -f "`printf /reports/x`"', `rm -f ${inside}/literal`],
       ['named home', 'rm -f ~root/x', `rm -f ${inside}/~root`],
       ['home outside', 'rm -f ~/x', `rm -f ${inside}/x`],
-      ['tmp glob incident', 'rm -f /tmp/tmp.*', `rm -f ${inside}/*.o`],
-      ['question glob', 'rm -f /tmp/tmp.?', `rm -f ${inside}/x?.o`],
-      ['bracket glob', 'rm -f /tmp/tmp.[ab]', `rm -f ${inside}/x[ab].o`],
+      ['outside glob incident', 'rm -f /var/tmp.*', `rm -f ${inside}/*.o`],
+      ['question glob', 'rm -f /var/tmp.?', `rm -f ${inside}/x?.o`],
+      ['bracket glob', 'rm -f /var/tmp.[ab]', `rm -f ${inside}/x[ab].o`],
       ['glob in directory', 'rm -rf /w*/build', `rm -f ${inside}/b*/*.o`],
       ['worktree root', 'rm -rf /w', `rm -rf ${inside}/child`],
       ['allow root', 'rm -rf /reports', 'rm -f /reports/x.log'],
@@ -316,7 +316,7 @@ describe('rm placement: R1-R7', () => {
   test('subagent-shaped event is guarded by its Bash tool', async ($, on) => {
     world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports' })
     const extra = { agent_id: 'general-purpose-child', parent_tool_use_id: 'Agent-call' }
-    expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /tmp/tmp.*', ...extra })).deny).toBeDefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /var/tmp.*', ...extra })).deny).toBeDefined()
     expect((await $.tool.call({ tool: 'Bash', command: 'rm -f /reports/x.log', ...extra })).deny).toBeUndefined()
   })
   for (const role of ['orchestrator', 'coordinator']) {
@@ -326,6 +326,96 @@ describe('rm placement: R1-R7', () => {
         expect((await $.tool.call({ tool: 'Bash', command })).deny).toBeUndefined()
     })
   }
+})
+
+// Batch 5, Task 4: /tmp and $TMPDIR are writable places for the guarded roles (real baton workers hit six false stops
+// on scratch files). A worker may write and remove DESCENDANTS of them; the directory itself and its ancestors stay
+// protected from rm, and a path outside every allowed place stays refused. The accepted cost: a worker can remove
+// another session's file in /tmp.
+describe('scratch directories: /tmp and $TMPDIR (batch 5)', () => {
+  const writeDeny = async ($: any, file_path: string) => ($.tool.call({ tool: 'Write', file_path, content: 'x' })).then((r: any) => r.deny)
+  const bashDeny = async ($: any, command: string) => ($.tool.call({ tool: 'Bash', command })).then((r: any) => r.deny)
+  for (const role of ['implementer', 'verifier', 'reviewer'] as const) {
+    test(`${role}: Write and Edit inside /tmp pass; a write outside every allowed place is still refused`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: role })
+      for (const path of ['/tmp/r3s2w3-redgate.sh', '/tmp/x', '/tmp/new/dir/y']) expect(await writeDeny($, path)).toBeUndefined()
+      expect((await $.tool.call({ tool: 'Edit', file_path: '/tmp/x', old_string: 'a', new_string: 'b' })).deny).toBeUndefined()
+      // adjacent controls: a path outside, a sibling that shares the prefix, another folder named tmp, and a .. out of /tmp
+      for (const path of ['/etc/x', '/tmpfoo/x', '/var/tmp/x', '/tmp/../etc/x', '/tmp/../x'])
+        expect(await writeDeny($, path)).toContain('no writes outside')
+    })
+    test(`${role}: rm of /tmp descendants passes; /tmp itself and its ancestors are refused (Review Focus 3)`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: role })
+      // rm /tmp/* is the accepted cost: one session can remove another's scratch files
+      for (const command of ['rm /tmp/status.py.bak', 'rm -f /tmp/r3s2w3-redgate.sh', 'rm -rf /tmp/x/y', 'rm -rf /tmp/*', 'rm -f /tmp/tmp.*'])
+        expect(await bashDeny($, command)).toBeUndefined()
+      for (const command of ['rm -rf /tmp', 'rm -rf /tmp/', 'rm -rf /tmp//', 'rm -rf /tmp/.', 'rm -rf /', 'rm -rf /*'])
+        expect(await bashDeny($, command)).toContain('roots or ancestors')
+      // adjacent controls: outside, a shared prefix, another folder named tmp, a .. out of /tmp, and one operand in a mixed list
+      for (const command of ['rm /etc/x', 'rm /tmpfoo/x', 'rm -rf /var/tmp/x', 'rm /tmp/../etc/x', 'rm /tmp/x /etc/x'])
+        expect(await bashDeny($, command)).toContain('no rm outside')
+    })
+    test(`${role}: $TMPDIR is a scratch place too, beside /tmp`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: role, TMPDIR: '/home/u/scratch/' })
+      for (const path of ['/home/u/scratch/f', '/home/u/scratch/new/g', '/tmp/f']) expect(await writeDeny($, path)).toBeUndefined()
+      for (const command of ['rm /home/u/scratch/f', 'rm -rf /home/u/scratch/*', 'rm /tmp/f']) expect(await bashDeny($, command)).toBeUndefined()
+      // its own path and its ancestors are protected like /tmp's
+      for (const command of ['rm -rf /home/u/scratch', 'rm -rf /home/u/scratch/', 'rm -rf /home/u', 'rm -rf /home'])
+        expect(await bashDeny($, command)).toContain('roots or ancestors')
+      // adjacent controls: its sibling and another home
+      for (const path of ['/home/u/other', '/home/seat/x', '/etc/x']) expect(await writeDeny($, path)).toContain('no writes outside')
+      expect(await bashDeny($, 'rm /home/u/other')).toContain('no rm outside')
+    })
+    // a TMPDIR that names no directory below the root opens nothing: `/` would put every absolute path inside
+    for (const TMPDIR of ['/', '//', 'scratch', '']) {
+      test(`${role}: TMPDIR=${JSON.stringify(TMPDIR)} opens nothing beyond /tmp`, async ($, on) => {
+        world(on, { SEAT_MODS_ROLE: role, TMPDIR })
+        for (const path of ['/etc/x', '/scratch/x', '/var/x']) expect(await writeDeny($, path)).toContain('no writes outside')
+        for (const command of ['rm /etc/x', 'rm /scratch/x']) expect(await bashDeny($, command)).toContain('no rm outside')
+        expect(await writeDeny($, '/tmp/x')).toBeUndefined()
+      })
+    }
+  }
+  test('a symlinked /tmp (macOS: /tmp -> /private/tmp): the resolved path and the given one are both inside (Review Focus 4)', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' }, true, '/w/seat-mods', false, { links: { '/tmp': '/private/tmp' } })
+    for (const path of ['/private/tmp/x', '/tmp/x', '/private/tmp/new/y']) expect(await writeDeny($, path)).toBeUndefined()
+    for (const command of ['rm /private/tmp/x', 'rm /tmp/x', 'rm -rf /private/tmp/*', 'rm -rf /tmp/*']) expect(await bashDeny($, command)).toBeUndefined()
+    // the link, its target and the target's parent are the directory's own path and its ancestor: protected
+    for (const command of ['rm -rf /private/tmp', 'rm -rf /private/tmp/', 'rm -rf /tmp', 'rm -rf /tmp/', 'rm -rf /private'])
+      expect(await bashDeny($, command)).toContain('roots or ancestors')
+    // adjacent controls: a sibling under /private, and a path outside
+    for (const path of ['/private/etc/x', '/etc/x']) expect(await writeDeny($, path)).toContain('no writes outside')
+    expect(await bashDeny($, 'rm /private/etc/x')).toContain('no rm outside')
+    // the deny names both spellings, so the worker sees where its scratch files may go
+    expect(await writeDeny($, '/etc/x')).toContain('go in /tmp, /private/tmp.')
+  })
+  test('the deny names the scratch places after the SEAT_MODS_ALLOW ones, each once', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports:/tmp', TMPDIR: '/home/u/scratch' })
+    expect(await writeDeny($, '/etc/x')).toContain('go in /reports, /tmp, /home/u/scratch.')
+  })
+  // placeOf lets an allow directory outrank the worktree, so a /tmp that held the worktree would hand a reviewer its edits
+  for (const link of [false, true]) {
+    const extra = link ? { links: { '/tmp': '/private/tmp' } } : {}
+    test(`a worktree under /tmp${link ? ' (a link to /private/tmp)' : ''}: /tmp adds no place, so the reviewer still cannot edit it`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: 'reviewer' }, false, '/tmp/wt', false, extra)
+      expect(await writeDeny($, '/tmp/wt/a.ts')).toContain('no edits in the worktree')
+      expect(await bashDeny($, 'rm /tmp/wt/a.ts')).toContain('no rm outside')
+      // the seat keeps today's refusals for the rest of /tmp
+      expect(await writeDeny($, '/tmp/other')).toContain('no writes outside')
+      expect(await bashDeny($, 'rm /tmp/other')).toContain('no rm outside')
+    })
+    test(`a worktree under /tmp${link ? ' (a link to /private/tmp)' : ''}: the implementer edits it as ever, and /tmp adds no place`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: 'implementer' }, false, '/tmp/wt', false, extra)
+      expect(await writeDeny($, '/tmp/wt/a.ts')).toBeUndefined()
+      expect(await bashDeny($, 'rm /tmp/wt/a.ts')).toBeUndefined()
+      expect(await writeDeny($, '/tmp/other')).toContain('no writes outside')
+      expect(await bashDeny($, 'rm -rf /tmp/wt')).toContain('roots or ancestors')
+    })
+  }
+  test('a TMPDIR that does not resolve (a dangling link) is dropped, as given or resolved', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', TMPDIR: '/w/link' })
+    expect(await writeDeny($, '/w/link/x')).toContain('go in /tmp.')
+  })
 })
 
 describe('rm resolution controls', () => {
@@ -735,7 +825,7 @@ describe('deny texts point at the way through (#844)', () => {
     world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
     const deny = (await $.tool.call({ tool: 'Write', file_path: '/var/commit-message.txt', content: 'x' })).deny
     expect(deny).toContain('no writes outside')
-    expect(deny).toContain('go in /reports.')
+    expect(deny).toContain('go in /reports, /tmp.')
   })
 })
 

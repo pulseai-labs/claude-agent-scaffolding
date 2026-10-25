@@ -1,5 +1,5 @@
 import type { EngineInterface, Register } from 'claude-code'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
+import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
 import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, waitingOnOperator, rewriteReason, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, WAITING_NOTICE } from './status'
 import { autonomicPath, parseAutonomic, seatLogPath } from './records'
@@ -96,10 +96,16 @@ async function worktreeOf($: any): Promise<string | undefined> {
   return realOf($, top?.exitCode === 0 ? top.stdout.trim() : cwd)
 }
 
-async function allowOf($: any): Promise<string[]> {
+// The directories a guarded seat may write: SEAT_MODS_ALLOW as each resolves, then /tmp and $TMPDIR (scratchAllow: the
+// scratch ones as given and as resolved, none that holds the worktree `root`).
+async function allowOf($: any, root: string | undefined): Promise<string[]> {
   const dirs = parseAllow(await $.env.get('SEAT_MODS_ALLOW'))
-  const real = await Promise.all(dirs.map(dir => realOf($, dir)))
-  return real.filter((dir): dir is string => dir !== undefined)
+  const scratch = scratchDirs(await $.env.get('TMPDIR'))
+  const [real, scratchReal] = await Promise.all([
+    Promise.all(dirs.map(dir => realOf($, dir))),
+    Promise.all(scratch.map(dir => realOf($, dir))),
+  ])
+  return [...new Set([...real.filter((dir): dir is string => dir !== undefined), ...scratchAllow(scratch, scratchReal, root)])]
 }
 
 // Where the kernel lands a path: each link followed before the `..` after it. The
@@ -161,7 +167,8 @@ export const register: Register = on => {
         const operands = rmTargets(e.command)
         const removals = []
         if (operands.length > 0) {
-          const [cwd, home, root, allow] = await Promise.all([$.session.cwd(), $.env.get('HOME'), worktreeOf($), allowOf($)])
+          const [cwd, home, root] = await Promise.all([$.session.cwd(), $.env.get('HOME'), worktreeOf($)])
+          const allow = await allowOf($, root)
           for (const operand of operands) {
             if (operand.path === undefined) { removals.push(UNREAD); continue }
             const target = await removalPath($, operand.path, cwd, home, operand.glob)
@@ -176,7 +183,8 @@ export const register: Register = on => {
     }
 
     if (e.tool === 'Edit' || e.tool === 'Write') {
-      const [target, root, allow] = await Promise.all([realOf($, e.file_path), worktreeOf($), allowOf($)])
+      const [target, root] = await Promise.all([realOf($, e.file_path), worktreeOf($)])
+      const allow = await allowOf($, root)
       const place = target === undefined || root === undefined ? 'outside' : placeOf(target, root, allow)
       const deny = decide(role, { kind: 'write', place, allow })
       return deny === undefined ? next(e) : { deny }

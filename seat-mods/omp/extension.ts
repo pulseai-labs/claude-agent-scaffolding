@@ -6,7 +6,7 @@ import { spawnSync } from 'node:child_process'
 import { dirname, basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
-  parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide,
+  parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide,
   uncheckedRmText, invalidText, statusText,
 } from '../hooks/rules'
 import type { Place, Role, RoleState, RuleId } from '../hooks/rules'
@@ -217,7 +217,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
       if (op === 'pr_create') rules.push('pr-create')
       else if (op === 'pr_push') rules.push('push')
       // pr_checkout makes a worktree and branch outside this one (default ~/.omp/wt); `force` resets a branch.
-      else if (op === 'pr_checkout') return decide(role, { kind: 'write', place: 'outside', allow: await allowOf(deps) })
+      else if (op === 'pr_checkout') return decide(role, { kind: 'write', place: 'outside', allow: await allowOf(deps, await deps.worktree()) })
       else if (!GITHUB_READS.has(op)) return toolDeny(role, `${label}github ${op}`)
       return rules.length === 0 ? undefined : decide(role, { kind: 'bash', rules })
     }
@@ -256,7 +256,8 @@ async function shellCheck(deps: GuardDeps, role: Role, commands: string[], baseO
       const texts = await Promise.all(messagePaths(files, base as string, deps.env.HOME).map(f => deps.readFile(f).catch(() => '')))
       const removals = []
       for (const operand of rmTargets(command)) {
-        const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
+        const root = await deps.worktree()
+        const allow = await allowOf(deps, root)
         if (operand.path === undefined) { removals.push(UNREAD); continue }
         const target = base === undefined ? undefined : await removalPath(deps, base, operand.path, operand.glob)
         removals.push(removalOf(target, root, allow, operand.glob))
@@ -272,7 +273,8 @@ async function shellCheck(deps: GuardDeps, role: Role, commands: string[], baseO
 
 async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: Record<string, unknown>): Promise<string | undefined> {
   const targets = writeTargets(toolName, input) ?? []
-  const [root, allow] = await Promise.all([deps.worktree(), allowOf(deps)])
+  const root = await deps.worktree()
+  const allow = await allowOf(deps, root)
   if (targets.length === 0) return decide(role, { kind: 'write', place: 'outside', allow })
   for (const raw of targets) {
     // `write xd://resolve` / `xd://reject` confirm or discard a preview an earlier, already-checked ast_edit staged.
@@ -372,9 +374,15 @@ function messagePaths(files: string[], base: string, home: string | undefined): 
   return paths
 }
 
-async function allowOf(deps: GuardDeps): Promise<string[]> {
-  const real = await Promise.all(parseAllow(deps.env.SEAT_MODS_ALLOW).map(d => deps.real(d)))
-  return real.filter((d): d is string => d !== undefined)
+// The directories a guarded seat may write, as register.ts allowOf: SEAT_MODS_ALLOW as each resolves, then /tmp and
+// $TMPDIR from the same env (scratchAllow: the scratch ones as given and as resolved, none that holds the worktree `root`).
+async function allowOf(deps: GuardDeps, root: string | undefined): Promise<string[]> {
+  const scratch = scratchDirs(deps.env.TMPDIR)
+  const [real, scratchReal] = await Promise.all([
+    Promise.all(parseAllow(deps.env.SEAT_MODS_ALLOW).map(d => deps.real(d))),
+    Promise.all(scratch.map(d => deps.real(d))),
+  ])
+  return [...new Set([...real.filter((d): d is string => d !== undefined), ...scratchAllow(scratch, scratchReal, root)])]
 }
 
 // The path itself if it resolves, else its nearest existing ancestor plus the rest (as register.ts realOf).

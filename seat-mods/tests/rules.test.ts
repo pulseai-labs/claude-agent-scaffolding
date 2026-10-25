@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText, substitutionsOf, SUBSTITUTION_TOO_DEEP } from '../hooks/rules'
+import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText, substitutionsOf, SUBSTITUTION_TOO_DEEP } from '../hooks/rules'
 
 describe('parseRole', () => {
   test('unset and empty default to the guarded implementer', () => {
@@ -1153,5 +1153,59 @@ describe('batch 5: substitutions', () => {
     expect(bashRules('printf x ${x:-`echo }` & git push --force }')).toEqual([])
     // control: a lone & outside the expansion still splits
     expect(bashRules('printf x ${x:-`echo }`} & git push --force')).toContain('force-push')
+  })
+})
+
+describe('batch 5: scratch directories', () => {
+  test('scratchDirs: /tmp, plus an absolute TMPDIR below the root, without its trailing slashes', () => {
+    expect(scratchDirs(undefined)).toEqual(['/tmp'])
+    expect(scratchDirs('/var/tmp/x/')).toEqual(['/tmp', '/var/tmp/x'])
+    expect(scratchDirs('/var/tmp/x')).toEqual(['/tmp', '/var/tmp/x'])
+    expect(scratchDirs('/var/tmp/x//')).toEqual(['/tmp', '/var/tmp/x'])
+    // controls: a TMPDIR that names no directory below the root adds nothing (`/` would put every path inside)
+    for (const tmpdir of ['relative', 'rel/dir', '', '/', '//', '///']) expect(scratchDirs(tmpdir)).toEqual(['/tmp'])
+    // /tmp named twice is one place
+    expect(scratchDirs('/tmp')).toEqual(['/tmp'])
+    expect(scratchDirs('/tmp/')).toEqual(['/tmp'])
+  })
+  test('scratchAllow: each scratch directory as given and as resolved, once; one that does not resolve adds nothing', () => {
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/w')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], ['/private/tmp'], '/w')).toEqual(['/tmp', '/private/tmp']) // macOS (Review Focus 4)
+    expect(scratchAllow(['/tmp', '/var/tmp/x'], ['/tmp', '/var/tmp/x'], '/w')).toEqual(['/tmp', '/var/tmp/x'])
+    expect(scratchAllow(['/tmp', '/dangling'], ['/tmp', undefined], '/w')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], [undefined], '/w')).toEqual([])
+    expect(scratchAllow(['/tmp'], ['/tmp'], undefined)).toEqual(['/tmp'])
+  })
+  // placeOf lets an allow directory outrank the worktree, so a scratch directory that holds the worktree would hand a
+  // reviewer its edits: it is left out, as given and as resolved. The worktree beside it, above it or elsewhere keeps it.
+  test('scratchAllow: a scratch directory that holds the worktree is left out', () => {
+    for (const root of ['/tmp/wt', '/tmp', '/tmp/a/b/wt']) expect(scratchAllow(['/tmp'], ['/tmp'], root)).toEqual([])
+    expect(scratchAllow(['/tmp'], ['/private/tmp'], '/private/tmp/wt')).toEqual([])
+    expect(scratchAllow(['/tmp'], ['/private/tmp'], '/private/tmp')).toEqual([])
+    // a resolved '/' (a TMPDIR such as /tmp/.. ) holds every worktree: it can never put everything inside
+    expect(scratchAllow(['/tmp/..'], ['/'], '/w')).toEqual([])
+    // controls: a sibling sharing the prefix, the worktree above the scratch directory, the worktree elsewhere
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/tmpfoo/wt')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/w')).toEqual(['/tmp'])
+    expect(scratchAllow(['/w/tmp'], ['/w/tmp'], '/w')).toEqual(['/w/tmp'])
+    // one directory leaving does not take the other with it
+    expect(scratchAllow(['/tmp', '/home/u/t'], ['/tmp', '/home/u/t'], '/tmp/wt')).toEqual(['/home/u/t'])
+  })
+  // Review Focus 3: the scratch directory is a writable place whose own path and ancestors rm still protects.
+  test('over scratchDirs: descendants are inside; the directory itself, its ancestors and everything else are not', () => {
+    const allow = scratchDirs(undefined)
+    expect(placeOf('/tmp/x', '/w', allow)).toBe('allow')
+    expect(placeOf('/tmp/a/b', '/w', allow)).toBe('allow')
+    expect(placeOf('/etc/x', '/w', allow)).toBe('outside')
+    expect(placeOf('/tmpfoo/x', '/w', allow)).toBe('outside')
+    expect(removalOf('/tmp/x', '/w', allow, false)).toEqual({ place: 'allow', protected: false })
+    expect(removalOf('/tmp', '/w', allow, true)).toEqual({ place: 'allow', protected: false }) // rm /tmp/*: the accepted cost
+    expect(removalOf('/tmp', '/w', allow, false).protected).toBe(true) // rm -rf /tmp
+    expect(removalOf('/', '/w', allow, false).protected).toBe(true) // rm -rf /
+    expect(removalOf('/', '/w', allow, true).protected).toBe(true) // rm -rf /*
+    expect(removalOf('/etc/x', '/w', allow, false)).toEqual({ place: 'outside', protected: false })
+    expect(decide('implementer', { kind: 'bash', rules: [], removals: [removalOf('/tmp', '/w', allow, false)] })).toContain('roots or ancestors')
+    expect(decide('implementer', { kind: 'bash', rules: [], removals: [removalOf('/tmp/x', '/w', allow, false)] })).toBeUndefined()
   })
 })
