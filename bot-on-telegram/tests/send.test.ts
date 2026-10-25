@@ -204,3 +204,21 @@ test("a unit-park send records an open action", async () => {
     message_id: 100, run: "r1", unit: "u1", park_at: "2026-10-23T10:00:00Z", text: "🔴 ACTION — parked",
   });
 });
+
+test("a 4096-char action fits Telegram's limit with the marker kept, and is recorded as sent", async () => {
+  spoolNotice("r1/u1/park/2026-10-23T11:00:00Z", "m".repeat(4096));
+  expect(await drainSpool(api(), 42, now)).toEqual({ sent: 1, failed: 0 });
+  const text = fake.calls[0]!.body.text as string;
+  expect(text.length).toBeLessThanOrEqual(4096);
+  expect(text.startsWith("🔴 ACTION — m")).toBe(true);
+  expect(text.endsWith("m…")).toBe(true);
+  const rec = JSON.parse(readFileSync(join(dir, "open-actions.jsonl"), "utf8").trim());
+  expect(rec.text).toBe(text);
+});
+
+test("a run-done summary that fits is sent unchanged", async () => {
+  const msg = "s".repeat(4096);
+  spoolNotice("r1/done", msg);
+  await drainSpool(api(), 42, now);
+  expect(fake.calls[0]!.body.text).toBe(msg);
+});

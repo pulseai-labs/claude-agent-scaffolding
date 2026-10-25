@@ -5,7 +5,7 @@ import { basename, join } from "node:path";
 import { stateDir } from "./paths.ts";
 import { recordOpen } from "./settle.ts";
 import { listSpool, removeSpool } from "./spool.ts";
-import { TelegramError, type Api } from "./telegram.ts";
+import { fitText, TelegramError, type Api } from "./telegram.ts";
 
 const ACTION_MARKER = "🔴 ACTION — ";
 
@@ -21,7 +21,7 @@ export async function drainSpool(
       const notice = parseKey(item.key);
       let keyboard = keyboardFor(notice, now());
       // Baton sends actions; the run-end summary is the one silent, marker-free notice.
-      const text = notice.kind === "run-done" ? item.message : ACTION_MARKER + item.message;
+      const text = fitText(notice.kind === "run-done" ? item.message : ACTION_MARKER + item.message);
       const body: Record<string, unknown> = { chat_id: chatId, text };
       if (notice.kind === "run-done") body.disable_notification = true;
       if (keyboard) body.reply_markup = keyboard;

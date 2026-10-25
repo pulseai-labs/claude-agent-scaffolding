@@ -124,3 +124,14 @@ test("a message with no recorded ids settles with one edit", async () => {
   expect(fake.calls[0]!.body).toEqual({ chat_id: 42, message_id: 100, text: "✅ settled — " + TEXT });
   expect(closed()).toHaveLength(1);
 });
+
+test("a settled edit of a 4096-char action fits Telegram's limit and closes the record", async () => {
+  const long = "🔴 ACTION — " + "a".repeat(4096 - "🔴 ACTION — ".length);
+  expect(long.length).toBe(4096);
+  recordOpen({ message_id: 100, run: "r1", unit: "u2", park_at: "2026-10-23T10:00:00Z", text: long });
+  expect(await sweepSettled(api(), 42, now)).toBe(1);
+  const text = fake.calls[0]!.body.text as string;
+  expect(text.length).toBeLessThanOrEqual(4096);
+  expect(text.startsWith("✅ settled — 🔴 ACTION — a")).toBe(true);
+  expect(closed()).toHaveLength(1);
+});

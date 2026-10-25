@@ -1,5 +1,17 @@
 export type Api = { call<T>(method: string, body: Record<string, unknown>): Promise<T> };
 
+/** Telegram's limit on a message text, which it counts in UTF-16 code units. */
+export const TEXT_LIMIT = 4096;
+
+/** The text as is when it fits; otherwise its tail cut to fit, ending in `…`, a surrogate pair never split. */
+export function fitText(text: string): string {
+  if (text.length <= TEXT_LIMIT) return text;
+  let cut = TEXT_LIMIT - 1;
+  const c = text.charCodeAt(cut - 1);
+  if (c >= 0xd800 && c <= 0xdbff) cut--; // a high surrogate whose pair would be cut off
+  return text.slice(0, cut) + "…";
+}
+
 // Messages are our own text: never the URL (it carries the token) and never a raw fetch error.
 export class TelegramError extends Error {
   constructor(readonly method: string, readonly description: string, readonly status?: number) {

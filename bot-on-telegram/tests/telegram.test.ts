@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { makeApi, TelegramError } from "../src/telegram.ts";
+import { fitText, makeApi, TelegramError, TEXT_LIMIT } from "../src/telegram.ts";
 import { FakeTelegram } from "./fake-telegram.ts";
 
 const TOKEN = "123456:FIXTURE-TOKEN-abcdef";
@@ -137,4 +137,17 @@ test("the default timeouts are 15 000 ms, and 40 000 ms for a long poll", async 
     AbortSignal.timeout = orig;
   }
   expect(seen).toEqual([15_000, 40_000, 15_000]);
+});
+
+test("fitText: Telegram's 4096 limit in UTF-16 code units, tail cut with an ellipsis", () => {
+  expect(TEXT_LIMIT).toBe(4096);
+  const fits = "x".repeat(4096);
+  expect(fitText(fits)).toBe(fits);
+  const over = "y".repeat(4097);
+  expect(fitText(over)).toBe("y".repeat(4095) + "…");
+  // A surrogate pair at the cut is dropped whole, never split.
+  const pair = "z".repeat(4094) + "😀" + "tail";
+  const out = fitText(pair);
+  expect(out).toBe("z".repeat(4094) + "…");
+  expect(out.length).toBeLessThanOrEqual(4096);
 });

@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { readUnit, runReadable, runStatus } from "./baton-state.ts";
 import { idsOnMessage, lookup, spend } from "./buttons.ts";
 import { stateDir } from "./paths.ts";
-import { TelegramError, type Api } from "./telegram.ts";
+import { fitText, TelegramError, type Api } from "./telegram.ts";
 
 export type OpenAction = {
   message_id: number;
@@ -62,7 +62,7 @@ export async function sweepSettled(api: Api, chatId: number, now: Date): Promise
         await api.call("editMessageText", {
           chat_id: chatId,
           message_id: a.message_id,
-          text: "✅ settled — " + a.text,
+          text: fitText("✅ settled — " + a.text),
         });
         edits++;
       } catch (e) {
