@@ -7,7 +7,7 @@ import {
 } from "./buttons.ts";
 import type { Notice } from "./notice.ts";
 import { stateDir } from "./paths.ts";
-import type { Api } from "./telegram.ts";
+import { fitText, type Api } from "./telegram.ts";
 
 export type Update = {
   update_id: number;
@@ -138,7 +138,7 @@ async function handlePress(
 
   const notice = firstLine(message.text ?? "");
   const edit = async (text: string, keyboard?: Keyboard) => {
-    const body: Record<string, unknown> = { chat_id: ctx.chatId, message_id: message.message_id, text };
+    const body: Record<string, unknown> = { chat_id: ctx.chatId, message_id: message.message_id, text: fitText(text) };
     if (keyboard) {
       body.reply_markup = keyboard;
       const ids = keyboard.inline_keyboard.flat().flatMap((b) => ("callback_data" in b ? [b.callback_data] : []));

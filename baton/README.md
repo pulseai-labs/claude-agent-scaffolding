@@ -179,7 +179,8 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 
 - **A stop parks the unit.** Read its `stop` file, write the ruling into the work item handoff's
   `## Clarifications` (or into the file the stop names), delete the `stop` file, then
-  `baton unpark <run> <unit>`. A stop file left in place parks the unit again.
+  `baton unpark <run> <unit>`. If the stop file is still there, `unpark` renames it to
+  `<path>.consumed-<iso>`, so it does not park the unit again.
 - **After a gap stop**, send the item back to its implementer: `baton unpark <run> <wi> --to implement`.
 - **A reversal before the spine merges**: write it to `out/spine-pr/operator.md`, then
   `baton unpark <run> spine-pr --to spine_work`; that round does it first and then removes the file.

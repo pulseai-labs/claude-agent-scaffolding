@@ -22,7 +22,8 @@ All notable changes to the `baton` plugin.
   `<stop>.consumed-<iso>` and the `unpark` event records `consumed`.
 - The ossify-spine example recipe gains a driver and `briefs/driver.md`: it settles flaky-CI
   (`rerun-check`) and dispatch-cap (`remove-file`) parks only.
-- A recipe without a `driver` stage behaves as before.
+- A recipe without a `driver` stage sends every park notice as before; the run-end summary and
+  the stop-file consumption on `unpark` apply to every recipe.
 
 ## 0.3.2 - 2026-10-24
 

@@ -566,3 +566,19 @@ test("merge-yes with a well-formed PR URL runs gh (the control beside the refusa
   await handleUpdate(press(m.id), ctx());
   expect(runs).toEqual([["gh", "pr", "merge", PR, "--merge", "--match-head-commit", HEAD]]);
 });
+
+test("a press on a 4096-char notice edits within Telegram's limit: the done edit and the disarm confirm", async () => {
+  const long = "🔴 ACTION — " + "n".repeat(4096 - "🔴 ACTION — ".length);
+  const k = sendParkNotice();
+  await handleUpdate(press(byText(k, "Disarm"), { text: long }), ctx());
+  const confirm = lastEdit().text as string;
+  expect(confirm.length).toBeLessThanOrEqual(4096);
+  expect(confirm.startsWith("🔴 ACTION — n")).toBe(true);
+  // The Disarm press spent the notice's buttons: a fresh notice for the done edit.
+  const k2 = sendParkNotice();
+  await handleUpdate(press(byText(k2, "Unpark"), { text: long }), ctx());
+  expect(runs).toEqual([["baton", "unpark", "r1", "u1"]]);
+  const done = lastEdit().text as string;
+  expect(done.length).toBeLessThanOrEqual(4096);
+  expect(done.startsWith("🔴 ACTION — n")).toBe(true);
+});
