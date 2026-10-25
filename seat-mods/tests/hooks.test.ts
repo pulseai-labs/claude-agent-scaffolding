@@ -1214,4 +1214,12 @@ describe('batch 5: rm after a literal cd or variable', () => {
     for (const command of ['cd /tmp/typo && rm -rf build', 'cd /tmp/x && rm -rf *'])
       expect(await deny(command)).toBeUndefined()
   })
+  // Fix round 1 (finding 3): a cd to a quoted `~` names a folder in the session directory, not HOME
+  test('reviewer: a relative cd to "~" is placed in the session directory, not in HOME', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/home/u/scratch', HOME: '/home/u' })
+    const deny = async (command: string) => (await $.tool.call({ tool: 'Bash', command })).deny
+    for (const command of ['cd "~" && rm -rf scratch/x', 'cd "~/scratch" && rm -rf x', 'rm -rf "~/scratch/x"'])
+      expect(await deny(command)).toContain('no rm outside writable places')
+    expect(await deny('rm -rf ~/scratch/x')).toBeUndefined()
+  })
 })

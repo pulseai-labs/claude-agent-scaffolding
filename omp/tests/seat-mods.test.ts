@@ -196,6 +196,14 @@ describe('bash cwd (fix wave 2)', () => {
     for (const command of ['cd /tmp/typo; rm -rf build', 'cd /tmp/x; rm -rf *']) expect(await bash(command)).toContain('no rm outside')
     for (const command of ['cd /tmp/typo && rm -rf build', 'cd /tmp/x && rm -rf *']) expect(await bash(command)).toBeUndefined()
   })
+  // seat-mods fix round 1 (finding 3): omp reads a leading `~`, `@` or `:` in a path, so a relative cd arrives as `./…`
+  test('reviewer: a relative cd to "~", "@" or ":~" is placed in the call folder, not in HOME or the root', async () => {
+    const d = () => deps({ env: { SEAT_MODS_ROLE: 'coordinator', SEAT_MODS_ALLOW: '/home/u/scratch:/tmp/allow', HOME: '/home/u' } })
+    const bash = (command: string) => guard(d(), 'bash', { command }, child('reviewer'))
+    for (const command of ['cd "~" && rm -rf scratch/x', 'cd "~/scratch" && rm -rf x', 'cd @ && rm -rf tmp/allow/x', 'cd ":~" && rm -rf scratch/x'])
+      expect(await bash(command)).toContain('no rm outside')
+    for (const command of ['rm -rf ~/scratch/x', 'rm -rf /tmp/allow/x']) expect(await bash(command)).toBeUndefined()
+  })
   test('a commit message file is read against the call cwd', async () => {
     const seen: string[] = []
     const d = norm({ readFile: async (f: string) => { seen.push(f); return '' } })

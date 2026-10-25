@@ -1243,15 +1243,16 @@ describe('batch 5: rm after cd', () => {
       'cd -; rm x', 'cd "$UNSET"; rm x', 'WT=$(pwd); rm "$WT/x"', 'cd /w/wt | cat; rm x', 'rm "$UNSET/x"'])
       expect(rmTargets(c)).toEqual([{ path: undefined, glob: false }])
     // a relative cd after a known absolute one. Ruling 21 amends the plan's value: `cd /w` may fail before the `;`,
-    // so `cd wt` joins onto the session's directory too, giving the bare `wt/x` beside `/w/wt/x`.
-    expect(rmTargets('cd /w; cd wt && rm x')).toEqual([{ path: 'wt/x', glob: false }, { path: '/w/wt/x', glob: false }])
+    // so `cd wt` joins onto the session's directory too, beside `/w/wt/x`. Fix round 1 (finding 3) writes that join
+    // `./wt`, so no glue reads a leading `~`, `@` or `:` in it: the same place as the bare `wt/x`.
+    expect(rmTargets('cd /w; cd wt && rm x')).toEqual([{ path: './wt/x', glob: false }, { path: '/w/wt/x', glob: false }])
   })
   test('adjacent controls: the same shapes with a ruled directory resolve to it and are refused', () => {
     expect(rmTargets('cd /etc && rm -rf x')).toEqual([t('/etc/x')])
     expect(rmTargets('WT=/etc; rm -rf "$WT/x"')).toEqual([t('/etc/x')])
     // Ruling 21: the failed-cd reading is a target beside the cd's own
     expect(rmTargets('WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc')).toEqual([t('pf/__pycache__/o.pyc'), t('/etc/pf/__pycache__/o.pyc')])
-    expect(rmTargets('cd /; cd etc && rm x')).toEqual([t('etc/x'), t('/etc/x')])
+    expect(rmTargets('cd /; cd etc && rm x')).toEqual([t('./etc/x'), t('/etc/x')]) // `./`: fix round 1 (finding 3)
     for (const command of ['cd /etc && rm -rf x', 'WT=/etc; rm -rf "$WT/x"', 'WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc',
       'cd /; cd etc && rm x', 'cd "/etc" && rm -rf pf/__pycache__ tests/__pycache__'])
       expect(verdict(command)).toContain('no rm outside writable places')
@@ -1286,7 +1287,7 @@ describe('batch 5: rm after cd', () => {
     expect(rmTargets('WT=/w/wt && cd "$WT" && rm a; rm b')).toEqual([t('/w/wt/a'), t('b'), t('/w/wt/b')])
     expect(rmTargets('cd /w && cd wt; rm x')).toEqual([t('x'), t('/w/x'), t('/w/wt/x')])
     expect(rmTargets('git status; WT=/w && cd "$WT"; rm x')).toEqual([t('x'), t('/w/x')])
-    expect(rmTargets('cd /a; cd b; rm x')).toEqual([t('x'), t('/a/x'), t('b/x'), t('/a/b/x')])
+    expect(rmTargets('cd /a; cd b; rm x')).toEqual([t('x'), t('/a/x'), t('./b/x'), t('/a/b/x')]) // `./`: fix round 1 (finding 3)
     // the cap: four directories are read, a fifth makes the operand unresolved; an absolute cd && starts again
     expect(rmTargets('cd /a; cd /b; cd /c; rm x')).toEqual([t('x'), t('/a/x'), t('/b/x'), t('/c/x')])
     expect(rmTargets('cd /a; cd /b; cd /c; cd /d; rm x')).toEqual([t(undefined)])
@@ -1334,7 +1335,7 @@ describe('batch 5: rm after cd', () => {
     // Ruling 21: after `cd /w;` the session's directory is a target beside /w; a relative cd joins onto each directory
     expect(rmTargets('cd /w; WT=wt; rm -rf "$WT/x"')).toEqual([t('wt/x'), t('/w/wt/x')])
     expect(rmTargets('WT=wt; rm -rf "$WT/x"')).toEqual([t('wt/x')])
-    expect(rmTargets('WT=wt; cd "$WT" && rm x')).toEqual([t('wt/x')])
+    expect(rmTargets('WT=wt; cd "$WT" && rm x')).toEqual([t('./wt/x')]) // `./`: fix round 1 (finding 3)
     // a glob after a substituted value is placed by its literal prefix
     expect(rmTargets('WT=/w/wt; rm -f "$WT"/pf/*.pyc')).toEqual([t('/w/wt/pf', true)])
   })
@@ -1404,5 +1405,90 @@ describe('batch 5: rm after cd', () => {
     for (const c of ['cd /w && echo "$(rm x)"', 'WT=/w; echo "$(rm "$WT/x")"', 'echo "$(cd /w && rm x)"', 'echo "$(WT=/w; rm "$WT/x")"',
       'cd /w; X=$(cd /etc); rm y', 'WT=/w; echo `rm "$WT/x"`'])
       expect(rmTargets(c)).toEqual([t(undefined)])
+  })
+})
+
+// Task 5 fix round 1: four ways the walk approved a removal Bash makes elsewhere (base 0572a24c refused each).
+describe('batch 5: rm after cd, fix round 1', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  const lexical = (path: string) => {
+    const parts: string[] = []
+    for (const part of path.split('/')) if (part === '..') parts.pop(); else if (part !== '' && part !== '.') parts.push(part)
+    return '/' + parts.join('/')
+  }
+  const verdict = (command: string, role: 'implementer' | 'reviewer' = 'implementer', root = '/w/wt') => decide(role, {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(lexical(target.path.startsWith('/') ? target.path : `${root}/${target.path}`), root, scratchDirs(undefined), target.glob)),
+  })
+  test('finding 1: a newline after &&, || or | continues the list; a command alone on its line ends it', () => {
+    // Bash skips the assignment with the list, and the rm on the next line removes /x
+    for (const c of ['false &&\nWT=/w/wt\nrm -rf "$WT/x"', 'cd /w/missing &&\nWT=/w/wt\nrm -rf "$WT/x"', 'true &&\n\n  WT=/w/wt\nrm "$WT/x"',
+      'true && # why\nWT=/w/wt\nrm "$WT/x"', 'cd /w ||\nrm x', 'cd /w |\ncat; rm x'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('false &&\nS=/tmp/x\nrm -rf "$S/y"')).toContain('cannot resolve')
+    // controls: the rest of a `cd X &&` list runs in X only, across the newline; a list ends at a newline after a command
+    expect(rmTargets('cd /w/wt &&\nrm -rf build')).toEqual([t('/w/wt/build')])
+    expect(rmTargets('cd /w/wt &&   \n  rm -rf build')).toEqual([t('/w/wt/build')])
+    expect(rmTargets('true\nWT=/w/wt\nrm "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(verdict('cd /tmp/x &&\nrm -rf build', 'reviewer')).toBeUndefined()
+    expect(verdict('cd /tmp/x\nrm -rf build', 'reviewer')).toContain('no rm outside writable places')
+    // the `&` or `|` of a redirection operator separates nothing
+    for (const c of ['cd /w && echo hi >|/tmp/f && rm y', 'cd /w && echo hi 2>&1 && rm y', 'cd /w && echo hi &>/dev/null && rm y',
+      'cd /w && echo hi <&0 && rm y'])
+      expect(rmTargets(c)).toEqual([t('/w/y')])
+    // a command made of a redirection or a heredoc alone is a command: the newline after it ends the list
+    expect(rmTargets('cd /w && >/dev/null\nrm x')).toEqual([t('x'), t('/w/x')])
+    expect(rmTargets('cd /w/missing && <<EOF\nb\nEOF\nrm x')).toEqual([t('x'), t('/w/missing/x')])
+  })
+  test('finding 2: an assignment-only command may fail, so an assignment after its && may be skipped', () => {
+    for (const c of ['A="$(false)" && WT=/w/wt; rm -rf "$WT/x"', 'A=`false` && WT=/w/wt; rm -rf "$WT/x"',
+      'A=1 </nonexistent && WT=/w/wt; rm -rf "$WT/x"', 'A="$(git rev-parse --show-toplevel)" && WT=/w/wt; rm -rf "$WT/x"',
+      'A="$HOME" && WT=/w/wt; rm -rf "$WT/x"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('A="$(git rev-parse --show-toplevel)" && S=/tmp/x; rm -rf "$S/y"')).toContain('cannot resolve')
+    // controls: a literal assignment cannot fail, and within the list the assignment holds
+    expect(rmTargets('A=1 && WT=/w/wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('A=/w X=1 && WT=/w/wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('A="$(false)" && WT=/w/wt && rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(verdict('A=1 && S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+  test('finding 3: a relative cd from the session directory is written ./ so no glue reads a leading ~, @ or :', () => {
+    expect(rmTargets('cd "~" && rm -rf scratch/x')).toEqual([t('./~/scratch/x')])
+    expect(rmTargets('cd "~/scratch" && rm -rf x')).toEqual([t('./~/scratch/x')])
+    expect(rmTargets('cd \\~ && rm -rf x')).toEqual([t('./~/x')])
+    expect(rmTargets('cd "~"; rm -rf x')).toEqual([t('x'), t('./~/x')])
+    expect(rmTargets('cd @ && rm -rf tmp/x')).toEqual([t('./@/tmp/x')])
+    expect(rmTargets('cd ":~" && rm -rf x')).toEqual([t('./:~/x')])
+    expect(rmTargets('cd file:///tmp && rm -rf x')).toEqual([t('./file:///tmp/x')])
+    expect(rmTargets('cd ./sub && cd ~x && rm y')).toEqual([t(undefined)])
+    expect(rmTargets('cd ./sub && rm y')).toEqual([t('./sub/y')])
+    // controls: an active tilde is HOME, so a cd to it is unknown; a quoted one in an operand stays literal, as before
+    expect(rmTargets('cd ~ && rm -rf scratch/x')).toEqual([t(undefined)])
+    expect(rmTargets('rm -rf "~/scratch/x" ~/scratch/y')).toEqual([t('./~/scratch/x'), t('~/scratch/y')])
+  })
+  test('finding 4: every write to a known variable is read, wherever the segment holds it', () => {
+    for (const c of ['S=/w/wt; X="$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; X=$[S=5]; rm -rf "$S/x"', 'S=/w/wt; A[S=5]=1; rm -rf "$S/x"',
+      'S=/w/wt; cd $[S=5]; rm -rf "$S/x"', 'S=/w/wt; cd "$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; : >"$((S=5))"; rm -rf "$S/x"',
+      'S=/w/wt; true > $[S=5]; rm -rf "$S/x"', 'S=/w/wt; : <<<"$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; true {S}>/dev/null; rm -rf "$S/x"',
+      'S=/w/wt; exec {S}>/dev/null; rm -rf "$S/x"', 'S=/w/wt; : <<EOF\n$((S=5))\nEOF\nrm -rf "$S/x"', 'S=/w/wt; [[ 1 -eq S=5 ]]; rm -rf "$S/x"',
+      'S=/w/wt; echo ${A[S=5]}; rm -rf "$S/x"', 'S=/w/wt X=$((S=5)); rm -rf "$S/x"', 'S=/w/wt; X="${ S=/etc; }"; rm -rf "$S/x"',
+      'S=/w/wt; rm -rf "$S/x" "$[S=5]"'])
+      expect(rmTargets(c).every(target => target.path === undefined)).toBe(true)
+    // a Bash 5.3 `${ …; }` runs in the current shell, and a heredoc line read in the 0.9.0 layout hides its tail
+    for (const c of ['cd /w; X="${ cd /etc; }"; rm y', 'cd /w; echo "${| cd /etc; }"; rm y', 'cd /w; cat <<EOF "$(true)"; cd /etc\nbody\nEOF\nrm y'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('S=/tmp/x; X="$((S=5))"; rm -rf "$S/y"', 'reviewer')).toContain('cannot resolve')
+    // controls: a read of the variable, arithmetic on another, an fd number, a body that only reads it
+    expect(rmTargets('S=/w/wt; X="$((1+1))"; : >"$S.log"; exec 3>/dev/null; rm -rf "$S/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('S=/w/wt; cat <<EOF\n$S\nEOF\nrm -rf "$S/x"')).toEqual([t('/w/wt/x')])
+    // Bash assigns left to right: the write in X's value comes before S=/w/wt
+    expect(rmTargets('X="$((S=5))" S=/w/wt; rm -rf "$S/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('cd /w/wt && git commit -m "$(cat <<\'EOF\'\nmsg\nEOF\n)" && rm -rf build')).toEqual([t('/w/wt/build')])
+    // a quoted body is literal text; in one assignment command a later value or subscript writes after S=/w/wt
+    expect(rmTargets("S=/w/wt; cat <<'EOF'\nS is $((S=5))\nEOF\nrm -rf \"$S/x\"")).toEqual([t('/w/wt/x')])
+    for (const c of ['S=/w/wt X="$((S=5))"; rm -rf "$S/x"', 'S=/w/wt A[S=5]=1; rm -rf "$S/x"', 'S=/w/wt S="$HOME/x"; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
   })
 })
