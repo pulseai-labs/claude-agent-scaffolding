@@ -784,3 +784,109 @@ describe('batch 5: command word', () => {
     expect(bashRules('./env git status')).toEqual([])
   })
 })
+
+// Batch 5, C2 (#724 A3/A9/A11, #702 B3/B10/B10b/B11): heredocs read as Bash reads them —
+// the opener line runs, a `<<` in arithmetic or a comment opens nothing, and the
+// delimiter is its word after quote removal, found before any line is folded.
+describe('batch 5: heredocs', () => {
+  const RULED = 'git push --force origin main'
+  // The 11 closing spellings of evidence row 702-B10: each closes at a line `EOF`.
+  const CLOSES = ['\\EOF', 'E\\OF', '\\E\\O\\F', "E'OF'", 'E"OF"', "'E'OF", '"E"OF', 'E\\O"F"', "\\E'OF'"]
+  test('C2a: the opener line after the delimiter word runs', () => {
+    expect(bashRules(`cat <<EOF; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF & ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF \\\n; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    // an escaped backslash ends the opener line, and its text joins nothing after the body
+    expect(bashRules(`echo <<EOF x\\\\\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo a\\\\\n${RULED}`)).toContain('force-push')
+    // control: the body is still text
+    expect(bashRules(`cat <<EOF; echo x\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF \\\n> out\n${RULED}\nEOF`)).toEqual([])
+  })
+  test('C2a: the body marker stays in the opener\'s own segment for the trailer check', () => {
+    expect(bashRules("git commit -F - <<'EOF' && echo done\nfix\n\nCo-Authored-By: a\nEOF")).toContain('ai-trailer')
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix\n\nCo-Authored-By: a\nEOF\n)\"")).toContain('ai-trailer')
+    // control: a trailer-shaped body fed to another command is not the commit's message
+    expect(bashRules("git commit -m x && cat <<'EOF'\nCo-Authored-By: a\nEOF")).toEqual(['commit'])
+  })
+  test('C2b: a << in arithmetic or in a comment opens no heredoc', () => {
+    expect(bashRules(`echo $((1<<c))\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo "$((1<<c))"\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`(( a << b ))\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`# <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo ok # <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF # <<X\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo $(( (1) + (2) << c ))\n${RULED}`)).toContain('force-push')
+    // a comment starts after an operator, a closed quote and a continued line; a body's quote is text
+    expect(bashRules(`echo ok;# <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo "a" # <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo 'a' # <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo ok \\\n# <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF\nit's\nEOF\n# <<X\n${RULED}`)).toContain('force-push')
+    expect(rmTargets('# <<EOF\nrm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(rmTargets('echo $((1<<c))\nrm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+  })
+  test('control: a heredoc after arithmetic, or after a # that starts no comment, still opens', () => {
+    expect(bashRules(`(( a )) && cat <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo $((1)) <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo "#" <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo "x #" <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo 'x #' <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo a#b <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo \\ #b <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF # note\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`# note\ncat <<EOF\n${RULED}\nEOF`)).toEqual([])
+    // `$((` in single quotes is text, and `((` inside a word starts no arithmetic
+    expect(bashRules(`echo '$((' <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <((cat <<EOF\n${RULED}\nEOF\n))`)).toEqual([])
+  })
+  test('C2c: the delimiter is its word after quote removal', () => {
+    for (const d of CLOSES) {
+      expect(bashRules(`cat <<${d}\nbody\nEOF\n${RULED}`)).toContain('force-push')
+      expect(rmTargets(`cat <<${d}\nbody\nEOF\nrm -f /etc/x`)).toEqual([{ path: '/etc/x', glob: false }])
+      // control: what comes before the closing line is still body text
+      expect(bashRules(`cat <<${d}\n${RULED}\nEOF`)).toEqual([])
+    }
+    expect(bashRules(`cat <<-\\EOF\n\tbody\n\tEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat 2<<\\EOF\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<E''OF\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<"E\\$OF"\nbody\nE$OF\n${RULED}`)).toContain('force-push')
+    // `<<-` strips the tabs of the joined line: this one closes at its second line
+    expect(bashRules(`cat <<-EOF\n\t\\\n\tEOF\n${RULED}\nEOF`)).toContain('force-push')
+    // An empty quoted delimiter closes at the first empty line.
+    expect(bashRules(`cat <<''\nbody\n\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<''\n${RULED}\n\necho done`)).toEqual([])
+  })
+  test('C2c: E"O\\F" never closes at EOF; Bash\'s delimiter is EO\\F', () => {
+    expect(bashRules(`cat <<E"O\\F"\nbody\nEOF\n${RULED}`)).not.toContain('force-push')
+    // control: its own delimiter closes it
+    expect(bashRules(`cat <<E"O\\F"\nbody\nEO\\F\n${RULED}`)).toContain('force-push')
+  })
+  test('B10b: a body line E does not close <<E\'OF\' early', () => {
+    expect(bashRules(`cat <<E'OF'\nE\n${RULED}\nEOF`)).not.toContain('force-push')
+  })
+  test('B11: a quoted body line ending in a backslash is not folded into the closing line', () => {
+    expect(rmTargets("cat <<'EOF'\ny\\\nEOF\nrm -f /var/x")).toEqual([{ path: '/var/x', glob: false }])
+    expect(bashRules(`cat <<'EOF'\ny\\\nEOF\n${RULED}`)).toContain('force-push')
+    // a quoted body keeps its lines, so git reads this trailer on a line of its own
+    expect(bashRules("git commit -F - <<'EOF'\nfix\\\nCo-Authored-By: a\nEOF")).toContain('ai-trailer')
+  })
+  test('control: an unquoted body line ending in a backslash joins the next, as in Bash', () => {
+    expect(bashRules(`cat <<EOF\ny\\\nEOF\n${RULED}`)).toEqual([])
+    expect(bashRules(`cat <<EOF\ny\\\nEOF\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF\ny\\\\\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules("git commit -F - <<EOF\nfix\\\nCo-Authored-By: a\nEOF")).toEqual(['commit'])
+  })
+  test('Review Focus 5: two heredocs on one line close in order', () => {
+    expect(bashRules(`cat <<A <<'B'\na\nA\nb\nB\n${RULED}`)).toContain('force-push')
+    expect(rmTargets("rm -i /reports/x <<A <<'B'\na\nA\nb\nB\nrm -rf /etc/x")).toEqual([
+      { path: '/reports/x', glob: false }, { path: '/etc/x', glob: false },
+    ])
+    // control: the second body is text, and it starts after the first one's closing line
+    expect(bashRules(`cat <<A <<'B'\na\nA\n${RULED}\nB`)).toEqual([])
+    expect(bashRules(`cat <<A <<B\nB\nA\n${RULED}\nB`)).toEqual([])
+  })
+  test('control: the standard commit form stays a commit', () => {
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit merge and git push --force are words here\nEOF\n)\"")).toEqual(['commit'])
+  })
+})

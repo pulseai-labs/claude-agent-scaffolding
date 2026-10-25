@@ -119,10 +119,14 @@ no writable root lies below it. Unquoted `{` and a glob suffix containing a `..`
 unresolvable and denied.
 A glob component starting with `.` and containing `*`, `?` or `[` is unresolvable and denied.
 Redirections, heredoc input and their destinations are excluded from `rm` operands.
-An fd prefix such as `2<<EOF` supplies shell input. Words and redirections after a heredoc
-delimiter on the rm opener line remain part of the command and meet the usual
-operand checks; only its body and closing line are excluded,
-and a single `&` separates commands for `rm`. Every Bash rail skips the unquoted reserved words
+An fd prefix such as `2<<EOF` supplies shell input. On every Bash rail a heredoc's delimiter is
+its word after Bash's quote removal (`<<\EOF`, `<<E'OF'` and `<<"E"OF` all close at a line
+`EOF`; `<<E"O\F"` closes only at `EO\F`), a body line ending in a backslash joins the next only
+in an unquoted body, several heredocs on one line close in order, and a `<<` inside `$((…))`,
+`((…))` or a `#` comment opens none. Words and redirections after the delimiter word on the
+opener line remain part of the command and meet the usual operand checks; only the opener, its
+body and its closing line are excluded (a `$'…'` or `$"…"` delimiter is the exception; see
+Limits), and a single `&` separates commands for `rm`. Every Bash rail skips the unquoted reserved words
 `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `time` at a command's
 head, before assignments or execution wrappers. A path such as `/tools/if`, or `if` after
 `A=1` or `env`, names a program; its arguments are not another command. The `builtin` execution
@@ -213,17 +217,17 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
   wrapper with its own options (`env -i git merge`, `sudo -u u git push -f`).
 - **Known limit:** `time -p <cmd>` is not parsed; for example, `time -p git push --force` passes.
 - **Unparsed shell forms pass:** bundled short flags (`-fqu`),
-  abbreviated long options (`--mir`), several heredocs on one command, a heredoc example inside a
-  quoted message, value-taking git globals (`--git-dir x`) and quoted subcommands or flags
-  (`git "merge"`). A trailer that opens an `-m` message, comes from `--trailer`, or follows a
-  backslash-newline inside single quotes, also passes.
+  abbreviated long options (`--mir`), a heredoc example inside a quoted message, value-taking
+  git globals (`--git-dir x`) and quoted subcommands or flags (`git "merge"`). A trailer that
+  opens an `-m` message, comes from `--trailer`, or follows a backslash-newline inside single
+  quotes, also passes.
 - Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
 - Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
 - An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
 - A named descriptor before the command (`{log}>file rm …`) hides the rm.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A double-quoted `<<`, or commands after a heredoc opener or a `#` comment on the same line, can hide commands from the rail.
+- A quoted `<<` (`"…<<EOF…"`, `'…<<EOF…'`) still opens a heredoc for the rails, so the lines after it are read as its body and can hide commands. So can a `$'…'` or `$"…"` delimiter, read with its `$`: its heredoc never closes at `EOF`.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
 - `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.

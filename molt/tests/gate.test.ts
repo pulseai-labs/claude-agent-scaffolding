@@ -288,3 +288,47 @@ describe('batch 5: command word', () => {
     expect(bash('git add f 2>&1; cat huge.log')).toBe(false)
   })
 })
+
+// Batch 5, C2 (#724 A3/A9/A11, #702 B3/B10/B10b/B11): heredocs read as Bash reads them.
+// Each opener is a commit the gate allows, so only the reading of what follows decides.
+describe('batch 5: heredocs', () => {
+  const CLOSES = ['\\EOF', 'E\\OF', '\\E\\O\\F', "E'OF'", 'E"OF"', "'E'OF", '"E"OF', 'E\\O"F"', "\\E'OF'"]
+  test('C2a: the opener line after the delimiter word runs', () => {
+    expect(bash('git commit -F - <<EOF; cat huge.log\nmsg\nEOF')).toBe(false)
+    expect(bash('git commit -F - <<EOF & cat huge.log\nmsg\nEOF')).toBe(false)
+    // control
+    expect(bash('git commit -F - <<EOF; git add f\nmsg\nEOF')).toBe(true)
+    expect(bash('git commit -F - <<EOF; git add f\ncat huge.log\nEOF')).toBe(true)
+  })
+  test('C2b: a << in arithmetic or in a comment opens no heredoc', () => {
+    expect(bash('git add $((1<<c))\ncat huge.log')).toBe(false)
+    expect(bash('git add f # <<EOF\ncat huge.log')).toBe(false)
+    // control: the line after is read, and allowed when it is git add
+    expect(bash('git add $((1<<c))\ngit add g')).toBe(true)
+    expect(bash('git add f # <<EOF\ngit add g')).toBe(true)
+  })
+  test('C2c: the delimiter is its word after quote removal', () => {
+    for (const d of [...CLOSES, '-\\EOF']) {
+      const end = d.startsWith('-') ? '\tEOF' : 'EOF'
+      expect(bash(`git commit -F - <<${d}\nmsg\n${end}\ncat huge.log`)).toBe(false)
+      expect(bash(`git commit -F - <<${d}\nmsg\n${end}\ngit add f`)).toBe(true)
+    }
+    expect(bash('git commit -F - 2<<\\EOF\nmsg\nEOF\ncat huge.log')).toBe(false)
+    expect(bash('git commit -F - 2<<\\EOF\nmsg\nEOF\ngit add f')).toBe(true)
+    // E"O\F" never closes at EOF (Bash's delimiter is EO\F): the cat is message text
+    expect(bash('git commit -F - <<E"O\\F"\nmsg\nEOF\ncat huge.log')).toBe(true)
+    // B10b: a body line E does not close <<E'OF' early
+    expect(bash("git commit -F - <<E'OF'\nE\ncat huge.log\nEOF")).toBe(true)
+  })
+  test('B11: a quoted body line ending in a backslash is not folded into the closing line', () => {
+    expect(bash("git commit -F - <<'EOF'\ny\\\nEOF\ncat huge.log")).toBe(false)
+    expect(bash("git commit -F - <<'EOF'\ny\\\nEOF\ngit add f")).toBe(true)
+  })
+  test('Review Focus 5: two heredocs on one line close in order', () => {
+    expect(bash("git commit -F - <<A <<'B'\na\nA\nb\nB\ncat huge.log")).toBe(false)
+    expect(bash("git commit -F - <<A <<'B'\na\nA\nb\nB\ngit add f")).toBe(true)
+  })
+  test('control: the standard commit form stays allowed', () => {
+    expect(bash("git commit -m \"$(cat <<'EOF'\nfix: x\n\ncat huge.log and git push are words here\nEOF\n)\"")).toBe(true)
+  })
+})

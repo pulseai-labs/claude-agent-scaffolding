@@ -13,46 +13,94 @@ const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 // Heredoc bodies and quoted strings are text, not commands: a commit message may
 // name `git merge` or `-n`. Each is swapped for a numbered marker before matching,
 // and the trailer check expands the markers in the commit's own segment.
-// A heredoc opener; its delimiter is any quoted word, or a bare word.
-const HEREDOC = /(?<!<)<<(?!<)(-?)[ \t]*(?:'([^'\n]+)'|"([^"\n]+)"|([^\s;&|<>()'"]+))/g
+// A heredoc opener and its whole delimiter word: any mix of quoted parts, escapes and
+// plain characters, up to an unquoted blank or metacharacter (#702 B10).
+const HEREDOC = /(?<!<)<<(?!<)(-?)[ \t]*((?:'[^'\n]*'|"(?:[^"\\\n]|\\.)*"|\\.|[^\s;&|<>()'"\\])+)/y
 
 const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
 
 // Words that run the next word as the command.
 const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 
-// Each heredoc, opener through its closing line, becomes one piece. The body ends at
-// the first line that is exactly the delimiter (leading tabs allowed after `<<-`);
-// a heredoc with no closing line runs to the end of the command, as in Bash.
-function blankHeredocs(command: string, keep: (piece: string) => string): string {
+// Each heredoc becomes one piece: its opener (`<<` and the delimiter word) and its body
+// through the closing line. `quoted` says the word held a quote or backslash, so Bash
+// expands nothing in the body. The opener line's text after the word stays command text
+// (#724 A3, A9), and the bodies follow that line in opener order. The delimiter is the
+// word after quote removal; a body ends at the first line that is exactly it (leading
+// tabs stripped after `<<-`), and in an unquoted body a line ending in a backslash first
+// joins the next, as in Bash. A heredoc with no closing line runs to the end of the
+// command. A `<<` in a comment or in arithmetic opens nothing (#724 A11, #702 B3).
+function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) => string): string {
+  const opens: Array<{ at: number; end: number; delimiter: string; strip: boolean; quoted: boolean }> = []
   let out = ''
   let from = 0
-  for (;;) {
-    HEREDOC.lastIndex = from
-    const open = HEREDOC.exec(command)
-    if (open === null) return out + command.slice(from)
-    const delimiter = open[2] ?? open[3] ?? open[4] ?? ''
-    const bodyStart = command.indexOf('\n', HEREDOC.lastIndex)
-    if (bodyStart < 0) return out + command.slice(from)
-    let end = command.length
-    for (let line = bodyStart + 1; line <= command.length; ) {
-      const next = command.indexOf('\n', line)
-      const stop = next < 0 ? command.length : next
-      const text = command.slice(line, stop)
-      if ((open[1] === '-' ? text.replace(/^\t+/, '') : text) === delimiter) { end = stop; break }
-      if (next < 0) break
-      line = next + 1
+  let quote = ''     // the quote open here: ' or "
+  let parens = 0     // parentheses open in a `$((…))` or `((…))`
+  let comment = false
+  let inWord = false // the character before this one belongs to a word
+  for (let i = 0; i < command.length; i++) {
+    const char = command[i]!
+    if (char === '\n' && opens.length > 0) {
+      // The opener line ends here; each body starts where the one before it ended.
+      let body = i
+      for (const open of opens) {
+        let end = command.length
+        let joined = ''
+        for (let line = body + 1; line < command.length; ) {
+          const next = command.indexOf('\n', line)
+          const stop = next < 0 ? command.length : next
+          const text = joined + command.slice(line, stop)
+          if ((open.strip ? text.replace(/^\t+/, '') : text) === open.delimiter) { end = stop; break }
+          if (next < 0) break
+          joined = !open.quoted && /(?<!\\)(?:\\\\)*\\$/.test(text) ? text.slice(0, -1) : ''
+          line = next + 1
+        }
+        out += command.slice(from, open.at) + keep(command.slice(open.at, open.end) + command.slice(body, end), open.quoted)
+        from = open.end
+        body = end
+      }
+      out += command.slice(from, i)
+      from = body
+      i = body - 1
+      opens.length = 0
+      continue
     }
-    out += command.slice(from, open.index) + keep(command.slice(open.index, end))
-    from = end
+    if (comment) { comment = char !== '\n'; continue }
+    if (parens > 0) { parens += char === '(' ? 1 : char === ')' ? -1 : 0; continue }
+    if (char === '<') {
+      HEREDOC.lastIndex = i
+      const open = HEREDOC.exec(command)
+      if (open !== null) {
+        const word = open[2]!
+        opens.push({
+          at: i, end: HEREDOC.lastIndex, strip: open[1] === '-', quoted: /['"\\]/.test(word),
+          delimiter: word.replace(/'([^']*)'|"((?:[^"\\]|\\.)*)"|\\(.)/g, (_: string, single?: string, double?: string, escaped?: string) =>
+            single ?? escaped ?? double!.replace(/\\([$`"\\])/g, '$1')),
+        })
+        i = HEREDOC.lastIndex - 1
+        inWord = true
+        continue
+      }
+    }
+    if (quote === "'") { if (char === "'") quote = ''; continue }
+    if (char === '\\') { if (command[i + 1] !== '\n') inWord = true; i += 1; continue }
+    if (char === '$' && command.startsWith('((', i + 1)) { parens = 2; i += 2; inWord = true; continue }
+    if (quote === '"') { if (char === '"') quote = ''; continue }
+    if (char === "'" || char === '"') { quote = char; inWord = true; continue }
+    if (!inWord && char === '#') { comment = true; continue }
+    if (!inWord && command.startsWith('((', i)) { parens = 2; i += 1; inWord = true; continue }
+    inWord = !' \t\n;&|()'.includes(char)
   }
+  return out + command.slice(from)
 }
 
 function blank(command: string): { text: string; pieces: string[] } {
   const pieces: string[] = []
   const keep = (piece: string) => `\u0000${pieces.push(piece) - 1}\u0000`
-  // An unquoted backslash-newline is a line continuation, not a command boundary.
-  const joined = command.replace(/\\\n/g, ' ')
+  // An unquoted backslash-newline is a line continuation, not a command boundary; an
+  // escaped backslash before a newline continues nothing. The heredocs are found first,
+  // so only command text and unquoted bodies are folded (#702 B11).
+  const fold = (text: string) => text.replace(/(?<!\\)((?:\\\\)*)\\\n/g, '$1 ')
   // A backslash outside quotes makes the next character text (`\\|` is not a pipe).
   // Before a word character, `.`, `/` or `-` it only quotes: quote removal makes `\rm` read
   // `rm`, so it is dropped (#702 B8). A reserved word is syntax only unquoted, so `\if`
@@ -60,7 +108,8 @@ function blank(command: string): { text: string; pieces: string[] } {
   const reserved = /^(?:if|then|elif|else|fi|do|while|until)(?=[\s;&|()<>]|$)/
   const unescape = (escape: string, at: number, whole: string) =>
     /[A-Za-z0-9_./-]/.test(escape[1]!) && !reserved.test(whole.slice(at + 1)) ? escape[1]! : keep(escape)
-  const text = blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, unescape)
+  const text = fold(blankHeredocs(command, (piece, quoted) => keep(quoted ? piece : fold(piece))))
+    .replace(QUOTED, keep).replace(/\\./g, unescape)
   // A `#` that starts a word begins a comment, which runs no command.
   return { text: text.replace(/(^|[ \t;&|()])#[^\n]*/gm, '$1'), pieces }
 }
