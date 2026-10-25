@@ -472,7 +472,8 @@ test("a lane that writes nothing parks instead of looping", async () => {
   expect(unit("lane").stage).toBe("lane");
   expect(unit("lane").parked?.reason).toBe("outcome");
   expect(host.of("lane", "lane")).toHaveLength(1);
-  expect(r.notes).toEqual(["baton r1/lane parked in lane: outcome"]);
+  // The recipe's driver settles the park: it wrote no result, so the park is escalated.
+  expect(r.notes).toEqual(["baton r1/lane parked in lane: outcome — driver gave no valid result (no result file)"]);
   expect(existsSync(out("lane", "lane.done"))).toBe(false);
 });
 
@@ -522,7 +523,8 @@ test("a review without a verdict relaunches, then parks", async () => {
   expect(unit(SPINE_UNIT).parked?.reason).toBe("no result");
   expect(host.of(SPINE_UNIT, "spine_review")).toHaveLength(3);
   expect(moves(SPINE_UNIT)).toEqual([]);
-  expect(r.notes).toEqual([`baton r1/${SPINE_UNIT} parked in spine_review: no result`]);
+  await settle(r, 5);
+  expect(r.notes).toEqual([`baton r1/${SPINE_UNIT} parked in spine_review: no result — driver gave no valid result (no result file)`]);
 });
 
 test("a spine PR conflict parks the spine PR", async () => {

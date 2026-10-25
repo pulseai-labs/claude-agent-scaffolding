@@ -2,6 +2,23 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.4.0 - 2026-10-25
+
+- A recipe may carry a top-level `driver` stage. When a unit parks, a driver session reads the
+  unit's state file and writes one JSON result: resume (optionally `to` a stage `resume_to` allows,
+  with a `cleared` name from `clearing`), escalate, or stop. Baton checks the result's closed shape;
+  any refusal, a launch failure or a timeout becomes an escalate. A unit that parks again after one
+  driver resume goes to the operator. Events: `driver`, `driver resume`, `driver escalate`,
+  `driver stop`, `driver dropped`. Each result appends a ledger line.
+- With a driver, the escalate is the only park notice
+  (`baton <run>/<unit> parked in <stage>: <reason> — <action>`, with the PR suffix of a merge-stage
+  park); a driver stop parks the run.
+- A finished run sends one silent summary line (units, merged PRs, parks, drivers, wall time).
+- `unpark` and `disarm` drop a live driver and release its claim.
+- The ossify-spine example recipe gains a driver and `briefs/driver.md`: it settles flaky-CI
+  (`rerun-check`) and dispatch-cap (`remove-file`) parks only.
+- A recipe without a `driver` stage behaves as before.
+
 ## 0.3.2 - 2026-10-24
 
 - A merge-stage park by the `red` or `conflict` outcome names its PR. The `park` event carries `pr`

@@ -4,6 +4,7 @@ A recipe-driven engine. On a systemd timer it launches model sessions on a host 
 due, waits on closed signals (a done-file, a thread's turn end, a PR's checks) at no token cost,
 merges a pull request only by the recipe's rule, and notifies on parks, stalls and a host outage.
 A merge-stage park on red checks or a conflict names the PR and the failing checks in its notice.
+A recipe with a `driver` stage sends the operator only what a driver could not settle (see Driver).
 It judges nothing: anything that needs judgment is a session the recipe launches. It ships a CLI,
 a claim launcher and a timer, and no skill, so Codex has nothing to load. Needs `bun`.
 
@@ -73,6 +74,44 @@ Parks and how to clear them:
 `unpark --to` and `disarm` clear a live triage and release its claim. `baton report` counts
 `triage`, `triage answered` and `triage relaunch`.
 
+## Driver
+
+A recipe may carry one top-level `driver` stage (`kind: "driver"`). It takes the launch fields
+(like `triage`, with `stall_minutes` as its time limit, default 10) plus `state_file`,
+`result_file` and `ledger` (paths rendered with the unit's scope), `clearing` (a non-empty list of
+names the driver may report having cleared) and `resume_to` (park stage to the stages a resume may
+enter). Its message may use `{driver.stage}` and `{driver.reason}`. `session`-only fields
+(`outcomes`, `handoff`, `slots`, `stop_file`, `before`, `after_launch`, `watch` and the like) are
+refused, and a recipe with a driver cannot name a stage `driver`.
+
+With a driver, a park no longer sends its notice. Step 7 of the tick writes the unit's state file
+(the run, the units, this park, the events since the stage entry) and launches one driver session
+for it (`driver` event). The driver takes no slot and has its own claim. When it ends, baton reads
+the result file once:
+
+- `{"result":"resume","to"?:..,"cleared":..,"ledger":{..}}`: the unit is unparked in place, or into
+  `to` (allowed by `resume_to` for the park's stage); `cleared` must be in `clearing`
+  (`driver resume`). A unit that parks again with the same stage and reason after a driver resumed it
+  goes straight to the operator.
+- `{"result":"escalate","action":..,"ledger":{..}}`: the one park notice, `baton <run>/<unit> parked
+  in <stage>: <reason> — <action>`, with the PR suffix a merge-stage park carries (`driver escalate`).
+- `{"result":"stop","reason":..,"ledger":{..}}`: the run parks, `driver stop: <reason>` (`driver stop`).
+
+`ledger` is `{q, a, why, rejected}`, all non-empty; baton appends it as one line to the recipe's
+ledger file. A missing, unreadable or refused result (no file, not JSON, an unknown result, an empty
+`action` or `reason`, a `cleared` or `to` not allowed, a bad ledger), a driver that fails to launch,
+or one past its time limit (`driver dropped`) is an escalate whose action names the cause. `unpark`
+and `disarm` drop a live driver and release its claim. Without a `driver` stage every park sends its
+notice, as before.
+
+A run that finishes sends one silent summary line: units, merged PRs, parks and how they were
+settled, drivers, wall time and the ledger path.
+
+The example recipe's driver (`briefs/driver.md`) settles two parks only: a red `land` whose failing
+checks are all outside the item's changed files (re-run once), and a `correct` park at the dispatch
+cap with a used-up `correction.txt`. A `user:` walk, a change on `main`, a merge or any doubt goes
+to the operator.
+
 ## State and config
 
 State lives in `${BATON_STATE_DIR:-~/.local/state/baton}`: `runs/<id>/run.json` and
@@ -92,7 +131,8 @@ Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every
 
 The `park` event in `events.jsonl` is `{kind, unit, stage, reason}` plus `thread` (the seat's
 thread id, when the unit had a session) and, on `second prompt` and `triage gave no answer`,
-`questions` (the pending request's questions, JSON-stringified).
+`questions` (the pending request's questions, JSON-stringified). The driver adds the events
+`driver`, `driver resume`, `driver escalate`, `driver stop` and `driver dropped`.
 
 ```json
 {
@@ -171,3 +211,5 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - A seat that clears in place without a handoff line is seen only through the quiet window.
 - `findByNonce` depends on T3 keeping the thread title.
 - The 30-day token re-approval is manual.
+- A driver's judgment is prose: a driver that picks the wrong result is caught only by the closed
+  checks on its result file and by the operator reading the ledger.
