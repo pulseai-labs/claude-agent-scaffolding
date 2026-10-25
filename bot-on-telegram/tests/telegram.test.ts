@@ -150,4 +150,7 @@ test("fitText: Telegram's 4096 limit in UTF-16 code units, tail cut with an elli
   const out = fitText(pair);
   expect(out).toBe("z".repeat(4094) + "…");
   expect(out.length).toBeLessThanOrEqual(4096);
+  // `keep` is never cut: the head is cut so head + keep fits.
+  expect(fitText("k".repeat(4096), " — done")).toBe("k".repeat(4096 - 8) + "… — done");
+  expect(fitText("short", " — done")).toBe("short — done");
 });

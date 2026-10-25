@@ -137,8 +137,9 @@ async function handlePress(
   await api.call("answerCallbackQuery", { callback_query_id: queryId }).catch(() => {});
 
   const notice = firstLine(message.text ?? "");
-  const edit = async (text: string, keyboard?: Keyboard) => {
-    const body: Record<string, unknown> = { chat_id: ctx.chatId, message_id: message.message_id, text: fitText(text) };
+  // Each edit fits Telegram's limit: `keep` (a question or outcome after the notice) is never cut.
+  const edit = async (text: string, keyboard?: Keyboard, keep = "") => {
+    const body: Record<string, unknown> = { chat_id: ctx.chatId, message_id: message.message_id, text: fitText(text, keep) };
     if (keyboard) {
       body.reply_markup = keyboard;
       const ids = keyboard.inline_keyboard.flat().flatMap((b) => ("callback_data" in b ? [b.callback_data] : []));
@@ -151,7 +152,7 @@ async function handlePress(
   const outcome = async (res: { rc: number; stderr: string }): Promise<string> => {
     if (res.rc === 0) {
       line.result = "done";
-      await edit(`${notice} — done`, openPrOnly(rec));
+      await edit(notice, openPrOnly(rec), " — done");
       return "done";
     }
     line.result = "failed";
@@ -180,9 +181,9 @@ async function handlePress(
       const pr = parsePrView(view.stdout);
       if (!pr) return outcome({ rc: 1, stderr: "gh pr view gave no PR number and base" });
       const carry = { ...base, pr_url: rec.pr_url, head_sha: rec.head_sha };
-      await edit(`${notice}\n\nMerge PR #${pr.number} (head ${rec.head_sha.slice(0, 7)}) into ${pr.base}?`, {
+      await edit(notice, {
         inline_keyboard: [[btn("Yes", { action: "merge-yes", ...carry }), btn("No", { action: "merge-no", ...carry })]],
-      });
+      }, `\n\nMerge PR #${pr.number} (head ${rec.head_sha.slice(0, 7)}) into ${pr.base}?`);
       return "confirm";
     }
     case "merge-yes":
@@ -196,16 +197,16 @@ async function handlePress(
       if (rec.unit === undefined) return outcome({ rc: 1, stderr: "button carries no unit" });
       const rows = stageNames(rec.run).map((stage) => [btn(stage, { action: "unpark-stage", ...base, stage })]);
       rows.push([btn("Cancel", { action: "cancel", ...base })]);
-      await edit(`${notice}\n\nUnpark to which stage?`, { inline_keyboard: rows });
+      await edit(notice, { inline_keyboard: rows }, "\n\nUnpark to which stage?");
       return "picker";
     }
     case "unpark-stage":
       if (rec.unit === undefined || !rec.stage) return outcome({ rc: 1, stderr: "button carries no stage" });
       return outcome(await unparkTo(rec.run, rec.unit, rec.stage, runner));
     case "disarm":
-      await edit(`${notice}\n\nDisarm run ${rec.run}?`, {
+      await edit(notice, {
         inline_keyboard: [[btn("Yes", { action: "disarm-yes", ...base }), btn("No", { action: "disarm-no", ...base })]],
-      });
+      }, `\n\nDisarm run ${rec.run}?`);
       return "confirm";
     case "disarm-yes":
       return outcome(await disarm(rec.run, runner));

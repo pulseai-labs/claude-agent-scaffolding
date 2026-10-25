@@ -574,6 +574,7 @@ test("a press on a 4096-char notice edits within Telegram's limit: the done edit
   const confirm = lastEdit().text as string;
   expect(confirm.length).toBeLessThanOrEqual(4096);
   expect(confirm.startsWith("🔴 ACTION — n")).toBe(true);
+  expect(confirm.endsWith("…\n\nDisarm run r1?")).toBe(true); // the notice is cut, never the question
   // The Disarm press spent the notice's buttons: a fresh notice for the done edit.
   const k2 = sendParkNotice();
   await handleUpdate(press(byText(k2, "Unpark"), { text: long }), ctx());
@@ -581,4 +582,5 @@ test("a press on a 4096-char notice edits within Telegram's limit: the done edit
   const done = lastEdit().text as string;
   expect(done.length).toBeLessThanOrEqual(4096);
   expect(done.startsWith("🔴 ACTION — n")).toBe(true);
+  expect(done.endsWith("… — done")).toBe(true);
 });
