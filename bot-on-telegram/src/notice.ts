@@ -1,5 +1,5 @@
 export type Notice =
-  | { kind: "unit-park"; run: string; unit: string }
+  | { kind: "unit-park"; run: string; unit: string; at: string }
   | { kind: "unit-move"; run: string; unit: string; stage: string }
   | { kind: "run-park"; run: string }
   | { kind: "run-done"; run: string }
@@ -23,7 +23,7 @@ export function parseKey(key: string): Notice {
   // A unit literally named "run" reads as a run park; baton never mints that id on purpose.
   if (second === "run" && third === "park") return { kind: "run-park", run };
   if (!UNIT_ID_RE.test(second)) return PLAIN;
-  if (third === "park") return { kind: "unit-park", run, unit: second };
+  if (third === "park") return { kind: "unit-park", run, unit: second, at };
   if (!STAGE_NAME_RE.test(third)) return PLAIN;
   return { kind: "unit-move", run, unit: second, stage: third };
 }

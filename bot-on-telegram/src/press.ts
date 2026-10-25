@@ -243,7 +243,7 @@ async function handlePress(
 function originalNotice(rec: ButtonRec): Notice {
   if (rec.notice_kind === "run-park") return { kind: "run-park", run: rec.run };
   if (rec.notice_kind !== undefined && rec.unit !== undefined) {
-    if (rec.notice_kind === "unit-park") return { kind: "unit-park", run: rec.run, unit: rec.unit };
+    if (rec.notice_kind === "unit-park") return { kind: "unit-park", run: rec.run, unit: rec.unit, at: "" };
     const stage = rec.stage ?? readUnit(rec.run, rec.unit)?.stage ?? "";
     return { kind: "unit-move", run: rec.run, unit: rec.unit, stage };
   }

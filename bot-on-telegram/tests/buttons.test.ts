@@ -28,7 +28,7 @@ test("mint ids are 10 base32 chars and callback_data fits 64 bytes", () => {
   const r = mint({ action: "unpark", run: "r1", unit: "u1" }, now);
   expect(r.id).toMatch(/^[a-z2-7]{10}$/);
   expect(r.minted_at).toBe(now.toISOString());
-  const k = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1" }, now);
+  const k = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1", at: "" }, now);
   for (const b of cb(k)) expect(new TextEncoder().encode(b.callback_data).length).toBeLessThanOrEqual(64);
 });
 
@@ -62,7 +62,7 @@ test("setMessageId binds ids; idsOnMessage lists them; record survives", () => {
 });
 
 test("unit-park keyboard", () => {
-  const k = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1" }, now);
+  const k = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1", at: "" }, now);
   expect(texts(k)).toEqual(["Unpark", "Unpark to stage…", "Show question", "Disarm"]);
   expect(lookup(cb(k)[0]!.callback_data, now)).toMatchObject({ action: "unpark", run: "r1", unit: "u1" });
 });
@@ -90,7 +90,7 @@ test("unit-move with no pr_url, and run-park: Disarm only", () => {
 });
 
 test("undefined when the run state cannot be read, and for run-done / plain", () => {
-  expect(keyboardFor({ kind: "unit-park", run: "nope", unit: "u1" }, now)).toBeUndefined();
+  expect(keyboardFor({ kind: "unit-park", run: "nope", unit: "u1", at: "" }, now)).toBeUndefined();
   expect(keyboardFor({ kind: "run-park", run: "nope" }, now)).toBeUndefined();
   expect(keyboardFor({ kind: "run-done", run: "r1" }, now)).toBeUndefined();
   expect(keyboardFor({ kind: "plain" }, now)).toBeUndefined();
@@ -103,8 +103,8 @@ test("lookup of an id never minted is unknown, with and without a log file", () 
 });
 
 test("undefined for a missing unit in an existing run, and for a garbage run.json", () => {
-  expect(keyboardFor({ kind: "unit-park", run: "r1", unit: "no-such-unit" }, now)).toBeUndefined();
-  expect(keyboardFor({ kind: "unit-park", run: "r3", unit: "u1" }, now)).toBeUndefined();
+  expect(keyboardFor({ kind: "unit-park", run: "r1", unit: "no-such-unit", at: "" }, now)).toBeUndefined();
+  expect(keyboardFor({ kind: "unit-park", run: "r3", unit: "u1", at: "" }, now)).toBeUndefined();
   expect(keyboardFor({ kind: "run-park", run: "r3" }, now)).toBeUndefined();
 });
 

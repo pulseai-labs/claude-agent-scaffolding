@@ -3,8 +3,11 @@ import { parseKey } from "./notice.ts";
 import { mkdirSync, renameSync } from "node:fs";
 import { basename, join } from "node:path";
 import { stateDir } from "./paths.ts";
+import { recordOpen } from "./settle.ts";
 import { listSpool, removeSpool } from "./spool.ts";
 import { TelegramError, type Api } from "./telegram.ts";
+
+const ACTION_MARKER = "🔴 ACTION — ";
 
 export async function drainSpool(
   api: Api,
@@ -15,8 +18,12 @@ export async function drainSpool(
   let failed = 0;
   for (const { path, item } of listSpool()) {
     try {
-      let keyboard = keyboardFor(parseKey(item.key), now());
-      const body: Record<string, unknown> = { chat_id: chatId, text: item.message };
+      const notice = parseKey(item.key);
+      let keyboard = keyboardFor(notice, now());
+      // Baton sends actions; the run-end summary is the one silent, marker-free notice.
+      const text = notice.kind === "run-done" ? item.message : ACTION_MARKER + item.message;
+      const body: Record<string, unknown> = { chat_id: chatId, text };
+      if (notice.kind === "run-done") body.disable_notification = true;
       if (keyboard) body.reply_markup = keyboard;
       let msg: { message_id: number };
       try {
@@ -31,6 +38,9 @@ export async function drainSpool(
       if (keyboard) {
         const ids = keyboard.inline_keyboard.flat().flatMap((b) => ("callback_data" in b ? [b.callback_data] : []));
         setMessageId(ids, msg.message_id);
+      }
+      if (notice.kind === "unit-park") {
+        recordOpen({ message_id: msg.message_id, run: notice.run, unit: notice.unit, park_at: notice.at, text });
       }
       removeSpool(path);
       sent++;
