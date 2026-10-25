@@ -815,7 +815,7 @@ describe('a lone & reaches the hook rails (#723)', () => {
 describe('deny texts point at the way through (#844)', () => {
   test('implementer: rm "$S/x" is told to spell the path out; the literal path in the allow folder runs', async ($, on) => {
     world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
-    const deny = (await $.tool.call({ tool: 'Bash', command: 'S=/reports; rm -rf "$S/shallow"' })).deny
+    const deny = (await $.tool.call({ tool: 'Bash', command: 'rm -rf "$S/shallow"' })).deny
     expect(deny).toContain('no rm with an operand the guard cannot resolve')
     expect(deny).toContain('spell its path out literally')
     expect((await $.tool.call({ tool: 'Bash', command: 'rm -rf /var/x' })).deny).not.toContain('literally')
@@ -1187,5 +1187,22 @@ describe('waiting on the operator rings the bell (#873)', () => {
     await wait.promise
     expect(w.bellRuns.length).toBe(1)
     expect(w.runs.filter(argv => argv.join(' ').includes('bell failed exit=3')).length).toBe(1)
+  })
+})
+
+// Task 5: rmTargets hands the glue an absolute path after a literal cd or variable; the glue joins no session
+// directory to it, and walks its `..` through links as the kernel does (/w/outside is a link to /var).
+describe('batch 5: rm after a literal cd or variable', () => {
+  test('implementer: the resolved operand is placed where Bash removes it', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer', SEAT_MODS_ALLOW: '/reports' })
+    const deny = async (command: string) => (await $.tool.call({ tool: 'Bash', command })).deny
+    for (const command of ['cd /w/build && rm -f x', 'cd /w/build && rm -f ../x', 'cd /w; cd build && rm -f *.o',
+      'S=/reports; rm -rf "$S/shallow"', 'WT=/w; cd "$WT"\nrm -rf build/x', 'cd /w/inside && rm -f ../x'])
+      expect(await deny(command)).toBeUndefined()
+    for (const command of ['cd /var && rm -f x', 'cd /w/build && rm -f ../../var/x', 'S=/var; rm -rf "$S/x"',
+      'cd /w/outside && rm -f x', 'cd /w/outside && rm -f ../x'])
+      expect(await deny(command)).toContain('no rm outside writable places')
+    expect(await deny('cd /w && rm -rf ..')).toContain('roots or ancestors')
+    expect(await deny('cd /w/build || true; rm -f x')).toContain('cannot resolve')
   })
 })

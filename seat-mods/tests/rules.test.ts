@@ -296,10 +296,14 @@ describe('rm operand parsing', () => {
     expect(rmTargets('rm -rf')).toEqual([])
   })
   test('earlier directory changes poison only relative operands, including after --', async () => {
-    for (const change of ['cd', 'pushd', 'popd'])
-      expect(rmTargets(`${change} /var; rm -- -file /w/x ~/x`)).toEqual([
+    for (const change of ['cd -', 'cd "$D"', 'pushd /var', 'popd', 'builtin cd /var'])
+      expect(rmTargets(`${change}; rm -- -file /w/x ~/x`)).toEqual([
         { path: undefined, glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
       ])
+    // batch 5: a literal cd resolves the relative operand instead
+    expect(rmTargets('cd /var; rm -- -file /w/x ~/x')).toEqual([
+      { path: '/var/-file', glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
+    ])
     expect(rmTargets('rm x; cd /var')).toEqual([{ path: 'x', glob: false }])
   })
   test('malformed words fail closed beside valid quoted words', async () => {
@@ -1207,5 +1211,159 @@ describe('batch 5: scratch directories', () => {
     expect(removalOf('/etc/x', '/w', allow, false)).toEqual({ place: 'outside', protected: false })
     expect(decide('implementer', { kind: 'bash', rules: [], removals: [removalOf('/tmp', '/w', allow, false)] })).toContain('roots or ancestors')
     expect(decide('implementer', { kind: 'bash', rules: [], removals: [removalOf('/tmp/x', '/w', allow, false)] })).toBeUndefined()
+  })
+})
+
+// Task 5: a relative rm operand after a literal cd, and a "$NAME" after a literal NAME=value, resolve to an
+// absolute path, but only along a plain `;`, `&&` or newline sequence from the command's start (spec §7).
+describe('batch 5: rm after cd', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  // What both glues decide for an implementer whose worktree and session directory are `root`, with the scratch
+  // directories allowed. The glues walk each `..` (through links) before placing; with no links that is lexical.
+  const lexical = (path: string) => {
+    const parts: string[] = []
+    for (const part of path.split('/')) if (part === '..') parts.pop(); else if (part !== '' && part !== '.') parts.push(part)
+    return '/' + parts.join('/')
+  }
+  const verdict = (command: string, root = '/w/wt') => decide('implementer', {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(lexical(target.path.startsWith('/') ? target.path : `${root}/${target.path}`), root, scratchDirs(undefined), target.glob)),
+  })
+  test('the plan: a literal cd or assignment resolves; anything else stays unresolved', () => {
+    expect(rmTargets('cd "/w/wt" && rm -rf pf/__pycache__ tests/__pycache__'))
+      .toEqual([{ path: '/w/wt/pf/__pycache__', glob: false }, { path: '/w/wt/tests/__pycache__', glob: false }])
+    expect(rmTargets('WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/o.pyc'))
+      .toEqual([{ path: '/w/wt/pf/__pycache__/o.pyc', glob: false }])
+    expect(rmTargets('WT=/w/wt; rm -f "$WT/x"')).toEqual([{ path: '/w/wt/x', glob: false }])
+    // stays unresolved (refused as today)
+    for (const c of ['cd /w/wt || true; rm x', '(cd /w/wt); rm x', 'if true; then cd /w/wt; fi; rm x',
+      'cd -; rm x', 'cd "$UNSET"; rm x', 'WT=$(pwd); rm "$WT/x"', 'cd /w/wt | cat; rm x', 'rm "$UNSET/x"'])
+      expect(rmTargets(c)).toEqual([{ path: undefined, glob: false }])
+    // a relative cd after a known absolute one
+    expect(rmTargets('cd /w; cd wt && rm x')).toEqual([{ path: '/w/wt/x', glob: false }])
+  })
+  test('adjacent controls: the same shapes with a ruled directory resolve to it and are refused', () => {
+    expect(rmTargets('cd /etc && rm -rf x')).toEqual([t('/etc/x')])
+    expect(rmTargets('WT=/etc; rm -rf "$WT/x"')).toEqual([t('/etc/x')])
+    expect(rmTargets('WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc')).toEqual([t('/etc/pf/__pycache__/o.pyc')])
+    expect(rmTargets('cd /; cd etc && rm x')).toEqual([t('/etc/x')])
+    for (const command of ['cd /etc && rm -rf x', 'WT=/etc; rm -rf "$WT/x"', 'WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc',
+      'cd /; cd etc && rm x', 'cd "/etc" && rm -rf pf/__pycache__ tests/__pycache__'])
+      expect(verdict(command)).toContain('no rm outside writable places')
+    for (const command of ['cd "/w/wt" && rm -rf pf/__pycache__ tests/__pycache__', 'WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/o.pyc',
+      'WT=/w/wt; rm -f "$WT/x"', 'cd /w; cd wt && rm x'])
+      expect(verdict(command)).toBeUndefined()
+    // the session directory is the worktree here, so an unresolved operand is refused by its own text
+    expect(verdict('cd /w/wt || true; rm x')).toContain('cannot resolve')
+  })
+  test('Review Focus 2: a cd in a subshell, a block, a pipeline, or after || or & does not move the directory', () => {
+    for (const c of ['{ cd /w/wt; }; rm x', 'cd /w/wt & rm x', 'true || cd /w/wt; rm x', 'true | cd /w/wt; rm x',
+      'while true; do cd /w/wt; break; done; rm x', 'for d in /w/wt; do cd "$d"; done; rm x', 'case a in a) cd /w/wt;; esac; rm x',
+      '! cd /w/wt; rm x', 'time cd /w/wt; rm x', 'echo $(cd /w/wt); rm x', 'f() { cd /etc; }; cd /w && f && rm x',
+      'if false; then\ncd /w/wt\nelse\nrm x\nfi', 'if true; then\ncd /w/wt\nfi\nrm x',
+      'function f { cd /etc; }; cd /w && f && rm x', 'cd /w; (cd wt); rm x', '(cd /w/wt && rm x)', 'X=$(cd /w/wt && rm y)', 'cd /w/wt && ls | head; rm x', 'cd /w/wt || exit; rm x'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // the rm inside the plain sequence reads before the || or | that follows it
+    expect(rmTargets('cd /w/wt && rm x || true')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('cd /w/wt && rm x | cat')).toEqual([t('/w/wt/x')])
+    // no cd: a pipeline, subshell or block keeps the session directory, as today
+    for (const c of ['ls | wc -l; rm x', '(true); rm x', 'if true; then :; fi; rm x', 'true || false; rm x'])
+      expect(rmTargets(c)).toEqual([t('x')])
+  })
+  test('a cd or assignment after && behind another command holds only to the end of its list', () => {
+    // Bash skips the cd when the test fails, and the rm after `;` runs in the session directory
+    for (const c of ['false && cd /w/wt; rm x', 'test -d /w/wt && cd /w/wt\nrm x', 'true && WT=/w/wt; rm "$WT/x"',
+      'cd /w && rm a && cd wt; rm x'])
+      expect(rmTargets(c).at(-1)).toEqual(t(undefined))
+    expect(rmTargets('test -d /w/wt && cd /w/wt && rm x')).toEqual([t('/w/wt/x')])
+    // a list of only cds and assignments runs whole, so the directory holds after it
+    expect(rmTargets('WT=/w/wt && cd "$WT" && rm a; rm b')).toEqual([t('/w/wt/a'), t('/w/wt/b')])
+    expect(rmTargets('cd /w && cd wt; rm x')).toEqual([t('/w/wt/x')])
+    // a new list after `;` starts plain again
+    expect(rmTargets('git status; WT=/w && cd "$WT"; rm x')).toEqual([t('/w/x')])
+  })
+  test('the variable spellings that resolve, and the ones that do not', () => {
+    expect(rmTargets('WT=/w/wt; rm -f "${WT}/x" ${WT}/y $WT/z "$WT"/q "$WT" ${WT}x')).toEqual([
+      t('/w/wt/x'), t('/w/wt/y'), t('/w/wt/z'), t('/w/wt/q'), t('/w/wt'), t('/w/wtx')])
+    expect(rmTargets("WT=/w/wt; rm -f '$WT/x' \\$WT/y")).toEqual([t('$WT/x'), t('$WT/y')])
+    expect(rmTargets('WT=x; rm "it\'s/$WT"')).toEqual([t("it's/x")])
+    expect(rmTargets("WT='/w/wt' X=/w/x; rm -f \"$WT/a\" \"$X/b\"")).toEqual([t('/w/wt/a'), t('/w/x/b')])
+    expect(rmTargets('WT=/w/wt; cd $WT && rm -f a "$WT/b"')).toEqual([t('/w/wt/a'), t('/w/wt/b')])
+    for (const c of ['WT=/w/wt; rm "$WTx"', 'WT=/w/wt; rm "${WT:-/w}/x"', 'WT=/w/wt; rm "$$WT"', 'WT=/w/wt; rm ~$WT',
+      'WT=/w/wt; rm "${#WT}"', 'WT=/w/wt; rm "$1"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // a relative value is a relative operand: it joins a known directory, or the session's, like any other
+    expect(rmTargets('cd /w; WT=wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('WT=wt; rm -rf "$WT/x"')).toEqual([t('wt/x')])
+    expect(rmTargets('WT=wt; cd "$WT" && rm x')).toEqual([t(undefined)])
+    // a glob after a substituted value is placed by its literal prefix
+    expect(rmTargets('WT=/w/wt; rm -f "$WT"/pf/*.pyc')).toEqual([t('/w/wt/pf', true)])
+  })
+  test('a value with an expansion, or one Bash reads differently, never becomes known', () => {
+    for (const c of ['WT=$(pwd); rm "$WT/x"', 'WT="$HOME/x"; rm "$WT/y"', 'WT=`pwd`; rm "$WT/x"', 'WT=~/x; rm "$WT"',
+      "WT='/w/a b'; rm $WT/x", "WT='/w/*'; rm $WT", "WT='~/x'; rm $WT", 'WT=; rm "$WT/x"', 'WT=/w/wt true; rm "$WT/x"',
+      'export WT=/w/wt; rm "$WT/x"', 'local WT=/w/wt; rm "$WT/x"', 'declare WT=/w/wt; rm "$WT/x"', 'readonly WT=/w/wt; rm "$WT/x"',
+      'RANDOM=/w/wt; rm "$RANDOM/x"', 'SECONDS=/w; rm "$SECONDS/x"', 'PWD=/w/wt; rm "$PWD/x"', 'UID=/w; rm "$UID/x"',
+      'WT[0]=/w/wt; rm "$WT/x"', 'WT+=/w/wt; rm "$WT/x"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+  })
+  test('a later command that may change a known variable makes it unknown again', () => {
+    for (const c of ['WT=/w; WT=$(pwd); rm "$WT/x"', 'WT=/w; WT+=/x; rm "$WT/y"', 'WT=/w; WT[0]=/etc; rm "$WT/y"',
+      'WT=/w; unset WT; rm "$WT/y"', 'WT=/w; read WT </dev/null; rm "$WT/y"', 'WT=/w; printf -v WT /etc; rm "$WT/y"',
+      'WT=/w; N=WT; printf -v "$N" /etc; rm "$WT/y"', 'WT=/w; echo ${WT:=/etc}; rm "$WT/y"', 'WT=/w; export WT=/etc; rm "$WT/y"',
+      'WT=/w; eval "WT=/etc"; rm "$WT/y"', 'WT=/w; source ./env.sh; rm "$WT/y"', 'WT=/w; . ./env.sh; rm "$WT/y"',
+      'WT=/w; for WT in /etc; do :; done; rm "$WT/y"', 'WT=/w; let WT=1; rm "$WT/y"', 'WT=/w; mapfile WT </dev/null; rm "$WT/y"',
+      'WT=/w; $CMD; rm "$WT/y"', 'WT=/w; WT=/etc true; rm "$WT/y"', 'WT=/w; echo $((WT=1)); rm "$WT/y"',
+      'WT=/w; WT=`pwd`; rm "$WT/y"', 'WT=/w; WT="$HOME/x"; rm "$WT/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // controls: a command that only reads it, or names no variable, keeps it
+    for (const c of ['WT=/w; git -C "$WT" status; rm "$WT/y"', 'WT=/w; echo "$WT" ${WT}; rm "$WT/y"', 'WT=/w; set -euo pipefail; rm "$WT/y"',
+      'WT=/w; X=1; rm "$WT/y"', 'WT=/w; WT=/w; rm "$WT/y"'])
+      expect(rmTargets(c)).toEqual([t('/w/y')])
+  })
+  test('cd spellings: the builtin itself resolves; a wrapper, an option or an unread word does not', () => {
+    for (const c of ['\\cd /w && rm x', '"cd" /w && rm x', "c'd' /w && rm x", 'cd /w/ && rm x', 'cd /w 2>/dev/null && rm x',
+      'cd /w # go\nrm x', 'cd "/w"\nrm x'])
+      expect(rmTargets(c)).toEqual([t('/w/x')])
+    expect(rmTargets('cd / && rm x')).toEqual([t('/x')])
+    for (const c of ['builtin cd /w; rm x', 'command cd /w; rm x', '/usr/bin/cd /w; rm x', 'A=1 cd /w; rm x', 'cd -- /w; rm x',
+      'cd -P /w; rm x', 'cd /w /etc; rm x', 'cd; rm x', 'cd ~; rm x', 'cd ~/w; rm x', 'cd /w*; rm x', 'cd /w/{a,b}; rm x',
+      'cd ""; rm x', 'cd /w/wt/..; rm x', 'cd /w/wt && cd .. && rm x', 'pushd /w; rm x', 'cd /w; popd; rm x',
+      'cd /w; "pushd" /etc; rm x', 'cd /w; builtin cd /etc; rm x', 'cd /w; "command" cd /etc; rm x', 'cd /w; command cd /etc; rm x',
+      'cd /w; eval "cd /etc"; rm x', 'cd /w; source ./go.sh; rm x', 'cd /w; . ./go.sh; rm x', 'cd /w; C=cd; $C /etc; rm x',
+      'cd /w; `echo cd` /etc; rm x', 'cd /w; trap "cd /etc" DEBUG; rm x', 'cd /w; shopt -s cdable_vars; rm x',
+      'CDPATH=/etc; cd /w; cd ssl && rm x', 'cd /w; export CDPATH=/etc; cd ssl && rm x', 'IFS=/; cd /w && rm x',
+      'cd /w; command -p cd /etc; rm x', 'cd /w; command -- cd /etc; rm x', 'cd /w; builtin -- cd /etc; rm x',
+      'cd /w; command -p $C /etc; rm x', 'cd /w; env -i cd /etc; rm x', 'cd /w; cd - && rm x', 'cd /w; cd ~/x && rm y',
+      'cd /w; coproc { cd /etc; rm x; }', 'cd /w; A=1 $C /etc; rm x', 'if true; then "cd" /etc; fi; rm x', 'cd /w; c[d] /etc; rm x'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // as before batch 5, any word named cd counts, even through an unread folder
+    expect(rmTargets('$D/cd /etc; rm x')).toEqual([t(undefined)])
+    // controls: a command that only runs a program keeps the directory
+    for (const c of ['cd /w; echo cd /etc; rm x', 'cd /w; git status; rm x', 'cd /w; echo "cd /etc"; rm x', 'cd /w; command rm x',
+      'cd /w; command -p git status; rm x', 'cd /w && cat <<EOF\ncd /etc\nEOF\nrm x', '>/dev/null cd /w; rm x', '""cd /w; rm x'])
+      expect(rmTargets(c)).toEqual([t('/w/x')])
+    // no cd before it: a builtin that can change the directory leaves the session's, as today
+    for (const c of ['source venv/bin/activate && rm -rf x', 'eval true; rm x', '$EDITOR f; rm x', 'export A=1; rm x'])
+      expect(rmTargets(c)).toEqual([t('x')])
+  })
+  test('operands keep their kind; a .. is left to placement, which follows links before it', () => {
+    expect(rmTargets("cd /w && rm -rf -- -x ~/x '~/y' /abs ..")).toEqual([t('/w/-x'), t('~/x'), t('/w/~/y'), t('/abs'), t('/w/..')])
+    expect(rmTargets('cd /w/wt && rm -rf ../x')).toEqual([t('/w/wt/../x')])
+    expect(rmTargets('cd /w/wt && rm -f *.pyc pf/__pycache__/o.*.pyc')).toEqual([t('/w/wt/.', true), t('/w/wt/pf/__pycache__', true)])
+    expect(rmTargets('cd /w/wt && rm -f ../*.pyc .*.pyc')).toEqual([t('/w/wt/..', true), t(undefined)])
+    // the real record: globs under a cd through a variable (Task 6 replays it)
+    expect(rmTargets('WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/ordinal.*.pyc tests/__pycache__/test_ordinal.*.pyc\npython3 -m unittest tests.test_ordinal; echo "rc=$?"'))
+      .toEqual([t('/w/wt/pf/__pycache__', true), t('/w/wt/tests/__pycache__', true)])
+    // a `..` out of the worktree is outside; one that stays inside is inside
+    expect(verdict('cd /w/wt && rm -rf ../x')).toContain('no rm outside writable places')
+    expect(verdict('cd /w/wt && rm -rf ..')).toContain('roots or ancestors')
+    expect(verdict('cd /w/wt/pf && rm -rf ../tests/x')).toBeUndefined()
+  })
+  test('Ruling 2: a substitution inherits neither the directory nor the variables', () => {
+    for (const c of ['cd /w && echo "$(rm x)"', 'WT=/w; echo "$(rm "$WT/x")"', 'echo "$(cd /w && rm x)"', 'echo "$(WT=/w; rm "$WT/x")"',
+      'cd /w; X=$(cd /etc); rm y', 'WT=/w; echo `rm "$WT/x"`'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
   })
 })

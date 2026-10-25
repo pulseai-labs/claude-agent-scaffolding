@@ -180,6 +180,16 @@ describe('bash cwd (fix wave 2)', () => {
   test('a cwd that is a link out of the worktree is followed', async () => {
     expect(await guard(norm(), 'bash', { command: 'rm x', cwd: 'link' }, child('implementer'))).toContain('no rm outside')
   })
+  // seat-mods batch 5 (Task 5): an operand after a literal cd or variable arrives absolute; the call cwd is not joined to it
+  test('rm after a literal cd or variable is placed where Bash removes it', async () => {
+    const bash = (command: string, cwd?: string) => guard(norm(), 'bash', cwd === undefined ? { command } : { command, cwd }, child('implementer'))
+    for (const [command, cwd] of [['cd /repo/wt/sub && rm -rf build'], ['WT=/repo/wt; rm -rf "$WT/build"'], ['cd /repo/wt && rm -rf build', '/outside'],
+      ['cd /repo/wt/sub && rm -rf ../build']] as const)
+      expect(await bash(command, cwd)).toBeUndefined()
+    for (const [command, cwd] of [['cd /etc && rm -rf x'], ['WT=/etc; rm -rf "$WT/x"'], ['cd /repo/wt/sub && rm -rf ../../x'], ['cd /etc && rm -rf x', '/repo/wt']] as const)
+      expect(await bash(command, cwd)).toContain('no rm outside')
+    expect(await bash('cd /repo/wt || true; rm -rf build')).toContain('cannot resolve')
+  })
   test('a commit message file is read against the call cwd', async () => {
     const seen: string[] = []
     const d = norm({ readFile: async (f: string) => { seen.push(f); return '' } })
@@ -635,7 +645,7 @@ describe('scratch sinks (#844)', () => {
     expect(deny).toContain('/tmp/allow')
   })
   test('an rm operand the guard cannot resolve says to spell the path literally; one outside keeps its own text', async () => {
-    const unresolved = await guard(deps(), 'bash', { command: 'S=/tmp/allow; rm -rf "$S/shallow"' }, child('implementer'))
+    const unresolved = await guard(deps(), 'bash', { command: 'rm -rf "$S/shallow"' }, child('implementer'))
     expect(unresolved).toContain('no rm')
     expect(unresolved).toContain('literal')
     const outside = await guard(deps(), 'bash', { command: 'rm -rf /etc/x' }, child('implementer'))
@@ -643,6 +653,9 @@ describe('scratch sinks (#844)', () => {
     expect(outside).not.toContain('literal')
     // control: the same removal spelled literally, in the allow folder, runs
     expect(await guard(deps(), 'bash', { command: 'rm -rf /tmp/allow/shallow' }, child('implementer'))).toBeUndefined()
+    // batch 5: so does one through a literal assignment, which places it outside when it names outside
+    expect(await guard(deps(), 'bash', { command: 'S=/tmp/allow; rm -rf "$S/shallow"' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'bash', { command: 'S=/etc; rm -rf "$S/shallow"' }, child('implementer'))).toContain('no rm outside')
   })
 })
 
