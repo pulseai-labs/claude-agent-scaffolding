@@ -405,6 +405,25 @@ describe("driver stage", () => {
     expectError(r, 'stages.work.message: unknown placeholder "{driver.launch}"');
   });
 
+  test("driver files are per run, and the state file is not the result file", () => {
+    expectError(withDriver({ ...driver(), result_file: "/tmp/shared/{unit.id}-{driver.launch}.json" }),
+      "driver.result_file: must contain {run.dir} or {run.id}");
+    expectError(withDriver({ ...driver(), state_file: "/tmp/shared/{unit.id}.md" }),
+      "driver.state_file: must contain {run.dir} or {run.id}");
+    expectError(withDriver({ ...driver(), state_file: "{run.dir}/{unit.id}/f-{driver.launch}", result_file: "{run.dir}/{unit.id}/f-{driver.launch}" }),
+      "driver.state_file: must not be the result_file");
+    // Two runs, the same unit id and launch number: a valid recipe renders distinct paths.
+    for (const tpl of ["{run.dir}/{unit.id}/r-{driver.launch}", "/tmp/shared/{run.id}/{unit.id}/r-{driver.launch}"]) {
+      const res = validate(withDriver({ ...driver(), result_file: tpl, state_file: tpl.replace("r-{driver.launch}", "state") }));
+      expect(res.ok).toBe(true);
+      if (!res.ok) continue;
+      const d = res.recipe.driver!;
+      const at = (id: string): Scope => ({ ...scope, run: { id, dir: `/runs/${id}`, group: "g1" },
+        driver: { reason: "stop", stage: "work", launch: "1" } });
+      for (const f of [d.result_file, d.state_file]) expect(render(f, at("r1"))).not.toBe(render(f, at("r2")));
+    }
+  });
+
   test("a stage named driver is refused when the recipe has a driver", () => {
     const r = withDriver();
     r.stages.driver = r.stages.work;

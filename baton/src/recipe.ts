@@ -416,15 +416,19 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       for (const f of ["state_file", "result_file", "ledger"]) {
         if (!isStr(d[f])) err(`driver.${f}`, "must be a string");
       }
-      // Two units must not share a state or result file, and a result binds to the launch that
-      // wrote it, so an earlier driver's late write is never read for a later one. The ledger is
-      // append-only and may be shared.
+      // Two runs or two units must not share a state or result file, and a result binds to the
+      // launch that wrote it, so an earlier driver's late write is never read for a later one.
+      // The ledger is append-only and may be shared.
       for (const f of ["state_file", "result_file"]) {
-        if (isStr(d[f]) && !d[f].includes("{unit.id}")) err(`driver.${f}`, "must contain {unit.id}");
+        if (!isStr(d[f])) continue;
+        if (!d[f].includes("{run.dir}") && !d[f].includes("{run.id}")) err(`driver.${f}`, "must contain {run.dir} or {run.id}");
+        if (!d[f].includes("{unit.id}")) err(`driver.${f}`, "must contain {unit.id}");
       }
       if (isStr(d.result_file) && !d.result_file.includes("{driver.launch}")) {
         err("driver.result_file", "must contain {driver.launch}");
       }
+      // The launch writes the state file, then removes the result path: one file would be lost.
+      if (isStr(d.state_file) && d.state_file === d.result_file) err("driver.state_file", "must not be the result_file");
       launchFields("driver", d);
       if (!isStrArr(d.clearing) || d.clearing.length === 0) {
         err("driver.clearing", "must be a non-empty list of names");

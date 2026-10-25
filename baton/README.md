@@ -82,8 +82,8 @@ A recipe may carry one top-level `driver` stage (`kind: "driver"`). It takes the
 names the driver may report having cleared) and `resume_to` (park stage to the stages a resume may
 enter). Its message may use `{driver.stage}`, `{driver.reason}` and `{driver.launch}` (the launch's
 number, `<n>` of its nonce `<run>/<unit>/driver/<n>`). `state_file` and `result_file` must contain
-`{unit.id}`, and `result_file` must contain `{driver.launch}`, so a result is read only for the launch
-that wrote it; both may use `{driver.launch}`, the ledger (which may be shared) may not. `session`-only fields
+`{run.dir}` or `{run.id}` and `{unit.id}`, `result_file` must contain `{driver.launch}`, and the two
+must differ, so a result is read only for the launch that wrote it; both may use `{driver.launch}`, the ledger (which may be shared) may not. `session`-only fields
 (`outcomes`, `handoff`, `slots`, `stop_file`, `before`, `after_launch`, `watch` and the like) are
 refused, and a recipe with a driver cannot name a stage `driver`.
 
