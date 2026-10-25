@@ -102,8 +102,14 @@ function blank(command: string): { text: string; pieces: string[] } {
   // An unquoted backslash-newline is a line continuation, not a command boundary.
   const joined = command.replace(/\\\n/g, ' ')
   // A backslash outside quotes makes the next character text (`\\|` is not a pipe).
+  // Before a word character, `.`, `/` or `-` it only quotes: quote removal makes `\rm` read
+  // `rm`, so it is dropped (#702 B8). A reserved word is syntax only unquoted, so `\if`
+  // keeps its escape and stays a program name.
+  const reserved = /^(?:if|then|elif|else|fi|do|while|until)(?=[\s;&|()<>]|$)/
+  const unescape = (escape: string, at: number, whole: string) =>
+    /[A-Za-z0-9_./-]/.test(escape[1]!) && !reserved.test(whole.slice(at + 1)) ? escape[1]! : keep(escape)
+  const text = blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, unescape)
   // A `#` that starts a word begins a comment, which runs no command.
-  const text = blankHeredocs(joined, keep).replace(QUOTED, keep).replace(/\\./g, keep)
   return { text: text.replace(/(^|[ \t;&|()])#[^\n]*/gm, '$1'), pieces }
 }
 
@@ -172,14 +178,18 @@ function expand(text: string, pieces: readonly string[], seen: readonly string[]
 }
 
 // The command word and its arguments: leading VAR=value assignments and wrapper
-// words are skipped, and a path such as /usr/bin/git names git.
-function commandOf(tokens: readonly string[]): { name: string; args: string[] } | undefined {
+// words are skipped, and a path such as /usr/bin/git names git. `viaPath` says a skipped
+// wrapper carried a `/`: `./env` may be any local program (#702 B7), so a reader that
+// approves must not take it for the system one.
+function commandOf(tokens: readonly string[]): { name: string; args: string[]; viaPath: boolean } | undefined {
   let i = 0
+  let viaPath = false
   for (;;) {
     const token = tokens[i]
     if (token === undefined) return undefined
-    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token) || WRAPPERS.has(token.replace(/^.*\//, ''))) i += 1
-    else return { name: token.replace(/^.*\//, ''), args: tokens.slice(i + 1) }
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) i += 1
+    else if (WRAPPERS.has(token.replace(/^.*\//, ''))) { viaPath = viaPath || token.includes('/'); i += 1 }
+    else return { name: token.replace(/^.*\//, ''), args: tokens.slice(i + 1), viaPath }
   }
 }
 
@@ -206,8 +216,22 @@ export function parseAllow(value: string | undefined): string[] {
     .filter(dir => dir.startsWith('/'))
 }
 
+// A segment's words, less its redirections: a word that is one (`2>&1`, `{fd}>f`, `&>f`)
+// is dropped, with the next word when the operator ends its word (`> f`), and a redirection
+// glued to a word (`--force>&2`) is cut off it (#724 A10, #702 B2).
 function tokensOf(segment: string): string[] {
-  return segment.trim().split(/\s+/).filter(Boolean)
+  const redirect = /^(?:\{[A-Za-z_]\w*\}|\d+|&)?(?:>>?|<|>&|<&|&>>?|>\|)/
+  const words = segment.trim().split(/\s+/).filter(Boolean)
+  const tokens: string[] = []
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]!
+    const cut = redirect.test(word) ? 0 : word.search(/&?[<>]/)
+    if (cut < 0) { tokens.push(word); continue }
+    if (cut > 0) tokens.push(word.slice(0, cut))
+    const operator = redirect.exec(word.slice(cut))
+    if (operator !== null && /^[<>&|]*$/.test(word.slice(cut + operator[0].length))) i += 1
+  }
+  return tokens
 }
 
 // The git subcommand and its arguments, skipping global options (-C and -c take a value).
@@ -360,7 +384,7 @@ export function rmTargets(command: string): RmTarget[] {
   // Redirections belong to the shell, not rm. Blanked quotes/escapes keep
   // literal glyphs out of this match. Remove fd prefixes before their operators,
   // then operators with their attached or separate target words.
-  const redirects = input.replace(/(^|[\s;|&()])\d+(?=[<>])/g, '$1')
+  const redirects = input.replace(/(^|[\s;|&()])(?:\d+|\{[A-Za-z_]\w*\})(?=[<>])/g, '$1')
     .replace(/(?:<<<|&>>|&>|<>|>\||>>|[<>]&|>|(?<!<)<(?!<))[ \t]*[^\s;&|()]+/g, ' ')
   // rm's own second spelling of `&` (COMMANDS above): this list keeps every `&`
   // and runs after redirection stripping. Change one spelling and check the other.

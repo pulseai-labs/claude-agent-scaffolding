@@ -73,9 +73,11 @@ describe('shared shell reader pins (#702 item 4)', () => {
     expect(gitSubcommands(heredoc)).toEqual(['add'])
     expect(bash(heredoc)).toBe(true)
   })
-  test('path-qualified wrapper matches bare wrapper beside a non-git command', () => {
-    expect(gitSubcommands('/usr/bin/env git add h.md')).toEqual(['add'])
-    expect(bash('/usr/bin/env git add h.md')).toBe(true)
+  test('path-qualified wrapper is not the bare wrapper: it may be any local program (batch 5 B7)', () => {
+    // Until batch 5 these two rows read ['add'] and true: the shared reader skipped the
+    // wrapper by its basename. molt now refuses a wrapper reached by a path.
+    expect(gitSubcommands('/usr/bin/env git add h.md')).toEqual([undefined])
+    expect(bash('/usr/bin/env git add h.md')).toBe(false)
     expect(gitSubcommands('env git add h.md')).toEqual(['add'])
     expect(bash('env git add h.md')).toBe(true)
     expect(gitSubcommands('/usr/bin/env cat huge.log')).toEqual([undefined])
@@ -208,5 +210,56 @@ describe('the walk and closer sets (#711 review R4)', () => {
   test('are exactly the words molt ships', () => {
     expect([...(walked.HEAD_WORDS ?? [])]).toEqual(['if', 'then', 'elif', 'else', '!', '{', 'time'])
     expect([...(walked.CLOSERS ?? [])]).toEqual(['fi', '}'])
+  })
+})
+
+// Batch 5, C3 and C4 (#702 B7/B8, #724 A10): the command word is read as Bash reads it
+// after quote removal; a wrapper reached by a path may be any local program.
+describe('batch 5: command word', () => {
+  test('an escaped command word is the command it spells', () => {
+    expect(bash('\\git add f')).toBe(true)
+    expect(gitSubcommands('\\git add f')).toEqual(['add'])
+    // controls: the escape does not make a refused command allowed
+    expect(bash('\\git push origin main')).toBe(false)
+    expect(bash('\\cat huge.log')).toBe(false)
+    expect(bash('\\\\git add f')).toBe(false)
+    for (const word of ['if', 'then', 'elif', 'else'])
+      expect(bash(`\\${word} git commit -m m`)).toBe(false)
+    expect(bash('git add f; \\fi')).toBe(false)
+    expect(bash('if git add f; then git commit -m m; fi')).toBe(true)
+  })
+  test('a wrapper reached by a path may be any local program: not git', () => {
+    expect(bash('./env git add f')).toBe(false)
+    expect(gitSubcommands('./env git add f')).toEqual([undefined])
+    expect(gitSubcommands('FOO=1 ./sudo git commit -m m')).toEqual([undefined])
+    expect(walked.gitSubcommandsThatRun?.('./env git commit -m m')).toEqual([undefined])
+    expect(isProgress('Bash', { command: './env git commit -m m' })).toBe(false)
+    // the path counts wherever it stands among the wrappers
+    expect(gitSubcommands('./env env git add f')).toEqual([undefined])
+    expect(gitSubcommands('env ./env git add f')).toEqual([undefined])
+    // controls: the bare wrapper, a slash in an assignment, and a path-qualified git itself, still read as git
+    expect(gitSubcommands('FOO=./x env git add f')).toEqual(['add'])
+    expect(bash('env git add f')).toBe(true)
+    expect(gitSubcommands('/usr/bin/git add f')).toEqual(['add'])
+    expect(walked.gitSubcommandsThatRun?.('env git commit -m m')).toEqual(['commit'])
+    expect(isProgress('Bash', { command: 'env git commit -m m' })).toBe(true)
+  })
+  test('a redirection before the command does not hide it', () => {
+    expect(bash('{log}>/tmp/f git add f')).toBe(true)
+    expect(gitSubcommands('{log}>/tmp/f git add f')).toEqual(['add'])
+    expect(bash('> /tmp/f git add f')).toBe(true)
+    expect(bash('< /tmp/f git add f')).toBe(true)
+    // controls: what the redirection precedes is still judged
+    expect(bash('{log}>/tmp/f cat huge.log')).toBe(false)
+    expect(bash('> /tmp/f cat huge.log')).toBe(false)
+    expect(bash('{log}>/tmp/f git push origin main')).toBe(false)
+  })
+  test('a redirection glued to the subcommand is cut off it', () => {
+    expect(bash('git add f 2>&1')).toBe(true)
+    expect(bash('git add>/tmp/log f')).toBe(true)
+    expect(gitSubcommands('git commit>/dev/null -m m')).toEqual(['commit'])
+    // controls
+    expect(bash('git push>/tmp/log origin main')).toBe(false)
+    expect(bash('git add f 2>&1; cat huge.log')).toBe(false)
   })
 })

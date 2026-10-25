@@ -720,3 +720,64 @@ test('head rules and -F files are a superset of the 0.3.1 reading, over the veri
   }
   expect(missing).toEqual([])
 })
+
+// Batch 5, C3 and C4 (#702 B2/B8, #724 A10): the command word is read as Bash reads it
+// after quote removal, and a redirection never hides the word it touches.
+describe('batch 5: command word', () => {
+  test('an escaped command word runs the command it spells', () => {
+    expect(bashRules('\\git push --force origin main')).toContain('force-push')
+    expect(rmTargets('\\rm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('git push \\--force origin main')).toContain('force-push')
+  })
+  test('an escaped path character is the character Bash passes on', () => {
+    // Every member of the dropped class, and a word that starts like a reserved word (`\do`).
+    expect(commitMessageFiles('git commit -F \\/w\\/m\\_\\1\\.\\-\\a\\Z')).toEqual(['/w/m_1.-aZ'])
+    expect(commitMessageFiles('git commit -F /w/\\dos\\fi.txt')).toEqual(['/w/dosfi.txt'])
+    // control: a character outside the class keeps its escape, which the path then carries
+    expect(commitMessageFiles('git commit -F /w/m\\*')).toEqual(['/w/m\\*'])
+  })
+  test('control: an escaped backslash is not an escaped command word', () => {
+    expect(bashRules('\\\\git push --force origin main')).toEqual([])
+    expect(bashRules('\\git status')).toEqual([])
+  })
+  test('control: an escaped reserved word is a program, not a head word', () => {
+    for (const word of ['if', 'then', 'elif', 'else', 'do', 'while', 'until']) {
+      expect(bashRules(`\\${word} git push --force`)).toEqual([])
+      expect(bashRules(`${word} git push --force`)).toContain('force-push')
+    }
+  })
+  test('an fd-variable redirection before the command does not hide it', () => {
+    expect(rmTargets('{log}>/w/f rm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('{log}>/w/f git push --force')).toContain('force-push')
+    expect(bashRules('2>/w/f git push --force')).toContain('force-push')
+    expect(bashRules('&>/w/f git push --force')).toContain('force-push')
+  })
+  test('control: a brace word that is not an fd variable stays an ordinary word', () => {
+    expect(bashRules('{log,x}>/w/f git push --force')).toEqual([])
+  })
+  test('a lone redirection operator takes the next word as its target, not as the command', () => {
+    expect(bashRules('> /w/f git push --force')).toContain('force-push')
+    expect(bashRules('2> /w/f git push --force')).toContain('force-push')
+    expect(bashRules('git push origin main > --force')).toEqual(['push'])
+    expect(bashRules('git push origin main >& --force')).toEqual(['push'])
+    // control: only the target is dropped; the flag after it is still the push's
+    expect(bashRules('git push origin main > /w/f --force')).toContain('force-push')
+  })
+  test('a redirection glued to a flag is cut off it', () => {
+    for (const c of ['git push --force>&2', 'git push --force&>f', 'git push -f>/dev/null',
+      'git push --force</dev/null', 'git push --force<&0', 'git push --force>>f', 'git push --force>a>b'])
+      expect(bashRules(c)).toContain('force-push')
+    expect(bashRules('git push --force> /w/f')).toContain('force-push')
+    expect(bashRules('git push origin main --x> --force')).toEqual(['push'])
+    expect(bashRules('git push origin main --force2>/dev/null')).toEqual(['push'])
+  })
+  test('control: the redirection words are not the command\'s arguments', () => {
+    expect(bashRules('git push origin main 2>&1')).toEqual(['push'])
+    expect(bashRules('git push origin main 2>&1 --force')).toContain('force-push')
+    expect(bashRules('git commit -m "a\\b" 2>/dev/null')).toEqual(['commit'])
+  })
+  test('a path-qualified wrapper is skipped as its bare name', () => {
+    expect(bashRules('./env git push --force origin main')).toContain('force-push')
+    expect(bashRules('./env git status')).toEqual([])
+  })
+})
