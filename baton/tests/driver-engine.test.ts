@@ -570,3 +570,10 @@ test("a driver nonce that finds two threads escalates and keeps the directory", 
   expect(host.releases.map((r) => r.dir)).not.toContain(driverCwd());
   expect(notices()[0].endsWith("— driver could not launch: ambiguous nonce")).toBe(true);
 });
+
+test("disarm removes a running driver's claim", async () => {
+  await parked(SEAT);
+  expect(liveClaim(claimKey(driverCwd()))).toBe("r1/a/driver/1");
+  expect(await main(["disarm", "r1"])).toBe(0);
+  expect(liveClaim(claimKey(driverCwd()))).toBeNull();
+});

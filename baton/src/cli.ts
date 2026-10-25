@@ -201,6 +201,7 @@ async function disarmCmd(args: string[]): Promise<number> {
     }
     for (const u of Object.values(run.units)) {
       if (u.triage) removeClaim(u.triage.session.claim_key, u.triage.session.claim_nonce);
+      if (u.driver) removeClaim(u.driver.session.claim_key, u.driver.session.claim_nonce);
       if (!u.session) continue;
       removeClaim(u.session.claim_key, u.session.claim_nonce);
     }

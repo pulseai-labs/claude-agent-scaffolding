@@ -145,6 +145,12 @@ export function triageNote(run: RunState, recipe: Recipe, u: UnitState): string 
   }
 }
 
+/** A merge-stage park names its PR and what stopped it, so the notice alone says where to look. */
+function prSuffix(pr: ParkPr | undefined): string {
+  return pr === undefined ? ""
+    : ` — ${pr.why === "conflict" ? "conflict" : `red${pr.failing ? `: ${pr.failing.join(", ")}` : ""}`} — ${pr.url}`;
+}
+
 function removeFile(path: string): void {
   try {
     unlinkSync(path);
@@ -340,10 +346,7 @@ class RunTick {
     this.report.parked.push(u.id);
     // With a driver, step 7 settles the park: only its escalate or stop reaches the operator.
     if (this.recipe.driver) return;
-    // A merge-stage park names its PR and what stopped it, so the notice alone says where to look.
-    const about = o.pr === undefined ? ""
-      : ` — ${o.pr.why === "conflict" ? "conflict" : `red${o.pr.failing ? `: ${o.pr.failing.join(", ")}` : ""}`} — ${o.pr.url}`;
-    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}${about}`);
+    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}${prSuffix(o.pr)}`);
   }
 
   /** `note` is the outcome's notice, rendered by the caller before any side effect. */
@@ -1225,7 +1228,27 @@ class RunTick {
     this.save();
     this.ev("driver escalate", { unit: u.id, stage: u.stage, reason: p.reason, action });
     await this.notify(`${this.run.id}/${u.id}/park/${p.at}`,
-      `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${p.reason} — ${action}`);
+      `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${p.reason} — ${action}${prSuffix(this.parkPr(u))}`);
+  }
+
+  /** The PR detail the unit's latest park event recorded, as park() was given it; undefined without one. */
+  private parkPr(u: UnitState): ParkPr | undefined {
+    let text = "";
+    try {
+      text = readFileSync(join(this.run.dir, "events.jsonl"), "utf8");
+    } catch {
+      return undefined;
+    }
+    let last: Record<string, unknown> | undefined;
+    for (const line of text.split("\n")) {
+      try {
+        const e = JSON.parse(line) as Record<string, unknown>;
+        if (e !== null && typeof e === "object" && e.kind === "park" && e.unit === u.id) last = e;
+      } catch { /* a blank or torn line is not an event */ }
+    }
+    if (!last || typeof last.pr !== "string" || (last.pr_state !== "red" && last.pr_state !== "conflict")) return undefined;
+    const failing = Array.isArray(last.failing) && last.failing.every((f) => typeof f === "string") ? last.failing as string[] : undefined;
+    return { url: last.pr, why: last.pr_state, ...(failing ? { failing } : {}) };
   }
 
   /**
