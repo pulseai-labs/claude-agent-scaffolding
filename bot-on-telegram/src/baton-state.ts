@@ -38,6 +38,12 @@ export function readUnit(run: string, unit: string): UnitView | null {
   return view;
 }
 
+// The run's status from run.json ("armed", "parked", "disarmed", "done"), or null when unreadable.
+export function runStatus(run: string): string | null {
+  const doc = readJson(join(runDir(run), "run.json"));
+  return isObj(doc) && typeof doc.status === "string" ? doc.status : null;
+}
+
 export function stageNames(run: string): string[] {
   const doc = readJson(join(runDir(run), "recipe.json"));
   if (!isObj(doc) || !isObj(doc.stages)) return [];

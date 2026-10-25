@@ -2,6 +2,29 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.4.0 - 2026-10-25
+
+- A recipe may carry a top-level `driver` stage. When a unit parks, a driver session reads the
+  unit's state file and writes one JSON result: resume (optionally `to` a stage `resume_to` allows,
+  with a `cleared` name from `clearing`), escalate, or stop. Baton checks the result's closed shape;
+  any refusal, a launch failure or a timeout becomes an escalate. A unit that parks again after one
+  driver resume goes to the operator. Events: `driver`, `driver resume`, `driver escalate`,
+  `driver stop`, `driver dropped`. Each result appends a ledger line. The driver's `state_file` and
+  `result_file` must contain `{run.dir}` or `{run.id}` and `{unit.id}`, `result_file` the launch
+  number `{driver.launch}`, and the two must differ:
+  baton reads only the result file rendered for that launch, and removes it once a valid result is read.
+- With a driver, the escalate is the only unit-park notice
+  (`baton <run>/<unit> parked in <stage>: <reason> — <action>`, with the PR suffix of a merge-stage
+  park); a driver stop parks the run with its own notice.
+- A finished run sends one silent summary line (units, merged PRs, parks, drivers, wall time).
+- `unpark` and `disarm` drop a live driver and release its claim.
+- `baton unpark` of a `stop` park consumes its stop file, for every recipe: the file is renamed
+  `<stop>.consumed-<iso>` and the `unpark` event records `consumed`.
+- The ossify-spine example recipe gains a driver and `briefs/driver.md`: it settles flaky-CI
+  (`rerun-check`) and dispatch-cap (`remove-file`) parks only.
+- A recipe without a `driver` stage sends every park notice as before; the run-end summary and
+  the stop-file consumption on `unpark` apply to every recipe.
+
 ## 0.3.2 - 2026-10-24
 
 - A merge-stage park by the `red` or `conflict` outcome names its PR. The `park` event carries `pr`

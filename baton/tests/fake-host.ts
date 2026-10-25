@@ -164,10 +164,11 @@ export class FakeHost implements Host {
       t.step++;
       if (t.step === b.ticks) {
         // `{unit}` in a write's path or content is the launching unit's id, so one stage
-        // script can serve several units.
+        // script can serve several units; `{launch}` in a path is the nonce's launch number.
         const unit = segment(t.launch.request.title, 1);
+        const launch = segment(t.launch.request.title, 3);
         for (const w of b.writes ?? []) {
-          const path = w.path.replaceAll("{unit}", unit);
+          const path = w.path.replaceAll("{unit}", unit).replaceAll("{launch}", launch);
           mkdirSync(dirname(path), { recursive: true });
           writeFileSync(path, w.content.replaceAll("{unit}", unit));
         }

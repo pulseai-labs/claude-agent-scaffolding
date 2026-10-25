@@ -42,6 +42,29 @@
     "stall_minutes": 10,
     "note_file": "{run.dir}/out/{unit.id}/triage-note.md"
   },
+  "driver": {
+    "kind": "driver",
+    "instance": "OMP_Seat",
+    "model": "default",
+    "project": "{param.ai_project}",
+    "cwd": "{param.ai_root}",
+    "launch_dir": "worktree",
+    "title": "driver {unit.id}",
+    "message": "Read {param.briefs}/driver.md and follow it. Unit: {unit.id}. Parked in: {driver.stage}. Reason: {driver.reason}. State file: {run.dir}/out/{unit.id}/driver-state.md. Result file: {run.dir}/out/{unit.id}/driver-result-{driver.launch}.json. Briefs: {param.briefs}. Spine: {param.spine_dir}.",
+    "env": {
+      "SEAT_MODS_ROLE": "reviewer",
+      "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
+      "OMP_T3_VIA": "{param.via}",
+      "OMP_T3_SEAT": "worker",
+      "OMP_T3_DROP_T3_MCP": "1"
+    },
+    "stall_minutes": 15,
+    "state_file": "{run.dir}/out/{unit.id}/driver-state.md",
+    "result_file": "{run.dir}/out/{unit.id}/driver-result-{driver.launch}.json",
+    "ledger": "{param.spine_dir}/autopilot-ledger.md",
+    "clearing": ["rerun-check", "remove-file"],
+    "resume_to": { "correct": ["reclose"] }
+  },
   "stages": {
     "lane": {
       "kind": "session",

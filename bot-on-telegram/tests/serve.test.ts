@@ -56,7 +56,7 @@ const opts = (over: Record<string, unknown> = {}) => ({
 
 // An unpark button bound to message 7, and the update that presses it.
 function pressUpdate(updateId: number) {
-  const k: Keyboard = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1" }, T0)!;
+  const k: Keyboard = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1", at: "" }, T0)!;
   const btns = k.inline_keyboard.flat().filter((b): b is { text: string; callback_data: string } => "callback_data" in b);
   setMessageId(btns.map((b) => b.callback_data), 7);
   const unpark = btns.find((b) => b.text === "Unpark")!.callback_data;
@@ -78,7 +78,7 @@ test("serve sends the spooled notice, handles the press, and persists offset = u
   await serve(opts());
   const methods = fake.calls.map((c) => c.method);
   expect(methods[0]).toBe("sendMessage");
-  expect(fake.calls[0]!.body.text).toBe("hello");
+  expect(fake.calls[0]!.body.text).toBe("🔴 ACTION — hello");
   expect(methods).toContain("getUpdates");
   expect(runs.length).toBe(1);
   expect(runs[0]).toContain("unpark");
@@ -207,4 +207,12 @@ test("token sweep: after a CLI serve run no file under the state dir, nor stdout
   // control: the token did reach the (fake) server, so the sweep is not vacuous
   expect(fake.calls.length).toBeGreaterThan(0);
   expect(fake.calls.every((c) => c.token === TOKEN)).toBe(true);
+});
+
+test("serve sweeps settled actions each loop: an open action on an unparked unit is edited", async () => {
+  const { recordOpen } = await import("../src/settle.ts");
+  recordOpen({ message_id: 9, run: "r1", unit: "u2", park_at: "2026-10-23T10:00:00Z", text: "🔴 ACTION — x" });
+  await serve(opts());
+  const edit = fake.calls.find((c) => c.method === "editMessageText");
+  expect(edit?.body.text).toBe("✅ settled — 🔴 ACTION — x");
 });

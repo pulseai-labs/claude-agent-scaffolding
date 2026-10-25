@@ -3,7 +3,8 @@
 Sends [baton](../baton) notices to one Telegram chat, with buttons, and turns a button press into the
 matching `baton` or `gh` command. A CLI and a long-running service; no skill, no dependencies beyond
 [bun](https://bun.sh). Presses need `gh` (with its own auth) and `baton` on the service's PATH. It
-needs baton 0.3.1 or later (the `{key}` placeholder in `notify`).
+needs baton 0.4.0 or later: the `{key}` placeholder in `notify`, and the driver and the run-end
+summary this bot marks and settles.
 
 ## How it works
 
@@ -62,6 +63,18 @@ so `~` is not expanded:
 { "notify": ["/home/<user>/.local/bin/bot-on-telegram", "notify", "{key}", "{message}"] }
 ```
 
+## Notices
+
+Baton, with a driver, sends only what needs you, so every notice opens with `🔴 ACTION — `: a
+driver's escalate (`baton <run>/<unit> parked in <stage>: <reason> — <action>`), a run park, a
+moved unit. The one exception is the run-end summary (`baton <run> done — ...`),
+sent silently with no marker.
+
+When a unit is no longer in the park an action was sent for (you unparked it, a driver or a later
+tick moved it, the run was disarmed or finished), the bot edits that message to `✅ settled — <original text>`
+and spends its unused buttons. When a press already spent every button on the message, the edit is
+skipped and the action still closes. Settling is checked on every `serve` loop.
+
 ## Buttons
 
 | Notice | Buttons | A press runs |
@@ -83,7 +96,7 @@ back, fresh. One that succeeds marks the notice done and keeps only its Open PR 
 ## State
 
 `${BOT_ON_TELEGRAM_STATE_DIR:-~/.local/state/bot-on-telegram}`: `spool/`, `spool-failed/`,
-`buttons.jsonl`, `presses.jsonl` (every press and its result), `offset`, `serve.lock`.
+`buttons.jsonl`, `open-actions.jsonl` (parked-unit actions and when each settled), `presses.jsonl` (every press and its result), `offset`, `serve.lock`.
 Only one `serve` runs at a time; a second exits with code 3.
 
 ## Known limits
@@ -93,6 +106,10 @@ Only one `serve` runs at a time; a second exits with code 3.
 - Merge appears only when the unit has a PR and the ossify-spine `review.md` head line says which
   commit was reviewed.
 - Delivery is at least once: a crash between a send and the spool delete sends that one notice again.
+- A notice is not sent again when its bookkeeping fails after Telegram took it (`open-actions.jsonl`
+  or `buttons.jsonl` cannot be written): one stderr line names it. Without the
+  buttons' record a press does not spend that message's other buttons; an action with no record
+  never settles.
 - A notice Telegram rejects permanently (a 4xx other than 401, 403, 404 and 429) is set aside in
   `spool-failed/`; a wrong `chat_id` (400 "chat not found") sets every notice aside there. A 400 on a
   notice with buttons is first retried once without them.
@@ -101,4 +118,9 @@ Only one `serve` runs at a time; a second exits with code 3.
 - The unit's `ExecStart` path is not quoted: keep the install path free of spaces and `%`.
 - A command that runs past 60 s is sent SIGTERM only; one that ignores it keeps running, and `serve`
   waits for it.
+- An action whose edit fails with an error other than "message is not modified" stays open and is
+  retried every loop.
+- `open-actions.jsonl` is never compacted.
+- Every notice except the run-done summary is marked as an action; a recipe has no way to mark an
+  outcome's `notify` as informational.
 - A second poller on the same bot makes Telegram answer 409; `serve` logs one line and retries every 5 s.

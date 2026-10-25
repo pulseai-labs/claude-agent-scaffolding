@@ -4,6 +4,7 @@ import type { Runner } from "./actions.ts";
 import { stateDir } from "./paths.ts";
 import { handleUpdate, type Update } from "./press.ts";
 import { drainSpool } from "./send.ts";
+import { sweepSettled } from "./settle.ts";
 import type { Api } from "./telegram.ts";
 
 export class LockHeldError extends Error {
@@ -95,6 +96,7 @@ export async function serve(opts: ServeOptions): Promise<void> {
     for (let loop = 0; opts.stopAfter === undefined || loop < opts.stopAfter; loop++) {
       try {
         await drainSpool(opts.api, opts.chatId, opts.now);
+        await sweepSettled(opts.api, opts.chatId, opts.now());
         const updates = await opts.api.call<Update[]>("getUpdates", {
           offset,
           timeout: 25,

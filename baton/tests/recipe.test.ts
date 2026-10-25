@@ -326,6 +326,123 @@ describe("triage stage", () => {
   });
 });
 
+const triageBase = () => ({
+  kind: "triage", instance: "t", model: "m", project: "/p", cwd: "/p", title: "t", message: "m", env: {}, note_file: "n",
+});
+
+describe("driver stage", () => {
+  const driver = () => ({
+    kind: "driver", instance: "driver", model: "small", project: "{param.project}", cwd: "{param.project}",
+    launch_dir: "worktree", title: "driver {unit.id}",
+    message: "Unit {unit.id} parked at {driver.stage}: {driver.reason}. State {run.dir}/{unit.id}/state.",
+    env: { DRIVER_ROLE: "driver" }, stall_minutes: 15,
+    state_file: "{run.dir}/{unit.id}/state", result_file: "{run.dir}/{unit.id}/result-{driver.launch}",
+    ledger: "{run.dir}/{param.project}/ledger",
+    clearing: ["rerun-check", "remove-file"],
+    resume_to: { work: ["land"] } as Record<string, string[]>,
+  });
+  const withDriver = (d: unknown = driver()) => ({ ...relay(), driver: d });
+
+  test("driver section validates", () => {
+    const res = validate(withDriver());
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.recipe.driver?.clearing).toEqual(["rerun-check", "remove-file"]);
+  });
+
+  test("driver rejects forbidden keys", () => {
+    const extra: Record<string, unknown> = {
+      outcomes: [], handoff: null, slots: ["session"], max_launches: 2, settle_minutes: 1,
+      before: [["true"]], after_launch: [["true"]], stop_file: "x", watch: ["x"],
+    };
+    for (const [k, v] of Object.entries(extra)) {
+      expectError(withDriver({ ...driver(), [k]: v }), `driver.${k}: not allowed on a driver stage`);
+    }
+  });
+
+  test("driver clearing", () => {
+    expectError(withDriver({ ...driver(), clearing: [] }), "driver.clearing: must be a non-empty list of names");
+    expectError(withDriver({ ...driver(), clearing: "x" }), "driver.clearing: must be a non-empty list of names");
+    expectError(withDriver({ ...driver(), clearing: ["a", "a"] }), "driver.clearing[1]: duplicate");
+    expectError(withDriver({ ...driver(), clearing: ["A b"] }), "driver.clearing[0]: must match ^[a-z0-9_-]+$");
+  });
+
+  test("driver resume_to", () => {
+    expectError(withDriver({ ...driver(), resume_to: { nope: ["land"] } }), 'driver.resume_to.nope: names no stage: "nope"');
+    expectError(withDriver({ ...driver(), resume_to: { work: ["done"] } }),
+      'driver.resume_to.work[0]: "done" is a terminal, not a stage');
+    expectError(withDriver({ ...driver(), resume_to: { work: ["nowhere"] } }),
+      'driver.resume_to.work[0]: names no stage: "nowhere"');
+    expectError(withDriver({ ...driver(), resume_to: [] }), "driver.resume_to: must be an object");
+    expectError(withDriver({ ...driver(), resume_to: { work: "land" } }), "driver.resume_to.work: must be a list of stage names");
+  });
+
+  test("driver placeholders", () => {
+    expect(validate(withDriver({ ...driver(), message: "{driver.reason} {driver.stage}" })).ok).toBe(true);
+    for (const f of ["state_file", "result_file", "ledger"]) {
+      expectError(withDriver({ ...driver(), [f]: "{driver.reason}" }), `driver.${f}: unknown placeholder "{driver.reason}"`);
+    }
+    expectError(withDriver({ ...driver(), message: "{pending.request}" }), 'driver.message: unknown placeholder "{pending.request}"');
+    const r = relay();
+    r.stages.work.message = "{driver.reason}";
+    expectError(r, 'stages.work.message: unknown placeholder "{driver.reason}"');
+    expectError({ ...relay(), triage: { ...triageBase(), message: "{driver.stage}" } },
+      'triage.message: unknown placeholder "{driver.stage}"');
+  });
+
+  test("driver files are per unit, and the result file per launch", () => {
+    expectError(withDriver({ ...driver(), result_file: "{run.dir}/result-{driver.launch}" }),
+      "driver.result_file: must contain {unit.id}");
+    expectError(withDriver({ ...driver(), result_file: "{run.dir}/{unit.id}/result" }),
+      "driver.result_file: must contain {driver.launch}");
+    expectError(withDriver({ ...driver(), state_file: "{run.dir}/state" }), "driver.state_file: must contain {unit.id}");
+    // A shared append-only ledger is fine; {driver.launch} may name a per-launch state file.
+    expect(validate(withDriver({ ...driver(), ledger: "{run.dir}/ledger" })).ok).toBe(true);
+    expect(validate(withDriver({ ...driver(), state_file: "{run.dir}/{unit.id}/state-{driver.launch}" })).ok).toBe(true);
+    expect(validate(withDriver({ ...driver(), message: "result {driver.launch}" })).ok).toBe(true);
+    expectError(withDriver({ ...driver(), ledger: "{run.dir}/{driver.launch}" }), 'driver.ledger: unknown placeholder "{driver.launch}"');
+    const r = relay();
+    r.stages.work.message = "{driver.launch}";
+    expectError(r, 'stages.work.message: unknown placeholder "{driver.launch}"');
+  });
+
+  test("driver files are per run, and the state file is not the result file", () => {
+    expectError(withDriver({ ...driver(), result_file: "/tmp/shared/{unit.id}-{driver.launch}.json" }),
+      "driver.result_file: must contain {run.dir} or {run.id}");
+    expectError(withDriver({ ...driver(), state_file: "/tmp/shared/{unit.id}.md" }),
+      "driver.state_file: must contain {run.dir} or {run.id}");
+    expectError(withDriver({ ...driver(), state_file: "{run.dir}/{unit.id}/f-{driver.launch}", result_file: "{run.dir}/{unit.id}/f-{driver.launch}" }),
+      "driver.state_file: must not be the result_file");
+    // Two runs, the same unit id and launch number: a valid recipe renders distinct paths.
+    for (const tpl of ["{run.dir}/{unit.id}/r-{driver.launch}", "/tmp/shared/{run.id}/{unit.id}/r-{driver.launch}"]) {
+      const res = validate(withDriver({ ...driver(), result_file: tpl, state_file: tpl.replace("r-{driver.launch}", "state") }));
+      expect(res.ok).toBe(true);
+      if (!res.ok) continue;
+      const d = res.recipe.driver!;
+      const at = (id: string): Scope => ({ ...scope, run: { id, dir: `/runs/${id}`, group: "g1" },
+        driver: { reason: "stop", stage: "work", launch: "1" } });
+      for (const f of [d.result_file, d.state_file]) expect(render(f, at("r1"))).not.toBe(render(f, at("r2")));
+    }
+  });
+
+  test("a stage named driver is refused when the recipe has a driver", () => {
+    const r = withDriver();
+    r.stages.driver = r.stages.work;
+    expectError(r, "stages.driver: a recipe with a driver stage cannot name a stage driver");
+    const plain = relay();
+    plain.stages.driver = plain.stages.work;
+    expect(validate(plain).ok).toBe(true);
+  });
+
+  test("driver kind and file fields", () => {
+    expectError(withDriver({ ...driver(), kind: "session" }), 'driver.kind: must be "driver"');
+    for (const f of ["state_file", "result_file", "ledger"]) {
+      const d: Record<string, unknown> = driver();
+      delete d[f];
+      expectError(withDriver(d), `driver.${f}: must be a string`);
+    }
+  });
+});
+
 describe("render", () => {
   test("render substitutes every scope name", () => {
     const tpl =
@@ -357,5 +474,13 @@ describe("render", () => {
     expect(render(tpl, { ...scope, pending })).toBe('th-1|rq-9|[{"q":"ok?"}]|work');
     expect(() => render("{pending.thread}", scope)).toThrow("no pending in scope");
     expect(() => render("{pending.stage}", scope)).toThrow("no pending in scope");
+  });
+
+  test("driver placeholders render in a driver scope and throw outside it", () => {
+    expect(render("{driver.reason}|{driver.stage}|{driver.launch}",
+      { ...scope, driver: { reason: "error: a/b", stage: "work", launch: "3" } })).toBe("error: a/b|work|3");
+    expect(() => render("{driver.launch}", scope)).toThrow("no driver in scope");
+    expect(() => render("{driver.reason}", scope)).toThrow("no driver in scope");
+    expect(() => render("{driver.stage}", scope)).toThrow("no driver in scope");
   });
 });

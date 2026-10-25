@@ -468,3 +468,37 @@ test("control: a pr argv that prints a non-PR URL still parks pr url at once", a
   expect(parkedOf("o1")).toBe("pr url");
   expect(forgeEvents()).toEqual([]);
 });
+
+test("a merge-stage park a driver escalates: the notice carries the action, then the PR suffix", async () => {
+  forge.views.set(URL1, { ...green, checks: "red", failing: ["test", "lint"] });
+  const rec = {
+    version: 1, name: "rec", params: ["root", "repo"], sources: [],
+    seed: [{ id: "o1", stage: "merge", vars: { n: "1" } }],
+    stages: { merge: mergeStage({ outcomes: { merged: "done", red: "park", conflict: "done" } }), fixing },
+    driver: {
+      kind: "driver", instance: "dinst", model: "dmod", project: "proj", cwd: "{param.root}/d/{unit.id}",
+      title: "driver {unit.id}", message: "settle {unit.id}", env: {},
+      state_file: "{run.dir}/driver/{unit.id}.md", result_file: "{run.dir}/out/{unit.id}-{driver.launch}.json",
+      ledger: "{param.root}/ledger.md", clearing: ["rerun-check"], resume_to: {},
+    },
+  };
+  const file = join(root, "r1.recipe.json");
+  writeFileSync(file, JSON.stringify(rec));
+  mkdirSync(join(root, "d", "o1"), { recursive: true });
+  expect(await main(["arm", file, "--run", "r1", "--param", `root=${root}`, "--param", `repo=${repo}`, "--no-timer"])).toBe(0);
+  const result = JSON.stringify({
+    result: "escalate", action: "rerun the checks", ledger: { q: "q", a: "a", why: "w", rejected: "r" },
+  });
+  const host = new FakeHost({
+    driver: { ticks: 1, end: "completed", writes: [{ path: join(state, "runs", "r1", "out", "{unit}-{launch}.json"), content: result }] },
+  });
+  const t = () => tick({ store: openStore(state), host, forge, notify: notifyOnce, now: () => new Date(T0) });
+  await t(); // parks on red; the driver launches; no notice
+  expect(parkedOf("o1")).toBe("outcome");
+  expect(noticeLines()).toEqual([]);
+  host.advance();
+  await t();
+  expect(runState().units.o1.parked?.escalated).toBe(true);
+  expect(noticeLines().length).toBe(1);
+  expect(noticeLines()[0].endsWith(`baton r1/o1 parked in merge: outcome — rerun the checks — red: test, lint — ${URL1}`)).toBe(true);
+});
