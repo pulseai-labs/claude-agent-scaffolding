@@ -68,6 +68,17 @@ test("a missing unit settles", async () => {
   expect(await sweepSettled(api(), 42, now)).toBe(1);
 });
 
+// r3's run.json is garbage; "ghost" has no run dir at all. Unknown is not "left the park".
+for (const [run, what] of [["r3", "unparseable"], ["ghost", "missing"]] as const) {
+  test(`run.json ${what}: the action stays open, no edit, buttons unspent`, async () => {
+    const ids = open("u1", "2026-10-23T10:00:00Z", 100, run);
+    expect(await sweepSettled(api(), 42, now)).toBe(0);
+    expect(fake.calls).toHaveLength(0);
+    expect(closed()).toHaveLength(0);
+    for (const id of ids) expect(lookup(id, now)).not.toBe("used");
+  });
+}
+
 test("pressed already: all buttons spent, no edit, record closed", async () => {
   const ids = open("u2", "2026-10-23T10:00:00Z");
   for (const id of ids) spend(id, now);

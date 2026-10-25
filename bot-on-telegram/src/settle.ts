@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readUnit, runStatus } from "./baton-state.ts";
+import { readUnit, runReadable, runStatus } from "./baton-state.ts";
 import { idsOnMessage, lookup, spend } from "./buttons.ts";
 import { stateDir } from "./paths.ts";
 import { TelegramError, type Api } from "./telegram.ts";
@@ -46,11 +46,12 @@ function latest(): OpenAction[] {
 }
 
 // Edit every action message whose unit is no longer in that park, or whose run is disarmed or done,
-// to "settled". Returns the edits made.
+// to "settled". A run whose run.json cannot be read settles nothing. Returns the edits made.
 export async function sweepSettled(api: Api, chatId: number, now: Date): Promise<number> {
   let edits = 0;
   for (const a of latest()) {
     if (a.closed_at) continue;
+    if (!runReadable(a.run)) continue; // unknown is not "left the park": leave it open
     const u = readUnit(a.run, a.unit);
     const ended = ["disarmed", "done"].includes(runStatus(a.run) ?? "");
     if (!ended && u && u.parked && u.parked.at === a.park_at) continue; // still that park
