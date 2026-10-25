@@ -300,9 +300,9 @@ describe('rm operand parsing', () => {
       expect(rmTargets(`${change}; rm -- -file /w/x ~/x`)).toEqual([
         { path: undefined, glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
       ])
-    // batch 5: a literal cd resolves the relative operand instead
+    // batch 5: a literal cd resolves the relative operand instead, beside its failed-cd reading (Ruling 21)
     expect(rmTargets('cd /var; rm -- -file /w/x ~/x')).toEqual([
-      { path: '/var/-file', glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
+      { path: '-file', glob: false }, { path: '/var/-file', glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
     ])
     expect(rmTargets('rm x; cd /var')).toEqual([{ path: 'x', glob: false }])
   })
@@ -1225,7 +1225,7 @@ describe('batch 5: rm after cd', () => {
     for (const part of path.split('/')) if (part === '..') parts.pop(); else if (part !== '' && part !== '.') parts.push(part)
     return '/' + parts.join('/')
   }
-  const verdict = (command: string, root = '/w/wt') => decide('implementer', {
+  const verdict = (command: string, root = '/w/wt', role: 'implementer' | 'reviewer' = 'implementer') => decide(role, {
     kind: 'bash', rules: bashRules(command),
     removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
       : removalOf(lexical(target.path.startsWith('/') ? target.path : `${root}/${target.path}`), root, scratchDirs(undefined), target.glob)),
@@ -1233,21 +1233,25 @@ describe('batch 5: rm after cd', () => {
   test('the plan: a literal cd or assignment resolves; anything else stays unresolved', () => {
     expect(rmTargets('cd "/w/wt" && rm -rf pf/__pycache__ tests/__pycache__'))
       .toEqual([{ path: '/w/wt/pf/__pycache__', glob: false }, { path: '/w/wt/tests/__pycache__', glob: false }])
+    // Ruling 21 amends the plan's value: the cd may fail before the newline, so the bare operand (the session's
+    // directory) is a target too, and both must be allowed.
     expect(rmTargets('WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/o.pyc'))
-      .toEqual([{ path: '/w/wt/pf/__pycache__/o.pyc', glob: false }])
+      .toEqual([{ path: 'pf/__pycache__/o.pyc', glob: false }, { path: '/w/wt/pf/__pycache__/o.pyc', glob: false }])
     expect(rmTargets('WT=/w/wt; rm -f "$WT/x"')).toEqual([{ path: '/w/wt/x', glob: false }])
     // stays unresolved (refused as today)
     for (const c of ['cd /w/wt || true; rm x', '(cd /w/wt); rm x', 'if true; then cd /w/wt; fi; rm x',
       'cd -; rm x', 'cd "$UNSET"; rm x', 'WT=$(pwd); rm "$WT/x"', 'cd /w/wt | cat; rm x', 'rm "$UNSET/x"'])
       expect(rmTargets(c)).toEqual([{ path: undefined, glob: false }])
-    // a relative cd after a known absolute one
-    expect(rmTargets('cd /w; cd wt && rm x')).toEqual([{ path: '/w/wt/x', glob: false }])
+    // a relative cd after a known absolute one. Ruling 21 amends the plan's value: `cd /w` may fail before the `;`,
+    // so `cd wt` joins onto the session's directory too, giving the bare `wt/x` beside `/w/wt/x`.
+    expect(rmTargets('cd /w; cd wt && rm x')).toEqual([{ path: 'wt/x', glob: false }, { path: '/w/wt/x', glob: false }])
   })
   test('adjacent controls: the same shapes with a ruled directory resolve to it and are refused', () => {
     expect(rmTargets('cd /etc && rm -rf x')).toEqual([t('/etc/x')])
     expect(rmTargets('WT=/etc; rm -rf "$WT/x"')).toEqual([t('/etc/x')])
-    expect(rmTargets('WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc')).toEqual([t('/etc/pf/__pycache__/o.pyc')])
-    expect(rmTargets('cd /; cd etc && rm x')).toEqual([t('/etc/x')])
+    // Ruling 21: the failed-cd reading is a target beside the cd's own
+    expect(rmTargets('WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc')).toEqual([t('pf/__pycache__/o.pyc'), t('/etc/pf/__pycache__/o.pyc')])
+    expect(rmTargets('cd /; cd etc && rm x')).toEqual([t('etc/x'), t('/etc/x')])
     for (const command of ['cd /etc && rm -rf x', 'WT=/etc; rm -rf "$WT/x"', 'WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc',
       'cd /; cd etc && rm x', 'cd "/etc" && rm -rf pf/__pycache__ tests/__pycache__'])
       expect(verdict(command)).toContain('no rm outside writable places')
@@ -1271,17 +1275,50 @@ describe('batch 5: rm after cd', () => {
     for (const c of ['ls | wc -l; rm x', '(true); rm x', 'if true; then :; fi; rm x', 'true || false; rm x'])
       expect(rmTargets(c)).toEqual([t('x')])
   })
-  test('a cd or assignment after && behind another command holds only to the end of its list', () => {
-    // Bash skips the cd when the test fails, and the rm after `;` runs in the session directory
-    for (const c of ['false && cd /w/wt; rm x', 'test -d /w/wt && cd /w/wt\nrm x', 'true && WT=/w/wt; rm "$WT/x"',
-      'cd /w && rm a && cd wt; rm x'])
-      expect(rmTargets(c).at(-1)).toEqual(t(undefined))
+  // Ruling 21 (spec §4): a cd may fail, and one behind `&&` may be skipped, so after `;` or a newline the walk keeps
+  // every directory the shell may be in, and a relative operand is one target in each; the rest of a `cd X &&`
+  // list runs in X only.
+  test('Ruling 21: a cd that may fail or be skipped leaves every directory the next command may run in', () => {
+    expect(rmTargets('false && cd /w/wt; rm x')).toEqual([t('x'), t('/w/wt/x')])
+    expect(rmTargets('test -d /w/wt && cd /w/wt\nrm x')).toEqual([t('x'), t('/w/wt/x')])
     expect(rmTargets('test -d /w/wt && cd /w/wt && rm x')).toEqual([t('/w/wt/x')])
-    // a list of only cds and assignments runs whole, so the directory holds after it
-    expect(rmTargets('WT=/w/wt && cd "$WT" && rm a; rm b')).toEqual([t('/w/wt/a'), t('/w/wt/b')])
-    expect(rmTargets('cd /w && cd wt; rm x')).toEqual([t('/w/wt/x')])
-    // a new list after `;` starts plain again
-    expect(rmTargets('git status; WT=/w && cd "$WT"; rm x')).toEqual([t('/w/x')])
+    expect(rmTargets('cd /w && rm a && cd wt; rm x')).toEqual([t('/w/a'), t('x'), t('/w/x'), t('/w/wt/x')])
+    expect(rmTargets('WT=/w/wt && cd "$WT" && rm a; rm b')).toEqual([t('/w/wt/a'), t('b'), t('/w/wt/b')])
+    expect(rmTargets('cd /w && cd wt; rm x')).toEqual([t('x'), t('/w/x'), t('/w/wt/x')])
+    expect(rmTargets('git status; WT=/w && cd "$WT"; rm x')).toEqual([t('x'), t('/w/x')])
+    expect(rmTargets('cd /a; cd b; rm x')).toEqual([t('x'), t('/a/x'), t('b/x'), t('/a/b/x')])
+    // the cap: four directories are read, a fifth makes the operand unresolved; an absolute cd && starts again
+    expect(rmTargets('cd /a; cd /b; cd /c; rm x')).toEqual([t('x'), t('/a/x'), t('/b/x'), t('/c/x')])
+    expect(rmTargets('cd /a; cd /b; cd /c; cd /d; rm x')).toEqual([t(undefined)])
+    expect(rmTargets('cd /a; cd /b; cd /c; cd /d; cd /w && rm x')).toEqual([t('/w/x')])
+    // an assignment a failed command may skip is forgotten when its list ends (a failed cd leaves WT unset)
+    for (const c of ['true && WT=/w/wt; rm "$WT/x"', 'cd /w && WT=/w/wt; rm "$WT/x"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(rmTargets('cd /w && WT=/w/wt && rm "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('WT=/w/wt X=/w && rm "$WT/x" "$X/y"')).toEqual([t('/w/wt/x'), t('/w/y')])
+    expect(rmTargets('true; WT=/w && X=/x; rm "$X/y"')).toEqual([t('/x/y')])
+    // an unread change inside a list, a directory named twice, a relative cd after an unknown one
+    expect(rmTargets('cd /w && builtin cd /etc && rm x')).toEqual([t(undefined)])
+    expect(rmTargets('cd /w; cd /w; rm x')).toEqual([t('x'), t('/w/x')])
+    expect(rmTargets('cd - && cd wt && rm x')).toEqual([t(undefined)])
+  })
+  test('Ruling 21: the failed-cd hide is refused; the same removal behind && is allowed', () => {
+    // a reviewer whose session directory is the worktree: a failed cd removes the worktree's build
+    expect(verdict('cd /tmp/typo; rm -rf build', '/w/wt', 'reviewer')).toContain('no rm outside writable places')
+    expect(verdict('cd /tmp/typo && rm -rf build', '/w/wt', 'reviewer')).toBeUndefined()
+    expect(verdict('cd /tmp/x; rm -rf *', '/w/wt', 'reviewer')).toContain('no rm outside writable places')
+    expect(verdict('cd /tmp/x && rm -rf *', '/w/wt', 'reviewer')).toBeUndefined()
+    // the implementer's own worktree holds both readings
+    expect(verdict('cd /w/wt/pf; rm -rf build')).toBeUndefined()
+    expect(verdict('cd /etc; rm -rf build')).toContain('no rm outside writable places')
+  })
+  test('Ruling 21: both baton records stay allowed with cwd = root = their worktree; their /etc/x siblings are refused', () => {
+    for (const [command, root] of [['cd "/home/dev/projects/pilot-fourseat/.worktrees/r0.s6.w1" && rm -rf pf/__pycache__ tests/__pycache__ && grep -n \'value:\\.1f\' pf/sizes.py && python3 -m unittest tests.test_sizes; echo "rc=$?"; diff /tmp/sizes.py.orig pf/sizes.py && echo "identical to pre-mutation copy"', '/home/dev/projects/pilot-fourseat/.worktrees/r0.s6.w1'],
+      ['WT="/home/dev/projects/pilot-fourseat/.worktrees/r0.s7.w1"; cd "$WT"\nrm -f pf/__pycache__/ordinal.*.pyc tests/__pycache__/test_ordinal.*.pyc\npython3 -m unittest tests.test_ordinal; echo "post-cache-clear rc=$?"', '/home/dev/projects/pilot-fourseat/.worktrees/r0.s7.w1']] as const) {
+      expect(rmTargets(command).every(target => target.path !== undefined)).toBe(true)
+      expect(verdict(command, root)).toBeUndefined()
+      expect(verdict(command.split(root).join('/etc/x'), root)).toContain('no rm outside writable places')
+    }
   })
   test('the variable spellings that resolve, and the ones that do not', () => {
     expect(rmTargets('WT=/w/wt; rm -f "${WT}/x" ${WT}/y $WT/z "$WT"/q "$WT" ${WT}x')).toEqual([
@@ -1294,9 +1331,10 @@ describe('batch 5: rm after cd', () => {
       'WT=/w/wt; rm "${#WT}"', 'WT=/w/wt; rm "$1"'])
       expect(rmTargets(c)).toEqual([t(undefined)])
     // a relative value is a relative operand: it joins a known directory, or the session's, like any other
-    expect(rmTargets('cd /w; WT=wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    // Ruling 21: after `cd /w;` the session's directory is a target beside /w; a relative cd joins onto each directory
+    expect(rmTargets('cd /w; WT=wt; rm -rf "$WT/x"')).toEqual([t('wt/x'), t('/w/wt/x')])
     expect(rmTargets('WT=wt; rm -rf "$WT/x"')).toEqual([t('wt/x')])
-    expect(rmTargets('WT=wt; cd "$WT" && rm x')).toEqual([t(undefined)])
+    expect(rmTargets('WT=wt; cd "$WT" && rm x')).toEqual([t('wt/x')])
     // a glob after a substituted value is placed by its literal prefix
     expect(rmTargets('WT=/w/wt; rm -f "$WT"/pf/*.pyc')).toEqual([t('/w/wt/pf', true)])
   })
@@ -1323,9 +1361,10 @@ describe('batch 5: rm after cd', () => {
       expect(rmTargets(c)).toEqual([t('/w/y')])
   })
   test('cd spellings: the builtin itself resolves; a wrapper, an option or an unread word does not', () => {
-    for (const c of ['\\cd /w && rm x', '"cd" /w && rm x', "c'd' /w && rm x", 'cd /w/ && rm x', 'cd /w 2>/dev/null && rm x',
-      'cd /w # go\nrm x', 'cd "/w"\nrm x'])
+    for (const c of ['\\cd /w && rm x', '"cd" /w && rm x', "c'd' /w && rm x", 'cd /w/ && rm x', 'cd /w 2>/dev/null && rm x'])
       expect(rmTargets(c)).toEqual([t('/w/x')])
+    // Ruling 21: after a newline the failed-cd reading is a target too
+    for (const c of ['cd /w # go\nrm x', 'cd "/w"\nrm x']) expect(rmTargets(c)).toEqual([t('x'), t('/w/x')])
     expect(rmTargets('cd / && rm x')).toEqual([t('/x')])
     for (const c of ['builtin cd /w; rm x', 'command cd /w; rm x', '/usr/bin/cd /w; rm x', 'A=1 cd /w; rm x', 'cd -- /w; rm x',
       'cd -P /w; rm x', 'cd /w /etc; rm x', 'cd; rm x', 'cd ~; rm x', 'cd ~/w; rm x', 'cd /w*; rm x', 'cd /w/{a,b}; rm x',
@@ -1340,10 +1379,10 @@ describe('batch 5: rm after cd', () => {
       expect(rmTargets(c)).toEqual([t(undefined)])
     // as before batch 5, any word named cd counts, even through an unread folder
     expect(rmTargets('$D/cd /etc; rm x')).toEqual([t(undefined)])
-    // controls: a command that only runs a program keeps the directory
+    // controls: a command that only runs a program keeps the directories (Ruling 21: the session's, and /w)
     for (const c of ['cd /w; echo cd /etc; rm x', 'cd /w; git status; rm x', 'cd /w; echo "cd /etc"; rm x', 'cd /w; command rm x',
       'cd /w; command -p git status; rm x', 'cd /w && cat <<EOF\ncd /etc\nEOF\nrm x', '>/dev/null cd /w; rm x', '""cd /w; rm x'])
-      expect(rmTargets(c)).toEqual([t('/w/x')])
+      expect(rmTargets(c)).toEqual([t('x'), t('/w/x')])
     // no cd before it: a builtin that can change the directory leaves the session's, as today
     for (const c of ['source venv/bin/activate && rm -rf x', 'eval true; rm x', '$EDITOR f; rm x', 'export A=1; rm x'])
       expect(rmTargets(c)).toEqual([t('x')])
@@ -1355,7 +1394,7 @@ describe('batch 5: rm after cd', () => {
     expect(rmTargets('cd /w/wt && rm -f ../*.pyc .*.pyc')).toEqual([t('/w/wt/..', true), t(undefined)])
     // the real record: globs under a cd through a variable (Task 6 replays it)
     expect(rmTargets('WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/ordinal.*.pyc tests/__pycache__/test_ordinal.*.pyc\npython3 -m unittest tests.test_ordinal; echo "rc=$?"'))
-      .toEqual([t('/w/wt/pf/__pycache__', true), t('/w/wt/tests/__pycache__', true)])
+      .toEqual([t('pf/__pycache__', true), t('/w/wt/pf/__pycache__', true), t('tests/__pycache__', true), t('/w/wt/tests/__pycache__', true)]) // Ruling 21
     // a `..` out of the worktree is outside; one that stays inside is inside
     expect(verdict('cd /w/wt && rm -rf ../x')).toContain('no rm outside writable places')
     expect(verdict('cd /w/wt && rm -rf ..')).toContain('roots or ancestors')

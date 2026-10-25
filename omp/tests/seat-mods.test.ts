@@ -190,6 +190,12 @@ describe('bash cwd (fix wave 2)', () => {
       expect(await bash(command, cwd)).toContain('no rm outside')
     expect(await bash('cd /repo/wt || true; rm -rf build')).toContain('cannot resolve')
   })
+  // seat-mods Ruling 21: the bare operand of a cd that may fail is joined to the call's folder, here the worktree
+  test('reviewer: a cd before `;` that may fail is refused; the same removal behind && is allowed', async () => {
+    const bash = (command: string) => guard(norm(), 'bash', { command }, child('reviewer'))
+    for (const command of ['cd /tmp/typo; rm -rf build', 'cd /tmp/x; rm -rf *']) expect(await bash(command)).toContain('no rm outside')
+    for (const command of ['cd /tmp/typo && rm -rf build', 'cd /tmp/x && rm -rf *']) expect(await bash(command)).toBeUndefined()
+  })
   test('a commit message file is read against the call cwd', async () => {
     const seen: string[] = []
     const d = norm({ readFile: async (f: string) => { seen.push(f); return '' } })

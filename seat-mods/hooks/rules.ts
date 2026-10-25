@@ -607,12 +607,15 @@ function rmWord(word: string): { path: string; globAt: number; home: boolean } |
   return { path, globAt, home }
 }
 
-// The cd and variable walk (spec §7). Along a plain `;`, `&&` or newline sequence from the command's start, a
-// relative rm operand joins the directory a literal `cd <path>` left, and `$NAME` or `${NAME}`, quoted or not,
-// reads the value a literal `NAME=value` gave. The first `||`, `|`, `&`, parenthesis or compound command ends the
-// walk (what runs there may run in a subshell, or not at all), and so do a builtin in SHELL_STATE and a command
-// word the guard cannot read: from there a known directory is unknown, no variable is read, and every cd makes
-// the directory unknown, as every cd did before. With no cd before it an operand keeps the session's directory.
+// The cd and variable walk (spec §7, Ruling 21). Along a plain `;`, `&&` or newline sequence from the command's
+// start the walk keeps the set of directories the next command may run in, and `$NAME` or `${NAME}`, quoted or
+// not, reads the value a literal `NAME=value` gave. A literal `cd <path>` may fail, so after `;` or a newline the
+// set keeps what it held beside the new directory; the rest of a `cd <path> &&` list runs there only. A relative
+// rm operand gives one target per directory in the set, and each must be allowed (spec §4: never approve a removal
+// Bash may run elsewhere). The first `||`, `|`, `&`, parenthesis or compound command ends the walk (what runs
+// there may run in a subshell, or not at all), and so do a builtin in SHELL_STATE and a command word the guard
+// cannot read: from there a set with a cd in it is unknown, no variable is read, and every cd makes the directory
+// unknown, as every cd did before. With no cd before it an operand keeps the session's directory.
 // Reserved words that open a compound command, beside HEAD_WORDS. The walk never restarts, so no closer is needed.
 const BLOCK_WORDS = new Set(['case', 'for', 'select', 'function', 'coproc'])
 // Builtins that run text as commands, set a variable by a name the walk may not see, or change how cd reads.
@@ -680,15 +683,24 @@ function commandWord(tokens: readonly string[], pieces: readonly string[]): stri
 
 const DIRECTORY_CHANGES = ['cd', 'pushd', 'popd']
 
-const under = (dir: string, path: string) => `${dir === '/' ? '' : dir}/${path}`
+// A directory a command may run in: '' for the session's (the glue joins a bare operand to it), a path relative to
+// it, an absolute path, or UNKNOWN. A set holding UNKNOWN, or more than DIRECTORY_CAP members, is [UNKNOWN].
+const UNKNOWN = '\u0000unknown directory\u0000'
+const DIRECTORY_CAP = 4
+const under = (dir: string, path: string) => dir === '' ? path : `${dir === '/' ? '' : dir}/${path}`
+function directories(dirs: readonly string[]): string[] {
+  const set = [...new Set(dirs)]
+  return set.includes(UNKNOWN) || set.length > DIRECTORY_CAP ? [UNKNOWN] : set
+}
 
-// Where a plain `cd` with these operands leaves the shell, or 'unknown': one literal operand with no option, `~`,
-// glob or `..` (Bash's cd takes `..` from $PWD, not through links), absolute or below a known directory.
-function cdTarget(args: readonly string[], dir: string | undefined, vars: ReadonlyMap<string, string>, pieces: readonly string[]): string {
+// Where a plain `cd` with these operands leaves the shell when it succeeds, from each directory in `dirs`: one
+// literal operand with no option, `~`, glob or `..` (Bash's cd takes `..` from $PWD, not through links), absolute
+// or joined onto each directory. Anything else is [UNKNOWN].
+function cdTargets(args: readonly string[], dirs: readonly string[], vars: ReadonlyMap<string, string>, pieces: readonly string[]): string[] {
   const word = args.length === 1 ? rmWord(withVariables(expand(args[0]!, pieces), vars)) : undefined
-  if (word === undefined || word.home || word.globAt >= 0 || word.path.startsWith('-') || /(?:^|\/)\.\.(?:\/|$)/.test(word.path)) return 'unknown'
-  const path = word.path.startsWith('/') ? word.path : dir?.startsWith('/') ? under(dir, word.path) : undefined
-  return path === undefined ? 'unknown' : path.replace(/\/+$/, '') || '/'
+  if (word === undefined || word.home || word.globAt >= 0 || word.path.startsWith('-') || /(?:^|\/)\.\.(?:\/|$)/.test(word.path)) return [UNKNOWN]
+  const trim = (path: string) => path.replace(/\/+$/, '') || '/'
+  return directories(word.path.startsWith('/') ? [trim(word.path)] : dirs.map(dir => dir === UNKNOWN ? dir : trim(under(dir, word.path))))
 }
 
 // A relative operand in a substitution is unread when the command changes directory anywhere,
@@ -718,15 +730,17 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
   const withoutInput = blankHeredocs(command.replace(/(^|[\s;|&()])\d+(?=<<(?!<))/g, '$1'), () => ' ')
   const { text: input, pieces } = blank(withoutInput)
   let changedDirectory = moved
-  // The walk: `dir` is undefined for the session's directory, 'unknown', or absolute. `open` until the walk ends;
-  // `plainList` while every command so far in this &&-list is a plain cd or assignment; `conditional` when this
-  // list set `dir` or `vars` behind another command, which may fail and skip it: the list's end ends the walk.
-  let dir: string | undefined = moved ? 'unknown' : undefined
+  // The walk: `here` is where the next command of this &&-list may run, `after` where the shell may be when the list
+  // ends. `open` until the walk ends. `assignsOnly` while every command so far in this list is an assignment;
+  // `skippable` names the variables this list assigned behind another command, which may fail and skip it: the
+  // list's end forgets them.
+  let here = [moved ? UNKNOWN : '']
+  let after = here
   const vars = new Map<string, string>()
   let open = walk
-  let plainList = true
-  let conditional = false
-  const end = () => { open = false; vars.clear(); if (dir !== undefined) dir = 'unknown' }
+  let assignsOnly = true
+  const skippable: string[] = []
+  const end = () => { open = false; vars.clear(); if (after.length !== 1 || after[0] !== '') here = after = [UNKNOWN] }
   // Redirections belong to the shell, not rm. Blanked quotes/escapes keep
   // literal glyphs out of this match. Remove fd prefixes before their operators,
   // then operators with their attached or separate target words.
@@ -737,7 +751,7 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
   const parts = redirects.split(/(;|&&|\|\||[|&]|\n|\(|\))/)
   for (let k = 0; k < parts.length; k += 2) {
     const before = parts[k - 1]
-    if (before === ';' || before === '\n') { if (conditional) end(); conditional = false; plainList = true }
+    if (before === ';' || before === '\n') { here = after; assignsOnly = true; for (const name of skippable.splice(0)) vars.delete(name) }
     else if (before !== undefined && before !== '&&') end()
     const tokens = tokensOf(parts[k]!)
     if (tokens.length === 0) continue
@@ -750,7 +764,7 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
         if (word !== undefined && options && word.path === '--') { options = false; continue }
         if (word !== undefined && options && word.path.startsWith('-') && word.path !== '-') continue
         const relative = word !== undefined && !word.path.startsWith('/') && !word.home
-        if (word === undefined || (relative && dir === 'unknown')) {
+        if (word === undefined || (relative && here[0] === UNKNOWN)) {
           targets.push({ path: undefined, glob: false })
           continue
         }
@@ -765,33 +779,35 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
           const slash = prefix.lastIndexOf('/')
           path = slash < 0 ? '.' : slash === 0 ? '/' : prefix.slice(0, slash)
         }
-        // A known directory makes the operand absolute; the glues collapse no `..` before following links.
-        // Otherwise preserve whether the leading tilde was active, without treating a quoted literal tilde as
+        // A relative operand gives one target per directory; the glues collapse no `..` before following links.
+        // A bare one keeps whether its leading tilde was active, without treating a quoted literal tilde as
         // HOME. register.ts only expands an active leading tilde.
-        if (relative && dir !== undefined) path = under(dir, path)
-        else if (!word.home && path.startsWith('~')) path = './' + path
-        targets.push({ path, glob })
+        if (!relative) { targets.push({ path, glob }); continue }
+        for (const dir of here) targets.push({ path: dir === '' && path.startsWith('~') ? './' + path : under(dir, path), glob })
       }
     }
     // The raw reading counts every cd it counted before; the quote-removed one adds `"cd"` and `"command" cd`.
     const name = commandWord(tokens, pieces)
     const changes = DIRECTORY_CHANGES.includes(head?.name ?? '') || DIRECTORY_CHANGES.includes(name ?? '')
     if (changes) changedDirectory = true
-    const assigns = tokens.every(token => ASSIGNMENT.test(token))
-    if (open && (assigns || rmWord(expand(tokens[0]!, pieces))?.path === 'cd')) {
-      if (before === '&&' && !plainList) conditional = true
-      if (!assigns) dir = cdTarget(tokens.slice(1), dir, vars, pieces)
-      else for (const token of tokens) {
+    if (open && tokens.every(token => ASSIGNMENT.test(token))) {
+      for (const token of tokens) {
         const [whole, variable, subscript, append] = ASSIGNMENT.exec(token)!
         if (WALK_ENDERS.has(variable!)) { end(); break }
+        if (before === '&&' && !assignsOnly) skippable.push(variable!)
         const value = subscript || append || SHELL_VARIABLES.test(variable!) ? undefined : rmWord(expand(token.slice(whole.length), pieces))?.path
         if (value !== undefined && PLAIN_VALUE.test(value)) vars.set(variable!, value)
         else vars.delete(variable!)
       }
       continue
     }
-    plainList = false
-    if (changes) dir = 'unknown'
+    assignsOnly = false
+    if (open && rmWord(expand(tokens[0]!, pieces))?.path === 'cd') {
+      here = cdTargets(tokens.slice(1), here, vars, pieces)
+      after = directories([...after, ...here])
+      continue
+    }
+    if (changes) here = after = [UNKNOWN]
     if (!open) continue
     const text = expand(parts[k]!, pieces)
     for (const known of [...vars.keys()]) if (namesOtherwise(text, known)) vars.delete(known)

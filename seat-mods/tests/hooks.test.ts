@@ -1205,4 +1205,13 @@ describe('batch 5: rm after a literal cd or variable', () => {
     expect(await deny('cd /w && rm -rf ..')).toContain('roots or ancestors')
     expect(await deny('cd /w/build || true; rm -f x')).toContain('cannot resolve')
   })
+  // Ruling 21: the bare operand of a cd that may fail is joined to the session directory (/w/seat-mods, inside the worktree)
+  test('reviewer: a cd before `;` that may fail is refused; the same removal behind && is allowed', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports' })
+    const deny = async (command: string) => (await $.tool.call({ tool: 'Bash', command })).deny
+    for (const command of ['cd /tmp/typo; rm -rf build', 'cd /tmp/x; rm -rf *'])
+      expect(await deny(command)).toContain('no rm outside writable places')
+    for (const command of ['cd /tmp/typo && rm -rf build', 'cd /tmp/x && rm -rf *'])
+      expect(await deny(command)).toBeUndefined()
+  })
 })
