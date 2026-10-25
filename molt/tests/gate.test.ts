@@ -388,6 +388,83 @@ describe('batch 5: an opener line holding a substitution reads as in 0.9.0', () 
     expect(bash('git add "<<EOF" && cat huge.log\ngit add f')).toBe(false)
     expect(bash('git add "<<EOF" && git add g\ngit add f')).toBe(true)
     // control: the commit form keeps its line in the piece, whatever quotes that line holds
-    expect(bash("git commit -m \"$(cat <<'EOF' | tr -d '\"'\nfix: x\n\ncat words\nEOF\n)\"")).toBe(true)
+    expect(bash("git commit -m \"$(cat <<'EOF' | echo '\"'\nfix: x\n\ncat words\nEOF\n)\"")).toBe(true)
+    // C1 (Task 3): the substitution's own commands are read, and `tr` is outside the inner set
+    expect(bash("git commit -m \"$(cat <<'EOF' | tr -d '\"'\nfix: x\n\ncat words\nEOF\n)\"")).toBe(false)
+  })
+})
+
+// Batch 5, C1 (#724 A1, A2): past the hard threshold a substitution runs only what builds the
+// handoff's commit message: git add or git commit, cat of its stdin alone (a heredoc is stdin),
+// date, printf and echo. Anything else in a `$(…)` or backtick span refuses the call.
+describe('batch 5: substitutions', () => {
+  // n levels of `$(echo …)` around `inner`, which is itself level n
+  const nest = (n: number, inner: string) => 'git commit -m "' + '$(echo '.repeat(n - 1) + '$(' + inner + ')'.repeat(n) + '"'
+  test('a read inside a substitution refuses; the commit form and a date stay allowed', () => {
+    expect(bash('git commit -m "$(cat huge.log)"')).toBe(false)
+    expect(bash('git commit -m `cat huge.log`')).toBe(false)
+    expect(bash("git commit -m \"$(cat <<'EOF'\nhandoff\nEOF\n)\"")).toBe(true)
+    expect(bash('git commit -m "handoff $(date +%F)"')).toBe(true)
+    // a backtick span of several such commands runs; one other command in it refuses
+    expect(bash('git commit -m `date +%F; echo handoff`')).toBe(true)
+    expect(bash('git commit -m `date +%F; cat huge.log`')).toBe(false)
+  })
+  test('cat reads only its stdin: `-` or no operand, a heredoc, no input redirection', () => {
+    expect(bash("git commit -m \"$(cat - <<'EOF'\nhandoff\nEOF\n)\"")).toBe(true)
+    expect(bash("git commit -m \"$(cat<<'EOF'\nhandoff\nEOF\n)\"")).toBe(true)
+    expect(bash('git commit -m "$(cat)"')).toBe(true)
+    // controls: a file operand, quoted or beside `-`, an input redirection, an option
+    expect(bash('git commit -m "$(cat "huge.log")"')).toBe(false)
+    expect(bash("git commit -m \"$(cat huge.log - <<'EOF'\nhandoff\nEOF\n)\"")).toBe(false)
+    expect(bash('git commit -m "$(cat < huge.log)"')).toBe(false)
+    expect(bash('git commit -m "$(cat -n)"')).toBe(false)
+  })
+  test('date, printf, echo, git add and git commit run; other commands refuse', () => {
+    expect(bash("git commit -m \"$(printf 'fix: x\\n\\nbody')\"")).toBe(true)
+    expect(bash('git commit -m "$(echo handoff)"')).toBe(true)
+    expect(bash('git add "$(echo f)"')).toBe(true)
+    // controls
+    expect(bash('git commit -m "$(git log -1 --format=%s)"')).toBe(false)
+    expect(bash('git commit -m "$(head -1 huge.log)"')).toBe(false)
+    expect(bash('git commit -m "$(./env date)"')).toBe(false)
+    expect(bash('git commit -m "$(env date)"')).toBe(true)
+    // a command word reached by a relative path may be any local program; an absolute one is the program
+    expect(bash('git commit -m "$(./date)"')).toBe(false)
+    expect(bash('git commit -m "$(bin/echo x)"')).toBe(false)
+    expect(bash('git commit -m "$(/bin/date)"')).toBe(true)
+  })
+  test('nested spans and unquoted heredoc bodies are read; quoted bodies and plain text are not', () => {
+    expect(bash('git commit -m "$(echo $(cat huge.log))"')).toBe(false)
+    expect(bash('git commit -m "$(echo $(date))"')).toBe(true)
+    expect(bash('git commit -F - <<EOF\n$(cat huge.log)\nEOF')).toBe(false)
+    expect(bash('git commit -F - <<EOF\n`cat huge.log`\nEOF')).toBe(false)
+    expect(bash("git commit -F - <<EOF\nit's $(cat huge.log)\nEOF")).toBe(false)
+    // controls
+    expect(bash("git commit -F - <<'EOF'\n$(cat huge.log)\nEOF")).toBe(true)
+    expect(bash('git commit -F - <<EOF\nplease cat huge.log later\nEOF')).toBe(true)
+    expect(bash("git commit -m '$(cat huge.log)'")).toBe(true)
+  })
+  test('a substitution nested more than 8 deep refuses (Ruling 3)', () => {
+    expect(bash('git commit -m "' + '$('.repeat(9) + 'date' + ')'.repeat(9) + '"')).toBe(false)
+    expect(bash(nest(9, 'date'))).toBe(false)
+    // control: 8 deep is read level by level, and allowed when every level is
+    expect(bash(nest(8, 'date'))).toBe(true)
+    expect(bash(nest(8, 'cat huge.log'))).toBe(false)
+    // far deeper than the walk follows: refused, with no stack overflow (the host allows on a throw)
+    expect(bash('git commit -m "' + '$('.repeat(20000) + 'date' + ')'.repeat(20000) + '"')).toBe(false)
+  })
+  test('inner quotes in a double-quoted $(…) pair inside it, as in Bash', () => {
+    expect(bash('git commit -m "$(echo "it\'s")" && cat \'huge.log\'')).toBe(false)
+    expect(bash('git commit -m "$(echo "a;b")"')).toBe(true)
+    expect(bash('git commit -m "$(echo a # it\'s )\n)"')).toBe(true)
+    // controls
+    expect(bash('git commit -m "$(echo "a;b")" && cat \'huge.log\'')).toBe(false)
+    expect(bash('git commit -m "$(echo a # it\'s )\ncat huge.log)"')).toBe(false)
+  })
+  test('an unquoted $(…) is still split by the parentheses, so its command is a segment of its own', () => {
+    // as at 0.3.7: the gate reads `date` as a segment, which is not git add or git commit
+    expect(bash('git commit -m $(date +%F)')).toBe(false)
+    // control: the quoted form is a commit message
+    expect(bash('git commit -m "$(date +%F)"')).toBe(true)
   })
 })

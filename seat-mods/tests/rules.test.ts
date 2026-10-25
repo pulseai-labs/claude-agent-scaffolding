@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'claude-code/testing'
 import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText } from '../hooks/rules'
+import * as rules from '../hooks/rules'
 
 describe('parseRole', () => {
   test('unset and empty default to the guarded implementer', () => {
@@ -997,5 +998,140 @@ describe('batch 5: an opener line holding a substitution reads as in 0.9.0', () 
     expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
     // the commit form keeps its line in the piece, whatever quotes that line holds
     expect(bashRules("git commit -m \"$(cat <<'EOF' | tr -d '\"'\nfix: x\n\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
+  })
+})
+
+// Batch 5, C1 (#724 A1, A2): a `$(…)` or backtick span is a command of its own, read wherever
+// Bash runs it (unquoted, in double quotes, in an unquoted heredoc body) and nowhere else. The
+// new exports are read through a lookup so this file still loads on a tree without them.
+describe('batch 5: substitutions', () => {
+  const reader = rules as unknown as { substitutionsOf?: (command: string) => string[]; SUBSTITUTION_TOO_DEEP?: string }
+  const substitutionsOf = (command: string) => reader.substitutionsOf?.(command)
+  const SUBSTITUTION_TOO_DEEP = reader.SUBSTITUTION_TOO_DEEP
+  const RULED = 'git push --force origin main'
+  const nest = (n: number, inner: string) => 'echo ' + '$('.repeat(n) + inner + ')'.repeat(n)
+  test('substitutionsOf: the command text of each span Bash runs', () => {
+    expect(substitutionsOf('git commit -m "$(git push --force)"')).toEqual(['git push --force'])
+    expect(substitutionsOf('git commit -m `git push --force`')).toEqual(['git push --force'])
+    expect(substitutionsOf("echo '$(rm -rf /)'")).toEqual([])
+    expect(substitutionsOf("cat <<'EOF'\n$(rm -rf /)\nEOF")).toEqual([])
+    expect(substitutionsOf('cat <<EOF\n$(git push --force)\nEOF')).toEqual(['git push --force'])
+    // a heredoc before a span on the same level is read too
+    expect(substitutionsOf('cat <<EOF\n$(git push --force)\nEOF\necho $(date)')).toEqual(['git push --force', 'date'])
+  })
+  test('a nested span is listed after the span it sits in', () => {
+    expect(substitutionsOf('echo "$(echo $(git push --force))"')).toEqual(['echo $(git push --force)', 'git push --force'])
+    // inside backticks an escaped backtick opens the nested span
+    expect(substitutionsOf('echo `echo \\`git push --force\\``')).toEqual(['echo `git push --force`', 'git push --force'])
+  })
+  test('control: a $\'…\' string, an escaped opener and a quoted body run nothing', () => {
+    expect(substitutionsOf("echo $'$(git push --force)'")).toEqual([])
+    expect(substitutionsOf("echo $'a\\' $(git push --force)'")).toEqual([])
+    expect(substitutionsOf('echo \\$\\(git push\\) "\\$(git push)" \\`git push\\`')).toEqual([])
+    expect(substitutionsOf("cat <<'EOF'\n`git push --force`\nEOF")).toEqual([])
+    expect(substitutionsOf('cat <<EOF\n\\$(git push --force)\nEOF')).toEqual([])
+    // the unquoted body's backtick runs, and a quote in the body is text
+    expect(substitutionsOf('cat <<EOF\n`git push --force`\nEOF')).toEqual(['git push --force'])
+    expect(substitutionsOf("cat <<EOF\nit's $(git push --force)\nEOF")).toEqual(['git push --force'])
+    // `$$` is the PID: the quote after it is a single quote, closed by the next one
+    expect(substitutionsOf("echo $$'a\\' $(git push --force)")).toEqual(['git push --force'])
+  })
+  test('a span ends at its own closing parenthesis, and # starts a comment only at a word start', () => {
+    expect(substitutionsOf('echo "$( (true); git push --force )"')).toEqual([' (true); git push --force '])
+    expect(substitutionsOf('echo "$(echo ${#x} a#b "c"#d)"')).toEqual(['echo ${#x} a#b "c"#d'])
+    // `$((…); …)` read as arithmetic first: the spans found on that try are not kept
+    expect(substitutionsOf('echo $(($(date)); git push --force)')).toEqual(['($(date)); git push --force', 'date'])
+  })
+  test('$((…)) is arithmetic, walked for the spans in it; $( (…) …) is a substitution', () => {
+    expect(substitutionsOf('echo $((1 + 2))')).toEqual([])
+    expect(substitutionsOf('echo $(( $(git push --force) + 1 ))')).toEqual(['git push --force'])
+    expect(substitutionsOf('echo $((echo a); git push --force)')).toEqual(['(echo a); git push --force'])
+    expect(bashRules('echo "$((echo a); git push --force)"')).toContain('force-push')
+  })
+  test('a # comment inside a double-quoted $(…) ends at its newline, quotes and all', () => {
+    expect(substitutionsOf('git commit -m "$(echo a # it\'s )\n)"')).toEqual(['echo a # it\'s )\n'])
+    // control: a comment outside any span runs nothing
+    expect(substitutionsOf('echo ok # $(git push --force)')).toEqual([])
+  })
+  test('a ruled command in a substitution is refused', () => {
+    expect(bashRules('git commit -m "$(git push --force origin main)"')).toContain('force-push')
+    expect(bashRules('git commit -m `git push --force origin main`')).toContain('force-push')
+    expect(rmTargets('git commit -m "$(rm -rf /etc/x)"')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('cat <<EOF\n$(git push --force origin main)\nEOF')).toContain('force-push')
+    expect(commitMessageFiles('echo "`git commit -F /w/msg`"')).toEqual(['/w/msg'])
+    // control
+    expect(commitMessageFiles("echo '$(git commit -F /w/msg)'")).toEqual([])
+  })
+  test('a substitution nested more than 8 deep is refused (Ruling 3)', () => {
+    const deep = 'echo ' + '$('.repeat(9) + 'true' + ')'.repeat(9)
+    expect(substitutionsOf(deep)).toContain(SUBSTITUTION_TOO_DEEP)
+    expect(bashRules(deep)).toContain('force-push')
+    expect(rmTargets(deep)).toContainEqual({ path: undefined, glob: false })
+    // control: 8 deep is read level by level
+    expect(substitutionsOf(nest(8, 'true'))).toHaveLength(8)
+    expect(substitutionsOf(nest(8, 'true'))).not.toContain(SUBSTITUTION_TOO_DEEP)
+    expect(bashRules(nest(8, 'true'))).toEqual([])
+    expect(rmTargets(nest(8, 'true'))).toEqual([])
+    expect(bashRules(nest(8, RULED))).toContain('force-push')
+    // far deeper than the walk follows: still read as too deep, with no stack overflow
+    const deeper = 'echo "' + '$('.repeat(20000) + 'true' + ')'.repeat(20000) + '"'
+    expect(bashRules(deeper)).toContain('force-push')
+  })
+  test('Ruling 2: a relative rm operand in a substitution is unread when the command changes directory', () => {
+    expect(rmTargets('cd /etc && git commit -m "$(rm -rf x)"')).toEqual([{ path: undefined, glob: false }])
+    // controls: with no cd it reads as a top-level rm would; an absolute operand stays read
+    expect(rmTargets('git commit -m "$(rm -rf x)"')).toEqual([{ path: 'x', glob: false }])
+    expect(rmTargets('cd /etc && git commit -m "$(rm -rf /tmp/x)"')).toEqual([{ path: '/tmp/x', glob: false }])
+    // the list keeps no nesting, so a cd in any substitution counts: here the rm runs in /etc
+    expect(rmTargets('echo "$(cd /etc; echo "$(rm -rf x)")"')).toEqual([{ path: undefined, glob: false }])
+  })
+  test('a span the outer reading already splits is not listed twice', () => {
+    expect(rmTargets('echo $(rm -rf /etc/x)')).toEqual([{ path: '/etc/x', glob: false }])
+  })
+  test('control: plain body text, an honest substitution and the commit form stay allowed', () => {
+    expect(bashRules('cat <<EOF\nplease git merge later\nEOF')).toEqual([])
+    expect(bashRules('git commit -m "release $(date +%F)"')).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: it's (done)\n\ngit push --force words\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("gh pr create --title t --body \"$(cat <<'EOF'\n## Summary\n- git merge words\nEOF\n)\"")).toEqual(['pr-create'])
+    expect(rmTargets("git commit -m \"$(cat <<'EOF'\nrm -rf /etc/x\nEOF\n)\"")).toEqual([])
+  })
+  test('a heredoc opened after an opener in quotes keeps its own quoting inside the substitution', () => {
+    // Bash opens both heredocs inside the substitution: B's body runs only when B is unquoted
+    expect(bashRules(`git commit -m "$(cat <<'A' <<'B'\na\nA\n$(${RULED})\nB\n)"`)).toEqual(['commit'])
+    expect(bashRules(`git commit -m "$(cat <<'A' <<B\na\nA\n$(${RULED})\nB\n)"`)).toContain('force-push')
+  })
+  test('an opener line holding a substitution (Ruling 13): the line is command text, the body is body', () => {
+    expect(bashRules(`cat <<'EOF' "$(${RULED})"\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "$(date)"\n$(${RULED})\nEOF`)).toContain('force-push')
+    // control: the quoted body is text, and so is a comment on the line
+    expect(bashRules(`cat <<'EOF' "$(date)"\n$(${RULED})\nEOF`)).toEqual([])
+    expect(substitutionsOf(`cat <<EOF "$(date)" # $(${RULED})\nbody\nEOF`)).toEqual(['date'])
+  })
+  test('a later opener after a heredoc that never closes has no body of its own', () => {
+    expect(substitutionsOf('cat <<A <<B\n$(git push --force)')).toEqual(['git push --force'])
+    // control: the first body is quoted, so nothing runs; a backtick in the later delimiter is a word
+    expect(substitutionsOf("cat <<'A' <<B\n$(git push --force)")).toEqual([])
+    expect(substitutionsOf('cat <<A <<`x`\nbody')).toEqual([])
+  })
+  test('inner quotes in a double-quoted $(…) pair inside it, as in Bash', () => {
+    expect(bashRules(`git commit -m "$(echo "it's")" && ${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -m \`echo "\` && ${RULED} "x"`)).toContain('force-push')
+    // a backtick span ends at the next unescaped backtick, whatever quotes it holds
+    expect(substitutionsOf(`git commit -m \`echo "\` && ${RULED} "x"`)).toEqual(['echo "'])
+    // a comment inside the span takes its quotes with it
+    expect(bashRules(`git commit -m "$(echo "a" # it"s )\n)" && ${RULED} "x"`)).toContain('force-push')
+    // control: the substitution alone is a commit message
+    expect(bashRules('git commit -m "$(echo "it\'s")"')).toEqual(['commit'])
+    expect(bashRules('git commit -m "$(echo "a;b")"')).toEqual(['commit'])
+    // an inner string is text, as in Bash; a command beside it in the span is still read
+    expect(bashRules(`git commit -m "$(echo "a; ${RULED}")"`)).toEqual(['commit'])
+    expect(bashRules(`git commit -m "$(echo "a"; ${RULED})"`)).toContain('force-push')
+  })
+  test('C5 row 724-A12: a backtick inside ${…} no longer ends the expansion early (Ruling 15)', () => {
+    // Bash: the `}` in the backticks does not close `${`, so the & is in the word and no git runs
+    expect(bashRules('printf x ${x:-`echo }` & git push --force }')).toEqual([])
+    // control: a lone & outside the expansion still splits
+    expect(bashRules('printf x ${x:-`echo }`} & git push --force')).toContain('force-push')
   })
 })

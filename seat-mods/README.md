@@ -225,7 +225,7 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
   subcommands or flags (`git "merge"`). A trailer that opens an `-m` message, comes from
   `--trailer`, or follows a backslash-newline inside single
   quotes, also passes.
-- Backticks and quoted `$(rm …)` can escape recognition; bare `$(rm …)` is checked by the parentheses splitter.
+- A command inside `$(…)` or backticks is read as a command of its own wherever Bash runs it, but a `case` pattern's `)` ends the substitution early for the reader, and the rest of that substitution is not read.
 - Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
 - An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
@@ -233,7 +233,7 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
 - A heredoc opener line holding a `$(…)`, a backtick or a `${…}` after the delimiter word is read as in 0.9.0: the rest of that line goes with the heredoc, so a ruled command after the substitution on that line stays hidden (`cat <<EOF $(date); git push --force`). So does a quoted `<<` after one of those on its line, as in the `"$(cat <<'EOF' … )"` commit form. Any other quoted `<<` is text, as in Bash.
 - A `$'…'` or `$"…"` heredoc delimiter is read with its `$`, so its heredoc never closes at `EOF` and the lines after it can hide commands.
-- With no heredoc on the line, quotes inside a double-quoted `$(…)` still pair as if the substitution were plain text, so an inner quote can pair with one after the string and hide the commands between (`git commit -m "$(echo "it's")" && …`), as in 0.9.0.
+- Inside a double-quoted `$(…)`, a `#` after a blank in an inner quoted string still reads as a comment, as in 0.9.0, so the rest of that line is hidden (`git commit -m "$(echo "a # b")" && …`).
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
 - `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.

@@ -1,5 +1,5 @@
-// molt's reading of a Bash command. The declarations from COMMANDS to gitOf are a
-// copy of seat-mods/hooks/rules.ts: plugins never import each other, and
+// molt's reading of a Bash command. The declarations from COMMANDS to substitutionsOf
+// are a copy of seat-mods/hooks/rules.ts: plugins never import each other, and
 // tests/test-mod-shell-parity.sh holds the copies identical. Change them there
 // first, then copy.
 
@@ -120,6 +120,71 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
   return out + command.slice(from, comment < 0 ? command.length : comment)
 }
 
+// The `$(…)` and backtick spans of `text`, in order: `at`..`end` is the whole span, `from`..`to`
+// its command text, which runs to the end of the text when the span never closes. Bash reads a
+// span's text as a command of its own, with fresh quoting, so its quotes pair inside it and a `#`
+// that starts a word there begins a comment (#724 A1, A2). A `$((…))` is arithmetic, walked for the
+// spans in it, unless its inner parenthesis closes first (`$((a); b)` is a substitution). `mode`:
+// 'command' reports every span at the text's top level; 'blank' reports a backtick span or a
+// `$(…)` in double quotes only when it closes, and walks on through an unquoted `$(…)`, which
+// the parenthesis split reads; 'body' reads an unquoted heredoc body, where quotes are text. A
+// walk more than 64 constructs deep reads as never closing.
+function substitutionSpans(text: string, mode: 'command' | 'blank' | 'body'): Array<{ at: number; from: number; to: number; end: number; tick: boolean }> {
+  const spans: Array<{ at: number; from: number; to: number; end: number; tick: boolean }> = []
+  // From `i`, the index of the character that closes the construct, `)`, `"` or a backtick, or
+  // the text's length for '' (the top level); -1 when it never closes. Inside a span nothing is
+  // reported: its text is read on its own.
+  const walk = (i: number, close: string, quoted: boolean, report: boolean, nest: number): number => {
+    if (nest > 64) return -1
+    const literal = close === '"' || (close === '' && mode === 'body')
+    const comments = mode === 'command' || !report
+    let depth = 0
+    let word = false
+    for (; i < text.length; i++) {
+      const char = text[i]!
+      if (char === '\\') { if (text[i + 1] !== '\n') word = true; i += 1; continue }
+      if (close === '`') { if (char === '`') return i; continue }
+      if (char === '"' && close === '"') return i
+      if (char === '$' && text[i + 1] === '$') { i += 1; word = true; continue }
+      if (char === '`' || (char === '$' && text[i + 1] === '(')) {
+        const tick = char === '`'
+        if (!tick && mode === 'blank' && !quoted) { word = true; continue }
+        const from = i + (tick ? 1 : 2)
+        let end: number
+        if (!tick && text[i + 2] === '(') {
+          const mark = spans.length
+          const inner = walk(i + 3, ')', quoted, report, nest + 1)
+          if (inner >= 0 && text[inner + 1] === ')') { i = inner + 1; word = true; continue }
+          spans.length = mark
+          end = inner < 0 ? -1 : walk(inner + 1, ')', false, false, nest + 1)
+        } else end = walk(from, tick ? '`' : ')', false, false, nest + 1)
+        if (report && (end >= 0 || mode !== 'blank'))
+          spans.push({ at: i, from, to: end < 0 ? text.length : end, end: end < 0 ? text.length : end + 1, tick })
+        if (end < 0) return -1
+        i = end
+        word = true
+        continue
+      }
+      if (literal) continue
+      if (char === "'") { i = text.indexOf("'", i + 1); if (i < 0) return -1; word = true; continue }
+      if (char === '$' && text[i + 1] === "'") {
+        for (i += 2; i < text.length && text[i] !== "'"; i += text[i] === '\\' ? 2 : 1);
+        if (i >= text.length) return -1
+        word = true
+        continue
+      }
+      if (char === '"') { i = walk(i + 1, '"', true, report, nest + 1); if (i < 0) return -1; word = true; continue }
+      if (comments && !word && char === '#') { const end = text.indexOf('\n', i); if (end < 0) break; i = end - 1; continue }
+      if (close === ')' && char === '(') depth += 1
+      if (close === ')' && char === ')' && depth-- === 0) return i
+      word = !' \t\n;&|()'.includes(char)
+    }
+    return close === '' ? text.length : -1
+  }
+  walk(0, '', false, true, 0)
+  return spans
+}
+
 function blank(command: string): { text: string; pieces: string[] } {
   const pieces: string[] = []
   const keep = (piece: string) => `\u0000${pieces.push(piece) - 1}\u0000`
@@ -134,8 +199,17 @@ function blank(command: string): { text: string; pieces: string[] } {
   const reserved = /^(?:if|then|elif|else|fi|do|while|until)(?=[\s;&|()<>]|$)/
   const unescape = (escape: string, at: number, whole: string) =>
     /[A-Za-z0-9_./-]/.test(escape[1]!) && !reserved.test(whole.slice(at + 1)) ? escape[1]! : keep(escape)
-  // blankHeredocs has already dropped the comments, so a quote in one pairs with nothing.
-  const text = fold(blankHeredocs(command, (piece, quoted) => keep(quoted ? piece : fold(piece))))
+  // blankHeredocs has already dropped the comments, so a quote in one pairs with nothing. A
+  // backtick span, and a `$(…)` in double quotes, is masked whole before the quotes are read:
+  // its quotes pair inside it, as in Bash (#724 A1, A2).
+  const folded = fold(blankHeredocs(command, (piece, quoted) => keep(quoted ? piece : fold(piece))))
+  let masked = ''
+  let from = 0
+  for (const span of substitutionSpans(folded, 'blank')) {
+    masked += folded.slice(from, span.at) + keep(folded.slice(span.at, span.end))
+    from = span.end
+  }
+  const text = (masked + folded.slice(from))
     .replace(QUOTED, quoted => quoted.startsWith('\\') ? quoted : keep(quoted)).replace(/\\./g, unescape)
   return { text, pieces }
 }
@@ -188,6 +262,55 @@ function gitOf(tokens: string[]): { sub: string; args: string[] } | undefined {
   const args = rest.slice(i + 1)
   const end = args.indexOf('--')
   return { sub, args: end < 0 ? args : args.slice(0, end) }
+}
+
+// What substitutionsOf lists for a span nested more than 8 deep: bashRules reads it as
+// force-push and rmTargets as an unread operand, and molt's gate never allows it.
+export const SUBSTITUTION_TOO_DEEP = '\u0000substitution nested more than 8 deep\u0000'
+
+// The command text of every `$(…)` and backtick span Bash would run: unquoted, in double quotes,
+// on a heredoc's opener line and in an unquoted heredoc body; never in single quotes or a quoted
+// body (#724 A1, A2). Each span is read again on its own, as Bash reads it, for the spans nested
+// in it, which follow it in the list.
+export function substitutionsOf(command: string): string[] {
+  const found: string[] = []
+  const read = (command: string, level: number): void => {
+    const pieces: Array<{ piece: string; quoted: boolean }> = []
+    const text = blankHeredocs(command, (piece, quoted) => `\u0000${pieces.push({ piece, quoted }) - 1}\u0000`)
+    const spans: string[] = []
+    // `raw` text is a heredoc's own slice of the command: it holds no markers.
+    const take = (part: string, mode: 'command' | 'body', raw: boolean): void => {
+      const restore = (span: string) => raw ? span : span.replace(/\u0000(\d+)\u0000/g, (_: string, n: string) => pieces[Number(n)]?.piece ?? '')
+      let from = 0
+      for (const span of substitutionSpans(part, mode)) {
+        if (!raw) heredocsIn(part.slice(from, span.at))
+        const inner = restore(part.slice(span.from, span.to))
+        spans.push(span.tick ? inner.replace(/\\([\\`$])/g, '$1') : inner)
+        from = span.end
+      }
+      if (!raw) heredocsIn(part.slice(from))
+    }
+    // A heredoc outside every span: the rest of its opener line, which the older layout keeps
+    // in the piece, is command text; an unquoted body is read for spans.
+    const heredocsIn = (gap: string): void => {
+      for (const [, n] of gap.matchAll(/\u0000(\d+)\u0000/g)) {
+        const { piece, quoted } = pieces[Number(n)] ?? { piece: '', quoted: true }
+        HEREDOC.lastIndex = 0
+        const opener = HEREDOC.exec(piece)?.[0].length ?? 0
+        const line = piece.indexOf('\n')
+        take(piece.slice(opener, line < 0 ? piece.length : line), 'command', true)
+        if (!quoted && line >= 0) take(piece.slice(line + 1), 'body', true)
+      }
+    }
+    take(text, 'command', false)
+    for (const span of spans) {
+      if (level > 8) { if (!found.includes(SUBSTITUTION_TOO_DEEP)) found.push(SUBSTITUTION_TOO_DEEP); return }
+      found.push(span)
+      read(span, level + 1)
+    }
+  }
+  read(command, 1)
+  return found
 }
 
 // A Bash construct opens with a reserved head word; the reader skips those before
@@ -243,6 +366,27 @@ function subOf(rest: string[]): string | undefined {
 
 export function gitSubcommands(command: string): Array<string | undefined> {
   return segmentsOf(command).map(segment => subOf(segment.rest))
+}
+
+// The command of each segment of a substitution's text, for the gate's inner rule (#724 A1,
+// A2). A heredoc is the command's stdin, not an operand, so its marker is left out of the words;
+// `input` says another `<` feeds the command a file, and `local` that the command word is a
+// relative path, which may be any local program (#702 B7).
+export function innerCommandsOf(command: string): Array<{ name: string; args: string[]; sub: string | undefined; local: boolean; input: boolean } | undefined> {
+  const { text, pieces } = blank(command)
+  const commands: Array<{ name: string; args: string[]; sub: string | undefined; local: boolean; input: boolean } | undefined> = []
+  for (const segment of text.split(COMMANDS)) {
+    const words = segment.replace(/\u0000(\d+)\u0000/g, (marker: string, n: string) => pieces[Number(n)]?.startsWith('<<') ? ' ' : marker)
+    const { rest } = afterHeads(tokensOf(words))
+    if (namesNoCommand(rest)) continue
+    const head = commandOf(rest)
+    const word = head === undefined ? '' : rest[rest.length - head.args.length - 1] ?? ''
+    commands.push(head && {
+      name: head.name, args: head.args, sub: gitOf(rest)?.sub,
+      local: head.viaPath || (word.includes('/') && !word.startsWith('/')), input: /(?<!<)<(?!<)/.test(words),
+    })
+  }
+  return commands
 }
 
 // The one head word that surely runs the command after it: `time` runs what it
