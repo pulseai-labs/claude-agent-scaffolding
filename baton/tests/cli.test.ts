@@ -32,7 +32,7 @@ test("baton with no command is a usage error", async () => {
 
 // ---- run state commands ---------------------------------------------------------------
 
-import { mkdtempSync, mkdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
+import { rmSync, mkdtempSync, mkdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 
 const RELAY = join(FIX, "relay.json");
@@ -443,4 +443,15 @@ test("unpark keeps drivers", async () => {
   writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
   expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
   expect(runJson(st, "r1").units.planner.drivers).toEqual(["land/outcome"]);
+});
+
+test("in-place unpark works with a missing or invalid recipe.json (no stop file consumed)", async () => {
+  for (const content of [undefined, "{not json"]) {
+    const { st, stop } = await parkedAtWork("stop");
+    const rp = join(st, "runs", "r1", "recipe.json");
+    if (content === undefined) rmSync(rp); else writeFileSync(rp, content);
+    expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+    expect(runJson(st, "r1").units.planner.parked).toBeUndefined();
+    expect(existsSync(stop)).toBe(true);
+  }
 });

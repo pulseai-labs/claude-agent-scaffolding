@@ -90,13 +90,14 @@ export function unitScope(run: RunState, u: UnitState, extra: Partial<Scope> = {
 
 /** Unpark `u` in place (`to` undefined) or into stage `to`. A `stop` park's stop file is renamed
  *  to `<path>.consumed-<nowIso>`. A live driver's claim is removed and `u.driver` deleted.
- *  Returns the stage the unit is now in and the consumed path, if any. Caller holds the lock and saves. */
-export function unparkUnit(run: RunState, recipe: Recipe, u: UnitState, to: string | undefined, nowIso: string):
+ *  `recipe` is required for `to`; with none, an in-place unpark still resets but skips stop-file
+ *  consumption. Returns the stage the unit is now in and the consumed path, if any. Caller holds the lock and saves. */
+export function unparkUnit(run: RunState, recipe: Recipe | undefined, u: UnitState, to: string | undefined, nowIso: string):
   { stage: string; consumed?: string } {
   let consumed: string | undefined;
   if (u.parked?.reason === "stop") {
     // Rendered before any stage move: the park stage's stop_file is the one that blocks.
-    const stage = own(recipe.stages, u.stage);
+    const stage = recipe ? own(recipe.stages, u.stage) : undefined;
     if (stage?.kind === "session" && stage.stop_file !== undefined) {
       try {
         const path = render(stage.stop_file, unitScope(run, u));
@@ -115,7 +116,7 @@ export function unparkUnit(run: RunState, recipe: Recipe, u: UnitState, to: stri
   }
   delete u.parked;
   if (to !== undefined) {
-    enterStage(u, to, triageNote(run, recipe, u)); // the same stage entry an outcome's move makes
+    enterStage(u, to, recipe && triageNote(run, recipe, u)); // the same stage entry an outcome's move makes
   } else {
     // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
     u.stalls = 0;

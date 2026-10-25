@@ -249,13 +249,17 @@ async function unparkCmd(args: string[]): Promise<number> {
     // running: moving or resetting it here would leave that session bound to state it was not
     // launched in. A parked unit is never refused, whatever its record holds.
     if (unit.session && !unit.parked) return fail(`unit ${unitId} is running (live session) and not parked; nothing to unpark`);
-    let recipe: Recipe;
-    try {
+    let recipe: Recipe | undefined;
+    if (to !== undefined) {
       recipe = loadRecipe(run.dir);
-    } catch {
-      return fail(`no readable recipe for run ${runId}`);
+      if (!Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
+    } else {
+      try {
+        recipe = loadRecipe(run.dir); // best-effort: in-place unpark needs it only to consume a stop file
+      } catch {
+        recipe = undefined;
+      }
     }
-    if (to !== undefined && !Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
     const { stage, consumed } = unparkUnit(run, recipe, unit, to, new Date().toISOString());
     store.writeRun(run);
     store.event(runId!, { kind: "unpark", unit: unitId, stage, ...(consumed !== undefined ? { consumed } : {}) });
