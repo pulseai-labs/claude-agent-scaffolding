@@ -11,7 +11,7 @@ All notable changes to the `baton` plugin.
   driver resume goes to the operator. Events: `driver`, `driver resume`, `driver escalate`,
   `driver stop`, `driver dropped`. Each result appends a ledger line. The driver's `state_file` and
   `result_file` must contain `{unit.id}`, and `result_file` the launch number `{driver.launch}`:
-  baton reads only the result file rendered for that launch, then removes it.
+  baton reads only the result file rendered for that launch, and removes it once a valid result is read.
 - With a driver, the escalate is the only unit-park notice
   (`baton <run>/<unit> parked in <stage>: <reason> — <action>`, with the PR suffix of a merge-stage
   park); a driver stop parks the run with its own notice.

@@ -1174,10 +1174,13 @@ class RunTick {
     if (!(await this.driverEnded(u, d, drv))) return;
     const scope = this.scope(u);
     // The path stored at launch, never re-rendered: a result binds to the launch that wrote it.
+    // A valid result is removed once read; a refused one stays for the operator (no later launch reads it).
     const res = readDriverResult(d.result_file, drv, u.stage);
-    try {
-      removeFile(d.result_file);
-    } catch { /* best-effort: the next launch's path differs */ }
+    if (!("invalid" in res)) {
+      try {
+        removeFile(d.result_file);
+      } catch { /* best-effort: the next launch's path differs */ }
+    }
     await this.endDriver(u);
     if ("invalid" in res) return this.escalate(u, `driver gave no valid result (${res.invalid})`);
     const path = render(drv.ledger, scope);

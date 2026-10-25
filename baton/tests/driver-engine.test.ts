@@ -239,6 +239,7 @@ test("refused resume escalates", async () => {
   expect(n[0].endsWith('baton r1/a parked in work: stop — driver gave no valid result (resume to "done" is not allowed from "work")'))
     .toBe(true);
   expect(existsSync(ledger())).toBe(false);
+  expect(existsSync(result())).toBe(true); // a refused result stays for the operator; no later launch reads it
   expect(events().filter((e) => e.kind === "driver escalate")).toEqual([
     expect.objectContaining({ unit: "a", stage: "work", reason: "stop" }),
   ]);

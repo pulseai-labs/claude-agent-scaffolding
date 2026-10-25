@@ -90,7 +90,7 @@ refused, and a recipe with a driver cannot name a stage `driver`.
 With a driver, a park no longer sends its notice. Step 7 of the tick writes the unit's state file
 (the run, the units, this park, the events since the stage entry) and launches one driver session
 for it (`driver` event). The driver takes no slot and has its own claim. When it ends, baton reads
-the result file rendered for that launch once, then removes it:
+the result file rendered for that launch once (a valid one is then removed; a refused one is kept):
 
 - `{"result":"resume","to"?:..,"cleared":..,"ledger":{..}}`: the unit is unparked in place, or into
   `to` (allowed by `resume_to` for the park's stage); `cleared` must be in `clearing`
