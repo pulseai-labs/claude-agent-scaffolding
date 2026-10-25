@@ -8,7 +8,8 @@ All notable changes to the `bot-on-telegram` plugin.
   sent without the marker and without a notification sound.
 - An action for a parked unit is remembered in `open-actions.jsonl`. When the unit is no longer in
   that park (unparked, moved, or its run disarmed or done), the bot edits the message to start with `✅ settled — `
-  and spends its unused buttons.
+  and spends its unused buttons; when a press already spent every button, it skips the edit and
+  still closes the action.
 - Needs baton 0.4.0 or later, for the driver and the summary notice.
 
 ## 0.1.0 - 2026-10-23

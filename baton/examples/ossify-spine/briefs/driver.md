@@ -1,6 +1,6 @@
 # Drive a parked unit
 
-A unit has parked. Your message gives the unit, the stage it parked in and the reason. Read the state file first. Then read the brief the parked stage's seat was given: `common.md`, plus the stage's own file next to this one, named for the stage with `_` written as `-` (`spine_review` reads `spine-review.md`; `reclose` reads `close.md`). Then read the stop file or the failing checks the state file names.
+A unit has parked. Your message gives the unit, the stage it parked in and the reason. Read the state file first. Then read the brief the parked stage's seat was given: `common.md`, plus the stage's own file next to this one, named for the stage with `_` written as `-` (`spine_review` reads `spine-review.md`; `reclose` reads `close.md`); a merge or wait park (`land`, a `*_wait` stage, `spine_ack`) has none, so read `common.md` and the state file. Then read the stop file or the failing checks the state file names.
 
 Choose exactly one result, checking in this order and stopping at the first that applies:
 

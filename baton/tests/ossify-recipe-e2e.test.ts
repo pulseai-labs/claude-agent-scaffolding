@@ -465,6 +465,7 @@ test("control: an item below the dispatch cap launches its correction", async ()
 test("a lane that writes nothing parks instead of looping", async () => {
   await arm();
   const host = newHost(() => put(out("lane", "lane.done"), "x"));
+  host.script.driver = oneTick(); // the driver ends without writing a result
   const r = rig(host);
   await drive(r, 10, () => unit("lane").parked !== undefined);
   await settle(r, 5);
@@ -472,7 +473,9 @@ test("a lane that writes nothing parks instead of looping", async () => {
   expect(unit("lane").stage).toBe("lane");
   expect(unit("lane").parked?.reason).toBe("outcome");
   expect(host.of("lane", "lane")).toHaveLength(1);
-  // The recipe's driver settles the park: it wrote no result, so the park is escalated.
+  // The recipe's driver launched and ended without writing a result, so the park is escalated.
+  expect(host.of("lane", "driver")).toHaveLength(1);
+  expect(events().filter((e) => e.kind === "launch unknown" || e.kind === "orphan")).toEqual([]);
   expect(r.notes).toEqual(["baton r1/lane parked in lane: outcome — driver gave no valid result (no result file)"]);
   expect(existsSync(out("lane", "lane.done"))).toBe(false);
 });
@@ -516,6 +519,7 @@ test("a review without a verdict relaunches, then parks", async () => {
   const host = newHost(() => put(join(runDir, "rounds.done"), "x"), {
     spine_review: (u) => put(out(u, "review.md"), "head: abc123\nlooks fine\n"),
   });
+  host.script.driver = oneTick(); // the driver ends without writing a result
   const r = rig(host);
   await drive(r, 60, () => unit(SPINE_UNIT)?.parked !== undefined);
 
@@ -524,6 +528,9 @@ test("a review without a verdict relaunches, then parks", async () => {
   expect(host.of(SPINE_UNIT, "spine_review")).toHaveLength(3);
   expect(moves(SPINE_UNIT)).toEqual([]);
   await settle(r, 5);
+  // The recipe's driver launched and ended without writing a result, so the park is escalated.
+  expect(host.of(SPINE_UNIT, "driver")).toHaveLength(1);
+  expect(events().filter((e) => e.kind === "launch unknown" || e.kind === "orphan")).toEqual([]);
   expect(r.notes).toEqual([`baton r1/${SPINE_UNIT} parked in spine_review: no result — driver gave no valid result (no result file)`]);
 });
 

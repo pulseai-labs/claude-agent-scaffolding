@@ -102,8 +102,10 @@ the result file rendered for that launch once, then removes it:
 
 `ledger` is `{q, a, why, rejected}`, all non-empty; baton appends it as one line to the recipe's
 ledger file. A missing, unreadable or refused result (no file, not JSON, an unknown result, an empty
-`action` or `reason`, a `cleared` or `to` not allowed, a bad ledger), a driver that fails to launch,
-or one past its time limit (`driver dropped`) is an escalate whose action names the cause. `unpark`
+`action` or `reason`, a `cleared` or `to` not allowed, a bad ledger) or a driver that fails to launch
+is an escalate whose action names the cause. A driver past its time limit is interrupted; the
+`driver dropped` event names that cause, and with no result file the action reads `driver gave no
+valid result (no result file)`. `unpark`
 and `disarm` drop a live driver and release its claim. Without a `driver` stage every park sends its
 notice, as before.
 

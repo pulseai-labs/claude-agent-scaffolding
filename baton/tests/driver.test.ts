@@ -126,3 +126,16 @@ test("an unpark or unit event also starts the window", () => {
     expect(mkText(k)).not.toContain('"before"');
   }
 });
+
+test("a driver resume into the unit's stage starts the window; one into another stage does not", () => {
+  const u: UnitState = { id: "a", group: 1, order: 1, vars: {}, stage: "s", launches: {}, stalls: 0 };
+  const run = { id: "r", dir: "/x", recipe_sha256: "", params: {}, armed_at: "z", status: "armed", units: { a: u } } as RunState;
+  const mkText = (to: string) => renderDriverState(run, u, [
+    { at: "before", kind: "park", unit: "a" }, { at: "mid", kind: "driver resume", unit: "a", from: "p", to },
+    { at: "after", kind: "park", unit: "a" },
+  ].map((e) => JSON.stringify(e)).join("\n"), { result_file: "/r", ledger: "/l" });
+  const window = (t: string) => t.slice(t.indexOf("## Events since"), t.indexOf("## Paths"));
+  expect(window(mkText("s"))).toContain('"after"');
+  expect(window(mkText("s"))).not.toContain('"before"');
+  expect(window(mkText("other"))).toContain('"before"');
+});

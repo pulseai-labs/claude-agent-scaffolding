@@ -93,7 +93,11 @@ export function renderDriverState(run: RunState, u: UnitState, eventsText: strin
   let from = 0;
   for (let i = events.length - 1; i >= 0; i--) {
     const e = events[i]!;
-    if ((e.kind === "transition" && e.to === u.stage) || e.kind === "unit" || e.kind === "unpark") { from = i + 1; break; }
+    // A driver resume with `to` emits no transition: its own event is the stage entry.
+    if (((e.kind === "transition" || e.kind === "driver resume") && e.to === u.stage) || e.kind === "unit" || e.kind === "unpark") {
+      from = i + 1;
+      break;
+    }
   }
   out.push("", "## Events since the stage entry", "", ...raw.slice(from).slice(-50));
 

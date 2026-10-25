@@ -72,7 +72,8 @@ sent silently with no marker.
 
 When a unit is no longer in the park an action was sent for (you unparked it, a driver or a later
 tick moved it, the run was disarmed or finished), the bot edits that message to `✅ settled — <original text>`
-and spends its unused buttons. Settling is checked on every `serve` loop.
+and spends its unused buttons. When a press already spent every button on the message, the edit is
+skipped and the action still closes. Settling is checked on every `serve` loop.
 
 ## Buttons
 
