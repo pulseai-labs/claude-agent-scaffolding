@@ -890,3 +890,62 @@ describe('batch 5: heredocs', () => {
     expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit merge and git push --force are words here\nEOF\n)\"")).toEqual(['commit'])
   })
 })
+
+// Task 2 review R1: the text after an unquoted opener is command text, so its quotes, and
+// a comment's, must pair as Bash pairs them. A quote left unpaired there would pair across
+// the body with a later one and hide the lines between.
+describe('batch 5: quotes in a heredoc tail or a comment pair as in Bash', () => {
+  const RULED = 'git push --force origin main'
+  test('a quote in a # comment pairs with nothing', () => {
+    expect(bashRules(`cat > notes.md <<'EOF' # don't expand\ntext\nEOF\ngit commit -m 'notes' && ${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<'EOF' # say "hi\ntext\nEOF\n${RULED} "x"`)).toContain('force-push')
+    expect(bashRules(`echo hi # don't\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -m "$(cat <<EOF | grep "it's"\nit's\nEOF\n)" # don't\n${RULED} 'x'`)).toContain('force-push')
+    expect(rmTargets("cat <<'EOF' # don't\ntext\nEOF\nrm -rf /etc/x '/etc/y'")).toEqual([
+      { path: '/etc/x', glob: false }, { path: '/etc/y', glob: false },
+    ])
+    // control: the body is text, and the comment still runs nothing
+    expect(bashRules(`cat > notes.md <<'EOF' # don't expand\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<'EOF' # say "hi\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo hi # don't ${RULED}`)).toEqual([])
+  })
+  test('a comment ends at its newline, even after a backslash', () => {
+    expect(bashRules(`# x \\\n${RULED}`)).toContain('force-push')
+    // control: outside a comment the backslash-newline still joins the lines
+    expect(bashRules(`echo x \\\n${RULED}`)).toEqual([])
+  })
+  test('a quoted string in the tail that spans lines ends the opener line after it', () => {
+    expect(bashRules(`cat <<EOF 'a\nb'\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "a\nb"\nbody\nEOF\n${RULED} "x"`)).toContain('force-push')
+    // so does a newline inside arithmetic
+    expect(bashRules(`cat <<EOF $((1 +\n2)); ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(rmTargets("cat <<EOF 'a\nb'\nbody\nEOF\nrm -rf /etc/x '/etc/y'")).toEqual([
+      { path: '/etc/x', glob: false }, { path: '/etc/y', glob: false },
+    ])
+    // control: the body starts after that line
+    expect(bashRules(`cat <<EOF 'a\nb'\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF "a\nb"\n${RULED}\nEOF`)).toEqual([])
+  })
+  test('an escaped quote or a $\'…\' string in the tail opens nothing past the line', () => {
+    expect(bashRules(`cat <<EOF it\\'s\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF a\\"b\nbody\nEOF\n${RULED} "x"`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF $'it\\'s'\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`echo it\\'s\n${RULED} 'x'`)).toContain('force-push')
+    // control: the body is text, and a real string after an escape, or a $'…' string, still masks
+    expect(bashRules(`cat <<EOF it\\'s\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF $'it\\'s'\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules("echo \\' 'a ; git push --force'")).toEqual([])
+    expect(bashRules("echo $'a\\' ; git push --force'")).toEqual([])
+  })
+  test('a quoted << after an unquoted opener is text', () => {
+    expect(bashRules(`cat <<A "x <<B"\na\nA\nb\nB\n${RULED} "y"`)).toContain('force-push')
+    expect(bashRules(`cat <<A "x <<B"\na\nA\n${RULED}\nB`)).toContain('force-push')
+    // control: the first opener's body is text
+    expect(bashRules(`cat <<A "x <<B"\n${RULED}\nA`)).toEqual([])
+  })
+  test('an opener inside "$(…)" keeps its line in the piece', () => {
+    expect(bashRules(`git commit -m "$(cat <<EOF | grep "it's"\nit's\nEOF\n)" && ${RULED} 'x'`)).toContain('force-push')
+    // control: the commit form with that line is still a commit
+    expect(bashRules(`git commit -m "$(cat <<EOF | grep "it's"\nit's git merge\nEOF\n)"`)).toEqual(['commit'])
+  })
+})

@@ -125,8 +125,8 @@ its word after Bash's quote removal (`<<\EOF`, `<<E'OF'` and `<<"E"OF` all close
 in an unquoted body, several heredocs on one line close in order, and a `<<` inside `$((…))`,
 `((…))` or a `#` comment opens none. Words and redirections after the delimiter word on the
 opener line remain part of the command and meet the usual operand checks; only the opener, its
-body and its closing line are excluded (a `$'…'` or `$"…"` delimiter is the exception; see
-Limits), and a single `&` separates commands for `rm`. Every Bash rail skips the unquoted reserved words
+body and its closing line are excluded (a `$'…'` or `$"…"` delimiter and a `<<` inside quotes
+are the exceptions; see Limits), and a single `&` separates commands for `rm`. Every Bash rail skips the unquoted reserved words
 `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `time` at a command's
 head, before assignments or execution wrappers. A path such as `/tools/if`, or `if` after
 `A=1` or `env`, names a program; its arguments are not another command. The `builtin` execution
@@ -207,7 +207,9 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
   the lone `&` inside an unquoted `${…}` or `$[…]` expansion are not boundaries — inside an
   expansion only that character is masked, so its `(`, `)`, `;`, `|` and a nested `$(…)` keep
   their meaning), parentheses and newlines, after quoted strings and heredoc bodies are blanked as
-  text, so a commit message may mention `git merge` or `-n`. Every rule set is the union of that
+  text and `#` comments are dropped, so a commit message may mention `git merge` or `-n`. A quote
+  or a trailing backslash in a comment pairs or joins with nothing, and an escaped quote or a
+  `$'…'` string opens no string past its end. Every rule set is the union of that
   reading with the `seat-mods-v0.3.1` separator read over the same command, so the rails see
   everything 0.3.1 saw — plus a command after a lone `&`. Only the command word counts, after any
   `VAR=value` and `sudo`, `env`, `command`, `exec`, `nohup` or `time`, and the head words
@@ -227,7 +229,8 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 - An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
 - A named descriptor before the command (`{log}>file rm …`) hides the rm.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A quoted `<<` (`"…<<EOF…"`, `'…<<EOF…'`) still opens a heredoc for the rails, so the lines after it are read as its body and can hide commands. So can a `$'…'` or `$"…"` delimiter, read with its `$`: its heredoc never closes at `EOF`.
+- A quoted `<<` (`"…<<EOF…"`, `'…<<EOF…'`) that is the first on its line still opens a heredoc for the rails, so the lines after it are read as its body and can hide commands; after an unquoted opener on the same line it is text. So can a `$'…'` or `$"…"` delimiter, read with its `$`: its heredoc never closes at `EOF`.
+- Inside a double-quoted `$(…)` quotes still pair as if the substitution were plain text, so an inner quote can pair with one after the string and hide the commands between (`git commit -m "$(echo "it's")" && …`).
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
 - `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.

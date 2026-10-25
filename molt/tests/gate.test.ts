@@ -332,3 +332,30 @@ describe('batch 5: heredocs', () => {
     expect(bash("git commit -m \"$(cat <<'EOF'\nfix: x\n\ncat huge.log and git push are words here\nEOF\n)\"")).toBe(true)
   })
 })
+
+// Task 2 review R1: quotes in the text after an unquoted opener, or in a comment, pair as
+// in Bash; one left unpaired would pair across the body and hide a read after it.
+describe('batch 5: quotes in a heredoc tail or a comment pair as in Bash', () => {
+  test('a quote in a # comment pairs with nothing', () => {
+    expect(bash("git commit -F - <<'EOF' # don't sign\nmsg\nEOF\ncat 'huge.log'")).toBe(false)
+    expect(bash("git add f # don't\ncat 'huge.log'")).toBe(false)
+    // control
+    expect(bash("git commit -F - <<'EOF' # don't sign\nmsg\nEOF\ngit add 'f'")).toBe(true)
+    expect(bash("git commit -F - <<'EOF' # don't sign\ncat 'huge.log'\nEOF")).toBe(true)
+    expect(bash("git add f # don't\ngit add 'g'")).toBe(true)
+  })
+  test('a quoted string in the tail that spans lines ends the opener line after it', () => {
+    expect(bash('git commit -F - <<EOF -m "a\nb"\nbody\nEOF\ncat huge.log "x"')).toBe(false)
+    // control
+    expect(bash('git commit -F - <<EOF -m "a\nb"\nbody\nEOF\ngit add f "x"')).toBe(true)
+    expect(bash('git commit -F - <<EOF -m "a\nb"\ncat huge.log "x"\nEOF')).toBe(true)
+  })
+  test('an escaped quote in the tail opens nothing past the line', () => {
+    expect(bash("git commit -F - <<EOF it\\'s\nmsg\nEOF\ncat 'huge.log'")).toBe(false)
+    // control
+    expect(bash("git commit -F - <<EOF it\\'s\nmsg\nEOF\ngit add 'f'")).toBe(true)
+  })
+  test('an opener inside "$(…)" keeps its line in the piece', () => {
+    expect(bash('git commit -m "$(cat <<EOF | grep "it\'s"\nit\'s\nEOF\n)" && cat \'huge.log\'')).toBe(false)
+  })
+})

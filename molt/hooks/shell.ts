@@ -17,31 +17,42 @@ const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 // plain characters, up to an unquoted blank or metacharacter (#702 B10).
 const HEREDOC = /(?<!<)<<(?!<)(-?)[ \t]*((?:'[^'\n]*'|"(?:[^"\\\n]|\\.)*"|\\.|[^\s;&|<>()'"\\])+)/y
 
-const QUOTED = /"(?:[^"\\]|\\.)*"|'[^']*'/g
+// A quoted string — double, single or `$'…'` — or a backslash escape, which quotes one
+// character and opens no string. blankHeredocs reads quotes the same way: where the two
+// readings differ, a quote can pair across a heredoc body and hide the lines after it.
+const QUOTED = /\\.|\$'(?:[^'\\]|\\[\s\S])*'|"(?:[^"\\]|\\.)*"|'[^']*'/g
 
 // Words that run the next word as the command.
 const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 
-// Each heredoc becomes one piece: its opener (`<<` and the delimiter word) and its body
-// through the closing line. `quoted` says the word held a quote or backslash, so Bash
-// expands nothing in the body. The opener line's text after the word stays command text
-// (#724 A3, A9), and the bodies follow that line in opener order. The delimiter is the
-// word after quote removal; a body ends at the first line that is exactly it (leading
-// tabs stripped after `<<-`), and in an unquoted body a line ending in a backslash first
-// joins the next, as in Bash. A heredoc with no closing line runs to the end of the
-// command. A `<<` in a comment or in arithmetic opens nothing (#724 A11, #702 B3).
+// Each heredoc becomes one piece: its opener (`<<` and the delimiter word) and, from the
+// newline that ends the opener's line, its body through the closing line. `quoted` says
+// the word held a quote or backslash, so Bash expands nothing in the body. The delimiter
+// is the word after quote removal; a body ends at the first line that is exactly it
+// (leading tabs stripped after `<<-`), and in an unquoted body a line ending in a
+// backslash first joins the next, as in Bash. The bodies follow their line in opener
+// order; one with no closing line runs to the end of the command.
+// After an unquoted opener the line's text stays command text (#724 A3, A9), and the line
+// ends at a newline outside quotes and arithmetic. A `<<` in quotes is text there. As the
+// first opener on its line (the `"$(cat <<'EOF' … )"` commit form) it keeps the older
+// reading: the line ends at its first newline and the rest of it goes in the piece, so no
+// quote in it can pair past the body. A `<<` in arithmetic opens nothing, and a `#` that
+// starts a word begins a comment, which runs no command: it is dropped here, quotes and
+// all (#724 A11, #702 B3).
 function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) => string): string {
-  const opens: Array<{ at: number; end: number; delimiter: string; strip: boolean; quoted: boolean }> = []
+  const opens: Array<{ at: number; end: number; quote: string; delimiter: string; strip: boolean; quoted: boolean }> = []
   let out = ''
   let from = 0
-  let quote = ''     // the quote open here: ' or "
+  let quote = ''     // the quote open here: ', " or $'
   let parens = 0     // parentheses open in a `$((…))` or `((…))`
-  let comment = false
+  let comment = -1   // where the open comment starts
   let inWord = false // the character before this one belongs to a word
   for (let i = 0; i < command.length; i++) {
     const char = command[i]!
-    if (char === '\n' && opens.length > 0) {
+    const first = opens[0]
+    if (char === '\n' && first !== undefined && (first.quote !== '' || (quote === '' && parens === 0))) {
       // The opener line ends here; each body starts where the one before it ended.
+      const tail = first.quote === ''
       let body = i
       for (const open of opens) {
         let end = command.length
@@ -55,25 +66,32 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
           joined = !open.quoted && /(?<!\\)(?:\\\\)*\\$/.test(text) ? text.slice(0, -1) : ''
           line = next + 1
         }
-        out += command.slice(from, open.at) + keep(command.slice(open.at, open.end) + command.slice(body, end), open.quoted)
-        from = open.end
+        // In the older reading a later opener's piece starts empty: the line is already in.
+        const upto = tail ? open.end : i
+        out += command.slice(from, open.at) + keep(command.slice(open.at, upto) + command.slice(body, end), open.quoted)
+        from = upto
         body = end
       }
-      out += command.slice(from, i)
+      out += command.slice(from, comment < 0 ? i : comment)
       from = body
       i = body - 1
+      quote = first.quote
+      comment = -1
       opens.length = 0
       continue
     }
-    if (comment) { comment = char !== '\n'; continue }
+    if (comment >= 0) {
+      if (char === '\n') { out += command.slice(from, comment); from = i; comment = -1 }
+      continue
+    }
     if (parens > 0) { parens += char === '(' ? 1 : char === ')' ? -1 : 0; continue }
-    if (char === '<') {
+    if (char === '<' && (first === undefined || first.quote !== '' || quote === '')) {
       HEREDOC.lastIndex = i
       const open = HEREDOC.exec(command)
       if (open !== null) {
         const word = open[2]!
         opens.push({
-          at: i, end: HEREDOC.lastIndex, strip: open[1] === '-', quoted: /['"\\]/.test(word),
+          at: i, end: HEREDOC.lastIndex, quote, strip: open[1] === '-', quoted: /['"\\]/.test(word),
           delimiter: word.replace(/'([^']*)'|"((?:[^"\\]|\\.)*)"|\\(.)/g, (_: string, single?: string, double?: string, escaped?: string) =>
             single ?? escaped ?? double!.replace(/\\([$`"\\])/g, '$1')),
         })
@@ -84,14 +102,16 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
     }
     if (quote === "'") { if (char === "'") quote = ''; continue }
     if (char === '\\') { if (command[i + 1] !== '\n') inWord = true; i += 1; continue }
+    if (quote === "$'") { if (char === "'") quote = ''; continue }
     if (char === '$' && command.startsWith('((', i + 1)) { parens = 2; i += 2; inWord = true; continue }
     if (quote === '"') { if (char === '"') quote = ''; continue }
+    if (char === '$' && command[i + 1] === "'") { quote = "$'"; i += 1; inWord = true; continue }
     if (char === "'" || char === '"') { quote = char; inWord = true; continue }
-    if (!inWord && char === '#') { comment = true; continue }
+    if (!inWord && char === '#') { comment = i; continue }
     if (!inWord && command.startsWith('((', i)) { parens = 2; i += 1; inWord = true; continue }
     inWord = !' \t\n;&|()'.includes(char)
   }
-  return out + command.slice(from)
+  return out + command.slice(from, comment < 0 ? command.length : comment)
 }
 
 function blank(command: string): { text: string; pieces: string[] } {
@@ -108,10 +128,10 @@ function blank(command: string): { text: string; pieces: string[] } {
   const reserved = /^(?:if|then|elif|else|fi|do|while|until)(?=[\s;&|()<>]|$)/
   const unescape = (escape: string, at: number, whole: string) =>
     /[A-Za-z0-9_./-]/.test(escape[1]!) && !reserved.test(whole.slice(at + 1)) ? escape[1]! : keep(escape)
+  // blankHeredocs has already dropped the comments, so a quote in one pairs with nothing.
   const text = fold(blankHeredocs(command, (piece, quoted) => keep(quoted ? piece : fold(piece))))
-    .replace(QUOTED, keep).replace(/\\./g, unescape)
-  // A `#` that starts a word begins a comment, which runs no command.
-  return { text: text.replace(/(^|[ \t;&|()])#[^\n]*/gm, '$1'), pieces }
+    .replace(QUOTED, quoted => quoted.startsWith('\\') ? quoted : keep(quoted)).replace(/\\./g, unescape)
+  return { text, pieces }
 }
 
 // The command word and its arguments: leading VAR=value assignments and wrapper
