@@ -23,6 +23,7 @@ import {
   type DriverStage, type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type TriageStage, type WaitStage,
 } from "./recipe.ts";
 import { mergeUnit, type ParkPr } from "./merge.ts";
+import { runSummary } from "./summary.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
 import { enterStage, type RunState, type Session, type Store, type UnitState } from "./state.ts";
 
@@ -1353,6 +1354,18 @@ class RunTick {
     this.run.status = "done";
     this.save();
     this.ev("done");
-    await this.notify(`${this.run.id}/done`, `baton ${this.run.id} done`);
+    let eventsText = "";
+    try {
+      eventsText = readFileSync(join(this.run.dir, "events.jsonl"), "utf8");
+    } catch { /* no events */ }
+    let ledger: string | undefined;
+    if (this.recipe.driver) {
+      // The run's base scope has no unit: a ledger path that needs one is left out.
+      const base = { ...this.scope(units[0]), get unit(): never { throw new Error("no unit in scope"); } } as Scope;
+      try {
+        ledger = render(this.recipe.driver.ledger, base);
+      } catch { /* the summary goes without it */ }
+    }
+    await this.notify(`${this.run.id}/done`, runSummary(this.run, eventsText, this.nowIso(), ledger));
   }
 }

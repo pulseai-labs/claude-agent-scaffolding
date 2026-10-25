@@ -140,7 +140,8 @@ test("relay runs to done", async () => {
   expect(workers.map((l) => l.claim?.env.RELAY_UNIT)).toEqual(["a", "b"]);
   expect(host.launches.filter((l) => l.request.title.startsWith("plan ")).map((l) => l.claim?.env.RELAY_ROLE)).toEqual(["planner", "planner"]);
   expect(existsSync(join(runDir, "final"))).toBe(true);
-  expect(notes).toEqual([`baton r1 done`]);
+  expect(notes.length).toBe(1);
+  expect(notes[0]).toStartWith("baton r1 done — 3 units, 2 merged (");
 });
 
 test("relay with a gap re-enters through the planner", async () => {

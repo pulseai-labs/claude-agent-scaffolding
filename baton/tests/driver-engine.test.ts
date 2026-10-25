@@ -577,3 +577,38 @@ test("disarm removes a running driver's claim", async () => {
   expect(await main(["disarm", "r1"])).toBe(0);
   expect(liveClaim(claimKey(driverCwd()))).toBeNull();
 });
+
+// ---- run summary -------------------------------------------------------------------------
+
+test("done sends the summary", async () => {
+  await arm(recipe(["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" }, fix: SEAT, driver: SEAT });
+  await doTick();
+  put(join(runDir(), "out", "a.done"));
+  at(1);
+  await doTick();
+  host.advance();
+  at(2);
+  await doTick();
+  expect(runState().status).toBe("done");
+  const n = notices().filter((l) => l.includes(" r1/done "));
+  expect(n.length).toBe(1);
+  expect(n[0].split(" ").slice(1).join(" ")).toStartWith("r1/done baton r1 done — ");
+  expect(n[0]).toContain("; ledger " + ledger());
+});
+
+test("done leaves the ledger out when it cannot render", async () => {
+  await arm(recipe(["a"], driverStage({ ledger: "{param.root}/{unit.id}.md" })));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" }, fix: SEAT, driver: SEAT });
+  await doTick();
+  put(join(runDir(), "out", "a.done"));
+  at(1);
+  await doTick();
+  host.advance();
+  at(2);
+  await doTick();
+  const n = notices().filter((l) => l.includes(" r1/done "));
+  expect(n.length).toBe(1);
+  expect(n[0]).toContain("baton r1 done — ");
+  expect(n[0]).not.toContain("ledger");
+});
