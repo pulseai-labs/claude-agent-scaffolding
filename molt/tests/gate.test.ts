@@ -359,3 +359,35 @@ describe('batch 5: quotes in a heredoc tail or a comment pair as in Bash', () =>
     expect(bash('git commit -m "$(cat <<EOF | grep "it\'s"\nit\'s\nEOF\n)" && cat \'huge.log\'')).toBe(false)
   })
 })
+
+// Task 2 review R2 (Rulings 13, 14): an opener line holding a substitution after the word
+// reads as in 0.9.0; `$$` is the PID; a quoted `<<` with no substitution before it is text.
+describe('batch 5: an opener line holding a substitution reads as in 0.9.0', () => {
+  test('a substitution with an odd inner quote in the tail no longer hides a read', () => {
+    expect(bash('git commit -F - <<EOF -m "$(echo "don\'t")"\nmsg\nEOF\ncat \'huge.log\' \'x\'')).toBe(false)
+    // control
+    expect(bash('git commit -F - <<EOF -m "$(echo "don\'t")"\nmsg\nEOF\ngit add \'f\' \'x\'')).toBe(true)
+  })
+  test('a quoted body after such a tail is not read as commands', () => {
+    expect(bash('git commit -F - <<\'EOF\' --author="$(echo "Bob O\'Neil")"\nfix: x\n\ncat words\nEOF')).toBe(true)
+  })
+  test('a heredoc opened inside a substitution in the tail does not take the first one\'s place', () => {
+    expect(bash('git commit -F - <<A $(cat <<B\nb\nB\n)\na\nA\ncat huge.log')).toBe(false)
+    expect(bash('git commit -F - <<A $(cat <<B\nb\nB\n)\na\nA\ngit add f')).toBe(true)
+  })
+  test('control: a tail without a substitution is still command text', () => {
+    expect(bash('git commit -F - <<EOF; cat huge.log\nmsg\nEOF')).toBe(false)
+  })
+  test('$$ is the PID: the quote after it is a single quote', () => {
+    expect(bash("git add $$'a\\' ; cat huge.log ; git add 'b'")).toBe(false)
+    expect(bash("git add $$'a\\' ; git add 'b'")).toBe(true)
+    expect(bash("git commit -F - <<EOF $$'a\\'\nmsg\nEOF\ncat 'huge.log'")).toBe(false)
+    expect(bash("git commit -F - <<EOF $$'a\\'\nmsg\nEOF\ngit add 'f'")).toBe(true)
+  })
+  test('a quoted << with no substitution before it on its line is text', () => {
+    expect(bash('git add "<<EOF" && cat huge.log\ngit add f')).toBe(false)
+    expect(bash('git add "<<EOF" && git add g\ngit add f')).toBe(true)
+    // control: the commit form keeps its line in the piece, whatever quotes that line holds
+    expect(bash("git commit -m \"$(cat <<'EOF' | tr -d '\"'\nfix: x\n\ncat words\nEOF\n)\"")).toBe(true)
+  })
+})

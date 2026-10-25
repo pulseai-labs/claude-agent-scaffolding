@@ -17,10 +17,11 @@ const COMMANDS = /;|&&|(?<![&<>])&(?![&>])|\|\||\||\n|\(|\)/
 // plain characters, up to an unquoted blank or metacharacter (#702 B10).
 const HEREDOC = /(?<!<)<<(?!<)(-?)[ \t]*((?:'[^'\n]*'|"(?:[^"\\\n]|\\.)*"|\\.|[^\s;&|<>()'"\\])+)/y
 
-// A quoted string — double, single or `$'…'` — or a backslash escape, which quotes one
-// character and opens no string. blankHeredocs reads quotes the same way: where the two
-// readings differ, a quote can pair across a heredoc body and hide the lines after it.
-const QUOTED = /\\.|\$'(?:[^'\\]|\\[\s\S])*'|"(?:[^"\\]|\\.)*"|'[^']*'/g
+// A quoted string — double, single or `$'…'` — or a backslash escape or `$$` (the shell's
+// PID, so `$$'…'` is single-quoted), neither of which opens a string. blankHeredocs reads
+// quotes the same way: where the two readings differ, a quote can pair across a heredoc
+// body and hide the lines after it.
+const QUOTED = /\\.|\$\$|\$'(?:[^'\\]|\\[\s\S])*'|"(?:[^"\\]|\\.)*"|'[^']*'/g
 
 // Words that run the next word as the command.
 const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
@@ -33,10 +34,12 @@ const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 // backslash first joins the next, as in Bash. The bodies follow their line in opener
 // order; one with no closing line runs to the end of the command.
 // After an unquoted opener the line's text stays command text (#724 A3, A9), and the line
-// ends at a newline outside quotes and arithmetic. A `<<` in quotes is text there. As the
-// first opener on its line (the `"$(cat <<'EOF' … )"` commit form) it keeps the older
-// reading: the line ends at its first newline and the rest of it goes in the piece, so no
-// quote in it can pair past the body. A `<<` in arithmetic opens nothing, and a `#` that
+// ends at a newline outside quotes and arithmetic. Quotes nest inside `$(…)`, backticks
+// and `${…}`, which this scan does not model, so a line holding one after the first
+// opener's word keeps the seat-mods 0.9.0 reading: only that opener is read, its line ends
+// at its first newline, and the rest of the line goes in its piece. So does a `<<` in
+// quotes after one of those on its line (the `"$(cat <<'EOF' … )"` commit form); any other
+// `<<` in quotes is text, as in Bash. A `<<` in arithmetic opens nothing, and a `#` that
 // starts a word begins a comment, which runs no command: it is dropped here, quotes and
 // all (#724 A11, #702 B3).
 function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) => string): string {
@@ -46,15 +49,16 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
   let quote = ''     // the quote open here: ', " or $'
   let parens = 0     // parentheses open in a `$((…))` or `((…))`
   let comment = -1   // where the open comment starts
+  let nested = -1    // the last `$(`, backtick or `${` since a newline outside quotes
   let inWord = false // the character before this one belongs to a word
   for (let i = 0; i < command.length; i++) {
     const char = command[i]!
     const first = opens[0]
-    if (char === '\n' && first !== undefined && (first.quote !== '' || (quote === '' && parens === 0))) {
+    const older = first !== undefined && (first.quote !== '' || nested > first.at)
+    if (char === '\n' && first !== undefined && (older || (quote === '' && parens === 0))) {
       // The opener line ends here; each body starts where the one before it ended.
-      const tail = first.quote === ''
       let body = i
-      for (const open of opens) {
+      for (const open of older ? [first] : opens) {
         let end = command.length
         let joined = ''
         for (let line = body + 1; line < command.length; ) {
@@ -66,8 +70,7 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
           joined = !open.quoted && /(?<!\\)(?:\\\\)*\\$/.test(text) ? text.slice(0, -1) : ''
           line = next + 1
         }
-        // In the older reading a later opener's piece starts empty: the line is already in.
-        const upto = tail ? open.end : i
+        const upto = older ? i : open.end
         out += command.slice(from, open.at) + keep(command.slice(open.at, upto) + command.slice(body, end), open.quoted)
         from = upto
         body = end
@@ -80,12 +83,14 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
       opens.length = 0
       continue
     }
+    if (char === '\n' && quote === '') nested = -1
     if (comment >= 0) {
       if (char === '\n') { out += command.slice(from, comment); from = i; comment = -1 }
       continue
     }
+    if (char === '`' || (char === '$' && (command[i + 1] === '{' || (command[i + 1] === '(' && command[i + 2] !== '(')))) nested = i
     if (parens > 0) { parens += char === '(' ? 1 : char === ')' ? -1 : 0; continue }
-    if (char === '<' && (first === undefined || first.quote !== '' || quote === '')) {
+    if (char === '<' && (first === undefined ? quote === '' || nested >= 0 : quote === '')) {
       HEREDOC.lastIndex = i
       const open = HEREDOC.exec(command)
       if (open !== null) {
@@ -103,6 +108,7 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean) =
     if (quote === "'") { if (char === "'") quote = ''; continue }
     if (char === '\\') { if (command[i + 1] !== '\n') inWord = true; i += 1; continue }
     if (quote === "$'") { if (char === "'") quote = ''; continue }
+    if (char === '$' && command[i + 1] === '$') { i += 1; inWord = true; continue }
     if (char === '$' && command.startsWith('((', i + 1)) { parens = 2; i += 2; inWord = true; continue }
     if (quote === '"') { if (char === '"') quote = ''; continue }
     if (char === '$' && command[i + 1] === "'") { quote = "$'"; i += 1; inWord = true; continue }

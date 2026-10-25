@@ -949,3 +949,53 @@ describe('batch 5: quotes in a heredoc tail or a comment pair as in Bash', () =>
     expect(bashRules(`git commit -m "$(cat <<EOF | grep "it's"\nit's git merge\nEOF\n)"`)).toEqual(['commit'])
   })
 })
+
+// Task 2 review R2 (Rulings 13, 14): quotes nest inside `$(…)`, backticks and `${…}`, which
+// the scan does not model, so an opener line holding one after the delimiter word keeps the
+// 0.9.0 reading; `$$` is the PID, not the start of `$'…'`; a quoted `<<` with no such
+// construct before it on its line is text.
+describe('batch 5: an opener line holding a substitution reads as in 0.9.0', () => {
+  const RULED = 'git push --force origin main'
+  test('a substitution with an odd inner quote in the tail no longer hides the line after the body', () => {
+    expect(bashRules(`cat <<EOF "$(echo "it's")"\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -F - <<EOF --author="$(echo "it's")"\nmsg\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -F - <<EOF -m "$(echo 'say "hi')"\nmsg\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "\`echo "it's"\`"\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "\${x:-"it's"}"\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    // control: the body is text
+    expect(bashRules(`cat <<EOF "$(echo "it's")"\n${RULED}\nEOF`)).toEqual([])
+  })
+  test('a quoted body after such a tail is not read as commands', () => {
+    expect(bashRules(`git commit -F - <<'EOF' --author="$(echo "Bob O'Neil")"\nfix: x\n\ngit push --force words\nEOF`)).toEqual(['commit'])
+  })
+  test('a heredoc opened inside a substitution in the tail does not take the first one\'s place', () => {
+    expect(bashRules(`cat <<A $(cat <<B\nb\nB\n)\na\nA\n${RULED}`)).toContain('force-push')
+    // control: the first heredoc's body is text
+    expect(bashRules(`cat <<A $(cat <<B\nb\nB\n)\n${RULED}\nA`)).toEqual([])
+  })
+  test('control: a tail without a substitution is still command text', () => {
+    expect(bashRules(`cat <<EOF; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF > "$out"; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    // a substitution before the opener is not in its tail
+    expect(bashRules(`echo $(date); cat <<EOF; ${RULED}\nbody\nEOF`)).toContain('force-push')
+  })
+  test('$$ is the PID: the quote after it is a single quote, not $\'…\'', () => {
+    expect(bashRules(`echo $$'a\\' ; ${RULED} ; echo 'b'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF $$'a\\'\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    // control: the body is text, and a real $'…' string still masks
+    expect(bashRules(`cat <<EOF $$'a\\'\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules("echo $'a\\' ; git push --force'")).toEqual([])
+  })
+  test('a quoted << with no substitution before it on its line is text', () => {
+    expect(bashRules(`grep -n "<<EOF" a.sh && ${RULED}\necho done`)).toContain('force-push')
+    expect(bashRules(`echo "x <<EOF y"\n${RULED}\nEOF`)).toContain('force-push')
+    expect(bashRules(`echo 'x <<EOF'\n${RULED}\nEOF`)).toContain('force-push')
+    // a `$(` on an earlier line, closed before a newline outside quotes, does not count
+    expect(bashRules(`echo $(date)\necho "x <<EOF y"\n${RULED}\nEOF`)).toContain('force-push')
+    // control: after a `$(` on its line, even one opened on an earlier line, it opens a heredoc
+    expect(bashRules("git commit -m \"$(\ncat <<'EOF'\nsay \"hi\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
+    // the commit form keeps its line in the piece, whatever quotes that line holds
+    expect(bashRules("git commit -m \"$(cat <<'EOF' | tr -d '\"'\nfix: x\n\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
+  })
+})
