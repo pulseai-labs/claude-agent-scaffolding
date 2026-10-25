@@ -54,7 +54,8 @@ const notices = (): string[] => {
 };
 
 const stop = (unit = "a") => join(runDir(), "stop", unit);
-const result = (unit = "a") => join(runDir(), "out", unit, "driver-result.json");
+/** Launch `n`'s result file: the recipe binds it to the launch with {driver.launch}. */
+const result = (unit = "a", n = 1) => join(runDir(), "out", unit, `driver-result-${n}.json`);
 const stateFile = (unit = "a") => join(runDir(), "driver", unit, "state.md");
 const ledger = () => join(root, "ledger.md");
 const put = (p: string, text = "x") => { mkdirSync(dirname(p), { recursive: true }); writeFileSync(p, text); };
@@ -85,7 +86,7 @@ function driverStage(over: Record<string, unknown> = {}) {
     message: "settle {unit.id}: {driver.reason} in {driver.stage}",
     env: { DK: "d-{unit.id}" },
     state_file: "{run.dir}/driver/{unit.id}/state.md",
-    result_file: "{run.dir}/out/{unit.id}/driver-result.json",
+    result_file: "{run.dir}/out/{unit.id}/driver-result-{driver.launch}.json",
     ledger: "{param.root}/ledger.md",
     clearing: ["remove-file", "rerun-check"],
     resume_to: { work: ["fix"] },
@@ -116,7 +117,7 @@ async function arm(rec: unknown) {
 const SEAT: Behaviour = { ticks: 1000, end: "completed" };
 /** A driver that writes `content` as its result file on its first step, then completes. */
 const driverWrites = (content: string): Behaviour =>
-  ({ ticks: 1, end: "completed", writes: [{ path: join(runDir(), "out", "{unit}", "driver-result.json"), content }] });
+  ({ ticks: 1, end: "completed", writes: [{ path: join(runDir(), "out", "{unit}", "driver-result-{launch}.json"), content }] });
 
 /**
  * Arm `units` (default `a`), launch their seats at minute 0, put a stop file for `a`, and tick at
@@ -157,6 +158,8 @@ test("park launches one driver, no notice", async () => {
   expect(readFileSync(stateFile(), "utf8")).toContain("## This park");
   const u = runState().units.a;
   expect(u.driver?.key).toBe("work/stop");
+  expect(u.driver?.result_file).toBe(result("a", 1));
+  expect(readFileSync(stateFile(), "utf8")).toContain(result("a", 1));
   expect(u.driver?.session.thread_id).toBe("thread-2");
   expect(events().filter((e) => e.kind === "driver")).toEqual([
     expect.objectContaining({ unit: "a", nonce: "r1/a/driver/1", key: "work/stop" }),
@@ -447,6 +450,37 @@ test("stale result file is not read", async () => {
   expect(u.parked?.escalated).toBe(true);
   expect(notices()[0].endsWith("— driver gave no valid result (no result file)")).toBe(true);
   expect(notices()[0]).not.toContain("stale");
+});
+
+test("a result file is removed once read", async () => {
+  await parked(driverWrites(resume()));
+  host.advance();
+  expect(existsSync(result())).toBe(true);
+  at(2);
+  await doTick();
+  expect(count("driver resume")).toBe(1);
+  expect(existsSync(result())).toBe(false);
+});
+
+test("an earlier driver's late result is not read for a later launch", async () => {
+  // D1 launches for park P1; the operator unparks; P2 launches D2; D1 then writes its result.
+  await parked({ ticks: 100, end: "completed" });
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  put(stop());
+  at(2);
+  await doTick();
+  expect(driverLaunches().map((l) => l.request.nonce)).toEqual(["r1/a/driver/1", "r1/a/driver/2"]);
+  const u2 = runState().units.a;
+  expect(u2.driver?.result_file).toBe(result("a", 2));
+  put(result("a", 1), resume({ to: "fix" })); // D1, orphaned, writes to its own launch's path
+  host.finish(u2.driver!.session.thread_id!, "completed"); // D2 ends with no result
+  at(3);
+  await doTick();
+  const u = runState().units.a;
+  expect(u.stage).toBe("work");
+  expect(u.parked?.escalated).toBe(true);
+  expect(count("driver resume")).toBe(0);
+  expect(notices().at(-1)!.endsWith("— driver gave no valid result (no result file)")).toBe(true);
 });
 
 test("result after operator unpark is ignored", async () => {

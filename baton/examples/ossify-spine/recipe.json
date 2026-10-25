@@ -50,7 +50,7 @@
     "cwd": "{param.ai_root}",
     "launch_dir": "worktree",
     "title": "driver {unit.id}",
-    "message": "Read {param.briefs}/driver.md and follow it. Unit: {unit.id}. Parked in: {driver.stage}. Reason: {driver.reason}. State file: {run.dir}/out/{unit.id}/driver-state.md. Result file: {run.dir}/out/{unit.id}/driver-result.json. Briefs: {param.briefs}. Spine: {param.spine_dir}.",
+    "message": "Read {param.briefs}/driver.md and follow it. Unit: {unit.id}. Parked in: {driver.stage}. Reason: {driver.reason}. State file: {run.dir}/out/{unit.id}/driver-state.md. Result file: {run.dir}/out/{unit.id}/driver-result-{driver.launch}.json. Briefs: {param.briefs}. Spine: {param.spine_dir}.",
     "env": {
       "SEAT_MODS_ROLE": "reviewer",
       "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
@@ -60,7 +60,7 @@
     },
     "stall_minutes": 15,
     "state_file": "{run.dir}/out/{unit.id}/driver-state.md",
-    "result_file": "{run.dir}/out/{unit.id}/driver-result.json",
+    "result_file": "{run.dir}/out/{unit.id}/driver-result-{driver.launch}.json",
     "ledger": "{param.spine_dir}/autopilot-ledger.md",
     "clearing": ["rerun-check", "remove-file"],
     "resume_to": { "correct": ["reclose"] }

@@ -336,7 +336,7 @@ describe("driver stage", () => {
     launch_dir: "worktree", title: "driver {unit.id}",
     message: "Unit {unit.id} parked at {driver.stage}: {driver.reason}. State {run.dir}/{unit.id}/state.",
     env: { DRIVER_ROLE: "driver" }, stall_minutes: 15,
-    state_file: "{run.dir}/{unit.id}/state", result_file: "{run.dir}/{unit.id}/result",
+    state_file: "{run.dir}/{unit.id}/state", result_file: "{run.dir}/{unit.id}/result-{driver.launch}",
     ledger: "{run.dir}/{param.project}/ledger",
     clearing: ["rerun-check", "remove-file"],
     resume_to: { work: ["land"] } as Record<string, string[]>,
@@ -387,6 +387,22 @@ describe("driver stage", () => {
     expectError(r, 'stages.work.message: unknown placeholder "{driver.reason}"');
     expectError({ ...relay(), triage: { ...triageBase(), message: "{driver.stage}" } },
       'triage.message: unknown placeholder "{driver.stage}"');
+  });
+
+  test("driver files are per unit, and the result file per launch", () => {
+    expectError(withDriver({ ...driver(), result_file: "{run.dir}/result-{driver.launch}" }),
+      "driver.result_file: must contain {unit.id}");
+    expectError(withDriver({ ...driver(), result_file: "{run.dir}/{unit.id}/result" }),
+      "driver.result_file: must contain {driver.launch}");
+    expectError(withDriver({ ...driver(), state_file: "{run.dir}/state" }), "driver.state_file: must contain {unit.id}");
+    // A shared append-only ledger is fine; {driver.launch} may name a per-launch state file.
+    expect(validate(withDriver({ ...driver(), ledger: "{run.dir}/ledger" })).ok).toBe(true);
+    expect(validate(withDriver({ ...driver(), state_file: "{run.dir}/{unit.id}/state-{driver.launch}" })).ok).toBe(true);
+    expect(validate(withDriver({ ...driver(), message: "result {driver.launch}" })).ok).toBe(true);
+    expectError(withDriver({ ...driver(), ledger: "{run.dir}/{driver.launch}" }), 'driver.ledger: unknown placeholder "{driver.launch}"');
+    const r = relay();
+    r.stages.work.message = "{driver.launch}";
+    expectError(r, 'stages.work.message: unknown placeholder "{driver.launch}"');
   });
 
   test("a stage named driver is refused when the recipe has a driver", () => {
@@ -442,8 +458,9 @@ describe("render", () => {
   });
 
   test("driver placeholders render in a driver scope and throw outside it", () => {
-    expect(render("{driver.reason}|{driver.stage}", { ...scope, driver: { reason: "error: a/b", stage: "work" } }))
-      .toBe("error: a/b|work");
+    expect(render("{driver.reason}|{driver.stage}|{driver.launch}",
+      { ...scope, driver: { reason: "error: a/b", stage: "work", launch: "3" } })).toBe("error: a/b|work|3");
+    expect(() => render("{driver.launch}", scope)).toThrow("no driver in scope");
     expect(() => render("{driver.reason}", scope)).toThrow("no driver in scope");
     expect(() => render("{driver.stage}", scope)).toThrow("no driver in scope");
   });

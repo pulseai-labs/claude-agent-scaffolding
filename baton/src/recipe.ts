@@ -99,7 +99,7 @@ export type Scope = {
   attempt: number;
   handoff_path?: string;
   pr?: { url: string; head: string };
-  driver?: { reason: string; stage: string };
+  driver?: { reason: string; stage: string; launch: string };
   pending?: { thread: string; request: string; questions: string; stage: string };
 };
 
@@ -147,15 +147,17 @@ const FIXED_NAMES = new Set([
 // Usable only in the triage stage: the stuck unit's pending request.
 const PENDING_NAMES = new Set(["pending.thread", "pending.request", "pending.questions", "pending.stage"]);
 
-// Usable only in the driver's launch fields: why the unit parked, and where.
-const DRIVER_NAMES = new Set(["driver.reason", "driver.stage"]);
-type PlaceholderMode = "stage" | "triage" | "driver";
+// Usable only in the driver's launch fields: why the unit parked, where, and the launch's number
+// (`<n>` of the nonce `<run>/<unit>/driver/<n>`). Its state and result files may use the number only.
+const DRIVER_NAMES = new Set(["driver.reason", "driver.stage", "driver.launch"]);
+type PlaceholderMode = "stage" | "triage" | "driver" | "driver-file";
 
 /** Is `name` (the text between braces) a placeholder the recipe may use? Returns a reason or null. */
 function placeholderProblem(name: string, params: Set<string>, mode: PlaceholderMode = "stage"): string | null {
   if (FIXED_NAMES.has(name)) return null;
   if (mode === "triage" && PENDING_NAMES.has(name)) return null;
   if (mode === "driver" && DRIVER_NAMES.has(name)) return null;
+  if (mode === "driver-file" && name === "driver.launch") return null;
   if (name.startsWith("param.")) {
     const p = name.slice(6);
     return params.has(p) ? null : `undeclared param "${p}"`;
@@ -189,8 +191,9 @@ export function render(tpl: string, scope: Scope): string {
         return scope.pending[name.slice(8) as "thread" | "request" | "questions" | "stage"];
       case "driver.reason":
       case "driver.stage":
+      case "driver.launch":
         if (!scope.driver) throw new Error("no driver in scope");
-        return name === "driver.reason" ? scope.driver.reason : scope.driver.stage;
+        return scope.driver[name.slice(7) as "reason" | "stage" | "launch"];
     }
     if (name.startsWith("param.")) {
       const k = name.slice(6);
@@ -413,6 +416,15 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       for (const f of ["state_file", "result_file", "ledger"]) {
         if (!isStr(d[f])) err(`driver.${f}`, "must be a string");
       }
+      // Two units must not share a state or result file, and a result binds to the launch that
+      // wrote it, so an earlier driver's late write is never read for a later one. The ledger is
+      // append-only and may be shared.
+      for (const f of ["state_file", "result_file"]) {
+        if (isStr(d[f]) && !d[f].includes("{unit.id}")) err(`driver.${f}`, "must contain {unit.id}");
+      }
+      if (isStr(d.result_file) && !d.result_file.includes("{driver.launch}")) {
+        err("driver.result_file", "must contain {driver.launch}");
+      }
       launchFields("driver", d);
       if (!isStrArr(d.clearing) || d.clearing.length === 0) {
         err("driver.clearing", "must be a non-empty list of names");
@@ -497,11 +509,12 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     walk(note_file, "triage.note_file");
   }
   if (isObj(r.driver)) {
-    // state_file, result_file and ledger render with the unit's own scope: no driver reason there.
+    // state_file and result_file are paths: of the driver names only the launch number (no slash).
+    // The ledger is also named in the run's summary, which has no launch: unit scope only.
     const { state_file, result_file, ledger, clearing, resume_to, ...launch } = r.driver;
     walk(launch, "driver", "driver");
-    walk(state_file, "driver.state_file");
-    walk(result_file, "driver.result_file");
+    walk(state_file, "driver.state_file", "driver-file");
+    walk(result_file, "driver.result_file", "driver-file");
     walk(ledger, "driver.ledger");
   }
   walk(r.sources, "sources");

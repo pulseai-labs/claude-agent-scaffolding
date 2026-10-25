@@ -1173,7 +1173,11 @@ class RunTick {
     const d = u.driver!;
     if (!(await this.driverEnded(u, d, drv))) return;
     const scope = this.scope(u);
-    const res = readDriverResult(render(drv.result_file, scope), drv, u.stage);
+    // The path stored at launch, never re-rendered: a result binds to the launch that wrote it.
+    const res = readDriverResult(d.result_file, drv, u.stage);
+    try {
+      removeFile(d.result_file);
+    } catch { /* best-effort: the next launch's path differs */ }
     await this.endDriver(u);
     if ("invalid" in res) return this.escalate(u, `driver gave no valid result (${res.invalid})`);
     const path = render(drv.ledger, scope);
@@ -1258,7 +1262,9 @@ class RunTick {
    */
   private async launchDriver(u: UnitState, drv: DriverStage, key: string): Promise<void> {
     const plain = this.scope(u);
-    const scope = this.scope(u, { driver: { reason: u.parked!.reason, stage: u.stage } });
+    const seqBefore = own(u.seq, DRIVER);
+    const n = (seqBefore ?? 0) + 1;
+    const scope = this.scope(u, { driver: { reason: u.parked!.reason, stage: u.stage, launch: String(n) } });
     let f: { project: string; cwd: string; env: Record<string, string>; title: string; instance: string; model: string;
       text: string; stateFile: string; resultFile: string; ledger: string; stopFile?: string };
     try {
@@ -1268,8 +1274,8 @@ class RunTick {
       f = {
         project: render(drv.project, scope), cwd: render(drv.cwd, scope), env,
         title: render(drv.title, scope), instance: render(drv.instance, scope), model: render(drv.model, scope),
-        text: render(drv.message, scope), stateFile: render(drv.state_file, plain),
-        resultFile: render(drv.result_file, plain), ledger: render(drv.ledger, plain),
+        text: render(drv.message, scope), stateFile: render(drv.state_file, scope),
+        resultFile: render(drv.result_file, scope), ledger: render(drv.ledger, scope),
       };
     } catch (e) {
       return this.escalate(u, `driver could not launch: ${message(e)}`);
@@ -1289,9 +1295,7 @@ class RunTick {
       { result_file: f.resultFile, ledger: f.ledger, ...(f.stopFile !== undefined ? { stop_file: f.stopFile } : {}) }));
     removeFile(f.resultFile);
 
-    const seqBefore = own(u.seq, DRIVER);
     u.seq ??= {};
-    const n = (seqBefore ?? 0) + 1;
     u.seq[DRIVER] = n;
     const nn = launchNonce(this.run.id, u.id, DRIVER, n);
     let dir: string;
@@ -1319,7 +1323,7 @@ class RunTick {
       nonce: nn, claim_nonce: nn, launch_dir: dir, claim_key: claim, project: f.project, cwd: f.cwd,
       launched_at: now, last_progress_at: now, progress_mark: "",
     };
-    u.driver = { key, session: ds };
+    u.driver = { key, session: ds, result_file: f.resultFile };
     this.save();
     this.ev("driver", { unit: u.id, nonce: nn, key });
     const req: LaunchRequest = {

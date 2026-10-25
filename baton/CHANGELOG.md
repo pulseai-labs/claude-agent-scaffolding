@@ -9,7 +9,9 @@ All notable changes to the `baton` plugin.
   with a `cleared` name from `clearing`), escalate, or stop. Baton checks the result's closed shape;
   any refusal, a launch failure or a timeout becomes an escalate. A unit that parks again after one
   driver resume goes to the operator. Events: `driver`, `driver resume`, `driver escalate`,
-  `driver stop`, `driver dropped`. Each result appends a ledger line.
+  `driver stop`, `driver dropped`. Each result appends a ledger line. The driver's `state_file` and
+  `result_file` must contain `{unit.id}`, and `result_file` the launch number `{driver.launch}`:
+  baton reads only the result file rendered for that launch, then removes it.
 - With a driver, the escalate is the only park notice
   (`baton <run>/<unit> parked in <stage>: <reason> — <action>`, with the PR suffix of a merge-stage
   park); a driver stop parks the run.

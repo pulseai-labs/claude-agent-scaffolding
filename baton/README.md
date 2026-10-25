@@ -80,14 +80,17 @@ A recipe may carry one top-level `driver` stage (`kind: "driver"`). It takes the
 (like `triage`, with `stall_minutes` as its time limit, default 10) plus `state_file`,
 `result_file` and `ledger` (paths rendered with the unit's scope), `clearing` (a non-empty list of
 names the driver may report having cleared) and `resume_to` (park stage to the stages a resume may
-enter). Its message may use `{driver.stage}` and `{driver.reason}`. `session`-only fields
+enter). Its message may use `{driver.stage}`, `{driver.reason}` and `{driver.launch}` (the launch's
+number, `<n>` of its nonce `<run>/<unit>/driver/<n>`). `state_file` and `result_file` must contain
+`{unit.id}`, and `result_file` must contain `{driver.launch}`, so a result is read only for the launch
+that wrote it; both may use `{driver.launch}`, the ledger (which may be shared) may not. `session`-only fields
 (`outcomes`, `handoff`, `slots`, `stop_file`, `before`, `after_launch`, `watch` and the like) are
 refused, and a recipe with a driver cannot name a stage `driver`.
 
 With a driver, a park no longer sends its notice. Step 7 of the tick writes the unit's state file
 (the run, the units, this park, the events since the stage entry) and launches one driver session
 for it (`driver` event). The driver takes no slot and has its own claim. When it ends, baton reads
-the result file once:
+the result file rendered for that launch once, then removes it:
 
 - `{"result":"resume","to"?:..,"cleared":..,"ledger":{..}}`: the unit is unparked in place, or into
   `to` (allowed by `resume_to` for the park's stage); `cleared` must be in `clearing`

@@ -478,7 +478,7 @@ test("a merge-stage park a driver escalates: the notice carries the action, then
     driver: {
       kind: "driver", instance: "dinst", model: "dmod", project: "proj", cwd: "{param.root}/d/{unit.id}",
       title: "driver {unit.id}", message: "settle {unit.id}", env: {},
-      state_file: "{run.dir}/driver/{unit.id}.md", result_file: "{run.dir}/out/{unit.id}.json",
+      state_file: "{run.dir}/driver/{unit.id}.md", result_file: "{run.dir}/out/{unit.id}-{driver.launch}.json",
       ledger: "{param.root}/ledger.md", clearing: ["rerun-check"], resume_to: {},
     },
   };
@@ -490,7 +490,7 @@ test("a merge-stage park a driver escalates: the notice carries the action, then
     result: "escalate", action: "rerun the checks", ledger: { q: "q", a: "a", why: "w", rejected: "r" },
   });
   const host = new FakeHost({
-    driver: { ticks: 1, end: "completed", writes: [{ path: join(state, "runs", "r1", "out", "{unit}.json"), content: result }] },
+    driver: { ticks: 1, end: "completed", writes: [{ path: join(state, "runs", "r1", "out", "{unit}-{launch}.json"), content: result }] },
   });
   const t = () => tick({ store: openStore(state), host, forge, notify: notifyOnce, now: () => new Date(T0) });
   await t(); // parks on red; the driver launches; no notice
