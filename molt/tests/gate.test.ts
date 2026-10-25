@@ -114,6 +114,15 @@ describe('reserved head words past the hard threshold (#711)', () => {
     expect(bash('} git commit -m m')).toBe(false)
     expect(bash('fi foo')).toBe(false)
   })
+  // Walk rows 724-A7 and 724-A7b were false denies at 4d4a20b5: the closer's redirection made
+  // `}` / `fi` a command. The redirection is a shell word now, and Bash runs only add and commit.
+  test('a closer with a redirection names no command: the block is allowed (724-A7, 724-A7b)', () => {
+    expect(bash('{ git add f; git commit -m m; } >/tmp/log')).toBe(true)
+    expect(bash('if git add f; then git commit -m m; fi 2>/tmp/e')).toBe(true)
+    // controls: a command after the redirected closer, or an argument to the closer, is still refused
+    expect(bash('{ git add f; git commit -m m; } >/tmp/log; cat x')).toBe(false)
+    expect(bash('if git add f; then git commit -m m; fi 2>/tmp/e cat x')).toBe(false)
+  })
   test('a loop head and its closer are not skipped: the loop stays refused (#711 review R5)', () => {
     expect(bash('while git add f; do git commit -m m; done')).toBe(false)
     expect(bash('until git add f; do git commit -m m; done')).toBe(false)
@@ -156,6 +165,12 @@ describe('isProgress with reserved head words (#711 review R2/RR1)', () => {
     expect(isProgress('Bash', { command: '{ time git commit -m m; }' })).toBe(false)
     expect(isProgress('Bash', { command: 'f() { git commit -m m; }' })).toBe(false)
     expect(isProgress('Bash', { command: 'function f { git commit -m m; }' })).toBe(false)
+  })
+  // Progress at 4d4a20b5 and now alike (724-A7, 724-A7b): the commit of the first stands in its
+  // own segment; the second sits behind `then`.
+  test('a redirected closer leaves the progress reading as it was', () => {
+    expect(isProgress('Bash', { command: '{ git add f; git commit -m m; } >/tmp/log' })).toBe(true)
+    expect(isProgress('Bash', { command: 'if git add f; then git commit -m m; fi 2>/tmp/e' })).toBe(false)
   })
   test('the run-only reader sees only a bare commit or one behind time', () => {
     expect(walked.gitSubcommandsThatRun?.('git commit -m m')).toEqual(['commit'])
