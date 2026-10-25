@@ -440,4 +440,11 @@ describe("render", () => {
     expect(() => render("{pending.thread}", scope)).toThrow("no pending in scope");
     expect(() => render("{pending.stage}", scope)).toThrow("no pending in scope");
   });
+
+  test("driver placeholders render in a driver scope and throw outside it", () => {
+    expect(render("{driver.reason}|{driver.stage}", { ...scope, driver: { reason: "error: a/b", stage: "work" } }))
+      .toBe("error: a/b|work");
+    expect(() => render("{driver.reason}", scope)).toThrow("no driver in scope");
+    expect(() => render("{driver.stage}", scope)).toThrow("no driver in scope");
+  });
 });

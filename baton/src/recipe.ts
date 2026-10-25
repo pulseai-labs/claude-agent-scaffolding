@@ -187,6 +187,10 @@ export function render(tpl: string, scope: Scope): string {
       case "pending.stage":
         if (!scope.pending) throw new Error("no pending in scope");
         return scope.pending[name.slice(8) as "thread" | "request" | "questions" | "stage"];
+      case "driver.reason":
+      case "driver.stage":
+        if (!scope.driver) throw new Error("no driver in scope");
+        return name === "driver.reason" ? scope.driver.reason : scope.driver.stage;
     }
     if (name.startsWith("param.")) {
       const k = name.slice(6);
