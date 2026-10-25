@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readUnit } from "./baton-state.ts";
+import { readUnit, runStatus } from "./baton-state.ts";
 import { idsOnMessage, lookup, spend } from "./buttons.ts";
 import { stateDir } from "./paths.ts";
 import { TelegramError, type Api } from "./telegram.ts";
@@ -45,13 +45,15 @@ function latest(): OpenAction[] {
   return [...out.values()];
 }
 
-// Edit every action message whose unit is no longer in that park to "settled". Returns the edits made.
+// Edit every action message whose unit is no longer in that park, or whose run is disarmed or done,
+// to "settled". Returns the edits made.
 export async function sweepSettled(api: Api, chatId: number, now: Date): Promise<number> {
   let edits = 0;
   for (const a of latest()) {
     if (a.closed_at) continue;
     const u = readUnit(a.run, a.unit);
-    if (u && u.parked && u.parked.at === a.park_at) continue; // still that park
+    const ended = ["disarmed", "done"].includes(runStatus(a.run) ?? "");
+    if (!ended && u && u.parked && u.parked.at === a.park_at) continue; // still that park
     const ids = idsOnMessage(a.message_id);
     const unspent = ids.filter((id) => lookup(id, now) !== "used");
     if (unspent.length > 0 || ids.length === 0) {

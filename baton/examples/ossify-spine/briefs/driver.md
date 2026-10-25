@@ -5,7 +5,7 @@ A unit has parked. Your message gives the unit, the stage it parked in and the r
 Choose exactly one result, checking in this order and stopping at the first that applies:
 
 1. **Escalate** for a `user:` demo line or walk; anything that needs a change on `main`, in code, a spec, an ADR, a bone or the skeleton; a merge; a decision outside the spine's or the item's scope; a park this list does not cover; or any doubt. The `action` is one line, starting with a verb, saying what the operator must do.
-2. **Resume with `rerun-check`** only for a `land` park that is red when every failing check fails in a test outside the item's changed files (`git diff --name-only <base>...<head>` in the item's worktree). Re-run it once: `gh run rerun <run-id> --failed`. Then resume in place (no `to`).
+2. **Resume with `rerun-check`** only for a `land` park that is red when every failing check fails in a test outside the item's changed files (`gh pr diff <pr> --name-only`, `pr` from the state file's "This park"). Re-run it once: `gh run rerun <run-id> --failed`. Then resume in place (no `to`).
 3. **Resume with `remove-file`** only for a `correct` park with reason `before failed` (the dispatch cap) where `correction.txt` is used up: `corrected` exists, or the event list shows a reclose after it. Remove `correction.txt` from the unit's out directory, then resume with `"to": "reclose"`.
 4. **Stop** only when going on would harm the repo or the run, for example a unit acting on the wrong branch. Give the `reason`.
 

@@ -28,9 +28,10 @@ afterEach(() => {
 });
 
 // r1/u1 is parked at 2026-10-23T10:00:00Z; r1/u2 is not parked (fixtures).
-function open(unit: string, park_at: string, mid = 100): string[] {
-  recordOpen({ message_id: mid, run: "r1", unit, park_at, text: TEXT });
-  const ids = ["unpark", "show"].map((action) => mint({ action: action as "unpark", run: "r1", unit }, now).id);
+// r4 (disarmed) and r5 (done) each keep u1 parked at 2026-10-23T10:00:00Z.
+function open(unit: string, park_at: string, mid = 100, run = "r1"): string[] {
+  recordOpen({ message_id: mid, run, unit, park_at, text: TEXT });
+  const ids = ["unpark", "show"].map((action) => mint({ action: action as "unpark", run, unit }, now).id);
   setMessageId(ids, mid);
   return ids;
 }
@@ -90,4 +91,25 @@ test("another error leaves it open for the next loop", async () => {
   expect(idsOnMessage(100).sort()).toEqual([...ids].sort());
   for (const id of ids) expect(lookup(id, now)).not.toBe("used");
   expect(await sweepSettled(api(), 42, now)).toBe(1);
+});
+
+for (const [run, status] of [["r4", "disarmed"], ["r5", "done"]] as const) {
+  test(`a ${status} run settles a unit still recorded in that park`, async () => {
+    const ids = open("u1", "2026-10-23T10:00:00Z", 100, run);
+    expect(await sweepSettled(api(), 42, now)).toBe(1);
+    expect(fake.calls).toHaveLength(1);
+    expect(fake.calls[0]!.body).toEqual({ chat_id: 42, message_id: 100, text: "✅ settled — " + TEXT });
+    for (const id of ids) expect(lookup(id, now)).toBe("used");
+    expect(closed()).toHaveLength(1);
+  });
+}
+
+test("a message with no recorded ids settles with one edit", async () => {
+  recordOpen({ message_id: 100, run: "r1", unit: "u2", park_at: "2026-10-23T10:00:00Z", text: TEXT });
+  expect(idsOnMessage(100)).toEqual([]);
+  expect(await sweepSettled(api(), 42, now)).toBe(1);
+  expect(fake.calls).toHaveLength(1);
+  expect(fake.calls[0]!.method).toBe("editMessageText");
+  expect(fake.calls[0]!.body).toEqual({ chat_id: 42, message_id: 100, text: "✅ settled — " + TEXT });
+  expect(closed()).toHaveLength(1);
 });

@@ -213,3 +213,8 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - The 30-day token re-approval is manual.
 - A driver's judgment is prose: a driver that picks the wrong result is caught only by the closed
   checks on its result file and by the operator reading the ledger.
+- `baton unpark` during a live driver removes its claim but does not interrupt the driver thread or
+  release its launch worktree; its later result is ignored.
+- A live driver is not watched while the run is parked; it is handled after the run re-arms.
+- The driver guard key is `<stage>/<reason>`. A park reason that embeds a varying error message never
+  repeats, so only `driver.md`'s prose stops a second driver for the same underlying failure.

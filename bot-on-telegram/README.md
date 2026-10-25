@@ -3,8 +3,8 @@
 Sends [baton](../baton) notices to one Telegram chat, with buttons, and turns a button press into the
 matching `baton` or `gh` command. A CLI and a long-running service; no skill, no dependencies beyond
 [bun](https://bun.sh). Presses need `gh` (with its own auth) and `baton` on the service's PATH. It
-needs baton 0.3.1 or later (the `{key}` placeholder in `notify`); baton 0.4.0 adds the driver and the
-run-end summary this bot marks and settles.
+needs baton 0.4.0 or later: the `{key}` placeholder in `notify`, and the driver and the run-end
+summary this bot marks and settles.
 
 ## How it works
 
@@ -71,7 +71,7 @@ moved unit. The one exception is the run-end summary (`baton <run> done — ...`
 sent silently with no marker.
 
 When a unit is no longer in the park an action was sent for (you unparked it, a driver or a later
-tick moved it, the run was disarmed), the bot edits that message to `✅ settled — <original text>`
+tick moved it, the run was disarmed or finished), the bot edits that message to `✅ settled — <original text>`
 and spends its unused buttons. Settling is checked on every `serve` loop.
 
 ## Buttons
@@ -116,4 +116,6 @@ Only one `serve` runs at a time; a second exits with code 3.
 - An action whose edit fails with an error other than "message is not modified" stays open and is
   retried every loop.
 - `open-actions.jsonl` is never compacted.
+- Every notice except the run-done summary is marked as an action; a recipe has no way to mark an
+  outcome's `notify` as informational.
 - A second poller on the same bot makes Telegram answer 409; `serve` logs one line and retries every 5 s.

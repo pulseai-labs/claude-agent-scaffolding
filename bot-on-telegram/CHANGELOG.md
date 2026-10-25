@@ -7,10 +7,9 @@ All notable changes to the `bot-on-telegram` plugin.
 - Every notice except the run-end summary opens with `🔴 ACTION — `. The summary (`<run>/done`) is
   sent without the marker and without a notification sound.
 - An action for a parked unit is remembered in `open-actions.jsonl`. When the unit is no longer in
-  that park (unparked, moved or disarmed), the bot edits the message to start with `✅ settled — `
+  that park (unparked, moved, or its run disarmed or done), the bot edits the message to start with `✅ settled — `
   and spends its unused buttons.
-- Needs baton 0.4.0 for the driver and the summary notice; older baton still works, with every park
-  marked as an action.
+- Needs baton 0.4.0 or later, for the driver and the summary notice.
 
 ## 0.1.0 - 2026-10-23
 
