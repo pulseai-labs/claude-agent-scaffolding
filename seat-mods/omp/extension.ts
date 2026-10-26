@@ -259,8 +259,11 @@ async function shellCheck(deps: GuardDeps, role: Role, commands: string[], baseO
         const root = await deps.worktree()
         const allow = await allowOf(deps, root)
         if (operand.path === undefined) { removals.push(UNREAD); continue }
-        const target = base === undefined ? undefined : await removalPath(deps, base, operand.path, operand.glob)
-        removals.push(removalOf(target, root, allow, operand.glob))
+        // ompPlace drops a leading `@` or `:`, but the shell may remove the literal name in the folder: both are placed.
+        for (const spelling of /^[@:]/.test(operand.path) ? [operand.path, `./${operand.path}`] : [operand.path]) {
+          const target = base === undefined ? undefined : await removalPath(deps, base, spelling, operand.glob)
+          removals.push(removalOf(target, root, allow, operand.glob))
+        }
       }
       const deny = decide(role, { kind: 'bash', rules: bashRules(command, texts.join('\n')), removals })
       if (deny !== undefined) return deny
@@ -318,7 +321,8 @@ const LOCAL_SCRATCH = /^local:\/\/(?!(?:.*\/)?\.\.?(?:\/|$))[A-Za-z0-9._-]+(?:\/
 // path is kept; a relative one is joined to the cwd — collapsed (path.resolve) for a `cwd`, as omp does, and left
 // raw for a `target`, so realOf() follows links before `..` as the kernel will.
 // `shell` reads a word the shell hands a program — an rm operand, a `-F` file — whose folder is the command's: it
-// takes omp's spellings too (a false rewrite only denies) and a scheme is outside (omp's embedded coreutils route a
+// takes omp's spellings too, though the shell may act on the literal name instead (so the rm check also places a leading
+// `@` or `:` operand as that name in the folder), and a scheme is outside (omp's embedded coreutils route a
 // URL operand to its backing file), but `/` stays the root and only an active `~` or `~/` is HOME (`~user` throws:
 // that user's home is not known here). rmTargets and commitMessageFiles hand over a quoted `~` as literal.
 export type PlaceMode = 'cwd' | 'target' | 'shell'

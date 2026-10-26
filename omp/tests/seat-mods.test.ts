@@ -796,4 +796,16 @@ describe('scratch directories: /tmp and $TMPDIR (batch 5)', () => {
     const d = seat('reviewer', { TMPDIR: '/dangling' }, async p => (p.startsWith('/dangling') ? undefined : plain(p)))
     expect(await writes(d, '/dangling/x')).toContain('go in /tmp.')
   })
+  // Final fix wave, M2 (ledger 139): ompPlace drops a leading `@` or `:`, but Bash removes the literal name in the folder,
+  // `<cwd>/@/tmp/x`, inside the worktree, where a reviewer may not remove. Such an operand is placed both ways.
+  test('a reviewer is refused rm -rf @/tmp/x and :/tmp/x: the literal name lies in the worktree', async () => {
+    const tree = { cwd: '/w/wt', worktree: async () => '/w/wt', real: plain }
+    const reviewer = deps({ env: { SEAT_MODS_ROLE: 'coordinator', HOME: '/home/u' }, ...tree })
+    for (const command of ['rm -rf @/tmp/x', 'rm -rf :/tmp/x', 'rm -f @/tmp/x /tmp/y'])
+      expect(await guard(reviewer, 'bash', { command }, child('reviewer'))).toContain('no rm outside')
+    // control: the plain spelling in /tmp is still allowed
+    expect(await guard(reviewer, 'bash', { command: 'rm -rf /tmp/x' }, child('reviewer'))).toBeUndefined()
+    // an implementer may remove in its worktree and in /tmp, so both spellings pass
+    expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'implementer', HOME: '/home/u' }, ...tree }), 'bash', { command: 'rm -rf @/tmp/x' }, main)).toBeUndefined()
+  })
 })
