@@ -223,4 +223,18 @@ describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts w
     expect(gate('git commit -F - <<EOF\nEOFs are fine\nEOF')).toBe(true)
     expect(gate('git commit -F - <<EOF\nEOF) && cat huge.log\nEOF')).toBe(true)
   })
+  // Ruling 33: the `$(` check reads the opener's logical line, from the last newline outside quotes. A `$(` inside a
+  // quoted string that spans lines is text, so the top-level `EOF)` line stays body text, allowed as before the fix wave;
+  // a `$(` after such a string is read, so the honest `EOF)` form after it is allowed and a read after it refused.
+  test('a quoted string spanning lines: a `$(` inside it is text, and one after it is read', () => {
+    expect(gate("git add 'a\n$(' && git commit -F - <<'EOF'\nmsg\nEOF) && cat huge.log\nEOF")).toBe(true)
+    expect(gitSubcommands("git add 'a\n$(' && git commit -F - <<'EOF'\nmsg\nEOF) && cat huge.log\nEOF")).toEqual(['add', 'commit'])
+    expect(gate("git add 'a\nb' && git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toBe(true)
+    expect(gate("git add 'a\nb' && git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && cat huge.log")).toBe(false)
+    // after a heredoc body the line resumes in the opener's quote, which `)"` closes, so `'$('` is text
+    expect(gate("git commit -m \"$(cat <<'A'\na\nA\n)\" && git add '$(' && git commit --amend -F - <<B\nm\nB) && cat huge.log\nB")).toBe(true)
+    // a `$(` before a newline in quotes is on the opener's logical line: the honest form is allowed, a read after it refused
+    expect(gate("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\"")).toBe(true)
+    expect(gate("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\" && cat huge.log")).toBe(false)
+  })
 })

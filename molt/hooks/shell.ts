@@ -37,7 +37,8 @@ const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 // a `)` after it, and reads the rest of that line as command text: for the last opener read
 // on its line, inside a `$(` opened on that line, the piece ends after the delimiter there and
 // the scan resumes after it (not in a backtick span, which Bash reads apart, and not on a
-// line a backslash joined).
+// line a backslash joined). That line is the opener's logical one: from the last newline
+// outside quotes, or from where the scan resumed after a heredoc body, in the quote it resumed in.
 // After an unquoted opener the line's text stays command text (#724 A3, A9), and the line
 // ends at a newline outside quotes and arithmetic. Quotes nest inside `$(…)`, backticks
 // and `${…}`, which this scan does not model, so a line holding one after the first
@@ -49,7 +50,7 @@ const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 // all (#724 A11, #702 B3). `keep` also gets where the piece's two parts lie in `command`:
 // `at`..`upto` (the opener, and in the 0.9.0 reading the rest of its line) and `body`..`end`.
 function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, region: { at: number; upto: number; body: number; end: number }) => string): string {
-  const opens: Array<{ at: number; end: number; quote: string; delimiter: string; strip: boolean; quoted: boolean }> = []
+  const opens: Array<{ at: number; end: number; quote: string; delimiter: string; strip: boolean; quoted: boolean; start: number; seed: string }> = []
   let out = ''
   let from = 0
   let quote = ''     // the quote open here: ', " or $'
@@ -57,8 +58,12 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
   let comment = -1   // where the open comment starts
   let nested = -1    // the last `$(`, backtick or `${` since a newline outside quotes
   let inWord = false // the character before this one belongs to a word
-  // Whether `text`, the opener's line up to the opener, ends inside a `$(…)` opened on that line: the innermost span
-  // still open at its end is one, not a backtick span.
+  // Where the opener's logical line starts: after the last newline outside quotes, so a quoted string that spans lines
+  // is read whole, or where the scan resumed after a heredoc body, in the quote `seed` it resumed in.
+  let start = 0
+  let seed = ''
+  // Whether `text`, the opener's logical line up to the opener, ends inside a `$(…)` opened on that line: the innermost
+  // span still open at its end is one, not a backtick span.
   const inSubstitution = (text: string): boolean => {
     let tick: boolean | undefined
     for (let span = substitutionSpans(text, 'command').pop(); span !== undefined && span.to === text.length; span = substitutionSpans(text, 'command').pop()) {
@@ -86,7 +91,7 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
           const bare = open.strip ? text.replace(/^\t+/, '') : text
           if (bare === open.delimiter) { end = stop; break }
           if (open === last && joined === '' && bare.startsWith(open.delimiter) && bare.includes(')', open.delimiter.length) &&
-            (inside ??= inSubstitution(command.slice(command.lastIndexOf('\n', open.at - 1) + 1, open.at)))) { end = stop - bare.length + open.delimiter.length; break }
+            (inside ??= inSubstitution(open.seed + command.slice(open.start, open.at)))) { end = stop - bare.length + open.delimiter.length; break }
           if (next < 0) break
           joined = !open.quoted && /(?<!\\)(?:\\\\)*\\$/.test(text) ? text.slice(0, -1) : ''
           line = next + 1
@@ -97,6 +102,8 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
         body = end
       }
       out += command.slice(from, comment < 0 ? i : comment)
+      start = body
+      seed = first.quote
       from = body
       i = body - 1
       quote = first.quote
@@ -104,7 +111,7 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
       opens.length = 0
       continue
     }
-    if (char === '\n' && quote === '') nested = -1
+    if (char === '\n' && quote === '') { nested = -1; start = i + 1; seed = '' }
     if (comment >= 0) {
       if (char === '\n') { out += command.slice(from, comment); from = i; comment = -1 }
       continue
@@ -117,7 +124,7 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
       if (open !== null) {
         const word = open[2]!
         opens.push({
-          at: i, end: HEREDOC.lastIndex, quote, strip: open[1] === '-', quoted: /['"\\]/.test(word),
+          at: i, end: HEREDOC.lastIndex, quote, strip: open[1] === '-', quoted: /['"\\]/.test(word), start, seed,
           delimiter: word.replace(/'([^']*)'|"((?:[^"\\]|\\.)*)"|\\(.)/g, (_: string, single?: string, double?: string, escaped?: string) =>
             single ?? escaped ?? double!.replace(/\\([$`"\\])/g, '$1')),
         })

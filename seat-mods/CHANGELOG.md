@@ -53,8 +53,8 @@ judge as before.
   heredoc opener line stays hidden, as in 0.9.0; so do a `$'EOF'` delimiter, a `<<` inside an
   unquoted `$[…]` or a `${…}` (it opens a heredoc for the reader), a `#` after a blank in
   a quoted string inside `"$(…)"`, a command in a Bash 5.3 funsub, a quoted command word
-  (`"rm" …`), a subscripted prefix (`A[0]=1 rm …`), a closing line `EOF)` in a `$(` opened on an
-  earlier line, a backslash-newline inside a word and the spans whose end the reader loses. C5 (a
+  (`"rm" …`), a subscripted prefix (`A[0]=1 rm …`), a closing line `EOF)` in a `$(` opened before
+  a newline outside quotes or before an earlier heredoc's body, a backslash-newline inside a word and the spans whose end the reader loses. C5 (a
   `&` inside a word) and C6 (function bodies and syntax errors) still read wrongly toward a false
   stop. C8 (a partly quoted tilde, `rm ~""/scratch/x`) is a false stop too, but for a reviewer
   whose `SEAT_MODS_ALLOW` holds `$HOME/scratch` it passes while Bash removes `<cwd>/~/scratch/x`.

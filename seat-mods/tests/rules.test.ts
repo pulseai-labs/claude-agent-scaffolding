@@ -1651,4 +1651,29 @@ describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts w
     expect(bashRules('x=$(cat <<EOF\nmsg\nEO\\\nF) && git push --force')).toEqual([])
     expect(bashRules("x=$(cat <<'EOF' <<B\nb\nB\nmsg\nEOF) && git push --force")).toEqual([])
   })
+  // Ruling 33: the `$(` check reads the opener's logical line, from the last newline outside quotes, not its physical
+  // line, so a quoted string that spans lines neither opens a `$(` that is text nor hides one that is real (probed under
+  // Bash 5.3.9: the first two run no rm and no push, the third runs the push).
+  test('a quoted string spanning lines: a `$(` inside it is text, and one after it is read', () => {
+    expect(rmTargets("printf '%s\\n' 'x\n$(' >/dev/null; git commit -F - <<'EOF'\nmsg\nEOF) ; rm -rf /etc/x\nEOF")).toEqual([])
+    expect(bashRules("printf '%s\\n' 'x\n$(' >/dev/null; git commit -F - <<'EOF'\nmsg\nEOF) ; rm -rf /etc/x\nEOF")).toEqual(['commit'])
+    expect(bashRules("echo '\n$(' ; cat <<EOF\nEOF) && git push --force\nEOF")).toEqual([])
+    expect(bashRules('echo "\n\\$(" ; cat <<EOF\nEOF) && git push --force\nEOF')).toEqual([])
+    expect(bashRules("echo 'a\nb' ; x=$(cat <<EOF\nmsg\nEOF) ; git push --force")).toEqual(['push', 'force-push'])
+    expect(bashRules('echo "a\nb" ; x=$(cat <<EOF\nmsg\nEOF) ; git push --force')).toEqual(['push', 'force-push'])
+    expect(bashRules("git add 'a\nb' && git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toEqual(['commit'])
+    // a heredoc body on the logical line is not read as its text: here a `'(` in an earlier body would open a `$(`
+    expect(bashRules("y=$(cat <<A\n'(\nA) ; cat <<B\nB) ; git push --force\nB")).toEqual([])
+    // after a heredoc body the line resumes in the opener's quote: here inside the `"…"`, which `)"` closes, so `'$('` is text
+    expect(bashRules("git commit -m \"$(cat <<'A'\na\nA\n)\" ; echo '$(' ; cat <<B\nB) ; git push --force\nB\n")).toEqual(['commit'])
+    // a `$(` before a newline in quotes, or before a backslash-newline, is on the opener's logical line: Bash runs the push
+    expect(bashRules("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit', 'push', 'force-push'])
+    expect(bashRules("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\"")).toEqual(['commit'])
+    expect(bashRules('x=$( \\\ncat <<EOF\nmsg\nEOF) && git push --force')).toEqual(['push', 'force-push'])
+  })
+  // Known limit (README Limits): the logical line restarts where the scan resumes after a heredoc body, so a `$(` before
+  // an earlier heredoc's body is not seen. Bash runs the push.
+  test('known limit: a $( before an earlier heredoc body on the line is not seen', () => {
+    expect(bashRules("git commit -m \"$(cat <<'A'\na\nA\ncat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit'])
+  })
 })
