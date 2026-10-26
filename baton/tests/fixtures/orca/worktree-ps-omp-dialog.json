@@ -1,0 +1,78 @@
+{
+  "id": "f71ab429-fc34-4075-9d2c-7ee7c003b903",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+        "repoId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e",
+        "hostId": "local",
+        "terminalPlatform": "linux",
+        "repo": "pilot-fourseat",
+        "path": "/home/dev/projects/pilot-fourseat",
+        "branch": "refs/heads/main",
+        "isArchived": false,
+        "isMainWorktree": true,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": true,
+        "worktreeInstanceId": "6d70ff84-ff58-4928-85bd-49a7e3a1acee",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "displayName": "main",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1793015876707,
+        "lastActivityAt": 1792942133220,
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1793033654386,
+        "preview": "che/plugins/claude-agent-scaffolding___seat-mods___0.9.0\nplugin bin path skipped: molt has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___molt___0.3.5\nplugin bin path skipped: crew has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___crew___0.4.3",
+        "status": "active",
+        "agents": [
+          {
+            "paneKey": "65ef09a7-ba88-45eb-a72c-543f923e6b3b:037f73cd-bff0-448b-a33b-44fb694b1693",
+            "parentPaneKey": null,
+            "state": "done",
+            "agentType": "omp",
+            "prompt": "Spike 3 check. Run the shell command: env | grep -E \"^(SEAT_MODS_|MOLT_|OMP_SEAT|HERDR)\" | cut -c1-60 ; then reply with its output and the word done.",
+            "taskTitle": null,
+            "displayName": null,
+            "lastAssistantMessage": "No output — no environment variables matching `SEAT_MODS_`, `MOLT_`, `OMP_SEAT`, or `HERDR` are set in this shell.\n\ndone",
+            "toolName": "bash",
+            "toolInput": "env | grep -E \"^(SEAT_MODS_|MOLT_|OMP_SEAT|HERDR)\" | cut -c1-60",
+            "interrupted": false,
+            "stateStartedAt": 1793033576346,
+            "updatedAt": 1793033576346,
+            "programStatus": {
+              "state": "done",
+              "observedAt": 1793033576346
+            }
+          }
+        ],
+        "terminalVerdict": "live"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "totalCount": 84,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "1710eeed-e8d2-44c9-94dc-e230defa6bce"
+  }
+}

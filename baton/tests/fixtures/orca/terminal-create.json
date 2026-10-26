@@ -1,0 +1,23 @@
+{
+  "id": "b2c83e16-c2f7-4da6-855d-552f9eada428",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_3a3a4b2c-380f-4bcc-a4e0-9053d6206ec7",
+      "tabId": "65ef09a7-ba88-45eb-a72c-543f923e6b3b",
+      "paneKey": "65ef09a7-ba88-45eb-a72c-543f923e6b3b:037f73cd-bff0-448b-a33b-44fb694b1693",
+      "ptyId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat@@79f5c78c",
+      "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+      "title": "spike1 [baton s/u/st/1]",
+      "executionHostId": "local",
+      "incarnationId": "f28a1184-4530-48b0-be77-dc51295964a7",
+      "hostPlatform": "linux",
+      "surface": "background",
+      "processId": 713527,
+      "warning": "Terminal term_3a3a4b2c-380f-4bcc-a4e0-9053d6206ec7 is running, but Orca could not make it discoverable. Run `orca terminal focus --terminal term_3a3a4b2c-380f-4bcc-a4e0-9053d6206ec7` to reveal and focus it."
+    }
+  },
+  "_meta": {
+    "runtimeId": "1710eeed-e8d2-44c9-94dc-e230defa6bce"
+  }
+}
