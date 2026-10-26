@@ -1,10 +1,10 @@
 // The T3 Code host: baton's Host interface over T3's tailnet `/mcp` endpoint.
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, resolve, sep } from "node:path";
+import { join } from "node:path";
 import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type PendingQuestion, type PendingRequest, type ThreadStatus } from "../host.ts";
-import { stateDir } from "../state.ts";
+import { bindLaunchDir, git, isLaunchDir, releaseLaunchDir } from "./launch-dir.ts";
 import { callTool, callToolClassified, readToken, type ToolCall } from "./mcp.ts";
 
 export type T3Config = { base: string; tokenFile: string };
@@ -50,20 +50,6 @@ const describe = (r: ToolError): string => {
   return [e?.code, e?.message].filter(Boolean).join(": ") || JSON.stringify(r.error);
 };
 
-/** realpath when the path exists, else the resolved path. */
-function real(p: string): string {
-  try {
-    return realpathSync(p);
-  } catch {
-    return resolve(p);
-  }
-}
-
-function git(cwd: string, ...args: string[]): { ok: boolean; out: string; err: string } {
-  const p = Bun.spawnSync(["git", "-C", cwd, ...args], { stdout: "pipe", stderr: "pipe" });
-  return { ok: p.exitCode === 0, out: p.stdout.toString().trim(), err: p.stderr.toString().trim() };
-}
-
 const NONCE_TAG = /\[baton ([^\]]+)\]\s*$/;
 
 export class T3Host implements Host {
@@ -73,16 +59,6 @@ export class T3Host implements Host {
   constructor({ base, tokenFile }: T3Config) {
     this.base = base;
     this.tokenFile = tokenFile;
-  }
-
-  /** The per-launch worktree parent: `<state>/launch`. */
-  private launchRoot(): string {
-    return join(stateDir(), "launch");
-  }
-
-  private isLaunchDir(dir: string): boolean {
-    const root = real(this.launchRoot());
-    return real(dir).startsWith(root + sep);
   }
 
   private token(): string {
@@ -117,28 +93,11 @@ export class T3Host implements Host {
 
   async bind(project: string, cwd: string, nonce: string, mode: "worktree" | "root"): Promise<string> {
     const p = await this.project(project);
-    if (real(cwd) !== real(p.workspaceRoot)) return cwd;
-    if (mode === "root") return cwd;
-    // encodeURIComponent is injective and keeps the name readable: "/" becomes "%2F", and "_",
-    // which every nonce segment may contain, is left alone - flattening "/" to "_" was not.
-    const dir = join(this.launchRoot(), encodeURIComponent(nonce));
-    const listed = () => git(p.workspaceRoot, "worktree", "list", "--porcelain").out.split("\n").includes(`worktree ${real(dir)}`);
-    if (existsSync(dir)) {
-      if (listed()) return dir;
-      throw new LaunchError(`launch directory exists but is not a worktree of ${p.workspaceRoot}: ${dir}`);
-    }
-    const r = git(p.workspaceRoot, "worktree", "add", "--detach", dir, "HEAD");
-    if (!r.ok) throw new LaunchError(`git worktree add failed: ${r.err}`);
-    return dir;
+    return bindLaunchDir(p.workspaceRoot, cwd, nonce, mode);
   }
 
   async release(_project: string, cwd: string, dir: string): Promise<void> {
-    if (real(dir) === real(cwd)) return;
-    // Only a directory bind made is ever force-removed.
-    if (!this.isLaunchDir(dir)) throw new LaunchError(`refusing to remove a directory bind did not make: ${dir}`);
-    // --force also drops the registration of a worktree whose directory is already gone.
-    const r = git(cwd, "worktree", "remove", "--force", dir);
-    if (!r.ok) throw new LaunchError(`git worktree remove failed: ${r.err}`);
+    releaseLaunchDir(cwd, dir);
   }
 
   async launch(r: LaunchRequest): Promise<{ threadId: string }> {
@@ -146,7 +105,7 @@ export class T3Host implements Host {
     if (!head.ok) throw new LaunchError(`not a git checkout: ${r.cwd}`);
     const strategy: Record<string, string> = { type: "existing_worktree", worktreePath: r.cwd };
     if (head.out) strategy.branch = head.out;
-    else if (!this.isLaunchDir(r.cwd)) throw new LaunchError(`detached HEAD in ${r.cwd}`);
+    else if (!isLaunchDir(r.cwd)) throw new LaunchError(`detached HEAD in ${r.cwd}`);
     const p = await this.project(r.project);
     const res: ToolCall = await callToolClassified(this.base, this.token(), "t3_thread_launch", {
       projectId: p.id,
