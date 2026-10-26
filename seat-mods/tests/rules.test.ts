@@ -238,6 +238,21 @@ describe('decide', () => {
     expect(decide('implementer', { kind: 'write', place: 'outside' })).not.toContain('go in')
     expect(decide('implementer', { kind: 'write', place: 'allow', allow: ['/s/a'] })).toBeUndefined()
   })
+  // Batch 5: /tmp and $TMPDIR are writable places for every guarded role, so the texts that say where a write or an rm may go name them.
+  test('the outside-write and outside-rm texts name the scratch places beside the worktree and SEAT_MODS_ALLOW', () => {
+    for (const role of ['implementer', 'verifier', 'reviewer'] as const) {
+      const write = decide(role, { kind: 'write', place: 'outside' })
+      for (const place of ['the worktree', '/tmp', '$TMPDIR', 'the SEAT_MODS_ALLOW directories']) expect(write).toContain(place)
+      const rm = decide(role, { kind: 'bash', rules: [], removals: [removalOf('/etc/x', '/w', ['/s'], false)] })
+      for (const place of ['the worktree unless this seat reviews', '/tmp', '$TMPDIR', 'the SEAT_MODS_ALLOW directories', 'roots or ancestors']) expect(rm).toContain(place)
+    }
+  })
+  test('the unread-operand advice says what the guard reads: a plain NAME=value just before, a cd it can follow', () => {
+    const unread = decide('implementer', { kind: 'bash', rules: [], removals: [UNREAD] })
+    expect(unread).toContain('a $VAR no plain NAME=value just before gave')
+    expect(unread).toContain('a relative path after a cd it cannot follow')
+    expect(unread).not.toContain('the guard does not read $VAR')
+  })
   test('an rm operand the guard cannot read says to spell it out; a placed one outside keeps its text', () => {
     const unread = decide('verifier', { kind: 'bash', rules: [], removals: [UNREAD] })
     expect(unread).toContain('no rm with an operand the guard cannot resolve')

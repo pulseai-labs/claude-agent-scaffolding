@@ -17,7 +17,7 @@ import type { Removal, RmTarget, RuleId } from '../hooks/rules'
 const FORCE = 'no force-push'
 const PUSH = 'no git push'
 const COMMIT = 'no git commit'
-const RM = 'no rm outside writable places, or of their roots or ancestors'
+const RM = 'no rm outside writable places (the worktree unless this seat reviews, /tmp, $TMPDIR and the SEAT_MODS_ALLOW directories), or of their roots or ancestors'
 const ALLOWED = 'ALLOW'
 
 type Setup = { root: string; cwd: string; home: string; allow: readonly string[] }
@@ -326,12 +326,12 @@ describe('batch 5 corpus: the nine real baton refusals are allowed, and their /e
       expect(writeVerdict(record.path, record.root, allow)).toBeUndefined()
     })
     test(`${record.id}: the same write aimed at /etc/x is refused`, () => {
-      expect(writeVerdict('/etc/x', record.root, allowFor(record.allow))).toContain('no writes outside the worktree and the SEAT_MODS_ALLOW directories')
+      expect(writeVerdict('/etc/x', record.root, allowFor(record.allow))).toContain('no writes outside the worktree, /tmp, $TMPDIR and the SEAT_MODS_ALLOW directories')
     })
     // The control: without the folder (or /tmp) the same write is refused, so it passes because that place is allowed.
     test(`${record.id}: refused where its folder is not an allowed place`, () => {
       const without = record.allow.length > 0 ? scratchDirs(undefined) : []
-      expect(writeVerdict(record.path, record.root, without)).toContain('no writes outside the worktree and the SEAT_MODS_ALLOW directories')
+      expect(writeVerdict(record.path, record.root, without)).toContain('no writes outside the worktree, /tmp, $TMPDIR and the SEAT_MODS_ALLOW directories')
     })
   }
 })

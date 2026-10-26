@@ -28,7 +28,7 @@ Two environment variables, both set **per spawn**:
 | | `implementer`, `verifier`, `reviewer` | That role's guards are on. The status line shows `seat: <role>`. |
 | | `orchestrator`, `coordinator` | Unguarded: no denies, no write placement checks. On OMP an orchestrator may not spawn subagents (0.4.4). The status line shows `seat: <role>`. |
 | | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
-| `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree is writable — and a reviewer, whose profile may write only in these directories, then writes nothing. |
+| `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree and the scratch places (`/tmp`, `$TMPDIR`; see below) are writable — and a reviewer, whose profile may write only in these directories and the scratch places, then writes only there. |
 
 The pre-rename line's 0.2.2 through 0.2.6 export both in the pane of each implementer, verifier
 and reviewer seat before its command and leave every other pane unset; with this release an unset
@@ -83,13 +83,13 @@ Each is a `tool.call` deny on Bash, Edit or Write.
 | Force-push (`--force`, `-f`, `--force-with-lease`, `--mirror`, a `+` refspec); branch deletion (`git branch -D`, or `-d`/`--delete` with `-f`/`--force`; `git push --delete` / `-d` / `--prune` / `:branch`) | deny | deny | deny |
 | `--no-verify` on any git command (and `git commit -n`) | deny | deny | deny |
 | A commit message with `Co-Authored-By:` or `🤖 Generated with` — on the command line, in a heredoc, or in the `-F` / `--file` message file | deny | deny | deny |
-| Edit or Write outside the worktree and outside every `SEAT_MODS_ALLOW` directory (the deny names those directories as the place for scratch files) | deny | deny | deny |
+| Edit or Write outside the worktree, `/tmp`, `$TMPDIR` and every `SEAT_MODS_ALLOW` directory (the deny names `/tmp`, `$TMPDIR` and those directories as the place for scratch files) | deny | deny | deny |
 | `rm` outside writable places, with unresolvable operands, or removing a writable root or its ancestor (an operand it cannot read is told to spell its path out literally) | deny | deny | deny |
 | `rm` inside the worktree (below its root) | allow | allow | deny |
-| `rm` inside a `SEAT_MODS_ALLOW` directory (below its root) | allow | allow | allow |
+| `rm` inside a `SEAT_MODS_ALLOW` directory, or below `/tmp` or `$TMPDIR` (below its root; see Scratch places) | allow | allow | allow |
 | `git commit`, `git push`, `gh pr create` | allow | deny | deny |
 | Edit or Write inside the worktree | allow | allow | deny |
-| Edit or Write inside a `SEAT_MODS_ALLOW` directory | allow | allow | allow |
+| Edit or Write inside a `SEAT_MODS_ALLOW` directory, or below `/tmp` or `$TMPDIR` | allow | allow | allow |
 
 The worktree is the git top level of the session's working directory (outside a git repository,
 the working directory itself). Paths are compared after the file system resolves them, so `..` and
@@ -101,16 +101,18 @@ Relative operands
 use the live shell directory from `$.session.cwd()` at the call. This was measured on Claude Code
 2.1.294 on 2026-10-08: after a Bash `cd` into a project subdirectory, the next call's hook and
 `pwd` both reported that subdirectory; after Claude reset an outside-project `cd`, both reported
-the project directory. An earlier recognised `cd`, `pushd` or `popd` in the **same** call makes relative
-operands unresolvable and denies them; absolute operands remain eligible. `worktreeOf()` keeps
+the project directory. A `cd` earlier in the **same** call moves that start only as the `cd` and
+variables section below reads it; any other recognised `cd`, `pushd` or `popd` makes relative
+operands unresolvable and denies them. Absolute operands remain eligible. `worktreeOf()` keeps
 its existing behavior: the worktree is derived from that live directory.
 
-Operands containing active variables, parameter expansions or command substitutions, and
-`~user`, `~+` and `~-` operands, cannot be resolved and are denied, including `rm -rf "$OLDPWD"`.
+Operands containing parameter expansions or command substitutions, a variable no literal
+assignment in the same call gave, and `~user`, `~+` and `~-` operands, cannot be resolved and are
+denied, including `rm -rf "$OLDPWD"`.
 Single-quoted text and escaped characters are literal. Any other `$` in an operand is treated as
 unresolvable, including an inert dollar sign. Bare `~` and `~/...` use `HOME`. A glob is placed by
 the directory of its literal
-prefix: `/tmp/tmp.*` is outside, while `build/*.o` is placed in the live directory's `build`.
+prefix: `/etc/tmp.*` is outside, while `build/*.o` is placed in the live directory's `build`.
 The resolver follows links in parent directories, but keeps a terminal link literal because
 `rm` removes the link itself; a trailing `/` follows the directory. A writable root itself or
 its ancestor cannot be removed. A glob whose literal-prefix directory has a writable root
@@ -137,6 +139,63 @@ and `\cd` count as directory changes. A parsing or resolution exception denies t
 that could not be checked; forged self-referencing or excessively nested markers are rejected.
 
 A deny reads `seat-mods (<role>): <rule> — this seat may not <action>; report it instead.`
+
+### What the Bash rails stop, and what they leave to the next judge
+
+seat-mods reads free shell text, so it can miss a command, and it can only add a stop. A call it
+passes is not approved: it goes on to the next judge (the brief, the permission mode, git hooks,
+the server) exactly as if seat-mods were absent. For each way the reader looks at a command:
+
+- **Substitutions and backticks.** Stops a ruled command inside `$(…)` or a backtick span, on every
+  rail (the `rm` operands and the `-F` message file too): unquoted, in double quotes, on a heredoc
+  opener line or in an unquoted heredoc body, nested up to 8 deep. Leaves single-quoted text and
+  quoted heredoc bodies, which are text in Bash; a command inside a Bash 5.3 funsub (`${ …; }`,
+  `${| …; }`), which no rail reads; and the shapes in Limits where the reader loses a span's end.
+  A command nested more than 8 substitutions deep is refused, reported as `no force-push`. That is
+  an accepted false stop: no honest command nests that deep.
+- **Heredocs.** Stops a ruled command on a heredoc's opener line after the delimiter
+  (`cat <<EOF; git push --force`), on the line after its closing line, and after a `<<` that opens
+  no heredoc. Leaves the body and the closing line, which are text, and the fallback in Limits: when
+  an opener line holds a `$(…)`, a backtick or a `${…}` after the delimiter word, a ruled command
+  after the substitution on that line stays hidden, as in 0.9.0.
+- **The command word and glued redirections.** Stops a ruled command whose head is escaped
+  (`\rm -rf …`, `\git push --force`), follows a named descriptor (`{log}>f rm -rf …`), or has a
+  redirection glued to a flag (`git push --force>&2`, `--force&>f`, `-f>/dev/null`). Leaves a
+  quoted command word (`"rm" -rf …`, `"git" push --force`) and a subscripted prefix
+  (`A[0]=1 rm -rf …`), which are not read as the command.
+- **Scratch places** and **`cd` and variables, for `rm`**: below.
+
+### Scratch places
+
+Beside the `SEAT_MODS_ALLOW` directories, every guarded role may Edit, Write and `rm` below `/tmp`
+and below `$TMPDIR`, read from the seat's own environment on both hosts. Only descendants count:
+`rm` of the directory itself or of an ancestor (`rm -rf /tmp`, `rm -rf /`) is still denied, and a
+`..` out of it lands outside. A relative `$TMPDIR`, `/` and a directory that does not resolve name
+no place. A link counts by both spellings (on macOS `/tmp` and `/private/tmp`). `rm -rf /tmp/*` is
+allowed, which is the accepted cost: a seat can remove another session's scratch files. Limits
+names two more limits of the scratch places.
+
+### `cd` and variables, for `rm`
+
+A relative operand is placed from the session's directory. Inside one call the reader follows a
+literal `cd <path>` and literal `NAME=value` assignments in a plain `;`, `&&` or newline sequence
+from the call's start, so `cd "$WT" && rm -rf pf/__pycache__` is placed, and so is `rm -f pf/x`
+after `WT=/w/wt; cd "$WT"` and a newline.
+
+- A `cd` before `;` or a newline may fail, and Bash then runs the next command where it stood. So
+  an `rm` after one is checked in every directory it may run in, one target each, and every target
+  must be writable; after `cd X &&` it runs in X only. More than four possible directories is
+  unresolved.
+- A `$NAME` or `${NAME}` reads the value of a literal assignment: no `$`, backtick, parenthesis or
+  redirection in it, and no blank, glob, quote, brace or `~` once unquoted. A variable stays known
+  only across literal assignments, a literal `cd` and a bare `rm`; any other command forgets them
+  all (`WT=/w/wt; echo "$WT"; rm -rf "$WT/x"` is refused).
+- Unresolved, so refused as before: a `cd` in a subshell or an `if`, after `||` or in a pipeline;
+  `cd -`, `cd ..`, `cd ~` and a `cd` with an option, a glob or an unknown variable; `pushd`,
+  `popd`, `command cd` and `builtin cd`; a Bash 5.3 funsub. `eval`, `source`, `export`, `read`,
+  `printf` and the other builtins that run text or change shell state end the walk: no variable is
+  read after them, and a directory a `cd` moved to is unknown. Limits lists what the walk does not
+  model.
 
 ## Status block (orchestrator)
 
@@ -225,19 +284,25 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
   subcommands or flags (`git "merge"`). A trailer that opens an `-m` message, comes from
   `--trailer`, or follows a backslash-newline inside single
   quotes, also passes.
-- A command inside `$(…)` or backticks is read as a command of its own when the substitution stands unquoted, in double quotes, on a heredoc opener line or in an unquoted heredoc body, except as the next lines of this list say. A `case` pattern's `)` ends a substitution early for the reader, and the rest of that substitution is not read.
+- A command inside `$(…)` or backticks is read as a command of its own when the substitution stands unquoted, in double quotes, on a heredoc opener line or in an unquoted heredoc body, except as the next lines of this list say. The reader finds a span's end by counting parentheses and quotes, not by parsing, so a `)` Bash does not count ends it early and the rest of that span is not read: a `case` pattern's `)` in a double-quoted `$(…)`, a `)` inside a `${…}` there (`"$(echo ${x:-)} "it's")" && git push --force 'x'`), and a backslash-newline between `$` and `(`. A command nested more than 8 substitutions deep is refused as `no force-push`, whatever it runs.
+- **Funsubs:** a command inside a Bash 5.3 `${ …; }` or `${| …; }` runs in the current shell and is read by no rail: `X="${ git push --force; }"` and `X="${ rm -rf /etc/x; }"` pass. A funsub anywhere in a call makes its directory unknown, so a relative `rm` in that call is refused.
 - Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
-- An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny.
-- A named descriptor before the command (`{log}>file rm …`) hides the rm.
+- **C6, grammar:** the reader splits text and does not parse it. An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny, and so is a command in a script Bash would refuse to run (`if git push --force; then`).
+- **C5, a `&` inside a word:** only a lone `&` inside an unquoted `${…}` or `$[…]` is masked. A `&` inside any other word still splits it, so `a[foo&git push --force ]=x` and `echo @(a&git push --force )` are denied though Bash runs no `git`.
+- **C8, a quoted tilde:** `rm ~""/scratch/x` and `rm ~''/scratch/x` read the tilde as `HOME`. Bash expands no tilde that is partly quoted and removes `<cwd>/~/scratch/x`. The usual outcome is a false stop; for a reviewer whose `SEAT_MODS_ALLOW` holds `$HOME/scratch`, the rm is placed there and passes while Bash removes in the session directory. A tilde quoted whole (`"~"/x`) reads as a relative name.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
 - A heredoc opener line holding a `$(…)`, a backtick or a `${…}` after the delimiter word is read as in 0.9.0: the rest of that line goes with the heredoc, so a ruled command after the substitution on that line stays hidden (`cat <<EOF $(date); git push --force`). So does a quoted `<<` after one of those on its line, as in the `"$(cat <<'EOF' … )"` commit form. Any other quoted `<<` is text, as in Bash.
 - A `$'…'` or `$"…"` heredoc delimiter is read with its `$`, so its heredoc never closes at `EOF` and the lines after it can hide commands.
 - Inside a double-quoted `$(…)`, a `#` after a blank in an inner quoted string still reads as a comment, as in 0.9.0, so the rest of that line is hidden (`git commit -m "$(echo "a # b")" && …`).
+- A heredoc whose closing line has more after the delimiter (`EOF)` in `git commit -m "$(cat <<'EOF' … EOF)" && git push --force`) is not seen closing, though Bash closes it with a warning, so the commands after it can hide. A backslash-newline inside a word reads as a blank where Bash deletes it: `r\<newline>m -rf /etc/x` is not read as an `rm`, and `git push --for\<newline>ce` is a push but not a force-push.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
+- **A seat whose worktree lies under `/tmp` or `$TMPDIR` gets no scratch places.** A scratch directory that holds the seat's worktree is not added: an allowed directory outranks the worktree, so adding it would let a reviewer edit its own tree. That seat keeps the refusals it had for scratch writes.
+- **A broad scratch directory opens other trees.** Other seats' worktrees under `/tmp`, or under a broad `$TMPDIR` such as `/home/dev`, are writable by any guarded seat whose own tree is elsewhere, the same as putting that value in `SEAT_MODS_ALLOW`. A `$TMPDIR` inside the worktree opens that subtree to a reviewer. `rm -rf /tmp/*` is allowed, so a seat can remove another session's scratch files.
+- **The `cd` walk does not model the environment.** A `CDPATH` in the seat's environment (one assigned in the call ends the walk), a `cd` alias, any function or alias from the shell snapshot that changes directory (zoxide's `z`, for one) and zsh's `cd` behaviour are not read, and any of them can leave a later relative `rm` where the walk does not look.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
-- `$` outside literal quoting/escaping and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.
-- Quoted command names such as `"cd"` are not recognised as directory changes.
+- `$` outside literal quoting/escaping, other than a `$NAME` a literal assignment gave, and leading `~+`/`~-` are unresolvable, even when Bash could resolve them.
+- **Quoted command words:** a quoted command word (`"rm" -rf /etc/x`, `r'm' -rf /etc/x`, `"git" push --force`) and a subscripted assignment prefix (`A[0]=1 rm -rf /etc/x`) are not read as the command, so the rails pass them. A quoted `"cd"` does count as a directory change.
 - `POSIXLY_CORRECT` operand ordering and a backslash-newline inside double quotes are not modelled.
 - **The guarded launch needs a POSIX shell in the seat's pane.** crew sets the variables
   with `export`; a pane whose shell is Nushell leaves them unset, and the session runs under the
@@ -256,12 +321,12 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 - **The Bash placement rail covers only `rm`.** `rmdir`, `unlink`, `find -delete`, `git rm`, `git clean`,
   `xargs rm`, `bash -c '...'`, `mv` over a file, and other Bash writes such as `cat >` and `sed -i`
   remain outside it. These rails stop mistakes, not an adversary; precise shell parsing remains
-  out of scope. An earlier recognised same-call `cd`, `pushd` or `popd` conservatively denies relative `rm`
-  operands even if that directory change fails. Cross-call directory changes use the live cwd
-  measured above.
-- **A default-guarded session writes only inside the worktree and the `SEAT_MODS_ALLOW`
-  directories** — and outside a git repository the worktree is its working directory — so Claude
-  Code's own writes outside them, such as memory files under `~/.claude/projects/*/memory` and
+  out of scope. A same-call `cd` the walk follows is checked in every directory the `rm` may run in; any
+  other earlier recognised `cd`, `pushd` or `popd` conservatively denies relative `rm` operands even if
+  that directory change fails. Cross-call directory changes use the live cwd measured above.
+- **A default-guarded session writes only inside the worktree, `/tmp`, `$TMPDIR` and the
+  `SEAT_MODS_ALLOW` directories** — and outside a git repository the worktree is its working
+  directory — so Claude Code's own writes outside them, such as memory files under `~/.claude/projects/*/memory` and
   plan files under `~/.claude/plans`, are denied. That is the intended shape: a default-guarded
   session is a worker, and an operator session marks itself `orchestrator`.
 - **A failed `git rev-parse --show-toplevel` is read as "not a repository".** Any failure of that
@@ -281,12 +346,12 @@ Under `SEAT_MODS_ROLE=orchestrator`, the OMP guard blocks the `task` tool and ev
 
 `omp/status-extension.ts` (0.8.0) is the status-block check and idle stop for an OMP orchestrator, over the same `hooks/status.ts`: one block per turn, then the warning as an OMP notification. `omp-seat` loads it last, after molt and autonomic, for the orchestrator only, so their `session_stop` blocks win as they do beneath seat-mods on Claude Code; the guard stays first. OMP's `input` cannot tell typing from a herdr send, so a turn is status by its crew tag, or when no input started it (a job completion, an idle wake). **Known limit:** a turn that no prompt starts gets the check but not the status-turn context line.
 
-`omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
+`omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`, so the Bash reading, the scratch places (`$TMPDIR` from the seat's environment) and the `cd` walk above apply to a `bash` call there as they do on Claude Code. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
 
 | Child agent | Rails |
 |---|---|
-| `implementer`, `task`, any other name | verifier: no commit, push or PR; writes in the worktree and `SEAT_MODS_ALLOW` (an `implementer` child stages and never commits) |
-| `seat-reviewer`, `reviewer`, `scout` | reviewer: writes only in `SEAT_MODS_ALLOW`; `eval` and `debug` blocked |
+| `implementer`, `task`, any other name | verifier: no commit, push or PR; writes in the worktree, the scratch places and `SEAT_MODS_ALLOW` (an `implementer` child stages and never commits) |
+| `seat-reviewer`, `reviewer`, `scout` | reviewer: writes only in `SEAT_MODS_ALLOW` and the scratch places; `eval` and `debug` blocked |
 
 Under any guarded role, a tool call passes only if its name is on the allow list in `GUARDED_TOOLS` (omp 18.8.9's tools); any other name, an MCP or extension tool included, is denied:
 
