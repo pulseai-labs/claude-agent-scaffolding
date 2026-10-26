@@ -534,4 +534,67 @@ describe('/molt now', () => {
     await $.command.run(NOW)
     expect((await $.classic.Stop(STOP)).block).toContain('MOLT-HANDOFF:')
   })
+
+  // #903: below the handoff threshold the built-in instruction's first line says the operator asked, as the OMP glue has
+  // since 0.3.3. "Past molt's handoff threshold" is false there. The fill, not the /molt now flag, decides the line.
+  const ASKED = (percent: number) => `Context is at ${percent}% of the window, and the operator asked for a handoff now.`
+  const PAST = (percent: number) => `Context is at ${percent}% of the window, past molt's handoff threshold (65%).`
+  const EDITED = '/home/u/.claude/molt/instructions.md'
+  test('below the handoff threshold the request in the prompt box says the operator asked (#903)', async ($, on) => {
+    const w = world(on)
+    at(w, 3)
+    await $.command.run(NOW)
+    expect(w.fills.at(-1)).toStartWith(ASKED(3))
+    expect(w.fills.at(-1)).not.toContain('past molt')
+    expect(w.fills.at(-1)).toContain('MOLT-HANDOFF:')
+  })
+  test('below the handoff threshold the request the next prompt carries says the operator asked (#903)', async ($, on) => {
+    const w = world(on)
+    w.hasBox = false
+    at(w, 3)
+    const r = await $.command.run(NOW)
+    expect(r.context?.at(-1)).toStartWith(ASKED(3))
+    expect(r.context?.at(-1)).not.toContain('past molt')
+  })
+  test('the Stop reflex /molt now arms says the operator asked while the fill is below the threshold (#903)', async ($, on) => {
+    const w = world(on)
+    at(w, 45)
+    await $.command.run(NOW)
+    expect((await $.classic.Stop(STOP)).block).toStartWith(ASKED(45))
+  })
+  // The controls: the same words, and the line above the threshold, are the built-in default's own.
+  for (const percent of [67, 65]) {
+    test(`control: /molt now at ${percent}% keeps "past molt's handoff threshold"`, async ($, on) => {
+      const w = world(on)
+      at(w, percent)
+      await $.command.run(NOW)
+      expect(w.fills.at(-1)).toStartWith(PAST(percent))
+      expect(w.fills.at(-1)).not.toContain('operator asked')
+    })
+  }
+  test('control: the ladder\'s own command text, with /molt now never run, keeps "past"', async ($, on) => {
+    const w = world(on)
+    at(w, 67)
+    expect((await $.classic.Stop(STOP)).block).toStartWith(PAST(67))
+  })
+  test('control: after /molt now at 3%, a fill that rises past the threshold reads "past" again', async ($, on) => {
+    const w = world(on)
+    at(w, 3)
+    await $.command.run(NOW)
+    at(w, 70)
+    expect((await $.classic.Stop(STOP)).block).toStartWith(PAST(70))
+  })
+  test('control: an operator\'s instructions.md with its own first line is sent as written', async ($, on) => {
+    const w = world(on, { files: { [EDITED]: 'Wrap up now, at {{percent}}% of the window, and write MOLT-HANDOFF: <path>.' } })
+    at(w, 3)
+    await $.command.run(NOW)
+    expect(w.fills.at(-1)).toStartWith('Wrap up now, at 3% of the window, and write MOLT-HANDOFF: <path>.')
+    expect(w.fills.at(-1)).not.toContain('operator asked')
+  })
+  test('an edited instructions.md that keeps the built-in first line gets the true line and keeps the rest', async ($, on) => {
+    const w = world(on, { files: { [EDITED]: 'Context is at {{percent}}% of the window, past molt\'s handoff threshold ({{command}}%). Then do my steps.' } })
+    at(w, 3)
+    await $.command.run(NOW)
+    expect(w.fills.at(-1)).toStartWith(`${ASKED(3)} Then do my steps.`)
+  })
 })

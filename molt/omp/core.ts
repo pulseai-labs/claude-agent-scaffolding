@@ -17,7 +17,7 @@ import {
   MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, MISSING_HANDOFF,
   STATUS_METER, BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
   DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
-  fill,
+  OPERATOR_LEAD, PAST_LEAD, fill,
 } from '../hooks/templates'
 
 export type Shape = { tool: string; args: Record<string, unknown> }
@@ -241,9 +241,6 @@ export function messagesOf(branch: readonly unknown[]): Message[] {
 // omp cancels a session's background jobs when it clears it (newSession → #cancelOwnAsyncJobs), so the seeded session
 // is told to re-arm what its handoff lists (#855).
 export const JOBS_CANCELLED = 'omp cancelled every background job this session had running when it cleared: re-arm each wait and heartbeat the handoff lists before you continue.'
-// /molt now below the threshold: the instruction's lead names the operator, not a threshold the fill has not reached.
-const PAST_LEAD = "Context is at {{percent}}% of the window, past molt's handoff threshold ({{command}}%)."
-const OPERATOR_LEAD = 'Context is at {{percent}}% of the window, and the operator asked for a handoff now.'
 
 // The reply the session stopped on: the event's own field, else the last assistant message of the branch.
 function answerOf(e: { last_assistant_message?: unknown }, branch: readonly unknown[]): string {
@@ -312,7 +309,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     try { await io.remove(activePath(home(), id)) } catch {}
   }
 
-  // The stage file: molt's stage and effective thresholds, for autonomic's turn-end floor (same body as the Claude glue).
+  // The stage file: molt's stage and effective thresholds, for autonomic's /autopilot status (same body as the Claude glue).
   async function publishStage(id: string) {
     if (!safeSessionId(id)) return
     const t = thresholds(id)

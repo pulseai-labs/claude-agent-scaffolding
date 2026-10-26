@@ -19,7 +19,7 @@ import {
   MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, PAUSED_AGENT, MISSING_HANDOFF,
   STATUS_METER, BLOCK_NOTE, CHILD_NOTE, SDK_NOTE, SDK_HANDED_OFF, STALE_SESSION, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
   DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
-  fill,
+  OPERATOR_LEAD, PAST_LEAD, fill,
 } from './templates'
 
 // molt: in-place context handoff (spec §2). Module variables survive /clear, which is
@@ -127,8 +127,8 @@ async function hasProgress($: Engine, h: string, sessionId: string): Promise<boo
   }
 }
 
-// The stage file (0.2.1): molt's stage and effective thresholds, for autonomic's turn-end
-// floor. Rewritten only when the stage or a threshold changes; best-effort, logged once.
+// The stage file (0.2.1): molt's stage and effective thresholds, for autonomic's /autopilot status and its
+// handling of molt's block deny. Rewritten only when the stage or a threshold changes; best-effort, logged once.
 const published = new Map<string, string>()
 let stageFailed = false
 async function publishStage($: Engine, sessionId: string): Promise<void> {
@@ -185,7 +185,11 @@ async function instruction($: Engine, sessionId: string): Promise<string> {
     percent: Math.round(lastPercent ?? t.command), command: Math.round(t.command), block: Math.round(t.block),
     soft: Math.round(t.command), hard: Math.round(t.block),   // 0.1.0 template names (plan decision 5)
   }
-  const text = `${fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)}\n\n${await noteFor($)}`
+  let body = fill(await template($, cfg.instructionsTemplate, DEFAULT_INSTRUCTIONS), values)
+  // /molt now below the handoff threshold: the built-in first line says "past" a threshold the fill has not reached (#903).
+  const past = fill(PAST_LEAD, values)
+  if (forced.has(sessionId) && (lastPercent ?? 0) < t.command && body.startsWith(past)) body = fill(OPERATOR_LEAD, values) + body.slice(past.length)
+  const text = `${body}\n\n${await noteFor($)}`
   return atLeast(stage, 'block') ? `${text}\n\n${fill(BLOCK_NOTE, values)}` : text
 }
 

@@ -26,6 +26,17 @@ gate: it only refuses, and a miss is a read that reaches a nearly full window.
   `substitutionSpans`, `blank`, `commandOf`, `tokensOf`, `gitOf`, `substitutionsOf` and
   `SUBSTITUTION_TOO_DEEP` are byte-identical to seat-mods 0.10.0's `hooks/rules.ts`, held by
   `tests/test-mod-shell-parity.sh`.
+- **`/molt now` below the handoff threshold no longer says the fill is "past" it** (#903). On
+  Claude Code the instruction's built-in first line read "Context is at 3% of the window, past
+  molt's handoff threshold (65%)". When `/molt now` forces the stage and the fill is below the
+  command threshold, the first line now says "Context is at 3% of the window, and the operator
+  asked for a handoff now", as the OMP glue has since 0.3.3; at or above the threshold the line is
+  unchanged. Only the built-in line is swapped: an `instructions.md` you edited with another
+  first line is sent as written. Both glues now take the two lines from `hooks/templates.ts`.
+- **README.** The stage-file paragraph no longer says `autonomic` reads it to leave the turn end to
+  molt (#887): autonomic 0.11.0 (PR #886) removed the turn-end judge and the molt yield, and reads
+  the file only for `/autopilot status` and, on Claude Code, to tell molt's block deny from a seat
+  guard's. The two code comments that said the same are corrected.
 - **Still limits, now written down in the README.** C6 (the gate reads shapes, not grammar: loops,
   `case`, `[[`, `((`, `:` and function bodies are refused; a syntax error reads as the commands it
   spells) and C7 (the progress count reads text, not control flow) are unchanged. A heredoc opener

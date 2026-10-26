@@ -186,7 +186,8 @@ session's file carries none until its first response measures where it started. 
 rewrites the file whenever the stage or a threshold changes, at `/molt off`, `/molt on` and
 `/molt now`, and when a clear, compact or resume resets the stage. A child writes it too. The
 write is best-effort: a failure is logged once and never stops a warning, a handoff or a molt.
-`autonomic` 0.1.1+ reads it to leave the turn end to molt from the command stage on.
+`autonomic` reads it for `/autopilot status` and, on Claude Code, to tell molt's own block deny from a
+seat guard's. It leaves no turn end to molt: autonomic 0.11.0 judges none (#887).
 
 The three templates are written with their defaults on first start, only where no file exists
 (and the one 0.1.0 default above). Edit them freely; an empty or unreadable template falls back
@@ -196,7 +197,7 @@ to the default text.
 
 | Command | Effect |
 |---|---|
-| `/molt now` | Treats the session as past the handoff command whatever the fill, and puts the handoff instruction in the prompt box: press Enter to send it. Where the session has no prompt box, the next prompt you send carries it. It also lifts a pause and `/molt off`, and brings the active marker back in the same command. |
+| `/molt now` | Treats the session as past the handoff command whatever the fill, and puts the handoff instruction in the prompt box: press Enter to send it. Where the session has no prompt box, the next prompt you send carries it. Below the handoff threshold the instruction's first line says you asked for the handoff, not that the fill is past the threshold (#903); an `instructions.md` you edited with another first line is sent as written. It also lifts a pause and `/molt off`, and brings the active marker back in the same command. |
 | `/molt off` | molt stops measuring, warning, blocking, gating and molting in this session, and removes the active marker, so the crew context-ceiling hooks speak again here. |
 | `/molt on` | Turns it back on. In a stale session it also lifts the stale-resume guard and removes the successor record. |
 | `/molt status` | The fill and the ladder, the mode `autonomic` records, any settings problem, and whether auto-compact runs above the block threshold. |
