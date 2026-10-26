@@ -163,26 +163,34 @@ describe("launch", () => {
     const [argv] = callsTo("terminal create");
     expect(argv).toEqual([
       "terminal", "create", "--worktree", `path:${REPO_PATH}`, "--title", "w [baton r/u/s/1]",
-      "--command", `cd '${REPO_PATH}' && exec '/opt/bin/baton-seat' '${file}'`, "--json",
+      "--command", `cd '${REPO_PATH}' && BATON_STATE_DIR='${state}' exec '/opt/bin/baton-seat' '${file}'`, "--json",
     ]);
     expect(JSON.stringify(argvLog())).not.toContain("pwned");
     expect(JSON.stringify(argvLog())).not.toContain("line two");
   });
 
-  test("launch command quotes paths", async () => {
+  test("launch command quotes paths, and the launcher sees the exact state dir", async () => {
     const odd = join(base, "it's a dir");
     const cwd = join(odd, "cw'd");
     mkdirSync(cwd, { recursive: true });
-    process.env.BATON_STATE_DIR = join(odd, "state");
+    const stateDir = join(odd, "st'ate $HOME");
+    process.env.BATON_STATE_DIR = stateDir;
     replies({ "terminal create": "terminal-create.json" });
     await host().launch(req({ cwd }));
     const cmd = callsTo("terminal create")[0][callsTo("terminal create")[0].indexOf("--command") + 1];
     expect(cmd).toContain("exec ");
-    const run = cmd.replace("exec ", `printf '%s\\n' "$PWD" `);
-    const out = Bun.spawnSync(["bash", "-c", run]);
-    expect(out.stderr.toString()).toBe("");
-    const file = join(odd, "state", "orca", "messages", `${encodeURIComponent("r/u/s/1")}.txt`);
-    expect(out.stdout.toString().split("\n")).toEqual([cwd, "/opt/bin/baton-seat", file, ""]);
+    // The launcher is a script that prints its cwd, the state dir it was given, and its argv.
+    const probe = join(base, "probe");
+    writeFileSync(probe, `#!/usr/bin/env bash\nprintf '%s\\n' "$PWD" "$BATON_STATE_DIR" "$@"\n`);
+    chmodSync(probe, 0o755);
+    const run = cmd.replace(`'/opt/bin/baton-seat'`, shellQuote(probe));
+    const file = join(stateDir, "orca", "messages", `${encodeURIComponent("r/u/s/1")}.txt`);
+    // The terminal's own environment has another state dir; the command's must win.
+    for (const sh of ["bash", "sh", "zsh"]) {
+      const out = Bun.spawnSync([sh, "-c", run], { env: { ...process.env, BATON_STATE_DIR: "/from/orca-serve" } });
+      expect([sh, out.stderr.toString()]).toEqual([sh, ""]);
+      expect([sh, out.stdout.toString().split("\n")]).toEqual([sh, [cwd, stateDir, file, ""]]);
+    }
   });
 
   test("launch refusal is LaunchError (and leaves no message file); garbage and hang are HostDownError", async () => {
@@ -266,6 +274,17 @@ describe("interrupt, close, screen", () => {
     await host().interrupt(HANDLE, "x");
     await host().close!(HANDLE);
     expect(await host().screen!(HANDLE)).toBe("");
+  });
+
+  test("the whole terminal-gone class is quiet, not only a stale handle (orcad-server.js 1.4.238)", async () => {
+    const stale = JSON.parse(readFileSync(join(FIXTURES, "terminal-read-stale.json"), "utf8"));
+    for (const code of ["terminal_exited", "terminal_gone", "no_connected_pty", "terminal_not_writable"]) {
+      const gone = fixture(`${code}.edited.json`, { ...stale, error: { ...stale.error, code, message: code } });
+      replies({ "terminal send": gone, "terminal close": gone, "terminal read": gone });
+      await host().interrupt(HANDLE, "x");
+      await host().close!(HANDLE);
+      expect([code, await host().screen!(HANDLE)]).toEqual([code, ""]);
+    }
   });
 
   test("any other refusal is host down (control for the stale case)", async () => {

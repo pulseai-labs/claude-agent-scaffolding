@@ -9,12 +9,13 @@
 #   omp-seat "$OMP_T3_SEAT" --via "$OMP_T3_VIA" "<message text>"
 # Every refusal exits 78 with one line on stderr and one line in <state>/claims/seat.log:
 #   <utc> <result> cwd <cwd>
-# where <result> is the claim nonce, or none | invalid <line> | nomsg | toolong | noseat.
+# where <result> is the claim nonce, or none | invalid <line> | nomsg | toolong | noseat | noexec.
 # The claim validation is copied from omp-t3-claim on purpose; it retires with T3.
 
 set -u
 
-OMP_SEAT="${BATON_OMP_SEAT:-$HOME/.local/bin/omp-seat}"
+# Lowercase on purpose: claim keys are uppercase, so no claim line can replace the exec target.
+omp_seat_bin="${BATON_OMP_SEAT:-$HOME/.local/bin/omp-seat}"
 state="${BATON_STATE_DIR:-$HOME/.local/state/baton}"
 msgfile="${1-}"
 
@@ -102,10 +103,14 @@ size="$(wc -c <"$msgfile" 2>/dev/null)" || refuse nomsg
 if [ "$size" -gt "$max_msg" ]; then
   refuse toolong
 fi
+# 5. The seat program must be runnable before the message is spent: a refusal keeps the file.
+if [ ! -f "$omp_seat_bin" ] || [ ! -x "$omp_seat_bin" ]; then
+  refuse noexec
+fi
 text="$(cat -- "$msgfile" 2>/dev/null; printf x)"
 text="${text%x}"
 rm -f -- "$msgfile"
 
-# 5. Log and launch. exec leaves no wrapper between the terminal and omp.
+# 6. Log and launch. exec leaves no wrapper between the terminal and omp.
 log_line "$nonce"
-exec "$OMP_SEAT" "$OMP_T3_SEAT" --via "$OMP_T3_VIA" "$text"
+exec "$omp_seat_bin" "$OMP_T3_SEAT" --via "$OMP_T3_VIA" "$text"

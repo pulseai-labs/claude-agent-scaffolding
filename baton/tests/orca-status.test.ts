@@ -9,6 +9,8 @@ const FAKE = join(import.meta.dir, "fake-orca");
 const FIXTURES = join(import.meta.dir, "fixtures", "orca");
 const HANDLE = "term_3a3a4b2c-380f-4bcc-a4e0-9053d6206ec7"; // terminal-list.json
 const PANE = "65ef09a7-ba88-45eb-a72c-543f923e6b3b:037f73cd-bff0-448b-a33b-44fb694b1693"; // tabId:leafId of that row
+const LIVE = "term_9ce372e1-8d73-4999-b4db-e85223e7f6e5"; // terminal-list-working-live.json
+const ABSENT = "term_deadbeef-0000-0000-0000-000000000000"; // in no list
 
 let base: string, fakeDir: string, state: string;
 const saved: Record<string, string | undefined> = {};
@@ -49,8 +51,8 @@ const argvLog = (): string[][] =>
     : [];
 const callsTo = (sub: string) => argvLog().filter((a) => a.slice(0, 2).join(" ") === sub);
 const host = () => new OrcaHost({ cli: FAKE, launcher: "/opt/bin/baton-seat" });
-const statusWith = (list: string, ps: string, id = HANDLE) => {
-  replies({ "terminal list": list, "worktree ps": ps });
+const statusWith = (list: string, ps: string, id = HANDLE, read?: string) => {
+  replies({ "terminal list": list, "worktree ps": ps, ...(read === undefined ? {} : { "terminal read": read }) });
   return host().status(id);
 };
 async function thrown(p: Promise<unknown>): Promise<Error> {
@@ -63,10 +65,9 @@ async function thrown(p: Promise<unknown>): Promise<Error> {
 }
 
 describe("status mapping, from recorded and hand-edited 1.4.238 fixtures", () => {
-  // worktree-ps-working.json is a recorded `done` row (identical to -done), so the working row
-  // is a hand-edited copy of -done with state "working".
-  const rows: [string, string, string, string][] = [
-    ["working -> active (hand-edited)", "terminal-list.json", "worktree-ps-working.edited.json", "active"],
+  // [name, terminal list, worktree ps, want, handle, terminal read]
+  const rows: [string, string, string, string, string?, string?][] = [
+    ["working -> active (recorded live pair)", "terminal-list-working-live.json", "worktree-ps-working-live.json", "active", LIVE],
     ["waiting -> waiting", "terminal-list.json", "EDIT:waiting", "waiting"],
     ["blocked -> waiting (recorded omp ask)", "terminal-list.json", "worktree-ps-omp-ask.json", "waiting"],
     ["done -> completed (recorded)", "terminal-list.json", "worktree-ps-done.json", "completed"],
@@ -74,19 +75,14 @@ describe("status mapping, from recorded and hand-edited 1.4.238 fixtures", () =>
     ["done + interrupted -> interrupted (hand-edited)", "terminal-list.json", "worktree-ps-done-interrupted.edited.json", "interrupted"],
     ["unknown state -> active (hand-edited sleeping)", "terminal-list.json", "worktree-ps-done-sleeping.edited.json", "active"],
     ["no agent row -> active (hand-edited)", "terminal-list.json", "worktree-ps-done-no-agent.edited.json", "active"],
-    ["terminal left the list -> gone (recorded)", "terminal-list-exited.json", "worktree-ps-done.json", "gone"],
+    ["terminal left the list, read says exited -> gone (recorded)", "terminal-list-exited.json", "worktree-ps-done.json", "gone", HANDLE, "terminal-read-exited.json"],
   ];
-  for (const [name, list, psName, want] of rows) {
+  for (const [name, list, psName, want, id, read] of rows) {
     test(name, async () => {
       const ps = psName === "EDIT:waiting" ? edited("worktree-ps-done.json", "ps-waiting.json", (o) => (agentOf(o).state = "waiting")) : psName;
-      expect((await statusWith(list, ps)).state).toBe(want as any);
+      expect((await statusWith(list, ps, id, read)).state).toBe(want as any);
     });
   }
-
-  test("a terminal that is not in the list is gone, whatever the agent rows say", async () => {
-    // The stale case: an id Orca does not list (terminal-read-stale.json is the same handle seen by `terminal read`).
-    expect((await statusWith("terminal-list.json", "worktree-ps-done.json", "term_deadbeef-0000-0000-0000-000000000000")).state).toBe("gone");
-  });
 
   test("an agent row of another pane is not this terminal's row (no row -> active)", async () => {
     const ps = edited("worktree-ps-done.json", "ps-other-pane.json", (o) => (agentOf(o).paneKey = "other-tab:other-leaf"));
@@ -155,6 +151,81 @@ describe("status mapping, from recorded and hand-edited 1.4.238 fixtures", () =>
   });
 });
 
+describe("gone rests on positive evidence (a terminal missing from a whole list)", () => {
+  test("absent + terminal read stale -> gone, whatever the agent rows say; the read names the handle", async () => {
+    expect((await statusWith("terminal-list.json", "worktree-ps-done.json", ABSENT, "terminal-read-stale.json")).state).toBe("gone");
+    expect(callsTo("terminal read")).toEqual([["terminal", "read", "--terminal", ABSENT, "--json"]]);
+  });
+
+  test("absent + terminal read exited -> gone (recorded spike 6 pair)", async () => {
+    expect((await statusWith("terminal-list-exited.json", "worktree-ps-done.json", HANDLE, "terminal-read-exited.json")).state).toBe("gone");
+  });
+
+  test("absent + each other gone-class code -> gone", async () => {
+    for (const code of ["terminal_exited", "terminal_gone", "no_connected_pty", "terminal_not_writable"]) {
+      const read = edited("terminal-read-stale.json", `read-${code}.edited.json`, (o) => (o.error.code = o.error.message = code));
+      expect([code, (await statusWith("terminal-list.json", "worktree-ps-done.json", ABSENT, read)).state]).toEqual([code, "gone"]);
+    }
+  });
+
+  test("absent + a running terminal read -> host down, never gone (recorded running read)", async () => {
+    const err = await thrown(statusWith("terminal-list.json", "worktree-ps-done.json", ABSENT, "terminal-read-screen.json"));
+    expect(err).toBeInstanceOf(HostDownError);
+    expect(err.message).toContain("status running");
+  });
+
+  test("absent + any other read refusal -> host down (control for the gone codes)", async () => {
+    const read = edited("terminal-read-stale.json", "read-other.edited.json", (o) => (o.error.code = o.error.message = "runtime_unavailable"));
+    expect(await thrown(statusWith("terminal-list.json", "worktree-ps-done.json", ABSENT, read))).toBeInstanceOf(HostDownError);
+  });
+
+  test("a listed terminal is not read again", async () => {
+    await statusWith("terminal-list.json", "worktree-ps-done.json");
+    expect(callsTo("terminal read")).toEqual([]);
+  });
+});
+
+describe("the lists must cover the local host (hostScope)", () => {
+  const scoped = (name: string, out: string, hostIds: string[], omittedHostIds: string[]) =>
+    edited(name, out, (o) => (o.result.hostScope = { hostIds, omittedHostIds }));
+
+  test("local omitted from the terminal list -> host down, not gone", async () => {
+    const list = scoped("terminal-list-exited.json", "list-local-omitted.edited.json", [], ["local"]);
+    const err = await thrown(statusWith(list, "worktree-ps-done.json", HANDLE, "terminal-read-exited.json"));
+    expect(err).toBeInstanceOf(HostDownError);
+    expect(err.message).toContain("terminal list does not cover the local host");
+  });
+
+  test("local listed and omitted at once -> host down", async () => {
+    const list = scoped("terminal-list.json", "list-local-both.edited.json", ["local"], ["local"]);
+    expect(await thrown(statusWith(list, "worktree-ps-done.json"))).toBeInstanceOf(HostDownError);
+  });
+
+  test("local missing from hostIds (no omission either) -> host down", async () => {
+    const list = scoped("terminal-list.json", "list-local-missing.edited.json", ["ssh:box"], []);
+    expect(await thrown(statusWith(list, "worktree-ps-done.json"))).toBeInstanceOf(HostDownError);
+    const bare = edited("terminal-list.json", "list-no-scope.edited.json", (o) => delete o.result.hostScope);
+    expect(await thrown(statusWith(bare, "worktree-ps-done.json"))).toBeInstanceOf(HostDownError);
+  });
+
+  test("local omitted from worktree ps -> host down, not active", async () => {
+    const ps = scoped("worktree-ps-done.json", "ps-local-omitted.edited.json", [], ["local"]);
+    const err = await thrown(statusWith("terminal-list.json", ps));
+    expect(err).toBeInstanceOf(HostDownError);
+    expect(err.message).toContain("worktree ps does not cover the local host");
+    const missing = scoped("worktree-ps-done.json", "ps-local-missing.edited.json", ["ssh:box"], []);
+    expect(await thrown(statusWith("terminal-list.json", missing))).toBeInstanceOf(HostDownError);
+  });
+
+  test("another host omitted from both lists -> the normal mapping (control)", async () => {
+    const list = scoped("terminal-list.json", "list-other-omitted.edited.json", ["local"], ["ssh:box"]);
+    const ps = scoped("worktree-ps-done.json", "ps-other-omitted.edited.json", ["local"], ["ssh:box"]);
+    expect((await statusWith(list, ps)).state).toBe("completed");
+    const gone = scoped("terminal-list-exited.json", "list-exited-other-omitted.edited.json", ["local"], ["ssh:box"]);
+    expect((await statusWith(gone, ps, HANDLE, "terminal-read-exited.json")).state).toBe("gone");
+  });
+});
+
 describe("the per-instance list cache", () => {
   test("two status calls in one instance spawn each list once", async () => {
     replies({ "terminal list": "terminal-list.json", "worktree ps": "worktree-ps-done.json" });
@@ -180,14 +251,16 @@ describe("the per-instance list cache", () => {
   });
 
   test("interrupt drops the cache: the next status spawns again and sees the new state", async () => {
+    // First the recorded live working pair, then the recorded done pair (another handle: no
+    // recording has one terminal in both states). A kept cache would not list HANDLE at all.
     replies({
-      "terminal list": "terminal-list.json",
-      "worktree ps": ["worktree-ps-working.edited.json", "worktree-ps-done.json"],
+      "terminal list": ["terminal-list-working-live.json", "terminal-list.json"],
+      "worktree ps": ["worktree-ps-working-live.json", "worktree-ps-done.json"],
       "terminal send": "terminal-send-escape.json",
     });
     const h = host();
-    expect((await h.status(HANDLE)).state).toBe("active");
-    await h.interrupt(HANDLE, "stalled");
+    expect((await h.status(LIVE)).state).toBe("active");
+    await h.interrupt(LIVE, "stalled");
     expect((await h.status(HANDLE)).state).toBe("completed");
     expect(callsTo("terminal list")).toHaveLength(2);
     expect(callsTo("worktree ps")).toHaveLength(2);
@@ -197,6 +270,7 @@ describe("the per-instance list cache", () => {
     replies({
       "terminal list": ["terminal-list.json", "terminal-list-exited.json"],
       "worktree ps": "worktree-ps-done.json",
+      "terminal read": "terminal-read-stale.json",
       "terminal close": edited("worktree-ps-done.json", "closed.json", (o) => (o.result = { close: { handle: HANDLE } })),
     });
     const h = host();

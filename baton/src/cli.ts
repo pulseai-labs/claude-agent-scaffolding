@@ -104,6 +104,12 @@ async function armCmd(args: string[]): Promise<number> {
   if (file === undefined || runId === undefined) return usage();
   if (!RUN_ID_RE.test(runId)) return fail(`run id "${runId}" must match ^[a-z0-9_-]+$`);
   if (isProtoName(runId)) return fail(`run id "${runId}" ${PROTO_NAME_ERROR}`);
+  // A host key the tick would refuse fails here, before a run exists for the timer to tick.
+  try {
+    hostKind();
+  } catch (e) {
+    return fail((e as Error).message);
+  }
 
   let bytes: Buffer;
   try {

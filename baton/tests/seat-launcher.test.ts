@@ -157,3 +157,32 @@ test("log rotates past 1 MiB", () => {
   expect(readFileSync(logFile() + ".1", "utf8").length).toBe(1048577);
   expect(readFileSync(logFile(), "utf8")).toMatch(/ none cwd /);
 });
+
+test("a claim key cannot replace the exec target: OMP_SEAT=/bin/false still runs the seat", () => {
+  writeFileSync(claimFile(proj), GOOD + "OMP_SEAT=/bin/false\n");
+  const r = run(proj);
+  expect(r.rc).toBe(0);
+  expect(existsSync(ran)).toBe(true);
+  expect(r.json.argv).toEqual(["worker", "--via", "/v/w", "hello"]);
+  expect(r.json.env.OMP_SEAT).toBe("/bin/false"); // exported like any claim key, just not used
+});
+
+test("a seat program that cannot run refuses noexec and keeps the message file", () => {
+  writeFileSync(claimFile(proj), GOOD);
+  const plain = join(base, "not-executable");
+  writeFileSync(plain, "#!/bin/sh\nexit 0\n");
+  chmodSync(plain, 0o644);
+  for (const target of [plain, join(base, "absent-seat"), base]) {
+    const r = run(proj, msg, { BATON_OMP_SEAT: target });
+    expect([target, r.rc]).toEqual([target, 78]);
+    expect(r.err.trim().split("\n").length).toBe(1);
+    expect(existsSync(msg)).toBe(true);
+  }
+  expect(existsSync(ran)).toBe(false);
+  const lines = readFileSync(logFile(), "utf8").trim().split("\n");
+  expect(lines.length).toBe(3);
+  expect(lines.every((l) => / noexec cwd /.test(l))).toBe(true);
+  // Control: the same claim and message with a runnable seat start it.
+  expect(run(proj).rc).toBe(0);
+  expect(existsSync(ran)).toBe(true);
+});

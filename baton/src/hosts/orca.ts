@@ -34,13 +34,28 @@ export function shellQuote(p: string): string {
   return `'${p.replaceAll("'", `'\\''`)}'`;
 }
 
-const STALE = "terminal_handle_stale";
+/**
+ * The codes that say a terminal is gone, from the pinned Orca 1.4.238 runtime (orcad-server.js):
+ * its own classifier groups the first four as one class, and `terminal send` refuses a PTY that is
+ * no longer connected with the fifth.
+ */
+const GONE = new Set(["terminal_handle_stale", "terminal_exited", "terminal_gone", "no_connected_pty", "terminal_not_writable"]);
+
+/** A list reply covers this machine only when its hostScope names `local` and does not omit it. */
+function coversLocal(reply: any, what: string): void {
+  const ids = reply?.hostScope?.hostIds;
+  const omitted = reply?.hostScope?.omittedHostIds;
+  if (!Array.isArray(ids) || !ids.includes("local") || (Array.isArray(omitted) && omitted.includes("local"))) {
+    throw new HostDownError(`${what} does not cover the local host`);
+  }
+}
 
 /**
  * The Host state of one terminal, from its `terminal list` row and the agent row joined to it
  * (design 4.5). Only the listed values map to a finished or parked state; a missing row or any
  * other value is `active`, so a worker that cannot be read never passes as completed. There is no
- * `failed`: Orca 1.4.238 has no failure state, and a dead process leaves the list (`gone`).
+ * `failed`: Orca 1.4.238 has no failure state, and a dead process leaves the list (`gone`, once
+ * `status` has confirmed it with `terminal read`).
  */
 export function mapOrcaState(terminal: object | undefined, agent: object | undefined): ThreadStatus["state"] {
   if (terminal === undefined) return "gone";
@@ -112,7 +127,8 @@ export class OrcaHost implements Host {
     const file = join(dir, `${encodeURIComponent(r.nonce)}.txt`);
     writeFileSync(file, r.message, { mode: 0o600 });
     chmodSync(file, 0o600);
-    const command = `cd ${shellQuote(r.cwd)} && exec ${shellQuote(this.launcher)} ${shellQuote(file)}`;
+    // An Orca terminal inherits orca-serve's environment, not the timer's, so the state dir goes with it.
+    const command = `cd ${shellQuote(r.cwd)} && BATON_STATE_DIR=${shellQuote(stateDir())} exec ${shellQuote(this.launcher)} ${shellQuote(file)}`;
     const res = this.run(["terminal", "create", "--worktree", `path:${repo.path}`, "--title", r.title, "--command", command]);
     if (!res.ok) {
       // Only a selector Orca does not know is a refusal; any other code leaves the outcome unknown,
@@ -128,13 +144,18 @@ export class OrcaHost implements Host {
     return { threadId: handle };
   }
 
-  /** One `terminal list` and one `worktree ps` per instance; a truncated reply may hide the row, so it is host down. */
+  /**
+   * One `terminal list` and one `worktree ps` per instance. A truncated reply, or one that does not
+   * cover the local host, may hide the row, so it is host down.
+   */
   private readLists(): { terminals: any[]; worktrees: any[] } {
     if (this.lists) return this.lists;
     const t = this.must(["terminal", "list", "--limit", "1000"]);
     if (t?.truncated === true) throw new HostDownError("terminal list is truncated");
+    coversLocal(t, "terminal list");
     const w = this.must(["worktree", "ps", "--limit", "1000"]);
     if (w?.truncated === true) throw new HostDownError("worktree ps is truncated");
+    coversLocal(w, "worktree ps");
     this.lists = { terminals: Array.isArray(t?.terminals) ? t.terminals : [], worktrees: Array.isArray(w?.worktrees) ? w.worktrees : [] };
     return this.lists;
   }
@@ -142,6 +163,7 @@ export class OrcaHost implements Host {
   async status(threadId: string): Promise<ThreadStatus> {
     const { terminals, worktrees } = this.readLists();
     const terminal = terminals.find((t) => t?.handle === threadId);
+    if (terminal === undefined) return { state: this.confirmGone(threadId), activity: "|" };
     // The agent row of a terminal is the one whose paneKey is `${tabId}:${leafId}` (spike 1c).
     const paneKey = typeof terminal?.tabId === "string" && typeof terminal?.leafId === "string" ? `${terminal.tabId}:${terminal.leafId}` : undefined;
     const agent =
@@ -152,11 +174,23 @@ export class OrcaHost implements Host {
     return { state: mapOrcaState(terminal, agent), activity: `${agent?.updatedAt ?? ""}|${agent?.stateStartedAt ?? ""}` };
   }
 
-  /** Run a call on one terminal; a stale handle is `undefined`, any other refusal is host down. */
+  /**
+   * A terminal missing from a whole list is gone only on positive evidence: `terminal read` answers
+   * with a gone code, or with status `exited` (spike 6). Anything else, a running terminal included,
+   * is host down, so a live worker is never closed on a list that missed it.
+   */
+  private confirmGone(threadId: string): "gone" {
+    const r = this.run(["terminal", "read", "--terminal", threadId]);
+    if (r.ok ? r.result?.terminal?.status === "exited" : GONE.has(r.code)) return "gone";
+    const why = r.ok ? `status ${String(r.result?.terminal?.status)}` : `${r.code}: ${r.message}`;
+    throw new HostDownError(`terminal ${threadId} is not in the list, but terminal read says ${why}`);
+  }
+
+  /** Run a call on one terminal; a gone terminal is `undefined`, any other refusal is host down. */
   private onTerminal(args: string[]): any {
     const r = this.run(args);
     if (r.ok) return r.result;
-    if (r.code === STALE) return undefined;
+    if (GONE.has(r.code)) return undefined;
     throw new HostDownError(`orca ${args.slice(0, 2).join(" ")}: ${r.code}: ${r.message}`);
   }
 

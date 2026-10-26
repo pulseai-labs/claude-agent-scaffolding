@@ -811,9 +811,9 @@ class RunTick {
 
   /**
    * Park a worker that waits on a question the host cannot read (design §4.5), on a host with
-   * `screen`. Its session, claim
-   * and directory stay and nothing is interrupted; the notice goes out with or without a driver.
-   * The screen is read first: a host error there leaves nothing marked, so the next tick parks.
+   * `screen`. Its session, claim and directory stay and nothing is interrupted; the notice goes
+   * out with or without a driver. The screen is read first: a host error there leaves nothing
+   * marked, so the next tick parks.
    */
   private async blockedPark(u: UnitState, s: Session, project: string): Promise<void> {
     const thread = s.thread_id!;

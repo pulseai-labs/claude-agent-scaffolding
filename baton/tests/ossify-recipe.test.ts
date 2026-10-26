@@ -426,7 +426,8 @@ describe("ossify-spine triage", () => {
   test("triage brief names the three actions and the answer shape", () => {
     const b = brief("triage.md");
     for (const pin of [
-      "baton answer <run> <unit> \"<label>\"", "the chosen option's `label`, exactly", "A refusal (exit 2)", "triage-note.md",
+      "baton answer <run> <unit> \"<label>\"", "the chosen option's `label`, exactly",
+      "Exit 75 (a tick holds the lock): wait a minute and retry once.", "Any other non-zero exit: write the note file and stop.", "triage-note.md",
       "$SPINE_STOP_FILE", "never approve a merge",
     ]) {
       expect([pin, b.includes(pin)]).toEqual([pin, true]);
