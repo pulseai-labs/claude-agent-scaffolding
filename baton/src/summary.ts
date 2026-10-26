@@ -12,7 +12,11 @@ export function runSummary(run: RunState, eventsText: string, nowIso: string, le
       e = v as Record<string, unknown>;
     } catch { continue; }
     switch (e.kind) {
-      case "park": if (e.unit !== undefined) parks++; break;
+      case "park":
+        if (e.unit === undefined) break;
+        parks++;
+        if (e.reason === "blocked") toYou++; // a blocked park always reaches the operator
+        break;
       case "unpark": if (e.unit !== undefined) unparks++; break;
       case "driver": drivers++; break;
       case "driver resume": resumed++; break;

@@ -11,6 +11,7 @@ import { main } from "../src/cli.ts";
 import { tick, type TickReport } from "../src/engine.ts";
 import type { Forge } from "../src/forge.ts";
 import { HostDownError } from "../src/host.ts";
+import { setHostForTest } from "../src/hosts/select.ts";
 import { openStore, type RunState } from "../src/state.ts";
 import { FakeHost } from "./fake-host.ts";
 
@@ -33,6 +34,7 @@ beforeEach(() => {
   notices = [];
 });
 afterEach(() => {
+  setHostForTest(null);
   for (const [k, v] of [["BATON_STATE_DIR", saved.state], ["BATON_CONFIG", saved.config], ["HOME", saved.home]] as const) {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
@@ -140,7 +142,7 @@ test("waiting with no pending parks blocked at once", async () => {
   expect(notices[0].key).toMatch(/^r\/u1\/park\//);
   expect(notices[0].key).toBe(`r/u1/park/${u.parked!.at}`);
   expect(notices[0].text).toBe(
-    "baton r/u1 blocked in work (project proj): the worker waits on a question — answer it in its Orca terminal — screen: line a | line b",
+    "baton r/u1 blocked in work (project proj): the worker waits on a question — answer it in the worker's terminal — screen: line a | line b",
   );
   expect(events().filter((e) => e.kind === "park")).toMatchObject([{ unit: "u1", reason: "blocked", thread: "thread-1" }]);
   // Long past the stall time: a blocked park counts no stall and sends nothing more.
@@ -328,14 +330,31 @@ test("screen tail keeps the last 12 non-empty lines", async () => {
   expect(notices[0].text.split(" — screen: ")[1]).toBe(lines.slice(3).join(" | "));
 });
 
-test("a host with no screen method sends the notice with the screen unavailable", async () => {
+test("a host with no screen method keeps the 0.4.0 path: no park, the stall clock runs", async () => {
   await blockedAt1({ withOptional: false });
-  const u = unit();
-  expect(u.parked?.reason).toBe("blocked");
-  expect(u.session?.thread_id).toBe("thread-1");
+  expect("screen" in host).toBe(false);
+  expect(unit().parked).toBeUndefined();
+  expect(notices).toEqual([]);
+  at(45);
+  await doTick(); // 44 minutes idle since the first status read at minute 1
+  expect(unit().stalls).toBe(0);
   expect(host.interrupts).toEqual([]);
-  expect(notices.map((n) => n.text.split(" — screen: ")[1])).toEqual(["unavailable"]);
+  at(46);
+  await doTick(); // stall_minutes (45) reached
+  const u = unit();
+  expect(host.interrupts).toEqual([{ threadId: "thread-1", reason: "stalled" }]);
+  expect(u.stalls).toBe(1);
+  expect(u.parked).toBeUndefined();
+  expect(notices).toEqual([]);
 });
+
+for (const [name, screen] of [["empty", ""], ["blank-only", "\n   \n\t\n"]] as const) {
+  test(`an ${name} screen reads unavailable`, async () => {
+    await blockedAt1({ screen });
+    expect(unit().parked?.reason).toBe("blocked");
+    expect(notices.map((n) => n.text.split(" — screen: ")[1])).toEqual(["unavailable"]);
+  });
+}
 
 test("a screen read that fails with a non-host error reads unavailable", async () => {
   await arm(recipe());
@@ -381,4 +400,49 @@ test("a request the host can read ends the blocked park: triage takes it", async
   expect(count("unblocked")).toBe(1);
   expect(u.triage?.request_id).toBe("req-1");
   expect(host.launches.map((l) => l.request.nonce)).toEqual(["r/u1/work/1", "r/u1/triage/1"]);
+});
+
+async function capture(fn: () => Promise<number>): Promise<{ rc: number; err: string }> {
+  const write = process.stderr.write.bind(process.stderr);
+  let err = "";
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    err += typeof chunk === "string" ? chunk : Buffer.from(chunk).toString("utf8");
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    return { rc: await fn(), err };
+  } finally {
+    process.stderr.write = write;
+  }
+}
+
+test("disarm closes a blocked park's worker thread, then releases its directory", async () => {
+  await blockedAt1();
+  const s = unit().session!;
+  setHostForTest(host);
+  const order: string[] = [];
+  const close = host.close!.bind(host);
+  host.close = async (id) => { order.push(`close ${id}`); await close(id); };
+  const release = host.release.bind(host);
+  host.release = async (p, c, d) => { order.push(`release ${d}`); await release(p, c, d); };
+  const r = await capture(() => main(["disarm", "r"]));
+  expect(r).toEqual({ rc: 0, err: "" });
+  expect(order).toEqual(["close thread-1", `release ${s.launch_dir}`]);
+  expect(host.releases).toEqual([{ project: "proj", cwd: join(root, "w", "u1"), dir: s.launch_dir }]);
+  expect(liveClaim(s.claim_key)).not.toBe(s.claim_nonce);
+  const run = runState();
+  expect(run.status).toBe("disarmed");
+  expect(run.units.u1.session).toBeUndefined();
+});
+
+test("disarm: a blocked park's close that fails is reported and the disarm goes on", async () => {
+  await blockedAt1();
+  setHostForTest(host);
+  host.close = async () => { throw new HostDownError("orca unreachable"); };
+  const r = await capture(() => main(["disarm", "r"]));
+  expect(r).toEqual({ rc: 0, err: "baton disarm: could not close thread-1: orca unreachable\n" });
+  expect(host.releases).toEqual([]); // no release of a directory whose terminal may be open
+  const run = runState();
+  expect(run.status).toBe("disarmed");
+  expect(run.units.u1.session?.thread_id).toBe("thread-1"); // left on record, not closed
 });

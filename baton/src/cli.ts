@@ -215,8 +215,9 @@ async function disarmCmd(args: string[]): Promise<number> {
 }
 
 /**
- * Close every kept thread of the run, then release its directory. A failure is printed and the
- * disarm goes on; an entry that could not be closed stays in `u.kept`, its directory unreleased.
+ * Close every kept thread of the run, and a blocked park's worker thread, then release its
+ * directory. A failure is printed and the disarm goes on; an entry that could not be closed stays
+ * in `u.kept` (a blocked park's in `u.session`), its directory unreleased.
  */
 async function closeKept(run: RunState): Promise<void> {
   let host: Host | undefined;
@@ -226,26 +227,34 @@ async function closeKept(run: RunState): Promise<void> {
   } catch (e) {
     hostErr = (e as Error).message;
   }
+  /** Close, then release; false when the close failed (the directory is then not released). */
+  const closeThenRelease = async (k: { thread: string; project: string; cwd: string; dir: string }): Promise<boolean> => {
+    try {
+      if (!host) throw new Error(hostErr);
+      if (!host.close) throw new Error("host cannot close");
+      await host.close(k.thread);
+    } catch (e) {
+      process.stderr.write(`baton disarm: could not close ${k.thread}: ${(e as Error).message}\n`);
+      return false;
+    }
+    try {
+      await host.release(k.project, k.cwd, k.dir);
+    } catch (e) {
+      process.stderr.write(`baton disarm: could not release ${k.dir}: ${(e as Error).message}\n`);
+    }
+    return true;
+  };
   for (const u of Object.values(run.units)) {
     const left: KeptThread[] = [];
-    for (const k of u.kept ?? []) {
-      try {
-        if (!host) throw new Error(hostErr);
-        if (!host.close) throw new Error("host cannot close");
-        await host.close(k.thread);
-      } catch (e) {
-        process.stderr.write(`baton disarm: could not close ${k.thread}: ${(e as Error).message}\n`);
-        left.push(k);
-        continue;
-      }
-      try {
-        await host.release(k.project, k.cwd, k.dir);
-      } catch (e) {
-        process.stderr.write(`baton disarm: could not release ${k.dir}: ${(e as Error).message}\n`);
-      }
-    }
+    for (const k of u.kept ?? []) if (!(await closeThenRelease(k))) left.push(k);
     if (left.length) u.kept = left;
     else delete u.kept;
+    // A blocked park's worker is still open; on a host with `close` it goes as a kept thread does.
+    // Its session has project and cwd: blocked parks are newer than sessions without them.
+    const s = u.session;
+    if (u.parked?.blocked && s?.thread_id && (!host || host.close)) {
+      if (await closeThenRelease({ thread: s.thread_id, project: s.project!, cwd: s.cwd!, dir: s.launch_dir })) delete u.session;
+    }
   }
 }
 

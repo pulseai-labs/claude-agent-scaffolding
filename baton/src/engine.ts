@@ -775,8 +775,9 @@ class RunTick {
           s.last_progress_at = this.nowIso();
         }
         if (await this.prompt(u, s, st)) return;
-        // No request to read and no triage out: the question is the operator's, at once.
-        if (st.state === "waiting" && !st.pending && !u.triage) return this.blockedPark(u, s, this.launchedWith(stage, scope, s).project);
+        // No request to read and no triage out: the question is the operator's, at once. Only on
+        // a host that can show the screen; any other host keeps the 0.4.0 path (the stall clock).
+        if (this.host.screen !== undefined && st.state === "waiting" && !st.pending && !u.triage) return this.blockedPark(u, s, this.launchedWith(stage, scope, s).project);
         const idle = this.nowMs() - Date.parse(s.last_progress_at);
         const max = stage.max_launches ?? DEFAULT_MAX_LAUNCHES;
         const launches = own(u.launches, u.stage) ?? 0;
@@ -809,7 +810,8 @@ class RunTick {
   }
 
   /**
-   * Park a worker that waits on a question the host cannot read (design §4.5). Its session, claim
+   * Park a worker that waits on a question the host cannot read (design §4.5), on a host with
+   * `screen`. Its session, claim
    * and directory stay and nothing is interrupted; the notice goes out with or without a driver.
    * The screen is read first: a host error there leaves nothing marked, so the next tick parks.
    */
@@ -822,20 +824,20 @@ class RunTick {
     this.ev("park", { unit: u.id, stage: u.stage, reason: "blocked", thread });
     this.report.parked.push(u.id);
     await this.notify(`${this.run.id}/${u.id}/park/${at}`,
-      `baton ${this.run.id}/${u.id} blocked in ${u.stage} (project ${project}): the worker waits on a question — answer it in its Orca terminal — screen: ${tail}`);
+      `baton ${this.run.id}/${u.id} blocked in ${u.stage} (project ${project}): the worker waits on a question — answer it in the worker's terminal — screen: ${tail}`);
   }
 
-  /** The screen's last non-empty lines, trimmed and joined; `unavailable` with no screen to read. */
+  /** The screen's last non-empty lines, trimmed and joined; `unavailable` with nothing to read. */
   private async screenTail(thread: string): Promise<string> {
-    if (!this.host.screen) return "unavailable";
     let text: string;
     try {
-      text = await this.host.screen(thread);
+      text = await this.host.screen!(thread);
     } catch (e) {
       if (isHostError(e)) throw e;
       return "unavailable";
     }
     const lines = text.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+    if (lines.length === 0) return "unavailable";
     return lines.slice(-SCREEN_LINES).join(" | ").slice(-SCREEN_CHARS);
   }
 
