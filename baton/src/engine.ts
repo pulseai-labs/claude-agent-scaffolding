@@ -1,9 +1,10 @@
 // The tick: one pass, under the store lock, over every armed run. Per run, in order:
 // closing the threads an ended park kept (a host with `close` only), 0 orphan recovery,
-// 1 sources, 2 stop files, 3 live sessions, 4 wait stages, 5 merge stages, 6 launches due,
-// 7 drivers, 8 done. A host that refuses the credentials or cannot be reached stops the tick
-// with nothing marked. Step 3 also runs the decision procedure
-// for a session waiting on a pending request: wait, triage it once, act on the triage's result.
+// 1 sources, 2 stop files, then blocked parks, 3 live sessions, 4 wait stages, 5 merge stages,
+// 6 launches due, 7 drivers, 8 done. A host that refuses the credentials or cannot be reached
+// stops the tick with nothing marked. Step 3 also runs the decision procedure for a session
+// waiting on a pending request: wait, triage it once, act on the triage's result. A session
+// waiting with no request to read and no triage out gets a blocked park (design §4.5).
 // Step 7, with a driver in the recipe: a parked unit gets one driver session, whose result
 // resumes it, escalates it to the operator, or stops the run. Only an escalate or a stop notifies.
 
@@ -72,6 +73,9 @@ const STALLS_TO_PARK = 2;
 const DOWN_NOTIFY_MS = 30 * MIN;
 const HOOK_TIMEOUT_MS = 10 * MIN;
 const WALK_LIMIT = 5000;
+/** A blocked park's notice carries the last lines of the screen, cut to this many characters. */
+const SCREEN_LINES = 12;
+const SCREEN_CHARS = 1500;
 
 const emptyReport = (): TickReport => ({ launched: [], transitioned: [], parked: [], merged: [], errors: [] });
 const isHostError = (e: unknown) => e instanceof HostAuthError || e instanceof HostDownError;
@@ -479,6 +483,7 @@ class RunTick {
       await this.orphans();
       if (!(await this.sources())) return;
       await this.stops();
+      await this.blocked();
       await this.live();
       await this.waits();
       await this.merges();
@@ -686,6 +691,41 @@ class RunTick {
     }
   }
 
+  /**
+   * After step 2: each blocked park, in order: a stop file turns it into a `stop` park (the
+   * terminal kept); an `unpark --to` ends the session as a normal end and enters that stage; a
+   * worker no longer waiting with no request is unblocked, and step 3 reads it this same tick.
+   * Otherwise nothing changes: a blocked park runs no stall clock.
+   */
+  private async blocked(): Promise<void> {
+    for (const u of this.ordered()) {
+      const b = u.parked?.blocked;
+      if (!b) continue;
+      await this.guard(u, async () => {
+        const { stage, scope } = this.ctx(u);
+        if (stage?.kind === "session" && stage.stop_file !== undefined && existsSync(render(stage.stop_file, scope))) {
+          return this.park(u, "stop", { interrupt: "stop" });
+        }
+        if (b.to !== undefined) {
+          await this.endSession(u, { interrupt: "stop" });
+          unparkUnit(this.run, this.recipe, u, b.to, this.nowIso());
+          this.entered.add(u.id);
+          this.report.transitioned.push(u.id);
+          this.save();
+          this.ev("unpark", { unit: u.id, stage: b.to });
+          return;
+        }
+        const s = u.session;
+        const st = s?.thread_id ? await this.host.status(s.thread_id) : undefined;
+        if (st?.state === "waiting" && !st.pending) return;
+        delete u.parked;
+        if (s) s.last_progress_at = this.nowIso();
+        this.save();
+        this.ev("unblocked", { unit: u.id, thread: b.thread });
+      });
+    }
+  }
+
   /** The newest mtime over the stage's watch and done-file paths, plus the thread's activity. */
   private progressMark(stage: SessionStage, scope: Scope, activity: string): string {
     const paths: string[] = [];
@@ -735,6 +775,8 @@ class RunTick {
           s.last_progress_at = this.nowIso();
         }
         if (await this.prompt(u, s, st)) return;
+        // No request to read and no triage out: the question is the operator's, at once.
+        if (st.state === "waiting" && !st.pending && !u.triage) return this.blockedPark(u, s, this.launchedWith(stage, scope, s).project);
         const idle = this.nowMs() - Date.parse(s.last_progress_at);
         const max = stage.max_launches ?? DEFAULT_MAX_LAUNCHES;
         const launches = own(u.launches, u.stage) ?? 0;
@@ -764,6 +806,37 @@ class RunTick {
       });
       this.save();
     }
+  }
+
+  /**
+   * Park a worker that waits on a question the host cannot read (design §4.5). Its session, claim
+   * and directory stay and nothing is interrupted; the notice goes out with or without a driver.
+   * The screen is read first: a host error there leaves nothing marked, so the next tick parks.
+   */
+  private async blockedPark(u: UnitState, s: Session, project: string): Promise<void> {
+    const thread = s.thread_id!;
+    const tail = await this.screenTail(thread);
+    const at = this.nowIso();
+    u.parked = { reason: "blocked", at, blocked: { thread } };
+    this.save();
+    this.ev("park", { unit: u.id, stage: u.stage, reason: "blocked", thread });
+    this.report.parked.push(u.id);
+    await this.notify(`${this.run.id}/${u.id}/park/${at}`,
+      `baton ${this.run.id}/${u.id} blocked in ${u.stage} (project ${project}): the worker waits on a question — answer it in its Orca terminal — screen: ${tail}`);
+  }
+
+  /** The screen's last non-empty lines, trimmed and joined; `unavailable` with no screen to read. */
+  private async screenTail(thread: string): Promise<string> {
+    if (!this.host.screen) return "unavailable";
+    let text: string;
+    try {
+      text = await this.host.screen(thread);
+    } catch (e) {
+      if (isHostError(e)) throw e;
+      return "unavailable";
+    }
+    const lines = text.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+    return lines.slice(-SCREEN_LINES).join(" | ").slice(-SCREEN_CHARS);
   }
 
   /** `kind` names the event: a triage that asks for a relaunch logs `triage relaunch`. */
@@ -1190,7 +1263,8 @@ class RunTick {
     if (!drv) return;
     for (const u of this.ordered()) {
       // Checked per unit: a driver's stop parks the run partway through this loop.
-      if (this.run.status !== "armed" || !u.parked || u.parked.escalated) continue;
+      // A blocked park is the operator's question: no driver takes it.
+      if (this.run.status !== "armed" || !u.parked || u.parked.escalated || u.parked.blocked) continue;
       await this.guard(u, async () => {
         try {
           if (u.driver) await this.driverResult(u, drv);

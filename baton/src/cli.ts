@@ -298,6 +298,21 @@ async function unparkCmd(args: string[]): Promise<number> {
         recipe = undefined;
       }
     }
+    if (unit.parked?.blocked) {
+      // A blocked park keeps its session. In place, the park goes and the counts stand (the live
+      // launch still counts); a worker still waiting parks again next tick. `--to` is left to the
+      // tick, which ends the session before the move.
+      if (to === undefined) {
+        delete unit.parked;
+        store.writeRun(run);
+        store.event(runId!, { kind: "unpark", unit: unitId, stage: unit.stage });
+      } else {
+        unit.parked.blocked.to = to;
+        store.writeRun(run);
+        store.event(runId!, { kind: "unpark requested", unit: unitId, stage: to });
+      }
+      return 0;
+    }
     const { stage, consumed } = unparkUnit(run, recipe, unit, to, new Date().toISOString());
     store.writeRun(run);
     store.event(runId!, { kind: "unpark", unit: unitId, stage, ...(consumed !== undefined ? { consumed } : {}) });

@@ -49,7 +49,9 @@ export type UnitState = {
   seq?: Record<string, number>;
   stalls: number;
   session?: Session;
-  parked?: { reason: string; at: string; escalated?: true };
+  /** `blocked` (reason `blocked`, design §4.5): the worker waits on a question the host cannot read;
+   *  the session stays. `to`: the stage `unpark --to` asked for; the next tick moves the unit. */
+  parked?: { reason: string; at: string; escalated?: true; blocked?: { thread: string; to?: string } };
   /** The live driver for the current park. `lost`: step 0 found no thread for its nonce.
    *  `result_file`: the path rendered for this launch; the only file read as its result. */
   driver?: { key: string; session: Session; result_file: string; lost?: true };
