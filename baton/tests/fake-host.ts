@@ -65,9 +65,36 @@ export class FakeHost implements Host {
   down: "auth" | "unreachable" | null = null;
   /** Override to make `bind` return a directory other than `cwd`. */
   bindDir: ((project: string, cwd: string, nonce: string, mode: "worktree" | "root") => string) | null = null;
+  /** Threads `close` was called for, in order. */
+  closes: string[] = [];
+  /** What `screen` returns per thread; a thread with no entry reads `""`. */
+  screens: Record<string, string> = {};
+  answers: { threadId: string; requestId: string; answers: Record<string, string> }[] = [];
+  /** With it, the instance has `close`, `screen` and `respond`; without, it has none of them, as a 0.4.0 host. */
+  withOptional: boolean;
+  declare close?: (threadId: string) => Promise<void>;
+  declare screen?: (threadId: string) => Promise<string>;
+  declare respond?: (threadId: string, requestId: string, answers: Record<string, string>) => Promise<void>;
   private threads: Thread[] = [];
 
-  constructor(public script: Record<string, Behaviour>) {}
+  constructor(public script: Record<string, Behaviour>, opts: { withOptional?: boolean } = {}) {
+    this.withOptional = opts.withOptional ?? false;
+    if (!this.withOptional) return;
+    this.close = async (threadId) => {
+      this.check();
+      this.closes.push(threadId);
+      const t = this.threads.find((x) => x.id === threadId);
+      if (t) t.forced = "gone"; // a thread already gone is not an error
+    };
+    this.screen = async (threadId) => {
+      this.check();
+      return this.screens[threadId] ?? "";
+    };
+    this.respond = async (threadId, requestId, answers) => {
+      this.check();
+      this.answers.push({ threadId, requestId, answers });
+    };
+  }
 
   private check(): void {
     if (this.down === "auth") throw new HostAuthError();

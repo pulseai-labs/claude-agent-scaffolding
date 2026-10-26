@@ -4,12 +4,13 @@ import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
 import { exitCode, tick, unparkUnit } from "./engine.ts";
 import { GhForge } from "./forge.ts";
-import { HostAuthError, HostDownError } from "./host.ts";
+import { HostAuthError, HostDownError, type Host } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
-import { loadT3Config, T3Host } from "./hosts/t3.ts";
+import { hostKind, makeHost } from "./hosts/select.ts";
+import { loadT3Config } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
-import { openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
+import { openStore, replaceFileSync, type KeptThread, type RunState, type UnitState } from "./state.ts";
 import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
@@ -205,11 +206,47 @@ async function disarmCmd(args: string[]): Promise<number> {
       if (!u.session) continue;
       removeClaim(u.session.claim_key, u.session.claim_nonce);
     }
+    await closeKept(run);
     run.status = "disarmed";
     store.writeRun(run);
     store.event(id, { kind: "disarmed" });
     return 0;
   });
+}
+
+/**
+ * Close every kept thread of the run, then release its directory. A failure is printed and the
+ * disarm goes on; an entry that could not be closed stays in `u.kept`, its directory unreleased.
+ */
+async function closeKept(run: RunState): Promise<void> {
+  let host: Host | undefined;
+  let hostErr = "";
+  try {
+    host = makeHost();
+  } catch (e) {
+    hostErr = (e as Error).message;
+  }
+  for (const u of Object.values(run.units)) {
+    const left: KeptThread[] = [];
+    for (const k of u.kept ?? []) {
+      try {
+        if (!host) throw new Error(hostErr);
+        if (!host.close) throw new Error("host cannot close");
+        await host.close(k.thread);
+      } catch (e) {
+        process.stderr.write(`baton disarm: could not close ${k.thread}: ${(e as Error).message}\n`);
+        left.push(k);
+        continue;
+      }
+      try {
+        await host.release(k.project, k.cwd, k.dir);
+      } catch (e) {
+        process.stderr.write(`baton disarm: could not release ${k.dir}: ${(e as Error).message}\n`);
+      }
+    }
+    if (left.length) u.kept = left;
+    else delete u.kept;
+  }
 }
 
 async function unparkCmd(args: string[]): Promise<number> {
@@ -312,18 +349,20 @@ async function tickCmd(args: string[]): Promise<number> {
   if (args.length === 2 && args[0] === "--run" && RUN_ID_RE.test(args[1]) && !isProtoName(args[1])) runId = args[1];
   else if (args.length !== 0) return usage();
   try {
-    const cfg = loadT3Config();
-    // Only `expires_at` is read from the token here; the token itself stays inside the host.
-    let expiresAt: number | undefined;
-    try {
-      expiresAt = readToken(cfg.tokenFile).expires_at;
-    } catch { /* a missing or unreadable token surfaces as a host auth error when used */ }
-    if (expiresAt !== undefined && expiresAt * 1000 - Date.now() < 3 * DAY_MS) {
-      const day = new Date().toISOString().slice(0, 10);
-      await notifyOnce(`token/${day}`, `t3 token expires ${new Date(expiresAt * 1000).toISOString()} — run baton t3 login`);
+    const host = makeHost();
+    if (hostKind() === "t3") {
+      // Only `expires_at` is read from the token here; the token itself stays inside the host.
+      let expiresAt: number | undefined;
+      try {
+        expiresAt = readToken(loadT3Config().tokenFile).expires_at;
+      } catch { /* a missing or unreadable token surfaces as a host auth error when used */ }
+      if (expiresAt !== undefined && expiresAt * 1000 - Date.now() < 3 * DAY_MS) {
+        const day = new Date().toISOString().slice(0, 10);
+        await notifyOnce(`token/${day}`, `t3 token expires ${new Date(expiresAt * 1000).toISOString()} — run baton t3 login`);
+      }
     }
     const r = await tick({
-      store: openStore(), host: new T3Host(cfg), forge: new GhForge(), notify: notifyOnce, now: () => new Date(), runId,
+      store: openStore(), host, forge: new GhForge(), notify: notifyOnce, now: () => new Date(), runId,
     });
     for (const e of r.errors) process.stderr.write(`baton tick: ${e}\n`);
     return exitCode(r);

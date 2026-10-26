@@ -1,7 +1,8 @@
 // The tick: one pass, under the store lock, over every armed run. Per run, in order:
-// 0 orphan recovery, 1 sources, 2 stop files, 3 live sessions, 4 wait stages,
-// 5 merge stages, 6 launches due, 7 drivers, 8 done. A host that refuses the credentials or
-// cannot be reached stops the tick with nothing marked. Step 3 also runs the decision procedure
+// closing the threads an ended park kept (a host with `close` only), 0 orphan recovery,
+// 1 sources, 2 stop files, 3 live sessions, 4 wait stages, 5 merge stages, 6 launches due,
+// 7 drivers, 8 done. A host that refuses the credentials or cannot be reached stops the tick
+// with nothing marked. Step 3 also runs the decision procedure
 // for a session waiting on a pending request: wait, triage it once, act on the triage's result.
 // Step 7, with a driver in the recipe: a parked unit gets one driver session, whose result
 // resumes it, escalates it to the operator, or stops the run. Only an escalate or a stop notifies.
@@ -25,7 +26,7 @@ import {
 import { mergeUnit, type ParkPr } from "./merge.ts";
 import { runSummary } from "./summary.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
-import { enterStage, type RunState, type Session, type Store, type UnitState } from "./state.ts";
+import { enterStage, type KeptThread, type RunState, type Session, type Store, type UnitState } from "./state.ts";
 
 export type TickReport = {
   launched: string[];
@@ -292,17 +293,43 @@ class RunTick {
   /**
    * End the unit's session: interrupt (if asked), remove its claim, release its directory. A
    * triage still running for it is interrupted and released first: every exit ends the triage.
+   *
+   * On a host with `close` (design §4.7) the thread's terminal is closed before the release,
+   * which removes the directory it runs in. A park (`keep`), or an end after an `interrupted`
+   * status, closes nothing and releases nothing: the thread goes to `u.kept`, for the operator
+   * to read, until the unit is unparked or the run ends.
    */
-  private async endSession(u: UnitState, o: { interrupt?: string; release?: boolean } = {}): Promise<void> {
+  private async endSession(u: UnitState, o: { interrupt?: string; release?: boolean; keep?: "unpark" } = {}): Promise<void> {
     await this.endTriage(u, { interrupt: true });
     const s = u.session;
     if (!s) return;
     const { stage, scope } = this.ctx(u);
     if (o.interrupt && s.thread_id) await this.host.interrupt(s.thread_id, o.interrupt);
-    removeClaim(s.claim_key, s.claim_nonce);
-    if (o.release !== false && stage.kind === "session") await this.release(u, stage, scope, s.launch_dir, s);
+    const closing = this.host.close !== undefined && s.thread_id !== undefined && stage.kind === "session";
+    const until = o.keep ?? (s.last_state === "interrupted" ? "run-end" : undefined);
+    if (closing && until !== undefined) {
+      removeClaim(s.claim_key, s.claim_nonce);
+      const w = this.launchedWith(stage, scope, s);
+      u.kept = [...(u.kept ?? []), { thread: s.thread_id!, project: w.project, cwd: w.cwd, dir: s.launch_dir, until }];
+      this.ev("kept", { unit: u.id, thread: s.thread_id, until });
+    } else {
+      if (closing) await this.host.close!(s.thread_id!);
+      removeClaim(s.claim_key, s.claim_nonce);
+      if (o.release !== false && stage.kind === "session") await this.release(u, stage, scope, s.launch_dir, s);
+    }
     delete u.session;
     delete u.quiet_since;
+    this.save();
+  }
+
+  /** Close a kept thread, then release its directory; the entry goes only once both are done. */
+  private async closeKeptThread(u: UnitState, k: KeptThread): Promise<void> {
+    await this.host.close!(k.thread);
+    await this.releaseDir(u, k.dir, () => ({ project: k.project, cwd: k.cwd }));
+    const rest = (u.kept ?? []).filter((x) => x !== k);
+    if (rest.length) u.kept = rest;
+    else delete u.kept;
+    this.ev("closed", { unit: u.id, thread: k.thread });
     this.save();
   }
 
@@ -334,7 +361,7 @@ class RunTick {
     o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr } = {},
   ): Promise<void> {
     const thread = u.session?.thread_id ?? o.thread; // endSession deletes the session; a caller that ended it first passes it
-    await this.endSession(u, o);
+    await this.endSession(u, { ...o, keep: "unpark" });
     const at = this.nowIso();
     u.parked = { reason, at };
     this.save();
@@ -447,6 +474,7 @@ class RunTick {
 
   async tick(): Promise<void> {
     try {
+      await this.closeKept();
       await this.orphans();
       if (!(await this.sources())) return;
       await this.stops();
@@ -459,6 +487,17 @@ class RunTick {
     } finally {
       // Whatever ran stays recorded, including on a host error mid-tick.
       this.save();
+    }
+  }
+
+  /** Before step 0: a unit no longer parked closes the threads its park kept. */
+  private async closeKept(): Promise<void> {
+    if (!this.host.close) return;
+    for (const u of this.ordered()) {
+      if (u.parked || !u.kept) continue;
+      await this.guard(u, async () => {
+        for (const k of u.kept!.filter((x) => x.until === "unpark")) await this.closeKeptThread(u, k);
+      });
     }
   }
 
@@ -688,6 +727,7 @@ class RunTick {
         const { stage, scope } = this.ctx(u);
         if (stage.kind !== "session") throw new Error(`session in non-session stage ${u.stage}`);
         const st = await this.host.status(s.thread_id!);
+        s.last_state = st.state;
         const mark = this.progressMark(stage, scope, st.activity);
         if (mark !== s.progress_mark) {
           s.progress_mark = mark;
@@ -1358,6 +1398,10 @@ class RunTick {
   private async done(): Promise<void> {
     const units = Object.values(this.run.units);
     if (units.length === 0 || !units.every((u) => u.stage === "done")) return;
+    // Every kept thread closes before the run is marked done: a host error retries next tick.
+    if (this.host.close) {
+      for (const u of this.ordered()) for (const k of [...(u.kept ?? [])]) await this.closeKeptThread(u, k);
+    }
     this.run.status = "done";
     this.save();
     this.ev("done");
