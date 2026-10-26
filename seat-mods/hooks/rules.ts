@@ -788,7 +788,13 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
     return ` ${HEREDOC_MARK} ${source.slice(word, upto)} `
   })
   const { text: input, pieces } = blank(withoutInput)
-  const funsub = FUNSUB.test(command)
+  // Only text Bash expands can hold a funsub: a single-quoted string, an escape, a comment or a heredoc body runs none.
+  const expanded = (text: string, seen: readonly string[] = []): string => text.replace(MARKER, (_, i: string) => {
+    if (seen.includes(i) || seen.length >= 64) throw new Error('unresolvable shell marker')
+    const piece = pieces[Number(i)] ?? ''
+    return piece.startsWith("'") || piece.startsWith("$'") || piece.startsWith('\\') ? ' ' : expanded(piece, [...seen, i])
+  })
+  const funsub = FUNSUB.test(expanded(input))
   let changedDirectory = moved || funsub
   // The walk: `here` is where the next command of this &&-list may run, `after` where the shell may be when the list
   // ends. `open` until the walk ends. `literalList` while every command so far in this list is a literal assignment,

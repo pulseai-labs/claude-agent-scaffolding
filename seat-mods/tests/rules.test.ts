@@ -1708,3 +1708,21 @@ describe('PR 923 round 1: an opener line read in the 0.9.0 layout keeps its tail
     expect(rmTargets("cat <<'EOF'; rm -rf /boot\nbody\nEOF")).toEqual([{ path: '/boot', glob: false }])
   })
 })
+
+describe('PR 923 round 2: a funsub spelling in text Bash does not expand leaves the directory known', () => {
+  // `${ ` or `${|` inside single quotes, after an escape, in a comment or in a heredoc body runs nothing; 0.9.0 placed
+  // the rm in the session directory, and so does this.
+  test('quoted, escaped, commented and heredoc-body spellings do not unknow the directory', () => {
+    for (const c of ["echo '${ x}'; rm scratch.txt", 'echo \\${ x}; rm scratch.txt', 'rm scratch.txt # note ${ x} form',
+      "cat <<'E'\n${ x}\nE\nrm scratch.txt", "echo $'${| x}'; rm scratch.txt"]) {
+      expect(rmTargets(c)).toEqual([{ path: 'scratch.txt', glob: false }])
+    }
+  })
+  // controls: a real funsub, unquoted, in double quotes or inside a `$(…)` in double quotes, still makes it unknown
+  test('a real funsub still makes the directory unknown', () => {
+    for (const c of ['X="${ cd /etc; }"; rm -rf y', 'echo "${| cd /etc; }"; rm -rf y', 'X=${ cd /etc; }; rm -rf y',
+      'X="$(echo "${ cd /etc; }")"; rm -rf y']) {
+      expect(rmTargets(c)).toEqual([{ glob: false }])
+    }
+  })
+})
