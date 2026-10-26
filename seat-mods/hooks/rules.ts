@@ -80,7 +80,12 @@ const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 // is the word after quote removal; a body ends at the first line that is exactly it
 // (leading tabs stripped after `<<-`), and in an unquoted body a line ending in a
 // backslash first joins the next, as in Bash. The bodies follow their line in opener
-// order; one with no closing line runs to the end of the command.
+// order; one with no closing line runs to the end of the command. Inside a `$(…)`, Bash
+// 5.3 also ends a body, with a warning, at a line that starts with the delimiter and holds
+// a `)` after it, and reads the rest of that line as command text: for the last opener on
+// its line, inside a `$(` opened on that line, the piece ends after the delimiter there and
+// the scan resumes after it (not in a backtick span, which Bash reads apart, and not on a
+// line a backslash joined).
 // After an unquoted opener the line's text stays command text (#724 A3, A9), and the line
 // ends at a newline outside quotes and arithmetic. Quotes nest inside `$(…)`, backticks
 // and `${…}`, which this scan does not model, so a line holding one after the first
@@ -100,6 +105,16 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
   let comment = -1   // where the open comment starts
   let nested = -1    // the last `$(`, backtick or `${` since a newline outside quotes
   let inWord = false // the character before this one belongs to a word
+  // Whether `text`, the opener's line up to the opener, ends inside a `$(…)` opened on that line: the innermost span
+  // still open at its end is one, not a backtick span.
+  const inSubstitution = (text: string): boolean => {
+    let tick: boolean | undefined
+    for (let span = substitutionSpans(text, 'command').pop(); span !== undefined && span.to === text.length; span = substitutionSpans(text, 'command').pop()) {
+      tick = span.tick
+      text = text.slice(span.from)
+    }
+    return tick === false
+  }
   for (let i = 0; i < command.length; i++) {
     const char = command[i]!
     const first = opens[0]
@@ -107,14 +122,19 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
     if (char === '\n' && first !== undefined && (older || (quote === '' && parens === 0))) {
       // The opener line ends here; each body starts where the one before it ended.
       let body = i
+      const last = older ? first : opens[opens.length - 1]
       for (const open of older ? [first] : opens) {
         let end = command.length
         let joined = ''
+        let inside: boolean | undefined
         for (let line = body + 1; line < command.length; ) {
           const next = command.indexOf('\n', line)
           const stop = next < 0 ? command.length : next
           const text = joined + command.slice(line, stop)
-          if ((open.strip ? text.replace(/^\t+/, '') : text) === open.delimiter) { end = stop; break }
+          const bare = open.strip ? text.replace(/^\t+/, '') : text
+          if (bare === open.delimiter) { end = stop; break }
+          if (open === last && joined === '' && bare.startsWith(open.delimiter) && bare.includes(')', open.delimiter.length) &&
+            (inside ??= inSubstitution(command.slice(command.lastIndexOf('\n', open.at - 1) + 1, open.at)))) { end = stop - bare.length + open.delimiter.length; break }
           if (next < 0) break
           joined = !open.quoted && /(?<!\\)(?:\\\\)*\\$/.test(text) ? text.slice(0, -1) : ''
           line = next + 1
@@ -442,10 +462,17 @@ export function substitutionsOf(command: string): string[] {
       for (const [from, to] of [[at, upto], [body, end]] as const)
         view = view.slice(0, from) + ' '.repeat(to - from) + view.slice(to)
     const spans: Array<{ at: number; end: number; text: string }> = []
-    // The spans of `text`, which stands at `offset` in the command.
+    // The spans of `text`, which stands at `offset` in the command. A heredoc that closed at a line only starting with
+    // its delimiter ends mid-line: Bash reads the rest of that line as the next line, so the span's text gets a newline there.
     const take = (text: string, offset: number, mode: 'command' | 'body'): void => {
       for (const span of substitutionSpans(text, mode)) {
-        const inner = command.slice(offset + span.from, offset + span.to)
+        const from = offset + span.from
+        const to = offset + span.to
+        let inner = ''
+        let cut = from
+        for (const { end } of heredocs)
+          if (cut < end && end < to && command[end] !== '\n') { inner += command.slice(cut, end) + '\n'; cut = end }
+        inner += command.slice(cut, to)
         spans.push({ at: offset + span.at, end: offset + span.end, text: span.tick ? inner.replace(/\\([\\`$])/g, '$1') : inner })
       }
     }

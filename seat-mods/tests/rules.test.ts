@@ -1609,3 +1609,46 @@ describe('batch 5: rm after cd, fix round 3', () => {
   })
 })
 
+
+// Final fix wave, I1 (ledger 117): inside a `$(…)` Bash 5.3 also ends a heredoc at a body line that starts with the
+// delimiter and holds a `)` after it, with a warning, and reads the rest of that line as command text. A top-level
+// heredoc, and one in a backtick span, close only at a line that is exactly the delimiter (probed under Bash 5.3.9).
+describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts with its delimiter and holds a `)`', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  test('the `EOF)` commit form: a force-push or an rm after it is read', () => {
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit', 'push', 'force-push'])
+    expect(bashRules("git commit --amend -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force-with-lease")).toEqual(['commit', 'push', 'force-push'])
+    expect(rmTargets("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && rm -rf /etc/x")).toEqual([t('/etc/x')])
+    expect(substitutionsOf("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(["cat <<'EOF'\nmsg\nEOF"])
+  })
+  test('unquoted, after <<-, nested, and with a command between the delimiter and the `)`', () => {
+    expect(bashRules('x=$(cat <<EOF\nmsg\nEOF) && git push --force')).toEqual(['push', 'force-push'])
+    expect(bashRules('x=$(cat <<-EOF\nmsg\n\tEOF) && git push --force')).toEqual(['push', 'force-push'])
+    expect(bashRules('x=$(echo $(cat <<EOF\nmsg\nEOF) && git push --force)')).toEqual(['push', 'force-push'])
+    // Bash reads the rest of the closing line as the next line of the substitution, so it runs the push
+    expect(bashRules('x=$(cat <<EOF\nmsg\nEOF git push --force)')).toEqual(['push', 'force-push'])
+    expect(substitutionsOf('x=$(cat <<EOF\nmsg\nEOF git push --force)')).toEqual(['cat <<EOF\nmsg\nEOF\n git push --force'])
+    expect(rmTargets('x=$(cat <<EOF\nmsg\nEOF rm -rf /etc/x)')).toEqual([t('/etc/x')])
+  })
+  test('control: the standard commit form and a body line that only starts with the delimiter stay allowed', () => {
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfeat: x\n\ngit push --force is denied.\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toEqual(['commit'])
+    expect(rmTargets("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toEqual([])
+    // no `)` after the delimiter: Bash does not close there
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nEOFs are fine; git push --force\nEOF\n)\"")).toEqual(['commit'])
+  })
+  test('control: a top-level heredoc and one in a backtick span close only at the exact line', () => {
+    expect(bashRules('cat <<EOF\nEOFs are fine\nEOF\n')).toEqual([])
+    expect(bashRules('cat <<EOF\nEOFs are fine (really) && git push --force\nEOF\n')).toEqual([])
+    expect(rmTargets('cat <<EOF\nEOF) && rm -rf /etc/x\nEOF\n')).toEqual([])
+    expect(bashRules('x=`cat <<EOF\nmsg\nEOF) git push --force\n`')).toEqual([])
+  })
+  // Known-limit pins (README Limits): the rule is read only for a `$(` opened on the opener's line, only for the last
+  // opener on that line, and not on a line a backslash joined. Bash runs the push in all three.
+  test('known limit: a $( on an earlier line, an earlier opener on the line, or a joined line is not seen closing', () => {
+    expect(bashRules('x=$(\ncat <<EOF\nmsg\nEOF) && git push --force')).toEqual([])
+    expect(bashRules('x=$(cat <<EOF\nmsg\nEO\\\nF) && git push --force')).toEqual([])
+    expect(bashRules("x=$(cat <<'EOF' <<B\nb\nB\nmsg\nEOF) && git push --force")).toEqual([])
+  })
+})

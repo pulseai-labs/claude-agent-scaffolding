@@ -200,3 +200,27 @@ describe('batch 5 walk: honest commit forms stay allowed', () => {
     expect(gate('git commit -F - <<EOF\ncat huge.log\nEOF')).toBe(true)
   })
 })
+
+// Final fix wave, I1 (ledger 117): inside a `$(…)` Bash 5.3 also ends a heredoc at a body line that starts with the
+// delimiter and holds a `)` after it, and reads the rest of that line as command text. The honest `EOF)` commit form is
+// allowed now; a read after it is refused, and the reader sees the git command after it.
+describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts with its delimiter and holds a `)`', () => {
+  test('the honest `EOF)` commit form is allowed', () => {
+    expect(gate("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toBe(true)
+    expect(gate("git add f && git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toBe(true)
+  })
+  test('a command after the `EOF)` line is read', () => {
+    expect(gitSubcommands("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit', 'push'])
+    expect(gate("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force")).toBe(false)
+    expect(gitSubcommands("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && rm -rf /etc/x")).toEqual(['commit', undefined])
+    expect(gate("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && cat huge.log")).toBe(false)
+    // Bash runs the rest of the closing line inside the substitution
+    expect(gate("git commit -m \"$(cat <<'EOF'\nmsg\nEOF cat huge.log)\"")).toBe(false)
+  })
+  test('control: the standard form, and a body line that only starts with the delimiter', () => {
+    expect(gate("git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\"")).toBe(true)
+    expect(gate("git commit -m \"$(cat <<'EOF'\nEOFs are fine\nEOF\n)\"")).toBe(true)
+    expect(gate('git commit -F - <<EOF\nEOFs are fine\nEOF')).toBe(true)
+    expect(gate('git commit -F - <<EOF\nEOF) && cat huge.log\nEOF')).toBe(true)
+  })
+})
