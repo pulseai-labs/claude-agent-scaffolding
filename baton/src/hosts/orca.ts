@@ -205,6 +205,8 @@ export class OrcaHost implements Host {
     const res = this.must(["terminal", "list", "--worktree", `path:${repo.path}`, "--limit", "1000"]);
     // A truncated list may hide the very terminal being looked for.
     if (res?.truncated === true) throw new HostDownError("terminal list is truncated");
+    // An empty answer for an uncovered host is not "no such terminal": step 0 would release a live launch.
+    coversLocal(res, "terminal list");
     const tag = `[baton ${nonce}]`;
     return ((res?.terminals ?? []) as { handle: string; title?: string }[])
       .filter((t) => typeof t.title === "string" && t.title.includes(tag))

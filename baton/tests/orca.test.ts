@@ -221,11 +221,12 @@ describe("launch", () => {
 
 describe("findByNonce", () => {
   const term = (title: string, handle: string) => ({ handle, title });
+  const local = { hostIds: ["local"], omittedHostIds: [] as string[] };
   test("findByNonce matches the title tag only", async () => {
     replies({
       "terminal list": fixture("list.json", {
         ok: true,
-        result: { terminals: [term("a [baton r/u/s/1]", "term_a"), term("b [baton r/u/s/10]", "term_b"), term("r/u/s/1 plain", "term_c")], truncated: false },
+        result: { terminals: [term("a [baton r/u/s/1]", "term_a"), term("b [baton r/u/s/10]", "term_b"), term("r/u/s/1 plain", "term_c")], hostScope: local, truncated: false },
       }),
     });
     expect(await host().findByNonce("pilot-fourseat", "r/u/s/1")).toEqual(["term_a"]);
@@ -240,8 +241,40 @@ describe("findByNonce", () => {
   });
 
   test("truncated list is host down", async () => {
-    replies({ "terminal list": fixture("trunc.json", { ok: true, result: { terminals: [term("a [baton r/u/s/1]", "term_a")], truncated: true } }) });
+    replies({ "terminal list": fixture("trunc.json", { ok: true, result: { terminals: [term("a [baton r/u/s/1]", "term_a")], hostScope: local, truncated: true } }) });
     expect(await thrown(host().findByNonce("pilot-fourseat", "r/u/s/1"))).toBeInstanceOf(HostDownError);
+  });
+
+  // An empty answer for a host the reply does not cover would read as "no such terminal" and let
+  // the engine release the directory of a live launch.
+  const scoped = (hostScope: unknown) =>
+    replies({ "terminal list": fixture("scoped.json", { ok: true, result: { terminals: [], hostScope, truncated: false } }) });
+
+  test("local omitted from the terminal list -> host down, not []", async () => {
+    scoped({ hostIds: [], omittedHostIds: ["local"] });
+    const err = await thrown(host().findByNonce("pilot-fourseat", "r/u/s/1"));
+    expect(err).toBeInstanceOf(HostDownError);
+    expect(err.message).toContain("terminal list does not cover the local host");
+  });
+
+  test("local missing from hostIds (no omission either) -> host down", async () => {
+    scoped({ hostIds: ["ssh:box"], omittedHostIds: [] });
+    expect(await thrown(host().findByNonce("pilot-fourseat", "r/u/s/1"))).toBeInstanceOf(HostDownError);
+  });
+
+  test("local listed and omitted at once -> host down", async () => {
+    scoped({ hostIds: ["local"], omittedHostIds: ["local"] });
+    expect(await thrown(host().findByNonce("pilot-fourseat", "r/u/s/1"))).toBeInstanceOf(HostDownError);
+  });
+
+  test("another host omitted -> the normal match (control)", async () => {
+    replies({
+      "terminal list": fixture("other-omitted.json", {
+        ok: true,
+        result: { terminals: [term("a [baton r/u/s/1]", "term_a")], hostScope: { hostIds: ["local"], omittedHostIds: ["ssh:box"] }, truncated: false },
+      }),
+    });
+    expect(await host().findByNonce("pilot-fourseat", "r/u/s/1")).toEqual(["term_a"]);
   });
 });
 

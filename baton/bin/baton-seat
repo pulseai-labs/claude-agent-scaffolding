@@ -2,7 +2,7 @@
 #
 # baton-seat - launcher for a baton worker in an Orca terminal.
 #
-#   cd '<cwd>' && exec baton-seat '<message file>'
+#   cd '<cwd>' && BATON_STATE_DIR='<state>' exec baton-seat '<message file>'
 #
 # Looks up <state>/claims/<sha256 of the real cwd>.env, exports its keys, reads the
 # message file (then deletes it: one message starts at most one seat), and execs
