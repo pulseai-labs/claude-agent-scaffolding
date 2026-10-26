@@ -22,8 +22,8 @@ judge as before.
   `cd "$WT" && rm …` with no `WT=` earlier in the call is still unresolved. A `cd` before `;` or a
   newline may fail, so the rm after it is checked in every directory it may run in; a variable stays
   known only across literal assignments, a literal `cd` and a bare `rm`. A `cd` in a subshell, an
-  `if`, after `||` or in a pipeline, `cd -`, `cd ..`, `pushd`, `popd`, a Bash 5.3 funsub and every
-  other directory change stay unresolved, as before.
+  `if`, after `||` or in a pipeline, `cd -`, `cd ..`, `pushd`, `popd`, a `cd` before a Bash 5.3
+  funsub and every other directory change stay unresolved, as before.
   A `CDPATH`, a `cd` alias, a shell-snapshot function that changes directory (zoxide's `z`) and
   zsh's `cd` are not modelled.
 - **Commands inside `$(…)` and backticks are read** (C1), unquoted, in double quotes, on a heredoc

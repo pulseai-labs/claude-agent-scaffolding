@@ -197,8 +197,8 @@ unknown variable and the `rm` after it is unresolved.
   all (`WT=/w/wt; echo "$WT"; rm -rf "$WT/x"` is refused).
 - Unresolved, so refused as before: a `cd` in a subshell or an `if`, after `||` or in a pipeline;
   `cd -`, `cd ..`, `cd ~` and a `cd` with an option, a glob or an unknown variable; `pushd`,
-  `popd`, `command cd` and `builtin cd`; a Bash 5.3 funsub. `eval`, `source`, `export`, `read`,
-  `printf` and the other builtins that run text or change shell state end the walk: no variable is
+  `popd`, `command cd` and `builtin cd`; a `cd` before a Bash 5.3 funsub. `eval`, `source`,
+  `export`, `read`, `printf` and the other builtins that run text or change shell state end the walk: no variable is
   read after them, and a directory a `cd` moved to is unknown. Limits lists what the walk does not
   model.
 
@@ -291,7 +291,7 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
   quotes, also passes.
 - A command inside `$(…)` or backticks is read as a command of its own when the substitution stands unquoted, in double quotes, on a heredoc opener line or in an unquoted heredoc body, except as the next lines of this list say. The reader finds a span's end by counting parentheses and quotes, not by parsing, so a `)` Bash does not count ends it early and the rest of that span is not read: a `case` pattern's `)` in a double-quoted `$(…)`, a `)` inside a `${…}` there (`"$(echo ${x:-)} "it's")" && git push --force 'x'`), and a backslash-newline between `$` and `(`. A command nested more than 8 substitutions deep is refused as `no force-push`, whatever it runs.
 - A backtick inside a quoted heredoc body inside a backtick span closes the span in Bash, and the text after it runs; the reader keeps the body whole, so a command there hides: `` x=`cat <<'EOF' ``, a newline, `` a ` ; git push --force ; ` ``, a newline, `EOF`, a newline and a closing backtick passes.
-- **Funsubs:** a command inside a Bash 5.3 `${ …; }` or `${| …; }` runs in the current shell and is read by no rail: `X="${ git push --force; }"` and `X="${ rm -rf /etc/x; }"` pass. A funsub anywhere in a call makes its directory unknown, so a relative `rm` in that call is refused.
+- **Funsubs:** a command inside a Bash 5.3 `${ …; }` or `${| …; }` runs in the current shell and is read by no rail: `X="${ git push --force; }"` and `X="${ rm -rf /etc/x; }"` pass. A funsub ends the `cd` walk: after a `cd` the directory is unknown, so a later relative `rm` is refused; with no `cd` before it a relative `rm` is placed in the session directory, as in 0.9.0, though Bash runs it wherever the funsub's own `cd` went (`X="${ cd /etc; }"; rm -rf y` passes).
 - Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
 - **C6, grammar:** the reader splits text and does not parse it. An unexecuted shell function body (`cleanup() { rm …; }`) is checked as if it runs and may deny, and so is a command in a script Bash would refuse to run (`if git push --force; then`).

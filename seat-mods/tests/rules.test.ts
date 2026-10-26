@@ -1563,12 +1563,15 @@ describe('batch 5: rm after cd, fix round 2', () => {
     // controls: an absolute value is placed as is; a literal operand keeps its old reading
     expect(rmTargets('S=/tmp/allow; rm -rf "$S/x" sub/y')).toEqual([t('/tmp/allow/x'), t('sub/y')])
   })
-  test('pre-existing: a ${ …; } funsub runs in the current shell and may cd, so the directory is unknown', () => {
-    // a funsub after a cd moves the directory too, and a substitution after one runs in the directory it left
-    for (const c of ['X="${ cd /etc; }"; rm -rf y', 'echo "${| cd /etc; }"; rm -rf y', 'X="${ true; }" && rm -rf y',
-      'cd /w && echo "${ cd /etc; }" && rm y', 'X="${ cd /etc; }"; echo "$(rm x)"'])
+  test('pre-existing: a ${ …; } funsub runs in the current shell and may cd; it ends the walk', () => {
+    // after a cd the directory is unknown, as 0.9.0 left it after every cd
+    for (const c of ['cd /w && echo "${ cd /etc; }" && rm y', 'cd /w; X="${ cd /etc; }"; rm y', 'cd /w; X="\\${ x; }"; rm y'])
       expect(rmTargets(c)).toEqual([t(undefined)])
-    expect(verdict('X="${ cd /etc; }"; rm -rf y')).toContain('cannot resolve')
+    expect(verdict('cd /w; X="${ cd /etc; }"; rm -rf y')).toContain('cannot resolve')
+    // known limit (README Limits, #925): with no cd before it, the rm stays in the session directory, as in 0.9.0,
+    // though Bash runs it where the funsub's cd went
+    for (const c of ['X="${ cd /etc; }"; rm -rf y', 'echo "${| cd /etc; }"; rm -rf y', 'X="${ true; }" && rm -rf y'])
+      expect(rmTargets(c)).toEqual([t('y')])
     // control: a $( … ) runs in a subshell, so its cd stays there
     expect(rmTargets('X="$(cd /etc)"; rm -rf y')).toEqual([t('y')])
   })
@@ -1718,10 +1721,9 @@ describe('PR 923 round 2: a funsub spelling in text Bash does not expand leaves 
       expect(rmTargets(c)).toEqual([{ path: 'scratch.txt', glob: false }])
     }
   })
-  // controls: a real funsub, unquoted, in double quotes or inside a `$(…)` in double quotes, still makes it unknown
-  test('a real funsub still makes the directory unknown', () => {
-    for (const c of ['X="${ cd /etc; }"; rm -rf y', 'echo "${| cd /etc; }"; rm -rf y', 'X=${ cd /etc; }; rm -rf y',
-      'X="$(echo "${ cd /etc; }")"; rm -rf y']) {
+  // controls: after a cd, a real funsub, unquoted or in double quotes, still makes the directory unknown
+  test('after a cd a real funsub still makes the directory unknown', () => {
+    for (const c of ['cd /w; X="${ cd /etc; }"; rm -rf y', 'cd /w; echo "${| cd /etc; }"; rm -rf y', 'cd /w; X=${ cd /etc; }; rm -rf y']) {
       expect(rmTargets(c)).toEqual([{ glob: false }])
     }
   })

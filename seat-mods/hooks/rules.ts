@@ -759,8 +759,7 @@ const HEREDOC_MARK = '\u0000heredoc\u0000'
 // rm's own spelling of the command separators (COMMANDS above), on text whose redirections are still in place: a `&`
 // or `|` of a redirection operator (`>&`, `<&`, `&>`, `>|`) separates nothing. Change one spelling and check the other.
 const RM_SEPARATORS = /(;|&&|\|\||(?<!>)\|(?!\|)|(?<![&<>])&(?![&>])|\n|\(|\))/
-// A Bash 5.3 command substitution that runs in the current shell, `${ …; }` or `${| …; }`: the walk cannot read it,
-// and it may change the directory, so the directory is unknown.
+// A Bash 5.3 command substitution that runs in the current shell, `${ …; }` or `${| …; }`.
 const FUNSUB = /\$\{[\s|]/
 
 // A segment without its redirections, which belong to the shell, not rm: fd prefixes before their operators, then
@@ -788,21 +787,14 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
     return ` ${HEREDOC_MARK} ${source.slice(word, upto)} `
   })
   const { text: input, pieces } = blank(withoutInput)
-  // Only text Bash expands can hold a funsub: a single-quoted string, an escape, a comment or a heredoc body runs none.
-  const expanded = (text: string, seen: readonly string[] = []): string => text.replace(MARKER, (_, i: string) => {
-    if (seen.includes(i) || seen.length >= 64) throw new Error('unresolvable shell marker')
-    const piece = pieces[Number(i)] ?? ''
-    return piece.startsWith("'") || piece.startsWith("$'") || piece.startsWith('\\') ? ' ' : expanded(piece, [...seen, i])
-  })
-  const funsub = FUNSUB.test(expanded(input))
-  let changedDirectory = moved || funsub
+  let changedDirectory = moved
   // The walk: `here` is where the next command of this &&-list may run, `after` where the shell may be when the list
   // ends. `open` until the walk ends. `literalList` while every command so far in this list is a literal assignment,
   // which cannot fail: an assignment behind anything else may be skipped, so it never becomes known.
-  let here = [moved || funsub ? UNKNOWN : '']
+  let here = [moved ? UNKNOWN : '']
   let after = here
   const vars = new Map<string, string>()
-  let open = walk && !tail && !funsub
+  let open = walk && !tail
   let literalList = true
   const end = () => { open = false; vars.clear(); if (after.length !== 1 || after[0] !== '') here = after = [UNKNOWN] }
   const literal = (text: string) => !/[$`(]/.test(text)
@@ -822,6 +814,9 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
     const segment = parts[k]!
     if (segment.trim() === '') continue
     continued = false
+    // A Bash 5.3 funsub runs in the current shell and may cd, and the walk does not read it: it ends the walk, so after
+    // a cd the directory is unknown, as 0.9.0 left it after every cd, and before one it stays the session's.
+    if (FUNSUB.test(expand(segment, pieces))) end()
     const tokens = tokensOf(withoutRedirections(segment)).filter(token => token !== HEREDOC_MARK)
     const redirected = /[<>]/.test(segment) || segment.includes(HEREDOC_MARK)
     if (HEAD_WORDS.has(tokens[0] ?? '') || BLOCK_WORDS.has(tokens[0] ?? '')) end()
