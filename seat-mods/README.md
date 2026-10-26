@@ -160,7 +160,8 @@ the server) exactly as if seat-mods were absent. For each way the reader looks a
   `$((…))`, `((…))` or a `#` comment, which open no heredoc. Leaves the body and the closing line,
   which are text, and the fallbacks in Limits: when an opener line holds a `$(…)`, a backtick or a
   `${…}` after the delimiter word, a ruled command after the substitution on that line stays hidden,
-  as in 0.9.0; and a `<<` in an unquoted `$[…]` or a `${…}` still opens a heredoc.
+  as in 0.9.0 (an `rm` there is still read, though the `cd` walk does not start); and a `<<` in an
+  unquoted `$[…]` or a `${…}` still opens a heredoc.
 - **The command word and glued redirections.** Stops a ruled command whose head is escaped
   (`\rm -rf …`, `\git push --force`), follows a named descriptor (`{log}>f rm -rf …`), or has a
   redirection glued to a flag (`git push --force>&2`, `--force&>f`, `-f>/dev/null`). Leaves a
@@ -297,7 +298,7 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 - **C5, a `&` inside a word:** only a lone `&` inside an unquoted `${…}` or `$[…]` is masked. A `&` inside any other word still splits it, so `a[foo&git push --force ]=x` and `echo @(a&git push --force )` are denied though Bash runs no `git`.
 - **C8, a quoted tilde:** `rm ~""/scratch/x` and `rm ~''/scratch/x` read the tilde as `HOME`. Bash expands no tilde that is partly quoted and removes `<cwd>/~/scratch/x`. The usual outcome is a false stop; for a reviewer whose `SEAT_MODS_ALLOW` holds `$HOME/scratch`, the rm is placed there and passes while Bash removes in the session directory. A tilde quoted whole (`"~"/x`) reads as a relative name.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A heredoc opener line holding a `$(…)`, a backtick or a `${…}` after the delimiter word is read as in 0.9.0: the rest of that line goes with the heredoc, so a ruled command after the substitution on that line stays hidden (`cat <<EOF $(date); git push --force`, then a body line and `EOF`). So does a quoted `<<` after one of those on its line, as in the `"$(cat <<'EOF' … )"` commit form. Any other quoted `<<` is text, as in Bash.
+- A heredoc opener line holding a `$(…)`, a backtick or a `${…}` after the delimiter word is read as in 0.9.0: the rest of that line goes with the heredoc, so a ruled command after the substitution on that line stays hidden (`cat <<EOF $(date); git push --force`, then a body line and `EOF`). So does a quoted `<<` after one of those on its line, as in the `"$(cat <<'EOF' … )"` commit form. Any other quoted `<<` is text, as in Bash. An `rm` on that line is still read for its operands, as in 0.9.0, but a relative one is not placed through a `cd`.
 - On such a line only the first opener is read, even when a second one stands before the substitution, so the second heredoc's body reads as commands, toward a stop: `cat <<A <<'B' "$(date)"`, then `a`, `A`, `rm -rf /etc/x` and `B` is refused, though Bash removes nothing.
 - An arithmetic `$((…))` that spans lines on such a line leaves the reader counting its parentheses past the heredoc, so a later quote or comment can hide a ruled command: `cat <<EOF $(date) $((1 +`, a newline, `2))`, a body line and `EOF`, then `echo hi # it's` and `git push --force 'x'` passes.
 - A `$'…'` or `$"…"` heredoc delimiter is read with its `$`, so its heredoc never closes at `EOF` and the lines after it can hide commands.
