@@ -34,8 +34,8 @@ const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 // backslash first joins the next, as in Bash. The bodies follow their line in opener
 // order; one with no closing line runs to the end of the command. Inside a `$(…)`, Bash
 // 5.3 also ends a body, with a warning, at a line that starts with the delimiter and holds
-// a `)` after it, and reads the rest of that line as command text: for the last opener on
-// its line, inside a `$(` opened on that line, the piece ends after the delimiter there and
+// a `)` after it, and reads the rest of that line as command text: for the last opener read
+// on its line, inside a `$(` opened on that line, the piece ends after the delimiter there and
 // the scan resumes after it (not in a backtick span, which Bash reads apart, and not on a
 // line a backslash joined).
 // After an unquoted opener the line's text stays command text (#724 A3, A9), and the line

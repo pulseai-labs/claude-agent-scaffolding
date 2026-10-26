@@ -31,14 +31,18 @@ judge as before.
   `git commit -m "$(git push --force)"` and ``git commit -m `git push --force` `` are denied.
   A command nested more than 8 substitutions deep is refused, reported as `no force-push`: an
   accepted false stop no honest command reaches.
-- **Heredocs are read as Bash reads them** (C2). The tail of an opener line is read
+- **Heredocs are read closer to the way Bash reads them** (C2). The tail of an opener line is read
   (`cat <<EOF; git push --force`), a delimiter is its word after quote removal (`<<\EOF`,
   `<<E'OF'`, `<<"E"OF`), several heredocs on a line close in order, a body line ending in a
   backslash joins the next only in an unquoted body, and a `<<` in `$((…))`, `((…))` or a comment
-  opens none. `<<E'OF'` with a
-  body line `E` was a false stop and is allowed.
+  opens none. Inside a `$(…)` a heredoc also closes, as in Bash 5.3, at a line that starts with its
+  delimiter and holds a `)` after it, so `git commit -m "$(cat <<'EOF' … EOF)" && git push --force`
+  is denied. `<<E'OF'` with a body line `E` was a false stop and is allowed.
 - **The command word and glued redirections are read** (C3, C4): `\rm -rf …`, `\git push --force`,
   `{log}>f rm -rf …` and `git push --force>&2` (also `&>f`, `-f>/dev/null`) are denied.
+- **On OMP, an `rm` operand with a leading `@` or `:` is placed both ways.** omp reads `@/tmp/x` as
+  `/tmp/x`, but the shell removes `<cwd>/@/tmp/x`, in the worktree; both places must be allowed, so a
+  reviewer is refused it.
 - **Deny texts.** The rm and write denials name the scratch places beside the worktree and
   `SEAT_MODS_ALLOW`, and the advice for an unreadable operand says what the guard reads now.
 - **Shared reader.** `COMMANDS`, `HEREDOC`, `QUOTED`, `WRAPPERS`, `blankHeredocs`,
@@ -49,11 +53,11 @@ judge as before.
   heredoc opener line stays hidden, as in 0.9.0; so do a `$'EOF'` delimiter, a `<<` inside an
   unquoted `$[…]` or a `${…}` (it opens a heredoc for the reader), a `#` after a blank in
   a quoted string inside `"$(…)"`, a command in a Bash 5.3 funsub, a quoted command word
-  (`"rm" …`), a subscripted prefix (`A[0]=1 rm …`), a closing line `EOF)`, a backslash-newline
-  inside a word and the spans whose end the reader loses. C5 (a `&` inside a word) and C6 (function
-  bodies and syntax errors) still read wrongly toward a false stop. C8 (a partly quoted tilde,
-  `rm ~""/x`) is a false stop too, but for a reviewer whose `SEAT_MODS_ALLOW` holds `$HOME/scratch`
-  it passes while Bash removes `<cwd>/~/scratch/x`.
+  (`"rm" …`), a subscripted prefix (`A[0]=1 rm …`), a closing line `EOF)` in a `$(` opened on an
+  earlier line, a backslash-newline inside a word and the spans whose end the reader loses. C5 (a
+  `&` inside a word) and C6 (function bodies and syntax errors) still read wrongly toward a false
+  stop. C8 (a partly quoted tilde, `rm ~""/scratch/x`) is a false stop too, but for a reviewer
+  whose `SEAT_MODS_ALLOW` holds `$HOME/scratch` it passes while Bash removes `<cwd>/~/scratch/x`.
 
 ## 0.9.0 — 2026-10-20
 

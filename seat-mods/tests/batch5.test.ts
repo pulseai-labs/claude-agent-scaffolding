@@ -104,7 +104,7 @@ describe('batch 5 walk: a ruled command the reader missed is denied', () => {
 })
 
 describe('702-B10: a heredoc delimiter spelled with quotes or escapes closes as Bash closes it (C2c)', () => {
-  // Eleven spellings of the word EOF close on the line EOF, so what follows runs.
+  // Ten spellings of the word EOF close on the line EOF, so what follows runs.
   const CLOSING = ['\\EOF', 'E\\OF', '\\E\\O\\F', '-\\EOF', "E'OF'", 'E"OF"', "'E'OF", '"E"OF', 'E\\O"F"', "\\E'OF'"]
   for (const d of CLOSING) {
     test(`<<${d} rm`, () => {
@@ -129,7 +129,7 @@ describe('702-B10: a heredoc delimiter spelled with quotes or escapes closes as 
     expect(verdicts('true 2<<\\EOF\ngit push --force origin main\nrm -f /etc/x\nEOF')).toEqual([ALLOWED, ALLOWED, ALLOWED])
   })
 
-  // The twelfth spelling: Bash reads the delimiter E"O\F" as the word EO\F, which no line EOF closes, so the body runs to the
+  // The eleventh spelling: Bash reads the delimiter E"O\F" as the word EO\F, which no line EOF closes, so the body runs to the
   // end of the command and the lines after EOF are text. A correct allow at 4d4a20b5, and it stays one.
   test('E"O\\F" never closes at EOF: rm', () => {
     expect(verdicts('cat <<E"O\\F"\nbody\nEOF\nrm -f /etc/x')).toEqual([ALLOWED, ALLOWED, ALLOWED])

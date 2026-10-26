@@ -14,9 +14,11 @@ gate: it only refuses, and a miss is a read that reaches a nearly full window.
   and `git commit -m "release $(date +%F)"` still go through. `git commit -m "$(cat huge.log)"`,
   `cat < file`, `$(<file)`, `date -f file`, any other command, a relative-path command word
   (`./date`) and a substitution nested more than 8 deep are refused.
-- **Heredocs, command words and glued redirections are read as Bash reads them** (C2 to C4). An
-  opener line's tail is read, a delimiter is its word after quote removal, and a `<<` in `$((…))`,
-  `((…))` or a comment opens none, so a read behind them is refused. `\git add f`,
+- **Heredocs, command words and glued redirections are read closer to the way Bash reads them** (C2
+  to C4). An opener line's tail is read, a delimiter is its word after quote removal, and a `<<` in
+  `$((…))`, `((…))` or a comment opens none, so a read behind them is refused. Inside a `$(…)` a
+  heredoc also closes, as in Bash 5.3, at a line that starts with its delimiter and holds a `)`
+  after it, so the `EOF)` commit form goes through and a read after it is refused. `\git add f`,
   `{log}>/tmp/f git add f` and `git add f>/dev/null` read as `git add` and now go through; their
   ruled siblings (`\cat huge.log`) are refused. `./env git add f` is refused: a wrapper named by a
   relative path may be any local program. A redirect after a brace group or a `fi`, and a segment

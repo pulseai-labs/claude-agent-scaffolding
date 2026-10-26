@@ -80,9 +80,10 @@ commit is refused; a form the reader mis-reads goes through (Limits).
   A redirect after a brace group or a `fi` (`{ git add f; git commit -m m; } >log`) is not a
   command either, so that group is allowed.
 - **Heredocs.** A heredoc's delimiter is its word after quote removal, several heredocs on one line
-  close in order, a `<<` inside `$((…))`, `((…))` or a `#` comment opens none, and a quoted body is
-  text, never read for commands. A command on the opener line after the delimiter is read (the
-  exception is in Limits).
+  close in order, a heredoc inside a `$(…)` also closes at a line that starts with its delimiter and
+  holds a `)` after it (`EOF)`), as in Bash 5.3, a `<<` inside `$((…))`, `((…))` or a `#` comment
+  opens none, and a quoted body is text, never read for commands. A command on the opener line
+  after the delimiter is read (the exception is in Limits).
 - **Substitutions (INNER_OK).** A `$(…)` or backtick span runs before the call does, so it is read
   as commands of its own, in an unquoted heredoc body too. A call with a substitution goes through
   only if every command in it is `git add` or `git commit`, `cat` with no file operand (`-` or
@@ -247,14 +248,20 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   backstop. If it runs at or below the block threshold, it acts first. `/molt status` checks.
 - **Past the block threshold, a heredoc opener line holding a `$(…)`, a backtick or a `${…}` after
   its word keeps the 0.3.7 reading.** The commands after the substitution on that line are not
-  read (`git commit -F - <<EOF $(date); cat huge.log`). Inside a substitution such a line is
-  read, and so are the substitutions on it.
+  read (`git commit -F - <<EOF $(date); cat huge.log`, then a body line and `EOF`). Inside a
+  substitution such a line is read, and so are the substitutions on it.
 - **C6, the gate reads shapes, not grammar.** A construct other than the head words of the ladder
   table is refused even when everything in it is `git add` or `git commit`: a loop (`for`, `while`,
   `until`, `select`), `case`, `[[ … ]]`, `(( … ))`, `coproc`, the no-op `:` (`git add f; :`), and
   a function body (`f() { git commit -m m; }`, which only defines the function). A line that is a
   syntax error and runs nothing (`if git add f; git commit -m m`) reads as the commands it spells,
   and passes.
+- **An `EOF)` closing line in a `$(` opened on an earlier line is not seen closing,** so past the
+  block threshold `git commit -m "$(`, a newline, `cat <<'EOF'`, a body line and `EOF)"` is
+  refused. With the `$(` on the opener's line, or the `)` on a line of its own, it goes through.
+- **`>|` splits a command at its `|`.** `git add f >| out`, a redirection that overrides
+  `noclobber`, is refused past the block threshold, though Bash runs `git add f`;
+  `git add f > out` goes through.
 - **A relative command word reads as git outside a substitution.** `./git add f` and
   `bin/git add f` pass, as before; inside a substitution a relative command word is refused.
 - **The substitution reader is not a parser,** and in molt a miss lets a read through. A `#` after

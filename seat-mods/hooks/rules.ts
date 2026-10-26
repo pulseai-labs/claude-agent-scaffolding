@@ -82,8 +82,8 @@ const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup', 'time'])
 // backslash first joins the next, as in Bash. The bodies follow their line in opener
 // order; one with no closing line runs to the end of the command. Inside a `$(…)`, Bash
 // 5.3 also ends a body, with a warning, at a line that starts with the delimiter and holds
-// a `)` after it, and reads the rest of that line as command text: for the last opener on
-// its line, inside a `$(` opened on that line, the piece ends after the delimiter there and
+// a `)` after it, and reads the rest of that line as command text: for the last opener read
+// on its line, inside a `$(` opened on that line, the piece ends after the delimiter there and
 // the scan resumes after it (not in a backtick span, which Bash reads apart, and not on a
 // line a backslash joined).
 // After an unquoted opener the line's text stays command text (#724 A3, A9), and the line
@@ -398,7 +398,8 @@ export function scratchDirs(tmpdir: string | undefined): string[] {
 // What both glues append to the SEAT_MODS_ALLOW list: each scratch directory as given and as its realpath resolved it
 // (macOS: /tmp is a link to /private/tmp, so a target is inside by either spelling). A directory that does not resolve adds
 // nothing. Neither does one that holds the worktree: placeOf lets an allow directory outrank the worktree, so /tmp would
-// hand a reviewer the worktree of a seat whose tree lives under /tmp. That seat keeps the refusals it has today.
+// hand a reviewer the worktree of a seat whose tree lives under /tmp. That seat gets no scratch place there, and keeps the
+// refusals it had in 0.9.0.
 export function scratchAllow(scratch: readonly string[], resolved: readonly (string | undefined)[], root: string | undefined): string[] {
   const kept = scratch.flatMap((dir, i) => {
     const real = resolved[i]

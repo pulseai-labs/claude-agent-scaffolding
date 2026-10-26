@@ -124,12 +124,14 @@ Redirections, heredoc input and their destinations are excluded from `rm` operan
 An fd prefix such as `2<<EOF` supplies shell input. On every Bash rail a heredoc's delimiter is
 its word after Bash's quote removal (`<<\EOF`, `<<E'OF'` and `<<"E"OF` all close at a line
 `EOF`; `<<E"O\F"` closes only at `EO\F`), a body line ending in a backslash joins the next only
-in an unquoted body, several heredocs on one line close in order, and a `<<` inside `$((…))`,
-`((…))` or a `#` comment opens none. Words and redirections after the delimiter word on the
-opener line remain part of the command and meet the usual operand checks; only the opener, its
-body and its closing line are excluded, and a single `&` separates commands for `rm`. The
-exceptions are in Limits: a `$'…'` or `$"…"` delimiter, an opener line with a `$(…)`, a
-backtick or a `${…}` after the delimiter word, and a quoted `<<` after one of those. Every
+in an unquoted body, several heredocs on one line close in order, a heredoc inside a `$(…)` also
+closes at a line that starts with its delimiter and holds a `)` after it (`EOF)`), as in Bash 5.3,
+and a `<<` inside `$((…))`, `((…))` or a `#` comment opens none. Words and redirections after the
+delimiter word on the opener line remain part of the command and meet the usual operand checks;
+only the opener, its body and its closing line are excluded, and a single `&` separates commands
+for `rm`. The exceptions are in Limits: a `$'…'` or `$"…"` delimiter, an opener line with a `$(…)`, a
+backtick or a `${…}` after the delimiter word, a quoted `<<` after one of those, a `<<` inside an
+unquoted `$[…]` or a `${…}`, and an `EOF)` line the reader does not see closing. Every
 Bash rail skips the unquoted reserved words
 `if`, `then`, `elif`, `else`, `do`, `while`, `until`, `!`, `{`, `(` and `time` at a command's
 head, before assignments or execution wrappers. A path such as `/tools/if`, or `if` after
@@ -287,6 +289,7 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
   `--trailer`, or follows a backslash-newline inside single
   quotes, also passes.
 - A command inside `$(…)` or backticks is read as a command of its own when the substitution stands unquoted, in double quotes, on a heredoc opener line or in an unquoted heredoc body, except as the next lines of this list say. The reader finds a span's end by counting parentheses and quotes, not by parsing, so a `)` Bash does not count ends it early and the rest of that span is not read: a `case` pattern's `)` in a double-quoted `$(…)`, a `)` inside a `${…}` there (`"$(echo ${x:-)} "it's")" && git push --force 'x'`), and a backslash-newline between `$` and `(`. A command nested more than 8 substitutions deep is refused as `no force-push`, whatever it runs.
+- A backtick inside a quoted heredoc body inside a backtick span closes the span in Bash, and the text after it runs; the reader keeps the body whole, so a command there hides: `` x=`cat <<'EOF' ``, a newline, `` a ` ; git push --force ; ` ``, a newline, `EOF`, a newline and a closing backtick passes.
 - **Funsubs:** a command inside a Bash 5.3 `${ …; }` or `${| …; }` runs in the current shell and is read by no rail: `X="${ git push --force; }"` and `X="${ rm -rf /etc/x; }"` pass. A funsub anywhere in a call makes its directory unknown, so a relative `rm` in that call is refused.
 - Shell options changed in the same call (`shopt`, e.g. `extglob`, `dotglob`, `nullglob`) are not modelled beyond the `**` and dot-component denials.
 - `**` in an rm glob operand is unresolvable and denies; quoted literal `**` stays literal.
@@ -294,11 +297,13 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 - **C5, a `&` inside a word:** only a lone `&` inside an unquoted `${…}` or `$[…]` is masked. A `&` inside any other word still splits it, so `a[foo&git push --force ]=x` and `echo @(a&git push --force )` are denied though Bash runs no `git`.
 - **C8, a quoted tilde:** `rm ~""/scratch/x` and `rm ~''/scratch/x` read the tilde as `HOME`. Bash expands no tilde that is partly quoted and removes `<cwd>/~/scratch/x`. The usual outcome is a false stop; for a reviewer whose `SEAT_MODS_ALLOW` holds `$HOME/scratch`, the rm is placed there and passes while Bash removes in the session directory. A tilde quoted whole (`"~"/x`) reads as a relative name.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
-- A heredoc opener line holding a `$(…)`, a backtick or a `${…}` after the delimiter word is read as in 0.9.0: the rest of that line goes with the heredoc, so a ruled command after the substitution on that line stays hidden (`cat <<EOF $(date); git push --force`). So does a quoted `<<` after one of those on its line, as in the `"$(cat <<'EOF' … )"` commit form. Any other quoted `<<` is text, as in Bash.
+- A heredoc opener line holding a `$(…)`, a backtick or a `${…}` after the delimiter word is read as in 0.9.0: the rest of that line goes with the heredoc, so a ruled command after the substitution on that line stays hidden (`cat <<EOF $(date); git push --force`, then a body line and `EOF`). So does a quoted `<<` after one of those on its line, as in the `"$(cat <<'EOF' … )"` commit form. Any other quoted `<<` is text, as in Bash.
+- On such a line only the first opener is read, even when a second one stands before the substitution, so the second heredoc's body reads as commands, toward a stop: `cat <<A <<'B' "$(date)"`, then `a`, `A`, `rm -rf /etc/x` and `B` is refused, though Bash removes nothing.
+- An arithmetic `$((…))` that spans lines on such a line leaves the reader counting its parentheses past the heredoc, so a later quote or comment can hide a ruled command: `cat <<EOF $(date) $((1 +`, a newline, `2))`, a body line and `EOF`, then `echo hi # it's` and `git push --force 'x'` passes.
 - A `$'…'` or `$"…"` heredoc delimiter is read with its `$`, so its heredoc never closes at `EOF` and the lines after it can hide commands.
 - A `<<` inside an unquoted `$[…]` or inside a `${…}` still opens a heredoc for the reader (`X=$[1<<2]`, `echo ${x/<<a/b}`), though Bash runs it as arithmetic or a pattern. The lines after it, up to one that equals its delimiter word (`2]` and `a/b}` in those two examples), read as body, so a ruled command there is hidden: `X=$[1<<2]` then a newline and `git push --force` passes, and so does `rm -rf /etc/x` there.
 - Inside a double-quoted `$(…)`, a `#` after a blank in an inner quoted string still reads as a comment, as in 0.9.0, so the rest of that line is hidden (`git commit -m "$(echo "a # b")" && …`).
-- A heredoc whose closing line has more after the delimiter (`EOF)` in `git commit -m "$(cat <<'EOF' … EOF)" && git push --force`) is not seen closing, though Bash closes it with a warning, so the commands after it can hide. A backslash-newline inside a word reads as a blank where Bash deletes it: `r\<newline>m -rf /etc/x` is not read as an `rm`, and `git push --for\<newline>ce` is a push but not a force-push.
+- A heredoc inside a `$(…)` closes, as in Bash 5.3, at a body line that starts with its delimiter and holds a `)` after it, and the rest of that line is read as commands (`EOF)` in `git commit -m "$(cat <<'EOF' … EOF)" && git push --force`). The reader sees that close only when the `$(` opens on the heredoc's opener line, the heredoc is the last one the reader opens on that line, and no backslash joins the closing line to the one before it. Otherwise the heredoc is not seen closing, and the commands after it can hide: `x=$(`, a newline, `cat <<EOF`, a body line and `EOF) && git push --force` passes. A backslash-newline inside a word reads as a blank where Bash deletes it: `r\<newline>m -rf /etc/x` is not read as an `rm`, and `git push --for\<newline>ce` is a push but not a force-push.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
 - **A scratch directory that holds the seat's own worktree is not a scratch place for that seat.** A seat whose worktree lies under `/tmp` gets no `/tmp` place, and one under `$TMPDIR` gets no `$TMPDIR` place; a scratch directory that does not hold its tree still applies. An allowed directory outranks the worktree, so adding the one that holds it would let a reviewer edit its own tree. Writes there keep the refusals the seat had.
 - **A broad scratch directory opens other trees.** Other seats' worktrees under `/tmp`, or under a broad `$TMPDIR` such as `/home/dev`, are writable by any guarded seat whose own tree is elsewhere, the same as putting that value in `SEAT_MODS_ALLOW`. A `$TMPDIR` inside the worktree opens that subtree to a reviewer. `rm -rf /tmp/*` is allowed, so a seat can remove another session's scratch files.
