@@ -5,22 +5,26 @@ All notable changes to the `baton` plugin.
 ## 0.5.0 - 2026-10-27
 
 - **Orca host.** `"host": "orca"` in the config (`"t3"` is the default and stays so; any other
-  value fails the tick with `config: host must be "t3" or "orca"`) runs workers in Orca terminals.
-  `baton tick`, `disarm` (which closes kept threads) and `answer` build the host from that key; the
-  `baton t3` subcommands stay. An optional `orca` block gives `cli` (default `orca` on `PATH`, else
-  `~/.config/orca/cli/bin/orca`) and `launcher` (default baton's own `bin/baton-seat`). A thread is a
-  terminal and its id is the terminal handle. The T3 token-expiry notice runs on the T3 host only.
-  The T3 host is unchanged.
+  value fails `arm` and the tick with `config: host must be "t3" or "orca"`) runs workers in Orca
+  terminals. `baton tick`, `disarm` (which closes kept threads) and `answer` build the host from
+  that key; the `baton t3` subcommands stay. An optional `orca` block gives `cli` (default `orca`
+  on `PATH`, else `~/.config/orca/cli/bin/orca`) and `launcher` (default baton's own
+  `bin/baton-seat`). A thread is a terminal and its id is the terminal handle. The T3 token-expiry
+  notice runs on the T3 host only. The T3 host is unchanged.
 - **`bin/baton-seat`**, the launcher an Orca terminal runs: it reads the claim for its working
   directory, then execs `omp-seat <seat> --via <via> <message>` with an argv. It refuses with exit
   78 (one line on stderr, one in `claims/seat.log`) on no claim, a bad claim line, a claim with no
-  seat, or a message file that is missing or 131072 bytes or more; it deletes the message file after
-  reading it. No message text passes through a shell: only the launcher and message-file paths do.
-- **Orca status** comes from recorded Orca 1.4.238 replies: a terminal not listed is `gone`; an agent
-  `working` is `active`; `waiting` or `blocked` is `waiting`; `done` is `completed`, or `interrupted`
-  when Orca says so. A missing agent row or any other value is `active`, never `completed`. A
-  truncated `terminal list` or `worktree ps` reply is host down, not `gone`. Interrupt sends Escape
-  (`terminal send --interrupt` does not stop an omp turn).
+  seat or via, a message file that is missing or 131072 bytes or more, or an `omp-seat` it cannot
+  run (the message file stays); it deletes the message file after reading it. No message text
+  passes through a shell: only the working directory, state dir, launcher and message-file paths
+  do.
+- **Orca status** comes from recorded Orca 1.4.238 replies: a terminal not listed is `gone` only
+  when `terminal read` confirms it (a terminal-gone error or status `exited`), else host down; an
+  agent `working` is `active`; `waiting` or `blocked` is `waiting`; `done` is `completed`, or
+  `interrupted` when Orca says so. A missing agent row or any other value is `active`, never
+  `completed`. A truncated `terminal list` or `worktree ps` reply, or one that does not cover the
+  local host, is host down, not `gone`. Interrupt sends Escape (`terminal send --interrupt` does
+  not stop an omp turn).
 - **Optional host methods `close`, `screen` and `respond`.** On a host with `close` (Orca), every
   session end closes its terminal before the launch directory is released, except a park (kept until
   `unpark` or `disarm`) and an end after an `interrupted` status (kept until the run ends). Triage,
@@ -42,10 +46,11 @@ All notable changes to the `baton` plugin.
 - **Narrowing.** A T3 request with several questions used to be answerable by triage through the raw
   T3 tool; `baton answer` refuses it, so triage writes a note instead.
 - Known limits on Orca: a picker opened between turns reads `done`; an aborted omp turn reads
-  `completed`; a worker with a live async subagent stays `working` after Escape until the subagent
-  ends; after an Orca restart a live worker reads `active` until its next hook event. Orca gives
-  an omp question's text but not its options, so an Orca host has no `respond` and triage cannot
-  answer there.
+  `completed`; a worker in an `ask` dialog or with a live async subagent may keep running after
+  Escape, and a park keeps its terminal, so it can run until `unpark` or `disarm`; `disarm` leaves
+  live (non-parked) workers running, with their terminals and per-launch worktrees; after an Orca
+  restart a live worker reads `active` until its next hook event. Orca gives an omp question's
+  text but not its options, so an Orca host has no `respond` and triage cannot answer there.
 
 ## 0.4.0 - 2026-10-25
 

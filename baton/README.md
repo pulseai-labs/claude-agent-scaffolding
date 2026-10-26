@@ -35,8 +35,9 @@ days and the re-approval is manual: `baton t3 token-status` shows the days left.
 ## Orca host
 
 `"host": "orca"` in the config runs each worker in an Orca terminal instead of a T3 thread; the
-default stays `"t3"`. Any other value fails the tick with `config: host must be "t3" or "orca"`.
-A thread is a terminal: its id is the terminal handle, and the title ends with `[baton <nonce>]`.
+default stays `"t3"`. Any other value fails `arm` and the tick with
+`config: host must be "t3" or "orca"`. A thread is a terminal: its id is the terminal handle, and
+the title ends with `[baton <nonce>]`.
 A recipe's `project` (and the example's `ai_project`) names an Orca repo by its display name; none,
 or two, with that name refuses the launch. The T3 token-expiry notice is raised on the T3 host only.
 
@@ -48,20 +49,25 @@ Config keys (all optional; the `orca` block sits beside `host`):
 - `orca.launcher`: the script the terminal runs. Default: baton's own `bin/baton-seat`.
 
 The launcher. The host writes the launch message to a file under `<state>/orca/messages/` and runs
-`orca terminal create` with the command `cd '<cwd>' && exec '<launcher>' '<message file>'`; only
-those paths reach a shell. `bin/baton-seat` reads the claim for its directory (the same claim file
-and keys as `omp-t3-claim`), reads and deletes the message file, and execs
+`orca terminal create` with the command
+`cd '<cwd>' && BATON_STATE_DIR='<state dir>' exec '<launcher>' '<message file>'` (an Orca terminal
+inherits orca-serve's environment, not the timer's); only those paths reach a shell.
+`bin/baton-seat` reads the claim for its directory (the same claim file and keys as
+`omp-t3-claim`), reads and deletes the message file, and execs
 `omp-seat <seat> --via <via> <message>`. It refuses with exit 78, one line on stderr and one in
-`<state>/claims/seat.log`, on no claim, a bad claim line, a claim with no seat or via, or a message
-file that is missing or 131072 bytes or more; it never starts a seat without its claim.
+`<state>/claims/seat.log`, on no claim, a bad claim line, a claim with no seat or via, a message
+file that is missing or 131072 bytes or more, or an `omp-seat` it cannot run (the message file
+stays); it never starts a seat without its claim.
 
 Status and interrupt. From `orca terminal list` and `orca worktree ps`: a terminal not listed is
-`gone`; an agent `working` is `active`; `waiting` or `blocked` is `waiting`; `done` is `completed`
-(`interrupted` when Orca says so). A missing agent row or an unknown state is `active`, never
-`completed`, and a truncated list is a host outage, never `gone`. Interrupt sends Escape to the
-terminal. A session end closes its terminal before the launch directory is released, except a park
-(the terminal stays until `unpark` or `disarm`) and an end after `interrupted` (it stays until the
-run ends); triage, driver and molt-parent terminals close too.
+`gone` only when `orca terminal read` confirms it (a terminal-gone error or status `exited`), and a
+host outage otherwise; an agent `working` is `active`; `waiting` or `blocked` is `waiting`; `done`
+is `completed` (`interrupted` when Orca says so). A missing agent row or an unknown state is
+`active`, never `completed`, and a truncated list, or one that does not cover the local host, is a
+host outage, never `gone`. Interrupt sends Escape to the terminal. A session end closes its
+terminal before the launch directory is released, except a park (the terminal stays until `unpark`
+or `disarm`) and an end after `interrupted` (it stays until the run ends); triage, driver and
+molt-parent terminals close too.
 
 The blocked park. A worker in `waiting` with no structured question (an omp `ask` dialog shows as
 `blocked` with its text but no options) parks at once, on the next tick, and keeps its terminal: no
@@ -88,8 +94,12 @@ Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
 - A picker opened between turns (an omp `/review` picker) leaves the agent row `done`, so the worker
   reads `completed`, not blocked.
 - An aborted omp turn reads `completed`: Orca does not report `interrupted` for it.
-- A worker with a live async subagent stays `working` after Escape until the subagent ends; the
-  stall path then closes the terminal, which ends the subagent too.
+- Escape aborts a plain omp turn, but a worker in an `ask` dialog or with a live async subagent may
+  keep running after it (a subagent keeps the worker `working` until it ends). The first stall ends
+  the session and closes its terminal, but a park (the second stall, or a stop file) keeps the
+  terminal, so such a worker can keep running until `unpark` or `disarm`.
+- `baton disarm` leaves live (non-parked) workers running, as on T3; on Orca their terminals and
+  per-launch worktrees stay until you close them by hand.
 - After an Orca restart the terminals and their processes survive, but a live worker has no agent
   row until its next hook event and reads `active`: a worker blocked across a restart is caught by
   the stall rule, not the blocked park.
