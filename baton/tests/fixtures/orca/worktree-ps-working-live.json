@@ -1,0 +1,74 @@
+{
+  "id": "865697c3-e92b-44df-9430-d3ff98c0f7e5",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+        "repoId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e",
+        "hostId": "local",
+        "terminalPlatform": "linux",
+        "repo": "pilot-fourseat",
+        "path": "/home/dev/projects/pilot-fourseat",
+        "branch": "refs/heads/main",
+        "isArchived": false,
+        "isMainWorktree": true,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": true,
+        "worktreeInstanceId": "6d70ff84-ff58-4928-85bd-49a7e3a1acee",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "displayName": "main",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1793037704174,
+        "lastActivityAt": 1793037838390,
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": true,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1793041186595,
+        "preview": "che/plugins/claude-agent-scaffolding___seat-mods___0.9.0\nplugin bin path skipped: molt has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___molt___0.3.5\nplugin bin path skipped: crew has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___crew___0.4.3",
+        "status": "working",
+        "agents": [
+          {
+            "paneKey": "dafb4bc6-ca08-4759-b13c-7e963f530665:43f233b7-a46b-48a0-846f-10102411b84b",
+            "parentPaneKey": null,
+            "state": "working",
+            "agentType": "omp",
+            "prompt": "Run the bash command: sleep 60. Then reply done.",
+            "taskTitle": null,
+            "displayName": null,
+            "lastAssistantMessage": null,
+            "toolName": null,
+            "toolInput": null,
+            "interrupted": false,
+            "stateStartedAt": 1793041155267,
+            "updatedAt": 1793041155269
+          }
+        ],
+        "terminalVerdict": "live"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "totalCount": 84,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "26a412c9-87ac-4172-9872-b1eca867b633"
+  }
+}
