@@ -390,6 +390,8 @@ describe("ossify-spine triage", () => {
       expect([ph, t.message.includes(ph)]).toEqual([ph, true]);
     }
     expect(t.message).toContain("{param.briefs}/triage.md");
+    // `baton answer` takes the run and the unit; the message is where the seat reads them.
+    expect(t.message).toContain("Run: {run.id}. Unit: {unit.id}.");
   });
 
   test("triage brief checks the stop rule before answering", () => {
@@ -424,8 +426,8 @@ describe("ossify-spine triage", () => {
   test("triage brief names the three actions and the answer shape", () => {
     const b = brief("triage.md");
     for (const pin of [
-      "t3_pending_request_respond", "keyed by the question id", "triage-note.md", "$SPINE_STOP_FILE",
-      "never approve a merge", "{ threadId, requestId, answers }", "exactly",
+      "baton answer <run> <unit> \"<label>\"", "the chosen option's `label`, exactly", "A refusal (exit 2)", "triage-note.md",
+      "$SPINE_STOP_FILE", "never approve a merge",
     ]) {
       expect([pin, b.includes(pin)]).toEqual([pin, true]);
     }

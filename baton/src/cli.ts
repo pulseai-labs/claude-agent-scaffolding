@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
 import { exitCode, tick, unparkUnit } from "./engine.ts";
 import { GhForge } from "./forge.ts";
-import { HostAuthError, HostDownError, type Host } from "./host.ts";
+import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
 import { hostKind, makeHost } from "./hosts/select.ts";
 import { loadT3Config } from "./hosts/t3.ts";
@@ -20,6 +20,7 @@ const USAGE = [
   "       baton status [<run>]",
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
+  "       baton answer <run> <unit> <label>",
   "       baton report <run>",
   "       baton tick [--run <id>]",
   "       baton t3 call <tool> <json-object>",
@@ -46,6 +47,7 @@ export async function main(argv: string[]): Promise<number> {
     case "status": return statusCmd(rest);
     case "disarm": return disarmCmd(rest);
     case "unpark": return unparkCmd(rest);
+    case "answer": return answerCmd(rest);
     case "report": return reportCmd(rest);
     case "tick": return tickCmd(rest);
     case "t3": return t3Cmd(rest);
@@ -326,6 +328,48 @@ async function unparkCmd(args: string[]): Promise<number> {
     store.writeRun(run);
     store.event(runId!, { kind: "unpark", unit: unitId, stage, ...(consumed !== undefined ? { consumed } : {}) });
     return 0;
+  });
+}
+
+// ---- answer ---------------------------------------------------------------------------
+// The one answer path for a worker's pending question. rc 0 sent, 2 refused, 3 host auth, 4 host down.
+// It answers one question with one option, by the option's exact label (byte for byte); anything
+// else is left to whoever can read the screen.
+
+async function answerCmd(args: string[]): Promise<number> {
+  if (args.length !== 3) return usage();
+  const [runId, unitId, label] = args;
+  return locked(async () => {
+    const store = openStore();
+    let run: RunState;
+    try {
+      run = store.readRun(runId);
+    } catch {
+      return fail(`no such run: ${runId}`);
+    }
+    const unit = own(run.units, unitId);
+    if (!unit) return fail(`no such unit: ${unitId}`);
+    const thread = unit.session?.thread_id;
+    if (!thread) return fail("no live session");
+    try {
+      const host = makeHost();
+      if (!host.respond) return fail("host cannot answer");
+      const pending = (await host.status(thread)).pending;
+      if (!pending || pending.questions.length === 0) return fail("no pending request");
+      if (pending.questions.length > 1) return fail("several questions");
+      const q = pending.questions[0];
+      if (q.multiSelect === true) return fail("multi-select");
+      if (!q.options.some((o) => o.label === label)) return fail(`no option labelled "${label}"`);
+      await host.respond(thread, pending.id, { [q.id]: label });
+      store.event(runId, { kind: "answered", unit: unitId, request: pending.id, label });
+      return 0;
+    } catch (e) {
+      process.stderr.write(`baton answer: ${(e as Error).message}\n`);
+      if (e instanceof AnswerRefused) return 2;
+      if (e instanceof HostAuthError) return 3;
+      if (e instanceof HostDownError) return 4;
+      return 2;
+    }
   });
 }
 

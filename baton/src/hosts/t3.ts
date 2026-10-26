@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type PendingQuestion, type PendingRequest, type ThreadStatus } from "../host.ts";
+import { AnswerRefused, HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type PendingQuestion, type PendingRequest, type ThreadStatus } from "../host.ts";
 import { bindLaunchDir, git, isLaunchDir, releaseLaunchDir } from "./launch-dir.ts";
 import { callTool, callToolClassified, readToken, type ToolCall } from "./mcp.ts";
 
@@ -191,6 +191,20 @@ export class T3Host implements Host {
     if (isToolError(res)) {
       if (errorCode(res) === "thread_not_found") return;
       throw new HostDownError(`t3_thread_interrupt: ${describe(res)}`);
+    }
+  }
+
+  /**
+   * Send `answers` (question id to chosen label) for the pending request. T3's own tool error
+   * is a refusal of this answer; an RPC or protocol failure leaves the outcome unknown, so the
+   * host is down for the caller.
+   */
+  async respond(threadId: string, requestId: string, answers: Record<string, string>): Promise<void> {
+    const res = await callToolClassified(this.base, this.token(), "t3_pending_request_respond", { threadId, requestId, answers });
+    if (res.kind === "tool_error") throw new AnswerRefused(`t3_pending_request_respond: ${describe({ error: res.error })}`);
+    if (res.kind === "protocol") throw new HostDownError(`t3_pending_request_respond outcome unknown: ${res.cause}`);
+    if (res.kind === "rpc_error") {
+      throw new HostDownError(`t3_pending_request_respond outcome unknown: JSON-RPC error ${describe({ error: res.error })}`);
     }
   }
 
