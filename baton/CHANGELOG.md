@@ -2,6 +2,51 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.5.0 - 2026-10-27
+
+- **Orca host.** `"host": "orca"` in the config (`"t3"` is the default and stays so; any other
+  value fails the tick with `config: host must be "t3" or "orca"`) runs workers in Orca terminals.
+  `baton tick`, `disarm` (which closes kept threads) and `answer` build the host from that key; the
+  `baton t3` subcommands stay. An optional `orca` block gives `cli` (default `orca` on `PATH`, else
+  `~/.config/orca/cli/bin/orca`) and `launcher` (default baton's own `bin/baton-seat`). A thread is a
+  terminal and its id is the terminal handle. The T3 token-expiry notice runs on the T3 host only.
+  The T3 host is unchanged.
+- **`bin/baton-seat`**, the launcher an Orca terminal runs: it reads the claim for its working
+  directory, then execs `omp-seat <seat> --via <via> <message>` with an argv. It refuses with exit
+  78 (one line on stderr, one in `claims/seat.log`) on no claim, a bad claim line, a claim with no
+  seat, or a message file that is missing or 131072 bytes or more; it deletes the message file after
+  reading it. No message text passes through a shell: only the launcher and message-file paths do.
+- **Orca status** comes from recorded Orca 1.4.238 replies: a terminal not listed is `gone`; an agent
+  `working` is `active`; `waiting` or `blocked` is `waiting`; `done` is `completed`, or `interrupted`
+  when Orca says so. A missing agent row or any other value is `active`, never `completed`. A
+  truncated `terminal list` or `worktree ps` reply is host down, not `gone`. Interrupt sends Escape
+  (`terminal send --interrupt` does not stop an omp turn).
+- **Optional host methods `close`, `screen` and `respond`.** On a host with `close` (Orca), every
+  session end closes its terminal before the launch directory is released, except a park (kept until
+  `unpark` or `disarm`) and an end after an `interrupted` status (kept until the run ends). Triage,
+  driver and molt-parent threads are closed too. The T3 host defines `respond` only: its sessions
+  end as in 0.4.0.
+- **Blocked park** (only on a host with `screen`). A worker in `waiting` with no structured question
+  parks at once and keeps its session and terminal; nothing is interrupted and the claim and
+  directory stay. The notice reads `baton <run>/<unit> blocked in <stage> (project <project>): the
+  worker waits on a question — answer it in the worker's terminal — screen: <tail>`. The park clears
+  itself when the worker moves on. `baton unpark <run> <unit>` clears it by hand and `--to <stage>`
+  ends the session and moves the unit. A stop file wins over a blocked park, and `disarm` closes the
+  worker. No driver takes it, no stall clock runs on it, and the run summary counts it as "sent to
+  you".
+- **`baton answer <run> <unit> <label>`** answers the unit's pending question by the option's exact
+  label (rc 0 sent, 2 refused, 3 host auth, 4 host down). It answers one question with one option:
+  a request with several questions or a multi-select, an unknown label, no pending request or a host
+  with no `respond` is refused. The example recipe's triage brief now uses it in place of the raw
+  T3 tool, and the triage message carries `{run.id}`.
+- **Narrowing.** A T3 request with several questions used to be answerable by triage through the raw
+  T3 tool; `baton answer` refuses it, so triage writes a note instead.
+- Known limits on Orca: a picker opened between turns reads `done`; an aborted omp turn reads
+  `completed`; a worker with a live async subagent stays `working` after Escape until the subagent
+  ends; after an Orca restart a live worker reads `active` until its next hook event. Orca gives
+  an omp question's text but not its options, so an Orca host has no `respond` and triage cannot
+  answer there.
+
 ## 0.4.0 - 2026-10-25
 
 - A recipe may carry a top-level `driver` stage. When a unit parks, a driver session reads the

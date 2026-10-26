@@ -3,6 +3,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import type { Host } from "../host.ts";
 import { configPath } from "../notify.ts";
+import { loadOrcaConfig, OrcaHost } from "./orca.ts";
 import { loadT3Config, T3Host } from "./t3.ts";
 
 export type HostKind = "t3" | "orca";
@@ -27,6 +28,6 @@ export function hostKind(): HostKind {
 
 export function makeHost(): Host {
   if (testHost) return testHost;
-  if (hostKind() === "orca") throw new Error("orca host not built");
+  if (hostKind() === "orca") return new OrcaHost(loadOrcaConfig());
   return new T3Host(loadT3Config());
 }
