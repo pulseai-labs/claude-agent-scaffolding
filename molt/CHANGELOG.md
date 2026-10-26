@@ -41,8 +41,9 @@ gate: it only refuses, and a miss is a read that reaches a nearly full window.
   `case`, `[[`, `((`, `:` and function bodies are refused; a syntax error reads as the commands it
   spells) and C7 (the progress count reads text, not control flow) are unchanged. A heredoc opener
   line holding a substitution keeps the 0.3.7 reading, so a read after it stays hidden; so do a `#`
-  after a blank in a quoted string inside `"$(…)"`, a Bash 5.3 funsub and a backslash-newline between
-  `$` and `(`. `./git add f` outside a substitution still passes.
+  after a blank in a quoted string inside `"$(…)"`, a Bash 5.3 funsub, a backslash-newline between
+  `$` and `(`, a `<<` inside an unquoted `$[…]` or a `${…}` (it opens a heredoc for the reader) and
+  `date $'-f' file` inside a substitution. `./git add f` outside a substitution still passes.
 
 ## 0.3.7 — 2026-10-24
 

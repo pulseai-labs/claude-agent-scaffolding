@@ -14,14 +14,16 @@ judge as before.
   environment on both hosts; a symlinked `/tmp` counts by both spellings. The directory itself and
   its ancestors stay protected from `rm`, and `rm -rf /tmp/*` is allowed: the accepted cost is that
   a seat can remove another session's scratch files. A scratch directory that holds the seat's own
-  worktree is not added (an allowed directory outranks the worktree), so such a seat keeps its
-  refusals. Other seats' trees under a broad `$TMPDIR` become writable, as `SEAT_MODS_ALLOW` would
-  make them.
-- **`rm` follows a literal `cd` and literal variables in the same call.** `cd "$WT" && rm -rf
-  pf/__pycache__` is placed instead of refused. A `cd` before `;` or a newline may fail, so the rm
-  after it is checked in every directory it may run in; a variable stays known only across literal
-  assignments, a literal `cd` and a bare `rm`. A `cd` in a subshell, an `if`, after `||` or in a
-  pipeline, `cd -`, `cd ..`, a Bash 5.3 funsub and every other command stay unresolved, as before.
+  worktree is not added for that seat (an allowed directory outranks the worktree), so it keeps its
+  refusals there; its other scratch places still apply. Other seats' trees under a broad `$TMPDIR`
+  become writable, as `SEAT_MODS_ALLOW` would make them.
+- **`rm` follows a literal `cd` and literal variables in the same call.** `cd /w/wt && rm -rf
+  pf/__pycache__` and `WT=/w/wt; cd "$WT" && rm -rf pf/__pycache__` are placed instead of refused;
+  `cd "$WT" && rm …` with no `WT=` earlier in the call is still unresolved. A `cd` before `;` or a
+  newline may fail, so the rm after it is checked in every directory it may run in; a variable stays
+  known only across literal assignments, a literal `cd` and a bare `rm`. A `cd` in a subshell, an
+  `if`, after `||` or in a pipeline, `cd -`, `cd ..`, `pushd`, `popd`, a Bash 5.3 funsub and every
+  other directory change stay unresolved, as before.
   A `CDPATH`, a `cd` alias, a shell-snapshot function that changes directory (zoxide's `z`) and
   zsh's `cd` are not modelled.
 - **Commands inside `$(…)` and backticks are read** (C1), unquoted, in double quotes, on a heredoc
@@ -31,8 +33,9 @@ judge as before.
   accepted false stop no honest command reaches.
 - **Heredocs are read as Bash reads them** (C2). The tail of an opener line is read
   (`cat <<EOF; git push --force`), a delimiter is its word after quote removal (`<<\EOF`,
-  `<<E'OF'`, `<<"E"OF`), several heredocs on a line close in order, a backslash-newline joins only
-  inside an unquoted body, and a `<<` in `$((…))`, `((…))` or a comment opens none. `<<E'OF'` with a
+  `<<E'OF'`, `<<"E"OF`), several heredocs on a line close in order, a body line ending in a
+  backslash joins the next only in an unquoted body, and a `<<` in `$((…))`, `((…))` or a comment
+  opens none. `<<E'OF'` with a
   body line `E` was a false stop and is allowed.
 - **The command word and glued redirections are read** (C3, C4): `\rm -rf …`, `\git push --force`,
   `{log}>f rm -rf …` and `git push --force>&2` (also `&>f`, `-f>/dev/null`) are denied.
@@ -43,11 +46,14 @@ judge as before.
   `SUBSTITUTION_TOO_DEEP` are copied byte for byte into molt 0.3.8's `hooks/shell.ts`, held by
   `tests/test-mod-shell-parity.sh`.
 - **Still limits, now written down in the README.** A ruled command after a substitution on a
-  heredoc opener line stays hidden, as in 0.9.0; so do a `$'EOF'` delimiter, a `#` after a blank in
+  heredoc opener line stays hidden, as in 0.9.0; so do a `$'EOF'` delimiter, a `<<` inside an
+  unquoted `$[…]` or a `${…}` (it opens a heredoc for the reader), a `#` after a blank in
   a quoted string inside `"$(…)"`, a command in a Bash 5.3 funsub, a quoted command word
   (`"rm" …`), a subscripted prefix (`A[0]=1 rm …`), a closing line `EOF)`, a backslash-newline
-  inside a word and the spans whose end the reader loses. C5 (a `&` inside a word), C6 (function
-  bodies and syntax errors) and C8 (a partly quoted tilde) still read wrongly toward a false stop.
+  inside a word and the spans whose end the reader loses. C5 (a `&` inside a word) and C6 (function
+  bodies and syntax errors) still read wrongly toward a false stop. C8 (a partly quoted tilde,
+  `rm ~""/x`) is a false stop too, but for a reviewer whose `SEAT_MODS_ALLOW` holds `$HOME/scratch`
+  it passes while Bash removes `<cwd>/~/scratch/x`.
 
 ## 0.9.0 — 2026-10-20
 

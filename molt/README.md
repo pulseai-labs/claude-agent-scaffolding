@@ -22,7 +22,7 @@ state; it reads two environment variables.
 | 40% (`warnPercent`) | Once, after the next tool result (or with the next prompt when the turn ended first), a warning: find a good point to hand off. Work continues. | The same, plus "tell your parent". molt appends `warned 40` to the status file. |
 | 50% (`warnAgainPercent`) | Once, a second warning: the handoff is past due. Work continues. | The same; `warned 50`. |
 | 65% (`commandPercent`) | Once, after a tool result: finish the step in hand and write the handoff now. At the end of a turn with no `MOLT-HANDOFF:` line, or with one that names a file that does not exist, the Stop reflex blocks the stop and asks again, at most twice. | The same; `handoff required`. |
-| 75% (`blockPercent`) | Only Write, Edit, Skill, and Bash whose every command is `git add` or `git commit` run — a leading head word (`if`, `then`, `elif`, `else`, `!`, `{`, `time`) is skipped, a segment that only closes one (`fi`, `}`) is ignored, and a lone `&` splits commands as `;` does (`&&` and the redirections that carry `&` are untouched). A loop head (`while`, `until`, `do`) is not skipped, so a loop stays refused. Every other tool call, reads included, is refused with the instruction and a note on the block. A command substitution in such a Bash call must itself be one of those commands (The gate, below). | The same. |
+| 75% (`blockPercent`) | Only Write, Edit, Skill, and Bash whose every command is `git add` or `git commit` run — a leading head word (`if`, `then`, `elif`, `else`, `!`, `{`, `time`) is skipped, a segment that only closes one (`fi`, `}`) is ignored, and a lone `&` splits commands as `;` does (`&&` and the redirections that carry `&` are untouched). A loop head (`while`, `until`, `do`) is not skipped, so a loop stays refused. Every other tool call, reads included, is refused with the instruction and a note on the block. A command substitution in such a Bash call is read as commands of its own and goes through only if each is `git add`, `git commit`, `cat` on its stdin, `date` without `-f`, `printf` or `echo` (The gate, below). | The same. |
 | 80% (block + `fallbackMargin`) | molt stops waiting. With no handoff, it writes one: Haiku summarises the transcript into `~/.claude/state/molt/briefs/<id>.md`, above the facts molt extracts itself (files written, commits, issues, the last request). If Haiku fails, the facts alone stand in. molt molts on that brief. | The brief is written and handed off: `handed-off <brief path>`. No clear. |
 
 A warning never blocks a stop. Past 65% only the command is delivered; a warning the session
@@ -259,10 +259,17 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   `bin/git add f` pass, as before; inside a substitution a relative command word is refused.
 - **The substitution reader is not a parser,** and in molt a miss lets a read through. A `#` after
   a blank in a quoted string inside a double-quoted `$(…)` hides the rest of the line
-  (`git commit -m "$(echo "a # b")" && cat huge.log`), as in seat-mods 0.9.0. A Bash 5.3 funsub,
+  (`git commit -m "$(echo "a # b")" && cat huge.log`), as in molt 0.3.7. A Bash 5.3 funsub,
   `"${ cat huge.log; }"`, is read by no rail. A backslash-newline between `$` and `(`
   (`"$\<newline>(cat huge.log)"`) hides the span. The gate steers: what it misses goes on to the
   session's permission mode and its own care.
+- **A `<<` inside an unquoted `$[…]` or a `${…}` still opens a heredoc for the reader** (as in
+  seat-mods), though Bash runs it as arithmetic or a pattern. The lines after it read as body, so a
+  read there passes the gate: `git add f $[1<<2]` then a newline and `cat huge.log`, and the same
+  with `${x/<<a/b}`.
+- **`date` with a `$'…'` or `$"…"` flag passes inside a substitution.**
+  `git commit -m "$(date $'-f' huge.log)"` and `$(date $"-f" huge.log)` are not refused, though
+  `date` reads the file; `-f`, `'-f'`, `"-f"` and `--file` are.
 - **A Bash write is not progress unless it commits.** The autopilot loop guard counts Write,
   Edit, NotebookEdit and `git commit`; `sed -i` or `cat >` alone reads as no progress. A
   `git commit` counts only bare, or behind `time`: a `{ … }` segment cannot be told from a

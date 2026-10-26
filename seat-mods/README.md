@@ -106,9 +106,9 @@ variables section below reads it; any other recognised `cd`, `pushd` or `popd` m
 operands unresolvable and denies them. Absolute operands remain eligible. `worktreeOf()` keeps
 its existing behavior: the worktree is derived from that live directory.
 
-Operands containing parameter expansions or command substitutions, a variable no literal
-assignment in the same call gave, and `~user`, `~+` and `~-` operands, cannot be resolved and are
-denied, including `rm -rf "$OLDPWD"`.
+Operands containing a command substitution, a parameter expansion other than a plain `$NAME` or
+`${NAME}` that a literal assignment in the same call gave (`${NAME:-x}`, `${#NAME}`, `${HOME}`), and
+`~user`, `~+` and `~-` operands, cannot be resolved and are denied, including `rm -rf "$OLDPWD"`.
 Single-quoted text and escaped characters are literal. Any other `$` in an operand is treated as
 unresolvable, including an inert dollar sign. Bare `~` and `~/...` use `HOME`. A glob is placed by
 the directory of its literal
@@ -154,10 +154,11 @@ the server) exactly as if seat-mods were absent. For each way the reader looks a
   A command nested more than 8 substitutions deep is refused, reported as `no force-push`. That is
   an accepted false stop: no honest command nests that deep.
 - **Heredocs.** Stops a ruled command on a heredoc's opener line after the delimiter
-  (`cat <<EOF; git push --force`), on the line after its closing line, and after a `<<` that opens
-  no heredoc. Leaves the body and the closing line, which are text, and the fallback in Limits: when
-  an opener line holds a `$(…)`, a backtick or a `${…}` after the delimiter word, a ruled command
-  after the substitution on that line stays hidden, as in 0.9.0.
+  (`cat <<EOF; git push --force`), on the line after its closing line, and after a `<<` inside
+  `$((…))`, `((…))` or a `#` comment, which open no heredoc. Leaves the body and the closing line,
+  which are text, and the fallbacks in Limits: when an opener line holds a `$(…)`, a backtick or a
+  `${…}` after the delimiter word, a ruled command after the substitution on that line stays hidden,
+  as in 0.9.0; and a `<<` in an unquoted `$[…]` or a `${…}` still opens a heredoc.
 - **The command word and glued redirections.** Stops a ruled command whose head is escaped
   (`\rm -rf …`, `\git push --force`), follows a named descriptor (`{log}>f rm -rf …`), or has a
   redirection glued to a flag (`git push --force>&2`, `--force&>f`, `-f>/dev/null`). Leaves a
@@ -179,8 +180,9 @@ names two more limits of the scratch places.
 
 A relative operand is placed from the session's directory. Inside one call the reader follows a
 literal `cd <path>` and literal `NAME=value` assignments in a plain `;`, `&&` or newline sequence
-from the call's start, so `cd "$WT" && rm -rf pf/__pycache__` is placed, and so is `rm -f pf/x`
-after `WT=/w/wt; cd "$WT"` and a newline.
+from the call's start, so `cd /w/wt && rm -rf pf/__pycache__` is placed, and so is
+`WT=/w/wt; cd "$WT" && rm -rf pf/__pycache__`. With no `WT=` earlier in the call, `cd "$WT"` names an
+unknown variable and the `rm` after it is unresolved.
 
 - A `cd` before `;` or a newline may fail, and Bash then runs the next command where it stood. So
   an `rm` after one is checked in every directory it may run in, one target each, and every target
@@ -294,10 +296,11 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 - One-word runners beyond the recognised wrappers (`timeout`, `nice`, `stdbuf`, `setsid`, `xargs`) can hide `rm`.
 - A heredoc opener line holding a `$(…)`, a backtick or a `${…}` after the delimiter word is read as in 0.9.0: the rest of that line goes with the heredoc, so a ruled command after the substitution on that line stays hidden (`cat <<EOF $(date); git push --force`). So does a quoted `<<` after one of those on its line, as in the `"$(cat <<'EOF' … )"` commit form. Any other quoted `<<` is text, as in Bash.
 - A `$'…'` or `$"…"` heredoc delimiter is read with its `$`, so its heredoc never closes at `EOF` and the lines after it can hide commands.
+- A `<<` inside an unquoted `$[…]` or inside a `${…}` still opens a heredoc for the reader (`X=$[1<<2]`, `echo ${x/<<a/b}`), though Bash runs it as arithmetic or a pattern. The lines after it, up to one that equals its delimiter word (`2]` and `a/b}` in those two examples), read as body, so a ruled command there is hidden: `X=$[1<<2]` then a newline and `git push --force` passes, and so does `rm -rf /etc/x` there.
 - Inside a double-quoted `$(…)`, a `#` after a blank in an inner quoted string still reads as a comment, as in 0.9.0, so the rest of that line is hidden (`git commit -m "$(echo "a # b")" && …`).
 - A heredoc whose closing line has more after the delimiter (`EOF)` in `git commit -m "$(cat <<'EOF' … EOF)" && git push --force`) is not seen closing, though Bash closes it with a warning, so the commands after it can hide. A backslash-newline inside a word reads as a blank where Bash deletes it: `r\<newline>m -rf /etc/x` is not read as an `rm`, and `git push --for\<newline>ce` is a push but not a force-push.
 - Paths changed earlier in the same call (`ln -s`, `mv`, `mkdir` before `rm`) are checked against the filesystem as it stands before the call runs.
-- **A seat whose worktree lies under `/tmp` or `$TMPDIR` gets no scratch places.** A scratch directory that holds the seat's worktree is not added: an allowed directory outranks the worktree, so adding it would let a reviewer edit its own tree. That seat keeps the refusals it had for scratch writes.
+- **A scratch directory that holds the seat's own worktree is not a scratch place for that seat.** A seat whose worktree lies under `/tmp` gets no `/tmp` place, and one under `$TMPDIR` gets no `$TMPDIR` place; a scratch directory that does not hold its tree still applies. An allowed directory outranks the worktree, so adding the one that holds it would let a reviewer edit its own tree. Writes there keep the refusals the seat had.
 - **A broad scratch directory opens other trees.** Other seats' worktrees under `/tmp`, or under a broad `$TMPDIR` such as `/home/dev`, are writable by any guarded seat whose own tree is elsewhere, the same as putting that value in `SEAT_MODS_ALLOW`. A `$TMPDIR` inside the worktree opens that subtree to a reviewer. `rm -rf /tmp/*` is allowed, so a seat can remove another session's scratch files.
 - **The `cd` walk does not model the environment.** A `CDPATH` in the seat's environment (one assigned in the call ends the walk), a `cd` alias, any function or alias from the shell snapshot that changes directory (zoxide's `z`, for one) and zsh's `cd` behaviour are not read, and any of them can leave a later relative `rm` where the walk does not look.
 - Glob matches are not enumerated: a matched parent symlink can lead outside writable places, as in `rm -rf <worktree>/*/node_modules`.
