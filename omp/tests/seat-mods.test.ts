@@ -214,6 +214,14 @@ describe('bash cwd (fix wave 2)', () => {
         expect(await bash(command, who)).toContain('cannot resolve')
     for (const command of ['S=/tmp/allow; rm -rf "$S/x"', 'S=/tmp/allow && rm -rf "$S/x"']) expect(await bash(command)).toBeUndefined()
   })
+  // seat-mods fix round 3: an rm's prefix value or a wrapper's operand expands in this shell and may write the next rm's variable
+  test('an rm whose prefix writes a variable leaves it unread; a literal prefix keeps it', async () => {
+    const bash = (command: string, who: string) => guard(deps(), 'bash', { command }, child(who))
+    expect(await bash('S=/tmp/allow; X="$[S=5]" rm -f /tmp/allow/a; rm -rf "$S/x"', 'reviewer')).toContain('cannot resolve')
+    expect(await bash('Z=S=5; S=/tmp/allow; X="$((Z))" rm -f /tmp/allow/a; rm -rf "$S/x"', 'reviewer')).toContain('cannot resolve')
+    expect(await bash('S=/tmp/allow; X="$[S=5]" rm -f /tmp/allow/a; cd /etc; rm -rf "$S/x"', 'implementer')).toContain('cannot resolve')
+    expect(await bash('S=/tmp/allow; X=1 rm -f /tmp/allow/a; rm -rf "$S/x"', 'reviewer')).toBeUndefined()
+  })
   test('a commit message file is read against the call cwd', async () => {
     const seen: string[] = []
     const d = norm({ readFile: async (f: string) => { seen.push(f); return '' } })

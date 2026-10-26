@@ -1232,4 +1232,11 @@ describe('batch 5: rm after a literal cd or variable', () => {
       expect(await deny('S=/tmp/x; rm -rf "$S/y"')).toBeUndefined()
     })
   }
+  // Fix round 3: an rm's prefix value expands in this shell, so it may write the variable the next rm reads
+  test('reviewer: an rm whose prefix writes a variable leaves it unread; a literal prefix keeps it', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'reviewer', SEAT_MODS_ALLOW: '/reports' })
+    const deny = async (command: string) => (await $.tool.call({ tool: 'Bash', command })).deny
+    expect(await deny('S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; rm -rf "$S/y"')).toContain('cannot resolve')
+    expect(await deny('S=/tmp/x; X=1 rm -f /tmp/x/a; rm -rf "$S/y"')).toBeUndefined()
+  })
 })

@@ -611,7 +611,7 @@ function rmWord(word: string): { path: string; globAt: number; home: boolean } |
 // command's start the walk keeps the set of directories the next command may run in, and `$NAME` or `${NAME}`,
 // quoted or not, reads the value a literal `NAME=value` gave. A variable stays known only across three kinds of
 // command, none with a redirection: assignments whose every value is literal, a plain cd with literal operands, and
-// rm. Any other command may write a variable by a name the guard never sees, so it forgets them all. A literal
+// a bare rm after literal assignments only. Any other command may write a variable by a name the guard never sees, so it forgets them all. A literal
 // `cd <path>` may fail, so after `;` or a newline the set keeps what it held beside the new directory; the rest of a
 // `cd <path> &&` list runs there only. A relative rm operand gives one target per directory in the set, and each
 // must be allowed (spec §4: never approve a removal Bash may run elsewhere). The first `||`, `|`, `&`, parenthesis
@@ -819,9 +819,13 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
     const changes = DIRECTORY_CHANGES.includes(head?.name ?? '') || DIRECTORY_CHANGES.includes(name ?? '')
     if (changes) changedDirectory = true
     // Ruling 24: the three kinds of command that keep the variables. A literal assignment has no subscript, no `+=`
-    // and no `$`, backtick or `(` in its value; a plain cd's operands read with no expansion left.
-    const literalAssigns = !redirected && tokens.length > 0 && tokens.every(token => /^[A-Za-z_][A-Za-z0-9_]*=/.test(token) &&
-      literal(expand(token.slice(token.indexOf('=') + 1), pieces)))
+    // and no `$`, backtick or `(` in its value; a plain cd's operands read with no expansion left; an rm is the bare
+    // word `rm` after literal assignments alone, since a prefix value or a wrapper's operand expands in this shell.
+    const literalAssignment = (token: string) => /^[A-Za-z_][A-Za-z0-9_]*=/.test(token) && literal(expand(token.slice(token.indexOf('=') + 1), pieces))
+    let word = 0
+    while (word < tokens.length && literalAssignment(tokens[word]!)) word += 1
+    const literalAssigns = !redirected && tokens.length > 0 && word === tokens.length
+    const plainRm = !redirected && tokens[word] === 'rm'
     const plainCd = rmWord(expand(tokens[0] ?? '', pieces))?.path === 'cd'
     const literalCd = !redirected && plainCd && tokens.slice(1).every(token => literal(withVariables(expand(token, pieces), vars)))
     if (open && literalAssigns) {
@@ -842,7 +846,7 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
       if (!literalCd) vars.clear()
       continue
     }
-    if (head?.name !== 'rm' || redirected) vars.clear()
+    if (!plainRm) vars.clear()
     if (changes) here = after = [UNKNOWN]
     if (!open) continue
     if (name === undefined || SHELL_STATE.has(name ?? '')) end()

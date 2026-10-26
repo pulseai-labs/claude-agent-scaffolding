@@ -1563,3 +1563,34 @@ describe('batch 5: rm after cd, fix round 2', () => {
     expect(rmTargets('rm -i /reports/x <<EOF\ny\nEOF')).toEqual([t('/reports/x')])
   })
 })
+
+// Task 5 fix round 3 (Ruling 24, type c completed): an rm keeps the variables only as the bare word `rm` after literal
+// assignments, since Bash expands an rm's prefix values and a wrapper's operands in the current shell.
+describe('batch 5: rm after cd, fix round 3', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  const verdict = (command: string, role: 'implementer' | 'reviewer' = 'implementer', root = '/w/wt') => decide(role, {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(target.path.startsWith('/') ? target.path : `${root}/${target.path.replace(/^\.\//, '')}`, root, scratchDirs(undefined), target.glob)),
+  })
+  test('an rm whose prefix or wrapper writes a variable forgets them all (the opposite of mutant N04)', () => {
+    // Bash leaves S=5 and removes 5/y (or /etc/5/y after the cd)
+    for (const c of ['S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; rm -rf "$S/y"', 'S=/tmp/x; X=$[S=5] rm -f /tmp/x/a; rm -rf "$S/y"',
+      'S=/tmp/x; X="$((S=5))" rm -f /tmp/x/a; rm -rf "$S/y"', 'S=/tmp/x; env X="$((S=5))" rm -f /tmp/x/a; rm -rf "$S/y"',
+      'S=/tmp/x; command env X="$[S=5]" rm -f /tmp/x/a; rm -rf "$S/y"', 'Z=S=5; S=/tmp/x; X="$((Z))" rm -f /tmp/x/a; rm -rf "$S/y"',
+      'Z=S=5; S=/tmp/x; X="$[Z]" rm -f /tmp/x/a; rm -rf "$S/y"', 'S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; cd /etc; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t('/tmp/x/a'), t(undefined)])
+    expect(verdict('S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; rm -rf "$S/y"', 'reviewer')).toContain('cannot resolve')
+    expect(verdict('S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; cd /etc; rm -rf "$S/y"')).toContain('cannot resolve')
+    // a wrapper or a path-qualified rm forgets them too, whatever it writes
+    for (const c of ['S=/w/wt; env rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; command rm -f /w/wt/a; rm -rf "$S/x"',
+      'S=/w/wt; sudo rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; /bin/rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; X="$S" rm -f /w/wt/a; rm -rf "$S/x"'])
+      expect(rmTargets(c)).toEqual([t('/w/wt/a'), t(undefined)])
+    // controls: literal assignments before the bare rm keep them, and an escaped rm is the bare word
+    for (const c of ['S=/w/wt; X=1 rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; X=1 Y=/w rm -f /w/wt/a; rm -rf "$S/x"',
+      'S=/w/wt; \\rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; rm -f /w/wt/a; rm -rf "$S/x"'])
+      expect(rmTargets(c)).toEqual([t('/w/wt/a'), t('/w/wt/x')])
+    expect(verdict('S=/tmp/x; X=1 rm -f /tmp/x/a; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+})
+
