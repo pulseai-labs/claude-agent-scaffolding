@@ -36,12 +36,36 @@ export function shellQuote(p: string): string {
 
 const STALE = "terminal_handle_stale";
 
+/**
+ * The Host state of one terminal, from its `terminal list` row and the agent row joined to it
+ * (design 4.5). Only the listed values map to a finished or parked state; a missing row or any
+ * other value is `active`, so a worker that cannot be read never passes as completed. There is no
+ * `failed`: Orca 1.4.238 has no failure state, and a dead process leaves the list (`gone`).
+ */
+export function mapOrcaState(terminal: object | undefined, agent: object | undefined): ThreadStatus["state"] {
+  if (terminal === undefined) return "gone";
+  const a = agent as { state?: unknown; interrupted?: unknown } | undefined;
+  switch (a?.state) {
+    case "working":
+      return "active";
+    case "waiting":
+    case "blocked":
+      return "waiting";
+    case "done":
+      return a?.interrupted === true ? "interrupted" : "completed";
+    default:
+      return "active";
+  }
+}
+
 type Repo = { id: string; displayName: string; path: string };
 
 export class OrcaHost implements Host {
   private cli: string;
   private launcher: string;
   private timeoutMs?: number;
+  /** The two lists `status` reads, kept until the next mutating call. */
+  private lists?: { terminals: any[]; worktrees: any[] };
 
   constructor({ cli, launcher }: OrcaConfig, opts: { timeoutMs?: number } = {}) {
     this.cli = cli;
@@ -79,6 +103,7 @@ export class OrcaHost implements Host {
   }
 
   async launch(r: LaunchRequest): Promise<{ threadId: string }> {
+    this.lists = undefined;
     const repo = this.repo(r.project);
     // The message goes through a file; only paths reach the shell. baton-seat deletes the file.
     const dir = join(stateDir(), "orca", "messages");
@@ -103,8 +128,28 @@ export class OrcaHost implements Host {
     return { threadId: handle };
   }
 
-  async status(_threadId: string): Promise<ThreadStatus> {
-    throw new Error("status: Task 7");
+  /** One `terminal list` and one `worktree ps` per instance; a truncated reply may hide the row, so it is host down. */
+  private readLists(): { terminals: any[]; worktrees: any[] } {
+    if (this.lists) return this.lists;
+    const t = this.must(["terminal", "list", "--limit", "1000"]);
+    if (t?.truncated === true) throw new HostDownError("terminal list is truncated");
+    const w = this.must(["worktree", "ps", "--limit", "1000"]);
+    if (w?.truncated === true) throw new HostDownError("worktree ps is truncated");
+    this.lists = { terminals: Array.isArray(t?.terminals) ? t.terminals : [], worktrees: Array.isArray(w?.worktrees) ? w.worktrees : [] };
+    return this.lists;
+  }
+
+  async status(threadId: string): Promise<ThreadStatus> {
+    const { terminals, worktrees } = this.readLists();
+    const terminal = terminals.find((t) => t?.handle === threadId);
+    // The agent row of a terminal is the one whose paneKey is `${tabId}:${leafId}` (spike 1c).
+    const paneKey = typeof terminal?.tabId === "string" && typeof terminal?.leafId === "string" ? `${terminal.tabId}:${terminal.leafId}` : undefined;
+    const agent =
+      paneKey === undefined
+        ? undefined
+        : worktrees.flatMap((w) => (Array.isArray(w?.agents) ? w.agents : [])).find((a: { paneKey?: unknown }) => a?.paneKey === paneKey);
+    // updatedAt and stateStartedAt move with the agent; lastOutputAt moves every ~5 s with no input (spike 8).
+    return { state: mapOrcaState(terminal, agent), activity: `${agent?.updatedAt ?? ""}|${agent?.stateStartedAt ?? ""}` };
   }
 
   /** Run a call on one terminal; a stale handle is `undefined`, any other refusal is host down. */
@@ -116,6 +161,7 @@ export class OrcaHost implements Host {
   }
 
   async interrupt(threadId: string, _reason: string): Promise<void> {
+    this.lists = undefined;
     // Escape aborts an omp turn; `--interrupt` sends Ctrl-C, which omp ignores (spike 5).
     this.onTerminal(["terminal", "send", "--terminal", threadId, "--text", "\x1b"]);
   }
@@ -132,6 +178,7 @@ export class OrcaHost implements Host {
   }
 
   async close(threadId: string): Promise<void> {
+    this.lists = undefined;
     this.onTerminal(["terminal", "close", "--terminal", threadId]);
   }
 
