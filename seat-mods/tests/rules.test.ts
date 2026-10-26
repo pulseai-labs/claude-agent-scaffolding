@@ -1295,7 +1295,9 @@ describe('batch 5: rm after cd', () => {
     // an assignment a failed command may skip is forgotten when its list ends (a failed cd leaves WT unset)
     for (const c of ['true && WT=/w/wt; rm "$WT/x"', 'cd /w && WT=/w/wt; rm "$WT/x"'])
       expect(rmTargets(c)).toEqual([t(undefined)])
-    expect(rmTargets('cd /w && WT=/w/wt && rm "$WT/x"')).toEqual([t('/w/wt/x')])
+    // Ruling 24: an assignment behind a cd may be skipped, so it never becomes known; one before the cd holds
+    expect(rmTargets('cd /w && WT=/w/wt && rm "$WT/x"')).toEqual([t(undefined)])
+    expect(rmTargets('WT=/w/wt && cd /w && rm "$WT/x"')).toEqual([t('/w/wt/x')])
     expect(rmTargets('WT=/w/wt X=/w && rm "$WT/x" "$X/y"')).toEqual([t('/w/wt/x'), t('/w/y')])
     expect(rmTargets('true; WT=/w && X=/x; rm "$X/y"')).toEqual([t('/x/y')])
     // an unread change inside a list, a directory named twice, a relative cd after an unknown one
@@ -1325,7 +1327,7 @@ describe('batch 5: rm after cd', () => {
     expect(rmTargets('WT=/w/wt; rm -f "${WT}/x" ${WT}/y $WT/z "$WT"/q "$WT" ${WT}x')).toEqual([
       t('/w/wt/x'), t('/w/wt/y'), t('/w/wt/z'), t('/w/wt/q'), t('/w/wt'), t('/w/wtx')])
     expect(rmTargets("WT=/w/wt; rm -f '$WT/x' \\$WT/y")).toEqual([t('$WT/x'), t('$WT/y')])
-    expect(rmTargets('WT=x; rm "it\'s/$WT"')).toEqual([t("it's/x")])
+    expect(rmTargets('WT=x; rm "it\'s/$WT"')).toEqual([t("./it's/x")]) // Ruling 24: a bare operand built from a variable is ./
     expect(rmTargets("WT='/w/wt' X=/w/x; rm -f \"$WT/a\" \"$X/b\"")).toEqual([t('/w/wt/a'), t('/w/x/b')])
     expect(rmTargets('WT=/w/wt; cd $WT && rm -f a "$WT/b"')).toEqual([t('/w/wt/a'), t('/w/wt/b')])
     for (const c of ['WT=/w/wt; rm "$WTx"', 'WT=/w/wt; rm "${WT:-/w}/x"', 'WT=/w/wt; rm "$$WT"', 'WT=/w/wt; rm ~$WT',
@@ -1333,8 +1335,9 @@ describe('batch 5: rm after cd', () => {
       expect(rmTargets(c)).toEqual([t(undefined)])
     // a relative value is a relative operand: it joins a known directory, or the session's, like any other
     // Ruling 21: after `cd /w;` the session's directory is a target beside /w; a relative cd joins onto each directory
-    expect(rmTargets('cd /w; WT=wt; rm -rf "$WT/x"')).toEqual([t('wt/x'), t('/w/wt/x')])
-    expect(rmTargets('WT=wt; rm -rf "$WT/x"')).toEqual([t('wt/x')])
+    // Ruling 24: and a bare one built from a variable is written ./
+    expect(rmTargets('cd /w; WT=wt; rm -rf "$WT/x"')).toEqual([t('./wt/x'), t('/w/wt/x')])
+    expect(rmTargets('WT=wt; rm -rf "$WT/x"')).toEqual([t('./wt/x')])
     expect(rmTargets('WT=wt; cd "$WT" && rm x')).toEqual([t('./wt/x')]) // `./`: fix round 1 (finding 3)
     // a glob after a substituted value is placed by its literal prefix
     expect(rmTargets('WT=/w/wt; rm -f "$WT"/pf/*.pyc')).toEqual([t('/w/wt/pf', true)])
@@ -1356,10 +1359,13 @@ describe('batch 5: rm after cd', () => {
       'WT=/w; $CMD; rm "$WT/y"', 'WT=/w; WT=/etc true; rm "$WT/y"', 'WT=/w; echo $((WT=1)); rm "$WT/y"',
       'WT=/w; WT=`pwd`; rm "$WT/y"', 'WT=/w; WT="$HOME/x"; rm "$WT/y"'])
       expect(rmTargets(c)).toEqual([t(undefined)])
-    // controls: a command that only reads it, or names no variable, keeps it
-    for (const c of ['WT=/w; git -C "$WT" status; rm "$WT/y"', 'WT=/w; echo "$WT" ${WT}; rm "$WT/y"', 'WT=/w; set -euo pipefail; rm "$WT/y"',
-      'WT=/w; X=1; rm "$WT/y"', 'WT=/w; WT=/w; rm "$WT/y"'])
+    // Ruling 24: any other command forgets every variable, even one that only reads it
+    for (const c of ['WT=/w; git -C "$WT" status; rm "$WT/y"', 'WT=/w; echo "$WT" ${WT}; rm "$WT/y"', 'WT=/w; set -euo pipefail; rm "$WT/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // controls: a literal assignment, a literal cd and an rm keep it
+    for (const c of ['WT=/w; X=1; rm "$WT/y"', 'WT=/w; WT=/w; rm "$WT/y"', 'WT=/w; cd /etc; rm "$WT/y"'])
       expect(rmTargets(c)).toEqual([t('/w/y')])
+    expect(rmTargets('WT=/w; rm -f a; rm "$WT/y"')).toEqual([t('a'), t('/w/y')])
   })
   test('cd spellings: the builtin itself resolves; a wrapper, an option or an unread word does not', () => {
     for (const c of ['\\cd /w && rm x', '"cd" /w && rm x', "c'd' /w && rm x", 'cd /w/ && rm x', 'cd /w 2>/dev/null && rm x'])
@@ -1450,7 +1456,8 @@ describe('batch 5: rm after cd, fix round 1', () => {
     // controls: a literal assignment cannot fail, and within the list the assignment holds
     expect(rmTargets('A=1 && WT=/w/wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
     expect(rmTargets('A=/w X=1 && WT=/w/wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
-    expect(rmTargets('A="$(false)" && WT=/w/wt && rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    // Ruling 24: behind a command that may fail, the assignment never becomes known, in its own list too
+    expect(rmTargets('A="$(false)" && WT=/w/wt && rm -rf "$WT/x"')).toEqual([t(undefined)])
     expect(verdict('A=1 && S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
   })
   test('finding 3: a relative cd from the session directory is written ./ so no glue reads a leading ~, @ or :', () => {
@@ -1472,23 +1479,87 @@ describe('batch 5: rm after cd, fix round 1', () => {
       'S=/w/wt; cd $[S=5]; rm -rf "$S/x"', 'S=/w/wt; cd "$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; : >"$((S=5))"; rm -rf "$S/x"',
       'S=/w/wt; true > $[S=5]; rm -rf "$S/x"', 'S=/w/wt; : <<<"$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; true {S}>/dev/null; rm -rf "$S/x"',
       'S=/w/wt; exec {S}>/dev/null; rm -rf "$S/x"', 'S=/w/wt; : <<EOF\n$((S=5))\nEOF\nrm -rf "$S/x"', 'S=/w/wt; [[ 1 -eq S=5 ]]; rm -rf "$S/x"',
-      'S=/w/wt; echo ${A[S=5]}; rm -rf "$S/x"', 'S=/w/wt X=$((S=5)); rm -rf "$S/x"', 'S=/w/wt; X="${ S=/etc; }"; rm -rf "$S/x"',
-      'S=/w/wt; rm -rf "$S/x" "$[S=5]"'])
-      expect(rmTargets(c).every(target => target.path === undefined)).toBe(true)
+      'S=/w/wt; echo ${A[S=5]}; rm -rf "$S/x"', 'S=/w/wt X=$((S=5)); rm -rf "$S/x"', 'S=/w/wt; X="${ S=/etc; }"; rm -rf "$S/x"']) {
+      const found = rmTargets(c)
+      expect(found.length > 0 && found.every(target => target.path === undefined)).toBe(true)
+    }
+    // the operand before the write reads S as Bash does, and the write's own operand is unread: still refused
+    expect(rmTargets('S=/w/wt; rm -rf "$S/x" "$[S=5]"')).toEqual([t('/w/wt/x'), t(undefined)])
     // a Bash 5.3 `${ …; }` runs in the current shell, and a heredoc line read in the 0.9.0 layout hides its tail
     for (const c of ['cd /w; X="${ cd /etc; }"; rm y', 'cd /w; echo "${| cd /etc; }"; rm y', 'cd /w; cat <<EOF "$(true)"; cd /etc\nbody\nEOF\nrm y'])
       expect(rmTargets(c)).toEqual([t(undefined)])
     expect(verdict('S=/tmp/x; X="$((S=5))"; rm -rf "$S/y"', 'reviewer')).toContain('cannot resolve')
-    // controls: a read of the variable, arithmetic on another, an fd number, a body that only reads it
-    expect(rmTargets('S=/w/wt; X="$((1+1))"; : >"$S.log"; exec 3>/dev/null; rm -rf "$S/x"')).toEqual([t('/w/wt/x')])
-    expect(rmTargets('S=/w/wt; cat <<EOF\n$S\nEOF\nrm -rf "$S/x"')).toEqual([t('/w/wt/x')])
-    // Bash assigns left to right: the write in X's value comes before S=/w/wt
-    expect(rmTargets('X="$((S=5))" S=/w/wt; rm -rf "$S/x"')).toEqual([t('/w/wt/x')])
-    expect(rmTargets('cd /w/wt && git commit -m "$(cat <<\'EOF\'\nmsg\nEOF\n)" && rm -rf build')).toEqual([t('/w/wt/build')])
-    // a quoted body is literal text; in one assignment command a later value or subscript writes after S=/w/wt
-    expect(rmTargets("S=/w/wt; cat <<'EOF'\nS is $((S=5))\nEOF\nrm -rf \"$S/x\"")).toEqual([t('/w/wt/x')])
-    for (const c of ['S=/w/wt X="$((S=5))"; rm -rf "$S/x"', 'S=/w/wt A[S=5]=1; rm -rf "$S/x"', 'S=/w/wt S="$HOME/x"; rm -rf "$S/y"'])
+    // Ruling 24: a command that only reads it, a heredoc, an assignment with an expansion forget it too
+    for (const c of ['S=/w/wt; X="$((1+1))"; : >"$S.log"; exec 3>/dev/null; rm -rf "$S/x"', 'S=/w/wt; cat <<EOF\n$S\nEOF\nrm -rf "$S/x"',
+      'X="$((S=5))" S=/w/wt; rm -rf "$S/x"', "S=/w/wt; cat <<'EOF'\nS is $((S=5))\nEOF\nrm -rf \"$S/x\"",
+      'S=/w/wt X="$((S=5))"; rm -rf "$S/x"', 'S=/w/wt A[S=5]=1; rm -rf "$S/x"', 'S=/w/wt S="$HOME/x"; rm -rf "$S/y"'])
       expect(rmTargets(c)).toEqual([t(undefined)])
+    // controls: only literal assignments, a literal cd and rm between the assignment and its use
+    expect(rmTargets('S=/w/wt; X=1; cd /w; rm -f a; rm -rf "$S/x"')).toEqual([t('a'), t('/w/a'), t('/w/wt/x')])
+    expect(rmTargets('cd /w/wt && git commit -m "$(cat <<\'EOF\'\nmsg\nEOF\n)" && rm -rf build')).toEqual([t('/w/wt/build')])
     expect(verdict('S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+})
+
+// Task 5 fix round 2 (Ruling 24): a variable stays known only across literal assignments, a literal cd and rm.
+describe('batch 5: rm after cd, fix round 2', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  const verdict = (command: string, role: 'implementer' | 'reviewer' = 'implementer', root = '/w/wt') => decide(role, {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(target.path.startsWith('/') ? target.path : `${root}/${target.path.replace(/^\.\//, '')}`, root, scratchDirs(undefined), target.glob)),
+  })
+  test('open 2: a command made of redirections alone may fail, so the assignment after its && never becomes known', () => {
+    for (const c of ['</nonexistent && S=/tmp/x; rm -rf "$S/y"', '>/nonexistent/d/f && S=/tmp/x; rm -rf "$S/y"',
+      '</nonexistent &&\nS=/tmp/x\nrm -rf "$S/y"', '<"$(false)" && S=/tmp/x; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    for (const role of ['implementer', 'reviewer'] as const)
+      expect(verdict('</nonexistent && S=/tmp/x; rm -rf "$S/y"', role)).toContain('cannot resolve')
+    // a heredoc or here-string is a redirection too, so the command is not a literal assignment (Bash: this one succeeds)
+    for (const c of ['A=1 <<EOF && S=/tmp/x; rm -rf "$S/y"\nbody\nEOF', 'A=1 <<<x && S=/tmp/x; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // control: the same assignment at the start of its list
+    expect(rmTargets('S=/tmp/x && rm -rf "$S/y"')).toEqual([t('/tmp/x/y')])
+    expect(verdict('S=/tmp/x && rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+  test('open 4: a write through an indirect name is never seen, so any other command forgets every variable', () => {
+    for (const c of ['Z=S=5; S=/tmp/x; : "$((Z))"; rm -rf "$S/y"', 'Z=S=5; S=/tmp/x; : $[Z]; rm -rf "$S/y"',
+      'Z=S=5; S=/tmp/x; X=abcdef; : "${X:Z}"; rm -rf "$S/y"', 'Z=S; S=/tmp/x; : "$(($Z=5))"; rm -rf "$S/y"',
+      'Z=W; WT=/tmp/x; : "$((${Z}T=5))"; rm -rf "$WT/y"', "Z='$((S=5))'; S=/tmp/x; : \"${Z@P}\"; rm -rf \"$S/y\"",
+      'Z=S; S=/tmp/x; compgen -V "$Z" -W /etc >/dev/null; rm -rf "$S/y"', 'WT=/w/wt; echo "$WT"; rm -rf "$WT/x"',
+      'WT=/w/wt; true; rm -rf "$WT/x"', 'WT=/w/wt; : ; rm -rf "$WT/x"', 'WT=/w/wt; >/tmp/log; rm -rf "$WT/x"',
+      'WT=/w/wt; f; rm -rf "$WT/x"', 'WT=/w/wt; cd /w 2>/dev/null; rm -rf "$WT/x"', 'WT=/w/wt; rm -f a 2>/dev/null; rm -rf "$WT/x"',
+      'WT=/w/wt; cd "$UNSET"; rm -rf "$WT/x"'])
+      expect(rmTargets(c).at(-1)).toEqual(t(undefined))
+    expect(verdict('Z=S; S=/tmp/x; compgen -V "$Z" -W /etc >/dev/null; rm -rf "$S/y"', 'reviewer')).toContain('cannot resolve')
+    // an assignment before `&` or `|` runs in a subshell, so the rm after it reads the shell's own, unset variable
+    for (const c of ['WT=/w/wt & rm -rf "$WT/x"', 'WT=/w/wt | rm -rf "$WT/x"']) expect(rmTargets(c)).toEqual([t(undefined)])
+    // control: a pipe after the variable is set leaves it set for an rm in the pipeline
+    expect(rmTargets('WT=/w/wt; rm -rf "$WT/x" | cat')).toEqual([t('/w/wt/x')])
+    // controls: only literal assignments, a literal cd and rm stand between the assignment and its use
+    expect(rmTargets('Z=1; S=/tmp/x; cd /w; rm -f a; rm -rf "$S/y"')).toEqual([t('a'), t('/w/a'), t('/tmp/x/y')])
+    expect(verdict('Z=1; S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+  test('introduced by 2b6ee7ba: a bare operand built from a variable is written ./ whatever its first character', () => {
+    expect(rmTargets('S=@; rm -rf "$S/tmp/allow/x"')).toEqual([t('./@/tmp/allow/x')])
+    expect(rmTargets('S=:; rm -rf "$S~/scratch/x"')).toEqual([t('./:~/scratch/x')])
+    expect(rmTargets('S=x; rm -rf "$S" "$S"/*.o')).toEqual([t('./x'), t('./x', true)])
+    expect(rmTargets('S=./sub; rm -rf "$S/x"')).toEqual([t('./sub/x')])
+    // controls: an absolute value is placed as is; a literal operand keeps its old reading
+    expect(rmTargets('S=/tmp/allow; rm -rf "$S/x" sub/y')).toEqual([t('/tmp/allow/x'), t('sub/y')])
+  })
+  test('pre-existing: a ${ …; } funsub runs in the current shell and may cd, so the directory is unknown', () => {
+    // a funsub after a cd moves the directory too, and a substitution after one runs in the directory it left
+    for (const c of ['X="${ cd /etc; }"; rm -rf y', 'echo "${| cd /etc; }"; rm -rf y', 'X="${ true; }" && rm -rf y',
+      'cd /w && echo "${ cd /etc; }" && rm y', 'X="${ cd /etc; }"; echo "$(rm x)"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('X="${ cd /etc; }"; rm -rf y')).toContain('cannot resolve')
+    // control: a $( … ) runs in a subshell, so its cd stays there
+    expect(rmTargets('X="$(cd /etc)"; rm -rf y')).toEqual([t('y')])
+  })
+  test('minor: the heredoc sentinel holds a NUL, so a word Bash can pass is an operand', () => {
+    expect(rmTargets('rm -rf \u0001')).toEqual([t('\u0001')])
+    expect(rmTargets('rm -rf x \u0001')).toEqual([t('x'), t('\u0001')])
+    expect(rmTargets('rm -i /reports/x <<EOF\ny\nEOF')).toEqual([t('/reports/x')])
   })
 })

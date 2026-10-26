@@ -1222,4 +1222,14 @@ describe('batch 5: rm after a literal cd or variable', () => {
       expect(await deny(command)).toContain('no rm outside writable places')
     expect(await deny('rm -rf ~/scratch/x')).toBeUndefined()
   })
+  // Fix round 2 (Ruling 24, open 2): a command of redirections alone may fail, and its && may skip the assignment
+  for (const role of ['implementer', 'reviewer'] as const) {
+    test(`${role}: an assignment behind a redirection-only command is not read`, async ($, on) => {
+      world(on, { SEAT_MODS_ROLE: role, SEAT_MODS_ALLOW: '/reports' })
+      const deny = async (command: string) => (await $.tool.call({ tool: 'Bash', command })).deny
+      for (const command of ['</nonexistent && S=/tmp/x; rm -rf "$S/y"', '>/nonexistent/d/f && S=/tmp/x; rm -rf "$S/y"'])
+        expect(await deny(command)).toContain('cannot resolve')
+      expect(await deny('S=/tmp/x; rm -rf "$S/y"')).toBeUndefined()
+    })
+  }
 })

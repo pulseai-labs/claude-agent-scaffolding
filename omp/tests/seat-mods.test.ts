@@ -204,6 +204,16 @@ describe('bash cwd (fix wave 2)', () => {
       expect(await bash(command)).toContain('no rm outside')
     for (const command of ['rm -rf ~/scratch/x', 'rm -rf /tmp/allow/x']) expect(await bash(command)).toBeUndefined()
   })
+  // seat-mods fix round 2 (Ruling 24): a bare operand built from a variable arrives as `./…`; a redirection-only command may fail
+  test('reviewer: "$S/…" with S=@ or S=: is placed in the call folder; an assignment behind </missing && is not read', async () => {
+    const d = () => deps({ env: { SEAT_MODS_ROLE: 'coordinator', SEAT_MODS_ALLOW: '/home/u/scratch:/tmp/allow', HOME: '/home/u' } })
+    const bash = (command: string, who = 'reviewer') => guard(d(), 'bash', { command }, child(who))
+    for (const command of ['S=@; rm -rf "$S/tmp/allow/x"', 'S=:; rm -rf "$S~/scratch/x"']) expect(await bash(command)).toContain('no rm outside')
+    for (const who of ['reviewer', 'implementer'])
+      for (const command of ['</nonexistent && S=/tmp/allow; rm -rf "$S/x"', '>/nonexistent/d/f && S=/tmp/allow; rm -rf "$S/x"'])
+        expect(await bash(command, who)).toContain('cannot resolve')
+    for (const command of ['S=/tmp/allow; rm -rf "$S/x"', 'S=/tmp/allow && rm -rf "$S/x"']) expect(await bash(command)).toBeUndefined()
+  })
   test('a commit message file is read against the call cwd', async () => {
     const seen: string[] = []
     const d = norm({ readFile: async (f: string) => { seen.push(f); return '' } })
