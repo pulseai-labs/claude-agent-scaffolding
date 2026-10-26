@@ -776,15 +776,16 @@ function rmRead(command: string, moved: boolean, walk: boolean): { targets: RmTa
   // opener-line words after the delimiter in the command, so the normal quote, escape and
   // redirect walk judges them. It reads the raw command; blank folds continuations after.
   // Remove a numeric fd at a word boundary, preserving x2 and quoted '2'.
-  // An opener line read in the 0.9.0 layout keeps its tail in the piece, where the walk cannot read it: such a tail
-  // keeps the walk from starting.
+  // An opener line read in the 0.9.0 layout keeps its tail in the piece; the tail is put back after the mark, so its rm
+  // operands are still read, but such a tail keeps the cd walk from starting.
   let tail = false
   const source = command.replace(/(^|[\s;|&()])\d+(?=<<(?!<))/g, '$1')
   const withoutInput = blankHeredocs(source, (_, __, { at, upto }) => {
     HEREDOC.lastIndex = at
     const word = HEREDOC.exec(source) === null ? at : HEREDOC.lastIndex
     if (source.slice(word, upto).trim() !== '') tail = true
-    return ` ${HEREDOC_MARK} `
+    // The tail goes back into the command, as in 0.9.0, so the walk still reads an rm there.
+    return ` ${HEREDOC_MARK} ${source.slice(word, upto)} `
   })
   const { text: input, pieces } = blank(withoutInput)
   const funsub = FUNSUB.test(command)

@@ -1692,3 +1692,19 @@ describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts w
     expect(bashRules("echo \"$(echo \"'\")\" ; cat <<'X'\nx\nX\nx=$(cat <<EOF\nmsg\nEOF) ; git push --force\nEOF\n)\n")).toEqual([])
   })
 })
+
+describe('PR 923 round 1: an opener line read in the 0.9.0 layout keeps its tail for the rm walk', () => {
+  // The tail after the delimiter word goes into the heredoc piece when it holds a `$(`, a backtick or a `${`. 0.9.0 put
+  // that tail back for rm; the walk must still see an rm there (Bash runs it).
+  test('an rm in a $(…), backtick or ${…} opener tail is seen', () => {
+    for (const x of ['$(x)', '`x`', '${x}']) {
+      expect(rmTargets(`cat <<EOF; rm -rf /boot; echo ${x}\nbody\nEOF`)).toEqual([{ path: '/boot', glob: false }])
+    }
+  })
+  // controls: the body stays input, and the new-layout and quoted-delimiter tails read as before
+  test('the body stays input and other tails still read', () => {
+    expect(rmTargets('cat <<EOF; echo $(x)\nrm -rf /boot\nEOF')).toEqual([])
+    expect(rmTargets('cat <<EOF && rm -rf /boot\nbody\nEOF')).toEqual([{ path: '/boot', glob: false }])
+    expect(rmTargets("cat <<'EOF'; rm -rf /boot\nbody\nEOF")).toEqual([{ path: '/boot', glob: false }])
+  })
+})
