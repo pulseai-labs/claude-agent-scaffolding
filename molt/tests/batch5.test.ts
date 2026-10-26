@@ -237,4 +237,9 @@ describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts w
     expect(gate("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\"")).toBe(true)
     expect(gate("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\" && cat huge.log")).toBe(false)
   })
+  // Ruling 34: after `"$(echo "it's")"` the scan's flat quote reading sits in a `'` Bash never opened; a heredoc body
+  // resumed in it must not turn a later quoted `'a $('` into an open `$(` (allowed, as at af88a29e; Bash runs no `cat`).
+  test('a quote the scan misreads inside "$(…)" is not carried past a heredoc body into an early close', () => {
+    expect(gate("git add \"$(echo \"it's\")\" && git commit -F - <<'X'\nx\nX\ngit add 'a $(' && git commit -F - <<'EOF'\nEOF) && cat huge.log\nEOF")).toBe(true)
+  })
 })

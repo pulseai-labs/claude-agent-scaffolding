@@ -1671,9 +1671,24 @@ describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts w
     expect(bashRules("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\"")).toEqual(['commit'])
     expect(bashRules('x=$( \\\ncat <<EOF\nmsg\nEOF) && git push --force')).toEqual(['push', 'force-push'])
   })
+  // Ruling 34: the scan's own quote reading does not nest quotes inside `$(…)`, so after `"$(echo "it's")"` it sits in a `'`
+  // that Bash never opened. A heredoc body resumed in that quote must not flip the next line's quotes: a seeded reading
+  // closes a heredoc early only when the unseeded one agrees (probed under Bash 5.3.9: no push, no rm).
+  test('a quote the scan misreads inside "$(…)" is not carried past a heredoc body into an early close', () => {
+    expect(bashRules("git commit -m \"$(echo \"it's done\")\" --allow-empty && cat <<'EOF'\nnotes\nEOF\necho 'call $(' ; cat <<EOF\nEOF) ; git push --force\nEOF")).toEqual(['commit'])
+    expect(rmTargets("echo \"$(echo \"'\")\" ; cat <<'X'\nx\nX\necho a' $(' ; cat <<EOF\nEOF) ; rm -rf /etc/x\nEOF")).toEqual([])
+    // controls: the resume after a real `"$(…)"` body still reads a `$(` opened after it
+    expect(bashRules("x=\"$(cat <<A\na\nA\n)\" ; y=$(cat <<B\nB) ; git push --force\nB")).toEqual(['push', 'force-push'])
+  })
   // Known limit (README Limits): the logical line restarts where the scan resumes after a heredoc body, so a `$(` before
   // an earlier heredoc's body is not seen. Bash runs the push.
   test('known limit: a $( before an earlier heredoc body on the line is not seen', () => {
     expect(bashRules("git commit -m \"$(cat <<'A'\na\nA\ncat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit'])
+  })
+  // Known limit (README Limits, since 85fe6564): after `"$(echo "'")"` and a heredoc body the scan resumes in a `'` Bash never
+  // opened, so the seeded and unseeded readings of the next line disagree and the close is not read. Bash runs the push;
+  // af88a29e's physical-line reading caught it.
+  test('known limit: a quote the scan misreads inside "$(…)" before a heredoc body hides a later close', () => {
+    expect(bashRules("echo \"$(echo \"'\")\" ; cat <<'X'\nx\nX\nx=$(cat <<EOF\nmsg\nEOF) ; git push --force\nEOF\n)\n")).toEqual([])
   })
 })

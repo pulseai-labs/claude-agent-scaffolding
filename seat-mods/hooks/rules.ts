@@ -107,7 +107,9 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
   let nested = -1    // the last `$(`, backtick or `${` since a newline outside quotes
   let inWord = false // the character before this one belongs to a word
   // Where the opener's logical line starts: after the last newline outside quotes, so a quoted string that spans lines
-  // is read whole, or where the scan resumed after a heredoc body, in the quote `seed` it resumed in.
+  // is read whole, or where the scan resumed after a heredoc body, in the quote `seed` it resumed in. That quote is this
+  // scan's flat reading, which does not nest quotes inside `$(…)`, so a seeded line closes a heredoc early only when the
+  // unseeded reading agrees: where the two differ the close is not read, toward a hide.
   let start = 0
   let seed = ''
   // Whether `text`, the opener's logical line up to the opener, ends inside a `$(…)` opened on that line: the innermost
@@ -139,7 +141,7 @@ function blankHeredocs(command: string, keep: (piece: string, quoted: boolean, r
           const bare = open.strip ? text.replace(/^\t+/, '') : text
           if (bare === open.delimiter) { end = stop; break }
           if (open === last && joined === '' && bare.startsWith(open.delimiter) && bare.includes(')', open.delimiter.length) &&
-            (inside ??= inSubstitution(open.seed + command.slice(open.start, open.at)))) { end = stop - bare.length + open.delimiter.length; break }
+            (inside ??= inSubstitution(open.seed + command.slice(open.start, open.at)) && (open.seed === '' || inSubstitution(command.slice(open.start, open.at))))) { end = stop - bare.length + open.delimiter.length; break }
           if (next < 0) break
           joined = !open.quoted && /(?<!\\)(?:\\\\)*\\$/.test(text) ? text.slice(0, -1) : ''
           line = next + 1

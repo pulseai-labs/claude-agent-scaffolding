@@ -256,11 +256,12 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   a function body (`f() { git commit -m m; }`, which only defines the function). A line that is a
   syntax error and runs nothing (`if git add f; git commit -m m`) reads as the commands it spells,
   and passes.
-- **An `EOF)` closing line in a `$(` opened before a newline outside quotes, or before an earlier
-  heredoc's body, is not seen closing,** so past the block threshold `git commit -m $(`, a newline,
-  `cat <<'EOF'`, a body line and `EOF)` is refused. With the `$(` on the opener's line or before a
-  newline inside quotes (`git commit -m "$(`, a newline, `cat <<'EOF'` …), or the `)` on a line of
-  its own, it goes through.
+- **An `EOF)` closing line in a `$(` opened before an earlier heredoc's body is not seen
+  closing,** so past the block threshold `git commit -m "$(cat <<'A'`, a body line, `A`,
+  `cat <<'EOF'`, a body line and `EOF)"` is refused; with the `)` on a line of its own it goes
+  through. A `$(` opened before a newline outside quotes is not seen either, but the gate refuses
+  an unquoted `$(cat …)` as it stands. With the `$(` on the opener's line, or before a newline
+  inside quotes (`git commit -m "$(`, a newline, `cat <<'EOF'` …), the `EOF)` close goes through.
 - **`>|` splits a command at its `|`.** `git add f >| out`, a redirection that overrides
   `noclobber`, is refused past the block threshold, though Bash runs `git add f`;
   `git add f > out` goes through.
