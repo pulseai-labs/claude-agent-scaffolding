@@ -23,4 +23,9 @@ if [ -f "$SCRIPT_DIR/bin/omp-t3-claim" ]; then
   bash -n "$SCRIPT_DIR/bin/omp-t3-claim" || exit 1
 fi
 
+# bin/baton-seat is the Orca terminal launcher; same check.
+if [ -f "$SCRIPT_DIR/bin/baton-seat" ]; then
+  bash -n "$SCRIPT_DIR/bin/baton-seat" || exit 1
+fi
+
 bun test "$SCRIPT_DIR/tests"
