@@ -437,7 +437,8 @@ class RunTick {
     const note = m.o.notify === undefined ? undefined : render(m.o.notify, m.scope);
     if (!this.hooks(m.o.run, m.scope, hookCwd)) return this.park(u, "run failed");
     const thread = u.session?.thread_id; // endSession deletes the session; a park by outcome still records it
-    await this.endSession(u);
+    // A park by outcome keeps the thread as any park does.
+    await this.endSession(u, m.o.to === "park" ? { keep: "unpark" } : {});
     await this.move(u, m.o, note, thread);
   }
 
@@ -856,7 +857,8 @@ class RunTick {
 
   /**
    * Clear the unit's triage: remove its claim and release its directory. With `interrupt`, a
-   * triage thread still at work is interrupted first (`triage dropped`).
+   * triage thread still at work is interrupted first (`triage dropped`). A host with `close`
+   * closes the thread before the release.
    */
   private async endTriage(u: UnitState, o: { interrupt?: boolean; release?: boolean } = {}): Promise<void> {
     const t = u.triage;
@@ -866,6 +868,7 @@ class RunTick {
       await this.host.interrupt(ts.thread_id, "stop");
       this.ev("triage dropped", { unit: u.id, nonce: ts.nonce, request: t.request_id });
     }
+    if (this.host.close && ts.thread_id && !t.lost) await this.host.close(ts.thread_id);
     removeClaim(ts.claim_key, ts.claim_nonce);
     if (o.release !== false) await this.releaseDir(u, ts.launch_dir, () => ({ project: ts.project!, cwd: ts.cwd! }));
     delete u.triage;
@@ -972,6 +975,8 @@ class RunTick {
 
   private async successor(u: UnitState, stage: SessionStage, old: Session, path: string): Promise<void> {
     await this.endTriage(u, { interrupt: true });
+    // The parent's terminal closes; its claim and directory pass to the successor, unreleased.
+    if (this.host.close && old.thread_id) await this.host.close(old.thread_id);
     const n = this.mint(u);
     const scope = this.scope(u, { handoff_path: path });
     const req: LaunchRequest = {
@@ -1216,12 +1221,14 @@ class RunTick {
     // The path stored at launch, never re-rendered: a result binds to the launch that wrote it.
     // A valid result is removed once read; a refused one stays for the operator (no later launch reads it).
     const res = readDriverResult(d.result_file, drv, u.stage);
+    // Ended before the result file goes: a host error in its close leaves the driver and its
+    // result in place for the next tick to read again.
+    await this.endDriver(u);
     if (!("invalid" in res)) {
       try {
         removeFile(d.result_file);
-      } catch { /* best-effort: the next launch's path differs */ }
+      } catch { /* best-effort: the next launch's path differs, or removes it before launching */ }
     }
-    await this.endDriver(u);
     if ("invalid" in res) return this.escalate(u, `driver gave no valid result (${res.invalid})`);
     const path = render(drv.ledger, scope);
     mkdirSync(dirname(path), { recursive: true });
@@ -1258,11 +1265,12 @@ class RunTick {
     return true;
   }
 
-  /** Clear the unit's driver: remove its claim and release its directory. */
+  /** Clear the unit's driver: remove its claim and release its directory; a host with `close` closes the thread first. */
   private async endDriver(u: UnitState, o: { release?: boolean } = {}): Promise<void> {
     const d = u.driver;
     if (!d) return;
     const ds = d.session;
+    if (this.host.close && ds.thread_id && !d.lost) await this.host.close(ds.thread_id);
     removeClaim(ds.claim_key, ds.claim_nonce);
     delete u.driver;
     this.save();

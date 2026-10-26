@@ -269,3 +269,179 @@ test("disarm: a close that fails is reported and the disarm goes on", async () =
   expect(runState().status).toBe("disarmed");
   expect(runState().units.a.kept?.map((k) => k.thread)).toEqual(["thread-2"]); // left on record, not closed
 });
+
+// ---- fix round 1: a park by outcome keeps; triage, driver and molt parent threads close -----
+
+function outcomeRecipe(to: "park" | "done") {
+  return recipe({ work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to }] }) }, ["a"]);
+}
+
+test("a park by outcome keeps the terminal and the directory", async () => {
+  await arm(outcomeRecipe("park"));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } }, { withOptional: true });
+  ownDirs(host);
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  const u = runState().units.a;
+  expect(u.parked?.reason).toBe("outcome");
+  expect(host.closes).toEqual([]);
+  expect(host.releases).toEqual([]);
+  expect(u.kept?.map((k) => [k.thread, k.until, k.dir])).toEqual([["thread-1", "unpark", join(root, "launch", "r1_a_work_1")]]);
+  expect(claimFiles()).toEqual([]);
+});
+
+test("control: the same recipe's non-park outcome closes, then releases", async () => {
+  await arm(outcomeRecipe("done"));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } }, { withOptional: true });
+  ownDirs(host);
+  const order = recordOrder(host);
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  const u = runState().units.a;
+  expect(u.stage).toBe("done");
+  expect(order).toEqual(["close thread-1", `release ${join(root, "launch", "r1_a_work_1")}`]);
+  expect(u.kept).toBeUndefined();
+});
+
+const REQ = { id: "req-1", questions: [{ id: "q1", header: "Pick", question: "Which way?", options: [{ label: "left" }] }] };
+
+function triageRecipe() {
+  return {
+    ...recipe({ work: sess() }, ["a"]),
+    triage: {
+      kind: "triage", instance: "tinst", model: "tmod", project: "proj",
+      cwd: "{param.root}/w/{unit.id}", title: "triage {unit.id}", message: "answer {pending.request}",
+      env: { TK: "t-{unit.id}" }, note_file: "{run.dir}/notes/{unit.id}.md",
+    },
+  };
+}
+
+/** Seat thread-1 pending at once; its triage (thread-2) launches at minute 1, then answers and ends. */
+async function triageAnswers(withOptional: boolean): Promise<string[]> {
+  await arm(triageRecipe());
+  host = new FakeHost({
+    work: { ticks: 3, end: "completed", pending: { atStep: 0, request: REQ } },
+    triage: { ticks: 100, end: "completed" },
+  }, { withOptional });
+  ownDirs(host);
+  await doTick();
+  at(1);
+  await doTick();
+  expect(host.launches.map((l) => l.request.nonce)).toEqual(["r1/a/work/1", "r1/a/triage/1"]);
+  const log = withOptional ? recordOrder(host) : [];
+  host.answer("thread-1");
+  host.finish("thread-2", "completed");
+  at(2);
+  await doTick();
+  return log;
+}
+
+test("triage end closes the triage thread before its release", async () => {
+  const order = await triageAnswers(true);
+  const u = runState().units.a;
+  expect(u.triage).toBeUndefined();
+  expect(order).toEqual(["close thread-2", `release ${join(root, "launch", "r1_a_triage_1")}`]);
+  expect(u.session?.thread_id).toBe("thread-1"); // the seat goes on
+});
+
+test("control: on a host without close the triage ends as in 0.4.0", async () => {
+  await triageAnswers(false);
+  const u = runState().units.a;
+  expect(u.triage).toBeUndefined();
+  expect(u.parked).toBeUndefined();
+  expect(host.releases.map((r) => r.dir)).toEqual([join(root, "launch", "r1_a_triage_1")]);
+  expect(u.session?.thread_id).toBe("thread-1");
+});
+
+function driverRecipe() {
+  return {
+    ...recipe({ work: sess({ stop_file: "{run.dir}/stop/{unit.id}" }) }, ["a"]),
+    driver: {
+      kind: "driver", instance: "dinst", model: "dmod", project: "proj",
+      cwd: "{param.root}/w/{unit.id}", title: "driver {unit.id}", message: "settle {unit.id}",
+      env: { DK: "d-{unit.id}" },
+      state_file: "{run.dir}/driver/{unit.id}/state.md",
+      result_file: "{run.dir}/out/{unit.id}/driver-result-{driver.launch}.json",
+      ledger: "{param.root}/ledger.md",
+      clearing: ["remove-file"],
+      resume_to: {},
+    },
+  };
+}
+const RESUME = JSON.stringify({ result: "resume", cleared: "remove-file", ledger: { q: "q", a: "a", why: "w", rejected: "r" } });
+
+/** Seat thread-1 parks `stop` at minute 1 and its driver (thread-2) launches; the driver writes a resume. */
+async function driverOut(): Promise<void> {
+  await arm(driverRecipe());
+  host = new FakeHost({
+    work: { ticks: 100, end: "completed" },
+    driver: { ticks: 1, end: "completed", writes: [{ path: join(runDir(), "out", "{unit}", "driver-result-{launch}.json"), content: RESUME }] },
+  }, { withOptional: true });
+  ownDirs(host);
+  await doTick();
+  mkdirSync(join(runDir(), "stop"), { recursive: true });
+  writeFileSync(join(runDir(), "stop", "a"), "");
+  at(1);
+  await doTick();
+  expect(runState().units.a.parked?.reason).toBe("stop");
+  expect(runState().units.a.driver?.session.thread_id).toBe("thread-2");
+  host.advance();
+}
+
+test("driver end closes the driver thread before its release", async () => {
+  await driverOut();
+  const order = recordOrder(host);
+  at(2);
+  await doTick();
+  const u = runState().units.a;
+  expect(u.driver).toBeUndefined();
+  expect(u.parked).toBeUndefined(); // resumed in place
+  expect(order).toEqual(["close thread-2", `release ${join(root, "launch", "r1_a_driver_1")}`]);
+  // The seat thread the stop park kept closes on the next tick, as any unpark.
+  at(3);
+  await doTick();
+  expect(host.closes).toEqual(["thread-2", "thread-1"]);
+});
+
+test("driver close that fails retries next tick with the result still there", async () => {
+  await driverOut();
+  const close = host.close!.bind(host);
+  host.close = async () => { throw new HostDownError("orca unreachable"); };
+  at(2);
+  expect((await doTick()).host).toBe("down");
+  let u = runState().units.a;
+  expect(u.driver?.session.thread_id).toBe("thread-2");
+  expect(existsSync(join(runDir(), "out", "a", "driver-result-1.json"))).toBe(true);
+  host.close = close;
+  at(3);
+  await doTick();
+  u = runState().units.a;
+  expect(u.driver).toBeUndefined();
+  expect(u.parked).toBeUndefined(); // resumed, not escalated for a lost result
+  expect(host.closes).toContain("thread-2");
+});
+
+test("a molt successor closes the parent thread, keeping its claim and directory", async () => {
+  await arm(recipe({
+    work: sess({ handoff: { file: "{run.dir}/h/{unit.id}", token: "handed-off", message: "resume from {handoff_path}" } }),
+  }, ["a"]));
+  const line = `warned 40\n${new Date(T0 + 60_000).toISOString()} handed-off /tmp/hand {unit}.md\n`;
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [{ path: join(runDir(), "h", "{unit}"), content: line }] } }, { withOptional: true });
+  ownDirs(host);
+  const order = recordOrder(host);
+  const launch = host.launch.bind(host);
+  host.launch = async (r) => { order.push(`launch ${r.nonce}`); return launch(r); };
+  await doTick();
+  host.advance();
+  at(2);
+  await doTick();
+  expect(order).toEqual(["launch r1/a/work/1", "close thread-1", "launch r1/a/work/2"]);
+  const s = runState().units.a.session!;
+  expect(s.successor_of).toBe("r1/a/work/1");
+  expect(s.launch_dir).toBe(join(root, "launch", "r1_a_work_1"));
+  expect(claimFiles().length).toBe(1);
+});
