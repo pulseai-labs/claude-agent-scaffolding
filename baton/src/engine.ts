@@ -1,13 +1,18 @@
 // The tick: one pass, under the store lock, over every armed run. Per run, in order:
 // 0 orphan recovery, 1 sources, 2 stop files, 3 live sessions, 4 wait stages,
-// 5 merge stages, 6 launches due, 8 done. A host that refuses the credentials or cannot be
-// reached stops the tick with nothing marked. Step 3 also runs the decision procedure for a
-// session waiting on a pending request: wait, triage it once, act on the triage's result.
+// 5 merge stages, 6 launches due, 7 drivers, 8 done. A host that refuses the credentials or
+// cannot be reached stops the tick with nothing marked. Step 3 also runs the decision procedure
+// for a session waiting on a pending request: wait, triage it once, act on the triage's result.
+// Step 7, with a driver in the recipe: a parked unit gets one driver session, whose result
+// resumes it, escalates it to the operator, or stops the run. Only an escalate or a stop notifies.
 
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
 import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claims.ts";
+import { ledgerLine, readDriverResult, renderDriverState } from "./driver.ts";
 import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
 import {
   HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type PendingRequest, type ThreadStatus,
@@ -15,9 +20,10 @@ import {
 import { readConfig, type Config } from "./notify.ts";
 import {
   DEFAULT_SLOTS, DEFAULT_STAGE_SLOTS, isProtoName, nonce as launchNonce, own, render, threadTitle, UNIT_ID_RE,
-  type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type TriageStage, type WaitStage,
+  type DriverStage, type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type TriageStage, type WaitStage,
 } from "./recipe.ts";
 import { mergeUnit, type ParkPr } from "./merge.ts";
+import { runSummary } from "./summary.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
 import { enterStage, type RunState, type Session, type Store, type UnitState } from "./state.ts";
 
@@ -57,6 +63,9 @@ const DEFAULT_SETTLE_MINUTES = 10;
 const DEFAULT_TRIAGE_STALL_MINUTES = 10;
 /** The `seq` key and nonce segment of a triage launch: `<run>/<unit>/triage/<n>`. */
 const TRIAGE = "triage";
+const DEFAULT_DRIVER_STALL_MINUTES = 10;
+/** The `seq` key and nonce segment of a driver launch: `<run>/<unit>/driver/<n>`. */
+const DRIVER = "driver";
 const ORPHAN_MS = 2 * MIN;
 const STALLS_TO_PARK = 2;
 const DOWN_NOTIFY_MS = 30 * MIN;
@@ -88,6 +97,45 @@ export function unitScope(run: RunState, u: UnitState, extra: Partial<Scope> = {
   };
 }
 
+/** Unpark `u` in place (`to` undefined) or into stage `to`. A `stop` park's stop file is renamed
+ *  to `<path>.consumed-<nowIso>`. A live driver's claim is removed and `u.driver` deleted.
+ *  `recipe` is required for `to`; with none, an in-place unpark still resets but skips stop-file
+ *  consumption. Returns the stage the unit is now in and the consumed path, if any. Caller holds the lock and saves. */
+export function unparkUnit(run: RunState, recipe: Recipe | undefined, u: UnitState, to: string | undefined, nowIso: string):
+  { stage: string; consumed?: string } {
+  let consumed: string | undefined;
+  if (u.parked?.reason === "stop") {
+    // Rendered before any stage move: the park stage's stop_file is the one that blocks.
+    const stage = recipe ? own(recipe.stages, u.stage) : undefined;
+    if (stage?.kind === "session" && stage.stop_file !== undefined) {
+      try {
+        const path = render(stage.stop_file, unitScope(run, u));
+        if (existsSync(path)) {
+          consumed = `${path}.consumed-${nowIso}`;
+          renameSync(path, consumed);
+        }
+      } catch {
+        consumed = undefined; // a path that cannot render or move: the park still ends
+      }
+    }
+  }
+  if (u.driver) {
+    removeClaim(u.driver.session.claim_key, u.driver.session.claim_nonce);
+    delete u.driver;
+  }
+  delete u.parked;
+  if (to !== undefined) {
+    enterStage(u, to, recipe && triageNote(run, recipe, u)); // the same stage entry an outcome's move makes
+  } else {
+    // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
+    u.stalls = 0;
+    delete u.merge_failures;
+    delete u.forge_failures;
+    u.launches[u.stage] = 0;
+  }
+  return consumed === undefined ? { stage: u.stage } : { stage: u.stage, consumed };
+}
+
 /** The unit's rendered triage note path; undefined with no triage stage or a path that cannot render. */
 export function triageNote(run: RunState, recipe: Recipe, u: UnitState): string | undefined {
   if (!recipe.triage) return undefined;
@@ -96,6 +144,12 @@ export function triageNote(run: RunState, recipe: Recipe, u: UnitState): string 
   } catch {
     return undefined;
   }
+}
+
+/** A merge-stage park names its PR and what stopped it, so the notice alone says where to look. */
+function prSuffix(pr: ParkPr | undefined): string {
+  return pr === undefined ? ""
+    : ` — ${pr.why === "conflict" ? "conflict" : `red${pr.failing ? `: ${pr.failing.join(", ")}` : ""}`} — ${pr.url}`;
 }
 
 function removeFile(path: string): void {
@@ -291,10 +345,9 @@ class RunTick {
       ...(o.pr ? { pr: o.pr.url, pr_state: o.pr.why, ...(o.pr.failing ? { failing: o.pr.failing } : {}) } : {}),
     });
     this.report.parked.push(u.id);
-    // A merge-stage park names its PR and what stopped it, so the notice alone says where to look.
-    const about = o.pr === undefined ? ""
-      : ` — ${o.pr.why === "conflict" ? "conflict" : `red${o.pr.failing ? `: ${o.pr.failing.join(", ")}` : ""}`} — ${o.pr.url}`;
-    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}${about}`);
+    // With a driver, step 7 settles the park: only its escalate or stop reaches the operator.
+    if (this.recipe.driver) return;
+    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}${prSuffix(o.pr)}`);
   }
 
   /** `note` is the outcome's notice, rendered by the caller before any side effect. */
@@ -401,6 +454,7 @@ class RunTick {
       await this.waits();
       await this.merges();
       await this.launches();
+      await this.drivers();
       await this.done();
     } finally {
       // Whatever ran stays recorded, including on a host error mid-tick.
@@ -454,6 +508,29 @@ class RunTick {
         } else if (this.nowMs() - Date.parse(ts.launched_at) > ORPHAN_MS) {
           this.ev("orphan", { unit: u.id, nonce: ts.nonce });
           t.lost = true;
+          this.save();
+        }
+      });
+    }
+    // A driver launch whose outcome was unknown, the same way; none found, it has ended (step 7).
+    for (const u of this.ordered()) {
+      const d = u.driver;
+      if (!d || d.session.thread_id || d.lost || !u.parked) continue;
+      await this.guard(u, async () => {
+        const ds = d.session;
+        const ids = await this.host.findByNonce(ds.project!, ds.nonce);
+        if (ids.length === 1) {
+          ds.thread_id = ids[0];
+          this.ev("adopted", { unit: u.id, nonce: ds.nonce, thread: ids[0] });
+          this.save();
+        } else if (ids.length >= 2) {
+          // Two threads may be live in the directory: remove the claim, keep the directory.
+          this.ev("ambiguous nonce", { unit: u.id, nonce: ds.nonce, threads: ids, dir: ds.launch_dir });
+          await this.endDriver(u, { release: false });
+          await this.escalate(u, "driver could not launch: ambiguous nonce");
+        } else if (this.nowMs() - Date.parse(ds.launched_at) > ORPHAN_MS) {
+          this.ev("orphan", { unit: u.id, nonce: ds.nonce });
+          d.lost = true;
           this.save();
         }
       });
@@ -1060,6 +1137,223 @@ class RunTick {
     }
   }
 
+  // ---- drivers ----------------------------------------------------------------------------
+
+  /** Step 7: each parked unit not yet sent to the operator gets one driver, then its result. */
+  private async drivers(): Promise<void> {
+    const drv = this.recipe.driver;
+    if (!drv) return;
+    for (const u of this.ordered()) {
+      // Checked per unit: a driver's stop parks the run partway through this loop.
+      if (this.run.status !== "armed" || !u.parked || u.parked.escalated) continue;
+      await this.guard(u, async () => {
+        try {
+          if (u.driver) await this.driverResult(u, drv);
+          else await this.driverFor(u, drv);
+        } catch (e) {
+          // A refusal of any kind goes to the operator; a guard park here would relaunch forever.
+          if (isHostError(e) || !u.parked) throw e;
+          this.report.errors.push(`${this.run.id}/${u.id}: driver: ${message(e)}`);
+          await this.endDriver(u);
+          await this.escalate(u, `driver failed: ${message(e)}`);
+        }
+      });
+    }
+  }
+
+  /** A park with no driver yet: launch one, unless a driver already resumed this same park once. */
+  private async driverFor(u: UnitState, drv: DriverStage): Promise<void> {
+    const key = `${u.stage}/${u.parked!.reason}`;
+    if ((u.drivers ?? []).includes(key)) return this.escalate(u, "parked again after a driver resumed it once");
+    await this.launchDriver(u, drv, key);
+  }
+
+  /** A driver is out: wait until it ends, then act on its result exactly once. */
+  private async driverResult(u: UnitState, drv: DriverStage): Promise<void> {
+    const d = u.driver!;
+    if (!(await this.driverEnded(u, d, drv))) return;
+    const scope = this.scope(u);
+    // The path stored at launch, never re-rendered: a result binds to the launch that wrote it.
+    // A valid result is removed once read; a refused one stays for the operator (no later launch reads it).
+    const res = readDriverResult(d.result_file, drv, u.stage);
+    if (!("invalid" in res)) {
+      try {
+        removeFile(d.result_file);
+      } catch { /* best-effort: the next launch's path differs */ }
+    }
+    await this.endDriver(u);
+    if ("invalid" in res) return this.escalate(u, `driver gave no valid result (${res.invalid})`);
+    const path = render(drv.ledger, scope);
+    mkdirSync(dirname(path), { recursive: true });
+    appendFileSync(path, ledgerLine(this.nowIso(), u.id, res.ledger));
+    if (res.result === "escalate") return this.escalate(u, res.action);
+    if (res.result === "stop") {
+      u.parked!.escalated = true;
+      this.save();
+      this.ev("driver stop", { unit: u.id, reason: res.reason });
+      await this.parkRun(`driver stop: ${res.reason}`);
+      return;
+    }
+    const from = u.stage;
+    const { stage } = unparkUnit(this.run, this.recipe, u, res.to, this.nowIso());
+    u.drivers = [...(u.drivers ?? []), d.key];
+    if (res.to !== undefined) {
+      this.entered.add(u.id);
+      this.report.transitioned.push(u.id);
+    }
+    this.save();
+    this.ev("driver resume", { unit: u.id, from, to: stage, cleared: res.cleared });
+  }
+
+  /** Has the driver ended? One past its time limit is interrupted (`driver dropped`) and has. */
+  private async driverEnded(u: UnitState, d: NonNullable<UnitState["driver"]>, drv: DriverStage): Promise<boolean> {
+    if (d.lost) return true;
+    const id = d.session.thread_id;
+    if (!id) return false; // step 0 is still looking for it by nonce
+    if (!atWork(await this.host.status(id))) return true;
+    const limit = (drv.stall_minutes ?? DEFAULT_DRIVER_STALL_MINUTES) * MIN;
+    if (this.nowMs() - Date.parse(d.session.launched_at) < limit) return false;
+    await this.host.interrupt(id, "stalled");
+    this.ev("driver dropped", { unit: u.id, nonce: d.session.nonce });
+    return true;
+  }
+
+  /** Clear the unit's driver: remove its claim and release its directory. */
+  private async endDriver(u: UnitState, o: { release?: boolean } = {}): Promise<void> {
+    const d = u.driver;
+    if (!d) return;
+    const ds = d.session;
+    removeClaim(ds.claim_key, ds.claim_nonce);
+    delete u.driver;
+    this.save();
+    if (o.release !== false) await this.releaseDir(u, ds.launch_dir, () => ({ project: ds.project!, cwd: ds.cwd! }));
+  }
+
+  /** Send the park to the operator with one action; no driver runs for it after this. */
+  private async escalate(u: UnitState, action: string): Promise<void> {
+    const p = u.parked!;
+    p.escalated = true;
+    this.save();
+    this.ev("driver escalate", { unit: u.id, stage: u.stage, reason: p.reason, action });
+    await this.notify(`${this.run.id}/${u.id}/park/${p.at}`,
+      `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${p.reason} — ${action}${prSuffix(this.parkPr(u))}`);
+  }
+
+  /** The PR detail the unit's latest park event recorded, as park() was given it; undefined without one. */
+  private parkPr(u: UnitState): ParkPr | undefined {
+    let text = "";
+    try {
+      text = readFileSync(join(this.run.dir, "events.jsonl"), "utf8");
+    } catch {
+      return undefined;
+    }
+    let last: Record<string, unknown> | undefined;
+    for (const line of text.split("\n")) {
+      try {
+        const e = JSON.parse(line) as Record<string, unknown>;
+        if (e !== null && typeof e === "object" && e.kind === "park" && e.unit === u.id) last = e;
+      } catch { /* a blank or torn line is not an event */ }
+    }
+    if (!last || typeof last.pr !== "string" || (last.pr_state !== "red" && last.pr_state !== "conflict")) return undefined;
+    const failing = Array.isArray(last.failing) && last.failing.every((f) => typeof f === "string") ? last.failing as string[] : undefined;
+    return { url: last.pr, why: last.pr_state, ...(failing ? { failing } : {}) };
+  }
+
+  /**
+   * Launch the park's driver, stored in `u.driver`, never `u.session`: it takes no slot. The state
+   * file is written and any old result file removed before anything is launched.
+   */
+  private async launchDriver(u: UnitState, drv: DriverStage, key: string): Promise<void> {
+    const plain = this.scope(u);
+    const seqBefore = own(u.seq, DRIVER);
+    const n = (seqBefore ?? 0) + 1;
+    const scope = this.scope(u, { driver: { reason: u.parked!.reason, stage: u.stage, launch: String(n) } });
+    let f: { project: string; cwd: string; env: Record<string, string>; title: string; instance: string; model: string;
+      text: string; stateFile: string; resultFile: string; ledger: string; stopFile?: string };
+    try {
+      // Every field renders before any side effect.
+      const env: Record<string, string> = {};
+      for (const [k, v] of Object.entries(drv.env)) env[k] = render(v, scope);
+      f = {
+        project: render(drv.project, scope), cwd: render(drv.cwd, scope), env,
+        title: render(drv.title, scope), instance: render(drv.instance, scope), model: render(drv.model, scope),
+        text: render(drv.message, scope), stateFile: render(drv.state_file, scope),
+        resultFile: render(drv.result_file, scope), ledger: render(drv.ledger, scope),
+      };
+    } catch (e) {
+      return this.escalate(u, `driver could not launch: ${message(e)}`);
+    }
+    const parkStage = own(this.recipe.stages, u.stage);
+    if (parkStage?.kind === "session" && parkStage.stop_file !== undefined) {
+      try {
+        f.stopFile = render(parkStage.stop_file, plain);
+      } catch { /* the state file goes without it */ }
+    }
+    let eventsText = "";
+    try {
+      eventsText = readFileSync(join(this.run.dir, "events.jsonl"), "utf8");
+    } catch { /* no events yet */ }
+    mkdirSync(dirname(f.stateFile), { recursive: true });
+    writeFileSync(f.stateFile, renderDriverState(this.run, u, eventsText,
+      { result_file: f.resultFile, ledger: f.ledger, ...(f.stopFile !== undefined ? { stop_file: f.stopFile } : {}) }));
+    removeFile(f.resultFile);
+
+    u.seq ??= {};
+    u.seq[DRIVER] = n;
+    const nn = launchNonce(this.run.id, u.id, DRIVER, n);
+    let dir: string;
+    try {
+      dir = await this.host.bind(f.project, f.cwd, nn, drv.launch_dir ?? DEFAULT_LAUNCH_DIR);
+    } catch (e) {
+      if (isHostError(e)) {
+        // The host was not reached and made no directory: nothing is marked, a later tick retries.
+        if (seqBefore === undefined) delete u.seq[DRIVER];
+        else u.seq[DRIVER] = seqBefore;
+        if (Object.keys(u.seq).length === 0) delete u.seq;
+        throw e;
+      }
+      return this.driverRefused(u, nn, `bind: ${message(e)}`);
+    }
+    let claim: string;
+    try {
+      claim = writeClaim(dir, f.env, nn);
+    } catch (e) {
+      if (dir !== f.cwd) await this.releaseDir(u, dir, () => ({ project: f.project, cwd: f.cwd }));
+      return this.driverRefused(u, nn, `claim: ${message(e)}`);
+    }
+    const now = this.nowIso();
+    const ds: Session = {
+      nonce: nn, claim_nonce: nn, launch_dir: dir, claim_key: claim, project: f.project, cwd: f.cwd,
+      launched_at: now, last_progress_at: now, progress_mark: "",
+    };
+    u.driver = { key, session: ds, result_file: f.resultFile };
+    this.save();
+    this.ev("driver", { unit: u.id, nonce: nn, key });
+    const req: LaunchRequest = {
+      nonce: nn, title: threadTitle(f.title, nn), project: f.project, instance: f.instance, model: f.model, cwd: dir, message: f.text,
+    };
+    try {
+      ds.thread_id = (await this.host.launch(req)).threadId;
+    } catch (e) {
+      if (isHostError(e)) throw e;
+      if (e instanceof LaunchError) {
+        await this.endDriver(u);
+        return this.driverRefused(u, nn, e.message);
+      }
+      // Unknown: the launch may have reached the host. Step 0 looks for it by nonce.
+      this.report.errors.push(`${this.run.id}/${u.id}: driver launch outcome unknown: ${message(e)}`);
+      this.ev("launch unknown", { unit: u.id, nonce: nn, reason: message(e) });
+      return;
+    }
+    this.save();
+  }
+
+  /** A driver launch the host refused: the park goes to the operator. */
+  private async driverRefused(u: UnitState, nonce: string, reason: string): Promise<void> {
+    this.ev("launch failed", { unit: u.id, nonce, reason });
+    await this.escalate(u, `driver could not launch: ${reason}`);
+  }
+
   /** Step 8: every unit done marks the run done, once. */
   private async done(): Promise<void> {
     const units = Object.values(this.run.units);
@@ -1067,6 +1361,18 @@ class RunTick {
     this.run.status = "done";
     this.save();
     this.ev("done");
-    await this.notify(`${this.run.id}/done`, `baton ${this.run.id} done`);
+    let eventsText = "";
+    try {
+      eventsText = readFileSync(join(this.run.dir, "events.jsonl"), "utf8");
+    } catch { /* no events */ }
+    let ledger: string | undefined;
+    if (this.recipe.driver) {
+      // The run's base scope has no unit: a ledger path that needs one is left out.
+      const base = { ...this.scope(units[0]), get unit(): never { throw new Error("no unit in scope"); } } as Scope;
+      try {
+        ledger = render(this.recipe.driver.ledger, base);
+      } catch { /* the summary goes without it */ }
+    }
+    await this.notify(`${this.run.id}/done`, runSummary(this.run, eventsText, this.nowIso(), ledger));
   }
 }

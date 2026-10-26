@@ -3,8 +3,11 @@ import { parseKey } from "./notice.ts";
 import { mkdirSync, renameSync } from "node:fs";
 import { basename, join } from "node:path";
 import { stateDir } from "./paths.ts";
+import { recordOpen } from "./settle.ts";
 import { listSpool, removeSpool } from "./spool.ts";
-import { TelegramError, type Api } from "./telegram.ts";
+import { fitText, TelegramError, type Api } from "./telegram.ts";
+
+const ACTION_MARKER = "🔴 ACTION — ";
 
 export async function drainSpool(
   api: Api,
@@ -15,8 +18,12 @@ export async function drainSpool(
   let failed = 0;
   for (const { path, item } of listSpool()) {
     try {
-      let keyboard = keyboardFor(parseKey(item.key), now());
-      const body: Record<string, unknown> = { chat_id: chatId, text: item.message };
+      const notice = parseKey(item.key);
+      let keyboard = keyboardFor(notice, now());
+      // Baton sends actions; the run-end summary is the one silent, marker-free notice.
+      const text = fitText(notice.kind === "run-done" ? item.message : ACTION_MARKER + item.message);
+      const body: Record<string, unknown> = { chat_id: chatId, text };
+      if (notice.kind === "run-done") body.disable_notification = true;
       if (keyboard) body.reply_markup = keyboard;
       let msg: { message_id: number };
       try {
@@ -28,9 +35,23 @@ export async function drainSpool(
         keyboard = undefined;
         msg = await api.call<{ message_id: number }>("sendMessage", body);
       }
+      // Telegram has the message: from here the spool item always goes, or the next drain sends it
+      // again and every later notice waits behind it. The bookkeeping is best-effort.
+      const messageId = msg.message_id;
+      const bestEffort = (what: string, f: () => void) => {
+        try {
+          f();
+        } catch (e) {
+          console.error(`bot-on-telegram: sent notice ${item.key} but could not record its ${what}: ${(e as Error).message}`);
+        }
+      };
       if (keyboard) {
         const ids = keyboard.inline_keyboard.flat().flatMap((b) => ("callback_data" in b ? [b.callback_data] : []));
-        setMessageId(ids, msg.message_id);
+        bestEffort("buttons", () => setMessageId(ids, messageId));
+      }
+      if (notice.kind === "unit-park") {
+        bestEffort("action", () =>
+          recordOpen({ message_id: messageId, run: notice.run, unit: notice.unit, park_at: notice.at, text }));
       }
       removeSpool(path);
       sent++;

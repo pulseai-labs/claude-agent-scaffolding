@@ -35,7 +35,10 @@ export class FakeTelegram {
       const m = /^\/bot([^/]+)\/([A-Za-z]+)$/.exec(req.url ?? "");
       const body = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
       this.calls.push({ method: m?.[2] ?? "", body, token: m?.[1] ?? "" });
-      const f = this.failOn[m?.[2] ?? ""]?.shift() ?? this.failures.shift();
+      // Like Telegram: a text over 4096 UTF-16 code units is refused.
+      const tooLong = typeof body.text === "string" && body.text.length > 4096
+        ? { error_code: 400, description: "Bad Request: message is too long" } : undefined;
+      const f = tooLong ?? this.failOn[m?.[2] ?? ""]?.shift() ?? this.failures.shift();
       if (f) {
         res.writeHead(f.status ?? (f.error_code >= 500 || f.error_code === 429 ? f.error_code : 400), { "content-type": "application/json" });
         res.end(JSON.stringify({ ok: false, error_code: f.error_code, description: f.description, parameters: f.parameters }));

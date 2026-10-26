@@ -430,4 +430,19 @@ describe("ossify-spine triage", () => {
       expect([pin, b.includes(pin)]).toEqual([pin, true]);
     }
   });
+
+  test("example recipe has a valid driver", () => {
+    expect(validate(raw()).ok).toBe(true);
+    const r = loadRecipe();
+    expect(r.driver?.resume_to.correct).toEqual(["reclose"]);
+    expect(r.driver?.clearing).toEqual(["rerun-check", "remove-file"]);
+    // The driver is told the exact per-launch result path baton reads.
+    expect(r.driver?.result_file).toBe("{run.dir}/out/{unit.id}/driver-result-{driver.launch}.json");
+    expect(r.driver?.message).toContain(`Result file: ${r.driver?.result_file}.`);
+    const brief = join(import.meta.dir, "..", "examples", "ossify-spine", "briefs", "driver.md");
+    expect(existsSync(brief)).toBe(true);
+    const text = readFileSync(brief, "utf8");
+    expect(text).toContain("rerun-check");
+    expect(text).toContain("remove-file");
+  });
 });

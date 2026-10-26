@@ -56,6 +56,19 @@ export type TriageStage = Omit<SessionStage, "kind" | "outcomes" | "handoff" | "
   /** File the triage session writes to ask for a relaunch with a correction note. */
   note_file: string;
 };
+/** The recipe's one driver session: launched when a unit parks. Like triage, the engine ignores no
+ *  extra fields here; the session-only ones below are refused. */
+export type DriverStage = Omit<SessionStage, "kind" | "outcomes" | "handoff" | "slots" | "max_launches"
+  | "settle_minutes" | "before" | "after_launch" | "stop_file" | "watch"> & {
+  kind: "driver";
+  state_file: string;
+  result_file: string;
+  ledger: string;
+  /** Non-empty; each matches STAGE_NAME_RE; no duplicates. */
+  clearing: string[];
+  /** Park stage to the stages a resume may enter. */
+  resume_to: Record<string, string[]>;
+};
 export type Stage = SessionStage | WaitStage | MergeStage;
 
 export type Source = {
@@ -76,6 +89,7 @@ export type Recipe = {
   seed: { id: string; stage: string; vars?: Record<string, string> }[];
   stages: Record<string, Stage>;
   triage?: TriageStage;
+  driver?: DriverStage;
 };
 
 export type Scope = {
@@ -85,6 +99,7 @@ export type Scope = {
   attempt: number;
   handoff_path?: string;
   pr?: { url: string; head: string };
+  driver?: { reason: string; stage: string; launch: string };
   pending?: { thread: string; request: string; questions: string; stage: string };
 };
 
@@ -132,10 +147,17 @@ const FIXED_NAMES = new Set([
 // Usable only in the triage stage: the stuck unit's pending request.
 const PENDING_NAMES = new Set(["pending.thread", "pending.request", "pending.questions", "pending.stage"]);
 
+// Usable only in the driver's launch fields: why the unit parked, where, and the launch's number
+// (`<n>` of the nonce `<run>/<unit>/driver/<n>`). Its state and result files may use the number only.
+const DRIVER_NAMES = new Set(["driver.reason", "driver.stage", "driver.launch"]);
+type PlaceholderMode = "stage" | "triage" | "driver" | "driver-file";
+
 /** Is `name` (the text between braces) a placeholder the recipe may use? Returns a reason or null. */
-function placeholderProblem(name: string, params: Set<string>, inTriage = false): string | null {
+function placeholderProblem(name: string, params: Set<string>, mode: PlaceholderMode = "stage"): string | null {
   if (FIXED_NAMES.has(name)) return null;
-  if (inTriage && PENDING_NAMES.has(name)) return null;
+  if (mode === "triage" && PENDING_NAMES.has(name)) return null;
+  if (mode === "driver" && DRIVER_NAMES.has(name)) return null;
+  if (mode === "driver-file" && name === "driver.launch") return null;
   if (name.startsWith("param.")) {
     const p = name.slice(6);
     return params.has(p) ? null : `undeclared param "${p}"`;
@@ -167,6 +189,11 @@ export function render(tpl: string, scope: Scope): string {
       case "pending.stage":
         if (!scope.pending) throw new Error("no pending in scope");
         return scope.pending[name.slice(8) as "thread" | "request" | "questions" | "stage"];
+      case "driver.reason":
+      case "driver.stage":
+      case "driver.launch":
+        if (!scope.driver) throw new Error("no driver in scope");
+        return scope.driver[name.slice(7) as "reason" | "stage" | "launch"];
     }
     if (name.startsWith("param.")) {
       const k = name.slice(6);
@@ -293,7 +320,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     });
   };
 
-  // The launch fields a session stage and the triage stage share.
+  // The launch fields a session stage, the triage stage and the driver stage share.
   const launchFields = (p: string, st: Obj) => {
     for (const f of ["instance", "model", "project", "cwd", "title", "message"]) {
       if (!isStr(st[f])) err(`${p}.${f}`, "must be a string");
@@ -377,6 +404,59 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     }
   }
 
+  if (r.driver !== undefined) {
+    const d = r.driver;
+    if (!isObj(d)) err("driver", "must be an object");
+    else {
+      if (d.kind !== "driver") err("driver.kind", 'must be "driver"');
+      for (const k of ["outcomes", "handoff", "slots", "max_launches", "settle_minutes",
+        "before", "after_launch", "stop_file", "watch"]) {
+        if (k in d) err(`driver.${k}`, "not allowed on a driver stage");
+      }
+      for (const f of ["state_file", "result_file", "ledger"]) {
+        if (!isStr(d[f])) err(`driver.${f}`, "must be a string");
+      }
+      // Two runs or two units must not share a state or result file, and a result binds to the
+      // launch that wrote it, so an earlier driver's late write is never read for a later one.
+      // The ledger is append-only and may be shared.
+      for (const f of ["state_file", "result_file"]) {
+        if (!isStr(d[f])) continue;
+        if (!d[f].includes("{run.dir}") && !d[f].includes("{run.id}")) err(`driver.${f}`, "must contain {run.dir} or {run.id}");
+        if (!d[f].includes("{unit.id}")) err(`driver.${f}`, "must contain {unit.id}");
+      }
+      if (isStr(d.result_file) && !d.result_file.includes("{driver.launch}")) {
+        err("driver.result_file", "must contain {driver.launch}");
+      }
+      // The launch writes the state file, then removes the result path: one file would be lost.
+      if (isStr(d.state_file) && d.state_file === d.result_file) err("driver.state_file", "must not be the result_file");
+      launchFields("driver", d);
+      if (!isStrArr(d.clearing) || d.clearing.length === 0) {
+        err("driver.clearing", "must be a non-empty list of names");
+      } else {
+        const seen = new Set<string>();
+        d.clearing.forEach((c, i) => {
+          if (!STAGE_NAME_RE.test(c)) err(`driver.clearing[${i}]`, "must match ^[a-z0-9_-]+$");
+          else if (seen.has(c)) err(`driver.clearing[${i}]`, "duplicate");
+          seen.add(c);
+        });
+      }
+      if (!isObj(d.resume_to)) err("driver.resume_to", "must be an object of park stage to stage names");
+      else {
+        for (const [from, tos] of Object.entries(d.resume_to)) {
+          const fp = `driver.resume_to.${from}`;
+          if (!stageNames.has(from)) err(fp, `names no stage: "${from}"`);
+          if (!isStrArr(tos)) { err(fp, "must be a list of stage names"); continue; }
+          tos.forEach((t, i) => {
+            if (TERMINALS.includes(t)) err(`${fp}[${i}]`, `"${t}" is a terminal, not a stage`);
+            else if (!stageNames.has(t)) err(`${fp}[${i}]`, `names no stage: "${t}"`);
+          });
+        }
+      }
+      // A stage named driver would share the driver launches' seq key and nonce segment.
+      if (stageNames.has("driver")) err("stages.driver", "a recipe with a driver stage cannot name a stage driver");
+    }
+  }
+
   const unitStage = (path: string, stage: unknown) => {
     if (!isStr(stage)) err(path, "must be a stage name");
     else if (!stageNames.has(stage)) err(path, `names no stage: "${stage}"`);
@@ -416,21 +496,30 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
   }
 
   // Placeholders: every string in the recipe may use only the closed set, and params must be declared.
-  const walk = (v: unknown, path: string, inTriage = false) => {
+  const walk = (v: unknown, path: string, mode: PlaceholderMode = "stage") => {
     if (isStr(v)) {
       for (const m of v.matchAll(PLACEHOLDER_RE)) {
-        const problem = placeholderProblem(m[1], params, inTriage);
+        const problem = placeholderProblem(m[1], params, mode);
         if (problem) err(path, problem);
       }
-    } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`, inTriage));
-    else if (isObj(v)) for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`, inTriage);
+    } else if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`, mode));
+    else if (isObj(v)) for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`, mode);
   };
   walk(r.stages, "stages");
   if (isObj(r.triage)) {
     // note_file renders with the unit's own scope: no pending request there.
     const { note_file, ...launch } = r.triage;
-    walk(launch, "triage", true);
+    walk(launch, "triage", "triage");
     walk(note_file, "triage.note_file");
+  }
+  if (isObj(r.driver)) {
+    // state_file and result_file are paths: of the driver names only the launch number (no slash).
+    // The ledger is also named in the run's summary, which has no launch: unit scope only.
+    const { state_file, result_file, ledger, clearing, resume_to, ...launch } = r.driver;
+    walk(launch, "driver", "driver");
+    walk(state_file, "driver.state_file", "driver-file");
+    walk(result_file, "driver.result_file", "driver-file");
+    walk(ledger, "driver.ledger");
   }
   walk(r.sources, "sources");
   walk(r.seed, "seed");

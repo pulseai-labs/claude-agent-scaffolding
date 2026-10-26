@@ -53,7 +53,7 @@ const byText = (k: unknown, text: string): string => cbButtons(k).find((b) => b.
 
 // The four buttons a unit-park notice is sent with, bound to MSG.
 function sendParkNotice(): Keyboard {
-  const k = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1" }, T0)!;
+  const k = keyboardFor({ kind: "unit-park", run: "r1", unit: "u1", at: "" }, T0)!;
   setMessageId(cbButtons(k).map((b) => b.callback_data), MSG);
   return k;
 }
@@ -416,7 +416,7 @@ function longQuestionBaton(): string {
 
 test("show with a 10 000-char questions field: the reply is cut to 3500 chars plus an ellipsis; buttons come back", async () => {
   process.env.BATON_STATE_DIR = longQuestionBaton();
-  const k = keyboardFor({ kind: "unit-park", run: "r9", unit: "u1" }, T0)!;
+  const k = keyboardFor({ kind: "unit-park", run: "r9", unit: "u1", at: "" }, T0)!;
   setMessageId(cbButtons(k).map((b) => b.callback_data), MSG);
   await handleUpdate(press(byText(k, "Show question")), ctx());
   const text = calls("sendMessage")[0]!.body.text as string;
@@ -565,4 +565,22 @@ test("merge-yes with a well-formed PR URL runs gh (the control beside the refusa
   setMessageId([m.id], MSG);
   await handleUpdate(press(m.id), ctx());
   expect(runs).toEqual([["gh", "pr", "merge", PR, "--merge", "--match-head-commit", HEAD]]);
+});
+
+test("a press on a 4096-char notice edits within Telegram's limit: the done edit and the disarm confirm", async () => {
+  const long = "🔴 ACTION — " + "n".repeat(4096 - "🔴 ACTION — ".length);
+  const k = sendParkNotice();
+  await handleUpdate(press(byText(k, "Disarm"), { text: long }), ctx());
+  const confirm = lastEdit().text as string;
+  expect(confirm.length).toBeLessThanOrEqual(4096);
+  expect(confirm.startsWith("🔴 ACTION — n")).toBe(true);
+  expect(confirm.endsWith("…\n\nDisarm run r1?")).toBe(true); // the notice is cut, never the question
+  // The Disarm press spent the notice's buttons: a fresh notice for the done edit.
+  const k2 = sendParkNotice();
+  await handleUpdate(press(byText(k2, "Unpark"), { text: long }), ctx());
+  expect(runs).toEqual([["baton", "unpark", "r1", "u1"]]);
+  const done = lastEdit().text as string;
+  expect(done.length).toBeLessThanOrEqual(4096);
+  expect(done.startsWith("🔴 ACTION — n")).toBe(true);
+  expect(done.endsWith("… — done")).toBe(true);
 });

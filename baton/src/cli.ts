@@ -2,14 +2,14 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
-import { exitCode, tick, triageNote } from "./engine.ts";
+import { exitCode, tick, unparkUnit } from "./engine.ts";
 import { GhForge } from "./forge.ts";
 import { HostAuthError, HostDownError } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
 import { loadT3Config, T3Host } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
-import { enterStage, openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
+import { openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
 import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
@@ -201,6 +201,7 @@ async function disarmCmd(args: string[]): Promise<number> {
     }
     for (const u of Object.values(run.units)) {
       if (u.triage) removeClaim(u.triage.session.claim_key, u.triage.session.claim_nonce);
+      if (u.driver) removeClaim(u.driver.session.claim_key, u.driver.session.claim_nonce);
       if (!u.session) continue;
       removeClaim(u.session.claim_key, u.session.claim_nonce);
     }
@@ -253,19 +254,16 @@ async function unparkCmd(args: string[]): Promise<number> {
     if (to !== undefined) {
       recipe = loadRecipe(run.dir);
       if (!Object.prototype.hasOwnProperty.call(recipe.stages, to)) return fail(`no such stage: ${to}`);
-    }
-    delete unit.parked;
-    if (to !== undefined) {
-      enterStage(unit, to, triageNote(run, recipe!, unit)); // the same stage entry an outcome's move makes
     } else {
-      // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
-      unit.stalls = 0;
-      delete unit.merge_failures;
-      delete unit.forge_failures;
-      unit.launches[unit.stage] = 0;
+      try {
+        recipe = loadRecipe(run.dir); // best-effort: in-place unpark needs it only to consume a stop file
+      } catch {
+        recipe = undefined;
+      }
     }
+    const { stage, consumed } = unparkUnit(run, recipe, unit, to, new Date().toISOString());
     store.writeRun(run);
-    store.event(runId!, { kind: "unpark", unit: unitId, stage: unit.stage });
+    store.event(runId!, { kind: "unpark", unit: unitId, stage, ...(consumed !== undefined ? { consumed } : {}) });
     return 0;
   });
 }
