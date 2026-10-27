@@ -21,12 +21,18 @@ state; it reads two environment variables.
 | below 40% | Nothing. The status line shows `molt <fill>%/<handoff threshold>%`. | The same. |
 | 40% (`warnPercent`) | Once, after the next tool result (or with the next prompt when the turn ended first), a warning: find a good point to hand off. Work continues. | The same, plus "tell your parent". molt appends `warned 40` to the status file. |
 | 50% (`warnAgainPercent`) | Once, a second warning: the handoff is past due. Work continues. | The same; `warned 50`. |
-| 65% (`commandPercent`) | Once, after a tool result: finish the step in hand and write the handoff now. At the end of a turn with no `MOLT-HANDOFF:` line, or with one that names a file that does not exist, the Stop reflex blocks the stop and asks again, at most twice. | The same; `handoff required`. |
+| 65% (`commandPercent`) | Once, after a tool result: finish the step in hand and write the handoff now. At the end of a turn with no `MOLT-HANDOFF:` line, or with one that names a file that does not exist, molt submits one follow-up prompt that asks again, at most twice. | The same; `handoff required`. |
 | 75% (`blockPercent`) | Only Write, Edit, Skill, and Bash whose every command is `git add` or `git commit` run — a leading head word (`if`, `then`, `elif`, `else`, `!`, `{`, `time`) is skipped, a segment that only closes one (`fi`, `}`) is ignored, and a lone `&` splits commands as `;` does (`&&` and the redirections that carry `&` are untouched). A loop head (`while`, `until`, `do`) is not skipped, so a loop stays refused. Every other tool call, reads included, is refused with the instruction and a note on the block. A command substitution in such a Bash call is read as commands of its own and goes through only if each is `git add`, `git commit`, `cat` on its stdin, `date` without `-f`, `printf` or `echo` (The gate, below). | The same. |
 | 80% (block + `fallbackMargin`) | molt stops waiting. With no handoff, it writes one: Haiku summarises the transcript into `~/.claude/state/molt/briefs/<id>.md`, above the facts molt extracts itself (files written, commits, issues, the last request). If Haiku fails, the facts alone stand in. molt molts on that brief. | The brief is written and handed off: `handed-off <brief path>`. No clear. |
 
-A warning never blocks a stop. Past 65% only the command is delivered; a warning the session
+A warning never asks at a turn end. Past 65% only the command is delivered; a warning the session
 never received is not sent after it.
+
+molt registers no `classic.*` hook (#929): Claude Code skips a plugin's `classic.*` hooks on an org
+account, with no error. The warnings ride a main-loop tool result as model-only context; the
+turn-end request is a prompt molt submits once the turn is over; a `/clear` or a resume reaches
+molt as `session.end`, a compact as `session.compact`, and a molt's own clear sends its seed when
+the clear resolves under a new session id.
 
 The handoff instruction asks the session to write a handoff (where its brief says, else with
 `ossify:handoff` where it is installed) and to end its reply with one line:
@@ -41,7 +47,7 @@ chose. molt checks that it names a readable file, then:
 - **Root:** runs `/clear`, writes the lineage record, and submits one seed prompt: continue from
   the handoff at `<path>` (with `ossify:handoff-resume` where it is installed).
 - **Child:** appends `handed-off <path>` to the status file and stops pushing — no more
-  warnings, no Stop block. Past the block threshold the gate stays in force; below it, only the
+  warnings, no turn-end request. Past the block threshold the gate stays in force; below it, only the
   child's own instructions stop further work. Its parent replaces it.
 
 A relative path resolves against the session's working directory; `~/` resolves against `$HOME`.
@@ -51,8 +57,8 @@ or example line never hands off.
 When the turn ends past 65% without a usable marker:
 
 - **No marker line:** the last `.md` file the session wrote or edited past 65% is the handoff.
-- **A marker that names no file**, or no marker and no such `.md` file: molt waits while the Stop
-  reflex has asks left. Once both asks are spent, or at the fallback threshold whatever the asks,
+- **A marker that names no file**, or no marker and no such `.md` file: molt waits while it has
+  requests left. Once both are spent, or at the fallback threshold whatever the asks,
   molt writes a fallback brief and hands off on that.
 
 A subagent's turn and an interrupted turn never hand off, and a subagent's tool calls are never
@@ -115,7 +121,7 @@ how it is replaced are the launcher's and the crew's business, never molt's.
 An Agent SDK host keeps the session id it started and resumes that id when it restarts the
 process. A root cleared in place would come back later as its pre-handoff self (#901). So when
 `CLAUDE_CODE_ENTRYPOINT` is `sdk-ts` or `sdk-py`, a root hands off as a child does: no `/clear`
-and no seed, no more warnings or Stop asks, and the block stays. The warnings and the handoff
+and no seed, no more warnings or turn-end requests, and the block stays. The warnings and the handoff
 command tell the agent to end its reply by sending the operator to a new thread that resumes from
 the handoff, and every later prompt in the session repeats that — after a process restart too,
 because the handoff path is kept in `sdk-handoff/<id>`. `cli` and `sdk-cli` (`claude -p`)

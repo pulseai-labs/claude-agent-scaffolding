@@ -372,11 +372,20 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
   await log($, `molt session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent}`)
   const p = pending
   $.command.run({ command: 'clear' }).then(async () => {
-    // A SessionStart consumes pending before /clear resolves. When it did not, and the
-    // session id is unchanged, a hook answered /clear without clearing.
+    // The clear resolved: under a new session id it cleared, and the new session gets the
+    // seed first (#929: classic.SessionStart, which sent it, never runs for a plugin on an org
+    // account). Under the same id a hook answered /clear without clearing.
     try {
-      if (pending !== p || (await $.session.id()) !== sessionId) return
+      if (pending !== p) return
       pending = undefined
+      const now = await $.session.id()
+      if (now !== sessionId) {
+        newWindow(now, 'clear')
+        try { await seed($, now, p) } catch (err) { await log($, `seed error ${String(err)}`) }
+        try { await publishStage($, now) } catch {}
+        inFlight = false
+        return
+      }
       inFlight = false
       await setNotice($, { text: `molt: /clear did not clear this session; it keeps going. The handoff is at ${handoff.path}.`, tone: 'warn' })
       await log($, `clear did not clear session=${sessionId}`)
@@ -490,6 +499,44 @@ async function status($: Engine, sessionId: string): Promise<string> {
   return lines.join('\n')
 }
 
+// The warning a main-loop tool result carries, if one is due: the command's instruction once
+// past the command threshold, else the next of the two warnings.
+async function warningFor($: Engine, sessionId: string): Promise<string | undefined> {
+  if (off.has(sessionId) || inFlight || handedOff.has(sessionId)) return undefined
+  await measure($, sessionId)
+  if (atLeast(stage, 'command')) {
+    if (nudged.has(sessionId)) return undefined
+    warned.set(sessionId, 2)
+    nudged.add(sessionId)
+    await noteCommand($, sessionId)
+    return instruction($, sessionId)
+  }
+  const due = dueWarning(sessionId)
+  if (due === undefined) return undefined
+  warned.set(sessionId, due)
+  await appendStatus($, fill(WARNED, { percent: warnedAt(sessionId, due) }))
+  return warningText($, sessionId, due)
+}
+
+// A new context window: after a /clear (a new session id), a resume or a compact (the same
+// id). Module state survives each; the fill it measured does not. #929: these came from
+// classic.SessionStart's source, which never reaches a plugin on an org account.
+function newWindow(sessionId: string, source: 'clear' | 'compact' | 'resume'): void {
+  stage = 'below'
+  lastPercent = undefined
+  unmeasured = 0
+  // A compact keeps the session id: the new window gets a whole handoff cycle again.
+  nudged.delete(sessionId)
+  warned.delete(sessionId)
+  commandNoted.delete(sessionId)
+  stopBlocks.delete(sessionId)
+  lastMd.delete(sessionId)
+  published.delete(sessionId)
+  // A compact gives this session a new window: a ladder raised by the fill the seed
+  // landed in belongs to the old one, and the new window gets the plain ladder (#665).
+  if (source === 'compact' && seeded?.session === sessionId) seeded = undefined
+}
+
 export const register: Register = (on, options) => {
   cfg = parseConfig(options as Readonly<Record<string, unknown>> | undefined)
 
@@ -498,6 +545,9 @@ export const register: Register = (on, options) => {
       await $.command.register({ name: 'molt', description: 'molt: now | off | on | status' })
       const sessionId = await $.session.id()
       await touchActive($, sessionId)
+      // The process start (#929: once classic.SessionStart's `startup`). A reload of the module
+      // runs it again, which writes nothing: only missing templates are written.
+      await writeMissingTemplates($)
       showStatus($, sessionId)
       if (cfg.problems.length) $.ui.toast(fill(CONFIG_PROBLEMS, { problems: cfg.problems.join('; ') }))
       await sdkHandoff($, sessionId)
@@ -515,42 +565,21 @@ export const register: Register = (on, options) => {
   on('session.end', async ($, e, next) => {
     await dropActive($, e.sessionId)
     await dropProgress($, e.sessionId)
+    // A /clear or a resume: the process goes on under another id, in a new window. A molt's
+    // own clear comes here too; its seed follows in molt()'s clear.
+    if (e.reason === 'clear' || e.reason === 'resume') newWindow(e.sessionId, e.reason)
     return next(e)
   })
 
-  on('classic.SessionStart', async ($, e, next) => {
-    // A molt's seed goes out first. The session is already cleared, so nothing after this
-    // point — another plugin's SessionStart included — may stop it.
-    const p = e.source === 'clear' ? pending : undefined
-    if (p !== undefined) pending = undefined
-    // Module state survives a clear, a compact and a resume; the fill it measured does not.
-    if (e.source === 'clear' || e.source === 'compact' || e.source === 'resume') {
-      stage = 'below'
-      lastPercent = undefined
-      unmeasured = 0
-      // A compact keeps the session id: the new window gets a whole handoff cycle again.
-      nudged.delete(e.session_id)
-      warned.delete(e.session_id)
-      commandNoted.delete(e.session_id)
-      stopBlocks.delete(e.session_id)
-      lastMd.delete(e.session_id)
-      published.delete(e.session_id)
-      // A compact gives this session a new window: a ladder raised by the fill the seed
-      // landed in belongs to the old one, and the new window gets the plain ladder (#665).
-      if (e.source === 'compact' && seeded?.session === e.session_id) seeded = undefined
-      if (p === undefined) try { await publishStage($, e.session_id) } catch {}
-    }
-    if (p !== undefined) {
-      try { await seed($, e.session_id, p) } catch (err) { await log($, `seed error ${String(err)}`) }
-      try { await publishStage($, e.session_id) } catch {}
-    }
-    inFlight = false
+  on('session.compact', async ($, e, next) => {
     const r = await next(e)
+    if (e.agentId !== undefined || 'skip' in r) return r
     try {
-      if (e.source === 'startup') await writeMissingTemplates($)
-      await touchActive($, e.session_id)
+      const sessionId = await $.session.id()
+      newWindow(sessionId, 'compact')
+      await publishStage($, sessionId)
     } catch (err) {
-      await log($, `SessionStart error ${String(err)}`)
+      await log($, `session.compact error ${String(err)}`)
     }
     return r
   })
@@ -656,33 +685,18 @@ export const register: Register = (on, options) => {
       // turn it into one (#665).
       if ((e.tool === 'Write' || e.tool === 'Edit') && typeof path === 'string' && path.endsWith('.md')
         && sessionId !== '' && !off.has(sessionId) && atLeast(stage, 'command')) lastMd.set(sessionId, path)
+      // The warnings ride the tool's result as model-only context (#929: classic.PostToolUse,
+      // which carried them, never runs for a plugin on an org account).
+      if (sessionId !== '' && r.isError === undefined) {
+        try {
+          const text = await warningFor($, sessionId)
+          if (text !== undefined) return { ...r, context: [...(r.context ?? []), text] }
+        } catch (err) {
+          await log($, `warning error ${String(err)}`)
+        }
+      }
     }
     return r
-  })
-
-  on('classic.PostToolUse', async ($, e, next) => {
-    const r = await next(e)
-    try {
-      if ((e as { agent_id?: string }).agent_id !== undefined) return r
-      const sessionId = e.session_id
-      if (off.has(sessionId) || inFlight || handedOff.has(sessionId)) return r
-      await measure($, sessionId)
-      if (atLeast(stage, 'command')) {
-        if (nudged.has(sessionId)) return r
-        warned.set(sessionId, 2)
-        nudged.add(sessionId)
-        await noteCommand($, sessionId)
-        return { ...r, additionalContext: [...(r.additionalContext ?? []), await instruction($, sessionId)] }
-      }
-      const due = dueWarning(sessionId)
-      if (due === undefined) return r
-      warned.set(sessionId, due)
-      await appendStatus($, fill(WARNED, { percent: warnedAt(sessionId, due) }))
-      return { ...r, additionalContext: [...(r.additionalContext ?? []), await warningText($, sessionId, due)] }
-    } catch (err) {
-      await log($, `PostToolUse error ${String(err)}`)
-      return r
-    }
   })
 
   on('turn.step', async function* ($, e, next) {

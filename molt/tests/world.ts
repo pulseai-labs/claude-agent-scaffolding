@@ -41,7 +41,6 @@ export type World = {
   dirs: Set<string>            // paths that exist as directories: exists, but cannot be read
   failNotices?: boolean        // molt's notice write is refused (another mod, or the state store)
   slowInfoNotices?: boolean    // an info notice write takes 20 ms (a rejection can land meanwhile)
-  failSessionStart?: boolean   // a plugin beneath molt throws in its SessionStart hook
 }
 
 // The test runtime has timers; the engine's types declare none, so reach it through globalThis.
@@ -141,11 +140,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     result: w.staged && (e.tool === 'Write' || e.tool === 'Edit') ? { staged: true } : 'ran',
     text: w.toolText,
   }) as never)
-  on('classic.PostToolUse', () => ({}))
-  on('classic.SessionStart', () => {
-    if (w.failSessionStart) throw new Error('another plugin failed')
-    return {}
-  })
+  on('session.compact', () => ({ messages: [{ role: 'user', text: 'summary', toolUses: [] }] }) as never)
   on('turn.complete', (_$, e) => ({ text: e.answer }))
   // A response streams; the chain's result is what a hook after `yield* next(e)` reads. The
   // step it answers for is the one it was handed, and `stepUsage` is what it reports.
@@ -168,5 +163,13 @@ export async function flush(): Promise<void> {
 
 // molt's handoff requests among them: each asks for a MOLT-HANDOFF line (#929).
 export const requests = (w: World) => w.plugin.filter(text => text.includes('MOLT-HANDOFF:'))
+
+// The session events molt reads in place of classic SessionStart (#929): a process start, an
+// operator's /clear (the ending id; the process goes on under a new one) and a compaction.
+export const STARTED = { cwd: '/repo', surface: 'terminal', isInteractive: true } as never
+export const CLEARED = (id = 's1') => ({ reason: 'clear', sessionId: id, resume: { sessionId: id } }) as never
+export const COMPACT = { trigger: 'manual', messages: [{ role: 'user', text: 'x', toolUses: [] }] } as never
+// A tool call whose result molt's warnings ride on (#929: they rode classic PostToolUse).
+export const READ = { tool: 'Read', file_path: '/r/a' } as never
 
 export const MARK = (id = 's1') => `/home/u/.claude/state/molt/active/${id}`

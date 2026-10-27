@@ -643,7 +643,8 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     }
   }
 
-  // classic.Stop (block up to twice) and turn.complete (handoff, molt, fallback) share this one event.
+  // On Claude Code, turn.complete carries both (the follow-up request up to twice, #929; then the handoff,
+  // molt or fallback); OMP's stop is this one event, which still blocks.
   async function onSessionStop(e: { last_assistant_message?: unknown; signal?: AbortSignal } = {}): Promise<{ decision: 'block'; reason: string } | undefined> {
     if (e.signal?.aborted) return undefined
     await load()

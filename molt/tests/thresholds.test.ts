@@ -1,8 +1,7 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world, flush, requests } from './world'
+import { world, flush, requests, CLEARED, COMPACT, READ } from './world'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
-const POST = { tool_name: 'Read', tool_input: {}, tool_response: {}, tool_use_id: 't1', session_id: 's1' } as never
 const TURN = (answer: string, extra: object = {}) => ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', ...extra }) as never
 const RUN = (args: string) =>
   ({ command: 'molt', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } }) as never
@@ -11,7 +10,7 @@ describe('below soft', () => {
   test('nothing gates, nudges or blocks', async ($, on) => {
     const w = world(on); at(w, 30)
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
-    expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
+    expect((await $.tool.call(READ)).context).toBeUndefined()
     await $.turn.complete(TURN('done')); await flush()
     expect(requests(w)).toEqual([])
   })
@@ -26,11 +25,10 @@ describe('below soft', () => {
 describe('past soft', () => {
   test('one nudge after a tool result, never two', async ($, on) => {
     const w = world(on); at(w, 67)
-    await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)
-    const first = await $.classic.PostToolUse(POST)
-    expect(first.additionalContext?.join('\n')).toContain('MOLT-HANDOFF:')
-    const second = await $.classic.PostToolUse(POST)
-    expect(second.additionalContext).toBeUndefined()
+    const first = await $.tool.call(READ)
+    expect(first.context?.join('\n')).toContain('MOLT-HANDOFF:')
+    const second = await $.tool.call(READ)
+    expect(second.context).toBeUndefined()
   })
   test('two turn ends each submit the instruction, then the third molts on the fallback brief (#929)', async ($, on) => {
     const w = world(on); at(w, 67)
@@ -65,16 +63,33 @@ describe('past soft', () => {
   test('a /clear of your own resets the stage: no figure afterwards gates nothing', async ($, on) => {
     const w = world(on); at(w, 85)
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeDefined()
+    await $.session.end(CLEARED('s1'))
     w.session.id = 's2'
-    await $.classic.SessionStart({ source: 'clear', session_id: 's2' } as never)
     w.usage = { window: 1_000_000 }
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
+  })
+  test('a resume in place resets the stage too (#929)', async ($, on) => {
+    const w = world(on); at(w, 85)
+    expect((await $.tool.call(READ)).deny).toBeDefined()
+    await $.session.end({ reason: 'resume', sessionId: 's1', resume: { sessionId: 's1' } } as never)
+    w.session.id = 's2'
+    w.usage = { window: 1_000_000 }
+    expect((await $.tool.call(READ)).deny).toBeUndefined()
+  })
+  test("a subagent's compaction keeps the main window's requests spent (#929)", async ($, on) => {
+    const w = world(on); at(w, 67)
+    await $.turn.complete(TURN('done')); await $.turn.complete(TURN('done')); await flush()
+    await $.session.compact({ trigger: 'auto', agentId: 'a1', messages: [{ role: 'user', text: 'x', toolUses: [] }] } as never)
+    w.clearTo.push('s2')
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(2)
+    expect(w.clears).toBe(1)
   })
   test('after /compact the nudge and both requests come back', async ($, on) => {
     const w = world(on); at(w, 67)
     await $.turn.complete(TURN('done')); await $.turn.complete(TURN('done')); await flush()
     expect(requests(w)).toHaveLength(2)
-    await $.classic.SessionStart({ source: 'compact', session_id: 's1' } as never)
+    await $.session.compact(COMPACT)
     await $.turn.complete(TURN('done')); await flush()
     expect(requests(w)).toHaveLength(3)
     expect(w.clears).toBe(0)
@@ -116,7 +131,7 @@ describe('past hard', () => {
   test('/molt off also silences the nudge and the request', async ($, on) => {
     const w = world(on); at(w, 76)
     await $.command.run(RUN('off'))
-    expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
+    expect((await $.tool.call(READ)).context).toBeUndefined()
     await $.turn.complete(TURN('done')); await flush()
     expect(requests(w)).toEqual([])
   })

@@ -16,6 +16,13 @@ if ! command -v claude >/dev/null 2>&1; then
   exit 1
 fi
 
+# #929: Claude Code skips a plugin's classic.* hooks on an org account, silently. None may
+# come back; a comment naming one is fine.
+if grep -nE "^[^/]*on\\('classic\\." "$SCRIPT_DIR"/hooks/*.ts "$SCRIPT_DIR"/hooks/*.tsx; then
+  printf 'molt: a classic.* hook is registered (#929)\n' >&2
+  exit 1
+fi
+
 claude plugin validate "$SCRIPT_DIR" || exit 1
 
 # The host fills a declared key with its manifest default before register() runs, so a

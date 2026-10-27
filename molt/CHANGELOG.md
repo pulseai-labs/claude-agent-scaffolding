@@ -2,6 +2,28 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.4.0 — unreleased
+
+#929: molt works on org accounts. Claude Code skips a plugin's `classic.*` hooks there, with no
+error, so molt's warnings, its turn-end handoff request and its seed after a molt never ran.
+molt registers no `classic.*` hook now, on any host.
+
+- **The turn-end request is a follow-up turn.** Past the command threshold, a turn that ends with
+  no usable `MOLT-HANDOFF:` line gets one prompt from molt once it is over: the instruction, or the
+  missing-file text naming the path. At most twice per window, as the Stop block was; then the
+  fallback brief. Not on an interrupted turn or a subagent's. A refused request is logged.
+- **The warnings ride the tool result** (`tool.call`'s model-only `context`), once each, as they
+  rode `classic.PostToolUse`. A subagent's result and a refused call carry none.
+- **Window resets come from the session events:** a `/clear` or a resume from `session.end`, a
+  compact (not a subagent's) from `session.compact`. The missing templates are written at
+  `session.start`.
+- **The seed goes out when molt's own `/clear` resolves** under a new session id, before anything
+  that can fail, instead of at the next SessionStart.
+- **`run-tests.sh` refuses a `classic.*` hook registration** in `hooks/`.
+- Known limits: under `claude -p` the printed result is the request's reply; an Agent SDK host
+  (`sdk-ts`, `sdk-py`) is asked by follow-up like any root, which was not probed live; a block
+  that another plugin raised at `classic.Stop` is no longer joined to molt's request.
+
 ## 0.3.8 — 2026-10-26
 
 Batch 5 (#724, #702), molt's half: the shell reader the gate shares with seat-mods. molt is a steering
