@@ -2,6 +2,51 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.3.8 — 2026-10-26
+
+Batch 5 (#724, #702), molt's half: the shell reader the gate shares with seat-mods. molt is a steering
+gate: it only refuses, and a miss is a read that reaches a nearly full window.
+
+- **Past the block threshold the gate reads commands inside `$(…)` and backticks** (C1), in an
+  unquoted heredoc body too. A call with a substitution goes through only if every command in it is
+  `git add` or `git commit`, `cat` with no file operand (its stdin, a heredoc included), `date`
+  without `-f` or `--file`, `printf` or `echo` (`INNER_OK`). So `git commit -m "$(cat <<'EOF' … EOF)"`
+  and `git commit -m "release $(date +%F)"` still go through. `git commit -m "$(cat huge.log)"`,
+  `cat < file`, `$(<file)`, `date -f file`, any other command, a relative-path command word
+  (`./date`) and a substitution nested more than 8 deep are refused.
+- **Heredocs, command words and glued redirections are read closer to the way Bash reads them** (C2
+  to C4). An opener line's tail is read, a delimiter is its word after quote removal, and a `<<` in
+  `$((…))`, `((…))` or a comment opens none, so a read behind them is refused. Inside a `$(…)` a
+  heredoc also closes, as in Bash 5.3, at a line that starts with its delimiter and holds a `)`
+  after it, so the `EOF)` commit form goes through and a read after it is refused. `\git add f`,
+  `{log}>/tmp/f git add f` and `git add f>/dev/null` read as `git add` and now go through; their
+  ruled siblings (`\cat huge.log`) are refused. `./env git add f` is refused: a wrapper named by a
+  relative path may be any local program. A redirect after a brace group or a `fi`, and a segment
+  that is only a redirection, are not commands, so `{ git add f; git commit -m m; } >log` and
+  `git add f; > out` go through. `<<E'OF'` with a body line `E` was refused and is allowed.
+- **Shared reader.** `COMMANDS`, `HEREDOC`, `QUOTED`, `WRAPPERS`, `blankHeredocs`,
+  `substitutionSpans`, `blank`, `commandOf`, `tokensOf`, `gitOf`, `substitutionsOf` and
+  `SUBSTITUTION_TOO_DEEP` are byte-identical to seat-mods 0.10.0's `hooks/rules.ts`, held by
+  `tests/test-mod-shell-parity.sh`.
+- **`/molt now` below the handoff threshold no longer says the fill is "past" it** (#903). On
+  Claude Code the instruction's built-in first line read "Context is at 3% of the window, past
+  molt's handoff threshold (65%)". When `/molt now` forces the stage and the fill is below the
+  command threshold, the first line now says "Context is at 3% of the window, and the operator
+  asked for a handoff now", as the OMP glue has since 0.3.3; at or above the threshold the line is
+  unchanged. Only the built-in line is swapped: an `instructions.md` you edited with another
+  first line is sent as written. Both glues now take the two lines from `hooks/templates.ts`.
+- **README.** The stage-file paragraph no longer says `autonomic` reads it to leave the turn end to
+  molt (#887): autonomic 0.11.0 (PR #886) removed the turn-end judge and the molt yield, and reads
+  the file only for `/autopilot status` and, on Claude Code, to tell molt's block deny from a seat
+  guard's. The two code comments that said the same are corrected.
+- **Still limits, now written down in the README.** C6 (the gate reads shapes, not grammar: loops,
+  `case`, `[[`, `((`, `:` and function bodies are refused; a syntax error reads as the commands it
+  spells) and C7 (the progress count reads text, not control flow) are unchanged. A heredoc opener
+  line holding a substitution keeps the 0.3.7 reading, so a read after it stays hidden; so do a `#`
+  after a blank in a quoted string inside `"$(…)"`, a Bash 5.3 funsub, a backslash-newline between
+  `$` and `(`, a `<<` inside an unquoted `$[…]` or a `${…}` (it opens a heredoc for the reader) and
+  `date $'-f' file` inside a substitution. `./git add f` outside a substitution still passes.
+
 ## 0.3.7 — 2026-10-24
 
 - **Under an Agent SDK host a root is not cleared** (#901). T3 Code drives Claude Code through the Agent SDK

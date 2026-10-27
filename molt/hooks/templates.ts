@@ -23,6 +23,12 @@ export const DEFAULT_INSTRUCTIONS = `Context is at {{percent}}% of the window, p
 Then end your reply with one line, exactly:
 MOLT-HANDOFF: <absolute path of the handoff file>`
 
+// The built-in instruction's first line, and the line /molt now puts in its place below the handoff threshold: "past"
+// is false there, so the line names the operator (#903; the OMP glue has done this since 0.3.3). An operator's edited
+// instructions.md that starts with another line is sent as written.
+export const PAST_LEAD = "Context is at {{percent}}% of the window, past molt's handoff threshold ({{command}}%)."
+export const OPERATOR_LEAD = 'Context is at {{percent}}% of the window, and the operator asked for a handoff now.'
+
 export const DEFAULT_WARNING = `Context is at {{percent}}% of the window. This is molt's {{stage}} warning; its handoff threshold is {{command}}%. Keep working, and find a good point to hand off: the end of the step or unit in hand. Hand off there, before {{command}}%: write a session handoff and end that reply with MOLT-HANDOFF: <absolute path of the handoff file>.`
 
 export const ROOT_NOTE = 'molt then clears this session and resumes it from that file in the same pane.'

@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { parseRole, parseAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText } from '../hooks/rules'
+import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, invalidText, statusText, substitutionsOf, SUBSTITUTION_TOO_DEEP } from '../hooks/rules'
 
 describe('parseRole', () => {
   test('unset and empty default to the guarded implementer', () => {
@@ -238,6 +238,21 @@ describe('decide', () => {
     expect(decide('implementer', { kind: 'write', place: 'outside' })).not.toContain('go in')
     expect(decide('implementer', { kind: 'write', place: 'allow', allow: ['/s/a'] })).toBeUndefined()
   })
+  // Batch 5: /tmp and $TMPDIR are writable places for every guarded role, so the texts that say where a write or an rm may go name them.
+  test('the outside-write and outside-rm texts name the scratch places beside the worktree and SEAT_MODS_ALLOW', () => {
+    for (const role of ['implementer', 'verifier', 'reviewer'] as const) {
+      const write = decide(role, { kind: 'write', place: 'outside' })
+      for (const place of ['the worktree', '/tmp', '$TMPDIR', 'the SEAT_MODS_ALLOW directories']) expect(write).toContain(place)
+      const rm = decide(role, { kind: 'bash', rules: [], removals: [removalOf('/etc/x', '/w', ['/s'], false)] })
+      for (const place of ['the worktree unless this seat reviews', '/tmp', '$TMPDIR', 'the SEAT_MODS_ALLOW directories', 'roots or ancestors']) expect(rm).toContain(place)
+    }
+  })
+  test('the unread-operand advice says what the guard reads: a plain NAME=value just before, a cd it can follow', () => {
+    const unread = decide('implementer', { kind: 'bash', rules: [], removals: [UNREAD] })
+    expect(unread).toContain('a $VAR no plain NAME=value just before gave')
+    expect(unread).toContain('a relative path after a cd it cannot follow')
+    expect(unread).not.toContain('the guard does not read $VAR')
+  })
   test('an rm operand the guard cannot read says to spell it out; a placed one outside keeps its text', () => {
     const unread = decide('verifier', { kind: 'bash', rules: [], removals: [UNREAD] })
     expect(unread).toContain('no rm with an operand the guard cannot resolve')
@@ -296,10 +311,14 @@ describe('rm operand parsing', () => {
     expect(rmTargets('rm -rf')).toEqual([])
   })
   test('earlier directory changes poison only relative operands, including after --', async () => {
-    for (const change of ['cd', 'pushd', 'popd'])
-      expect(rmTargets(`${change} /var; rm -- -file /w/x ~/x`)).toEqual([
+    for (const change of ['cd -', 'cd "$D"', 'pushd /var', 'popd', 'builtin cd /var'])
+      expect(rmTargets(`${change}; rm -- -file /w/x ~/x`)).toEqual([
         { path: undefined, glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
       ])
+    // batch 5: a literal cd resolves the relative operand instead, beside its failed-cd reading (Ruling 21)
+    expect(rmTargets('cd /var; rm -- -file /w/x ~/x')).toEqual([
+      { path: '-file', glob: false }, { path: '/var/-file', glob: false }, { path: '/w/x', glob: false }, { path: '~/x', glob: false },
+    ])
     expect(rmTargets('rm x; cd /var')).toEqual([{ path: 'x', glob: false }])
   })
   test('malformed words fail closed beside valid quoted words', async () => {
@@ -719,4 +738,993 @@ test('head rules and -F files are a superset of the 0.3.1 reading, over the veri
       if (!commitMessageFiles(command).includes(file)) missing.push(`file ${file} :: ${command}`)
   }
   expect(missing).toEqual([])
+})
+
+// Batch 5, C3 and C4 (#702 B2/B8, #724 A10): the command word is read as Bash reads it
+// after quote removal, and a redirection never hides the word it touches.
+describe('batch 5: command word', () => {
+  test('an escaped command word runs the command it spells', () => {
+    expect(bashRules('\\git push --force origin main')).toContain('force-push')
+    expect(rmTargets('\\rm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('git push \\--force origin main')).toContain('force-push')
+  })
+  test('an escaped path character is the character Bash passes on', () => {
+    // Every member of the dropped class, and a word that starts like a reserved word (`\do`).
+    expect(commitMessageFiles('git commit -F \\/w\\/m\\_\\1\\.\\-\\a\\Z')).toEqual(['/w/m_1.-aZ'])
+    expect(commitMessageFiles('git commit -F /w/\\dos\\fi.txt')).toEqual(['/w/dosfi.txt'])
+    // A reserved word at the very end of the command is still not unescaped (the value keeps
+    // its backslash, as every kept escape does; it shows the word was not read as syntax).
+    expect(commitMessageFiles('git commit -F \\do')).toEqual(['\\do'])
+    // control: a character outside the class keeps its escape, which the path then carries
+    expect(commitMessageFiles('git commit -F /w/m\\*')).toEqual(['/w/m\\*'])
+  })
+  test('control: an escaped backslash is not an escaped command word', () => {
+    expect(bashRules('\\\\git push --force origin main')).toEqual([])
+    expect(bashRules('\\git status')).toEqual([])
+  })
+  test('control: an escaped reserved word is a program, not a head word', () => {
+    for (const word of ['if', 'then', 'elif', 'else', 'do', 'while', 'until']) {
+      expect(bashRules(`\\${word} git push --force`)).toEqual([])
+      expect(bashRules(`${word} git push --force`)).toContain('force-push')
+    }
+  })
+  test('an fd-variable redirection before the command does not hide it', () => {
+    expect(rmTargets('{log}>/w/f rm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('{log}>/w/f git push --force')).toContain('force-push')
+    expect(bashRules('2>/w/f git push --force')).toContain('force-push')
+    expect(bashRules('&>/w/f git push --force')).toContain('force-push')
+  })
+  test('control: a brace word that is not an fd variable stays an ordinary word', () => {
+    expect(bashRules('{log,x}>/w/f git push --force')).toEqual([])
+  })
+  test('a lone redirection operator takes the next word as its target, not as the command', () => {
+    expect(bashRules('> /w/f git push --force')).toContain('force-push')
+    expect(bashRules('2> /w/f git push --force')).toContain('force-push')
+    expect(bashRules('git push origin main > --force')).toEqual(['push'])
+    expect(bashRules('git push origin main >& --force')).toEqual(['push'])
+    // control: only the target is dropped; the flag after it is still the push's
+    expect(bashRules('git push origin main > /w/f --force')).toContain('force-push')
+  })
+  test('a redirection glued to a flag is cut off it', () => {
+    for (const c of ['git push --force>&2', 'git push --force&>f', 'git push -f>/dev/null',
+      'git push --force</dev/null', 'git push --force<&0', 'git push --force>>f', 'git push --force>a>b'])
+      expect(bashRules(c)).toContain('force-push')
+    expect(bashRules('git push --force> /w/f')).toContain('force-push')
+    expect(bashRules('git push origin main --x> --force')).toEqual(['push'])
+    expect(bashRules('git push origin main --force2>/dev/null')).toEqual(['push'])
+  })
+  test('control: the redirection words are not the command\'s arguments', () => {
+    expect(bashRules('git push origin main 2>&1')).toEqual(['push'])
+    expect(bashRules('git push origin main 2>&1 --force')).toContain('force-push')
+    expect(bashRules('git commit -m "a\\b" 2>/dev/null')).toEqual(['commit'])
+  })
+  test('a path-qualified wrapper is skipped as its bare name', () => {
+    expect(bashRules('./env git push --force origin main')).toContain('force-push')
+    expect(bashRules('./env git status')).toEqual([])
+  })
+})
+
+// Batch 5, C2 (#724 A3/A9/A11, #702 B3/B10/B10b/B11): heredocs read as Bash reads them —
+// the opener line runs, a `<<` in arithmetic or a comment opens nothing, and the
+// delimiter is its word after quote removal, found before any line is folded.
+describe('batch 5: heredocs', () => {
+  const RULED = 'git push --force origin main'
+  // The 11 closing spellings of evidence row 702-B10: each closes at a line `EOF`.
+  const CLOSES = ['\\EOF', 'E\\OF', '\\E\\O\\F', "E'OF'", 'E"OF"', "'E'OF", '"E"OF', 'E\\O"F"', "\\E'OF'"]
+  test('C2a: the opener line after the delimiter word runs', () => {
+    expect(bashRules(`cat <<EOF; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF & ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF \\\n; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    // an escaped backslash ends the opener line, and its text joins nothing after the body
+    expect(bashRules(`echo <<EOF x\\\\\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo a\\\\\n${RULED}`)).toContain('force-push')
+    // control: the body is still text
+    expect(bashRules(`cat <<EOF; echo x\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF \\\n> out\n${RULED}\nEOF`)).toEqual([])
+  })
+  test('C2a: the body marker stays in the opener\'s own segment for the trailer check', () => {
+    expect(bashRules("git commit -F - <<'EOF' && echo done\nfix\n\nCo-Authored-By: a\nEOF")).toContain('ai-trailer')
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix\n\nCo-Authored-By: a\nEOF\n)\"")).toContain('ai-trailer')
+    // control: a trailer-shaped body fed to another command is not the commit's message
+    expect(bashRules("git commit -m x && cat <<'EOF'\nCo-Authored-By: a\nEOF")).toEqual(['commit'])
+  })
+  test('C2b: a << in arithmetic or in a comment opens no heredoc', () => {
+    expect(bashRules(`echo $((1<<c))\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo "$((1<<c))"\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`(( a << b ))\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`# <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo ok # <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF # <<X\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo $(( (1) + (2) << c ))\n${RULED}`)).toContain('force-push')
+    // a comment starts after an operator, a closed quote and a continued line; a body's quote is text
+    expect(bashRules(`echo ok;# <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo "a" # <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo 'a' # <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`echo ok \\\n# <<EOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF\nit's\nEOF\n# <<X\n${RULED}`)).toContain('force-push')
+    expect(rmTargets('# <<EOF\nrm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(rmTargets('echo $((1<<c))\nrm -rf /etc/x')).toEqual([{ path: '/etc/x', glob: false }])
+  })
+  test('control: a heredoc after arithmetic, or after a # that starts no comment, still opens', () => {
+    expect(bashRules(`(( a )) && cat <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo $((1)) <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo "#" <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo "x #" <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo 'x #' <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo a#b <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo \\ #b <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF # note\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`# note\ncat <<EOF\n${RULED}\nEOF`)).toEqual([])
+    // `$((` in single quotes is text, and `((` inside a word starts no arithmetic
+    expect(bashRules(`echo '$((' <<EOF\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <((cat <<EOF\n${RULED}\nEOF\n))`)).toEqual([])
+  })
+  test('C2c: the delimiter is its word after quote removal', () => {
+    for (const d of CLOSES) {
+      expect(bashRules(`cat <<${d}\nbody\nEOF\n${RULED}`)).toContain('force-push')
+      expect(rmTargets(`cat <<${d}\nbody\nEOF\nrm -f /etc/x`)).toEqual([{ path: '/etc/x', glob: false }])
+      // control: what comes before the closing line is still body text
+      expect(bashRules(`cat <<${d}\n${RULED}\nEOF`)).toEqual([])
+    }
+    expect(bashRules(`cat <<-\\EOF\n\tbody\n\tEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat 2<<\\EOF\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<E''OF\nbody\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<"E\\$OF"\nbody\nE$OF\n${RULED}`)).toContain('force-push')
+    // `<<-` strips the tabs of the joined line: this one closes at its second line
+    expect(bashRules(`cat <<-EOF\n\t\\\n\tEOF\n${RULED}\nEOF`)).toContain('force-push')
+    // An empty quoted delimiter closes at the first empty line.
+    expect(bashRules(`cat <<''\nbody\n\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<''\n${RULED}\n\necho done`)).toEqual([])
+  })
+  test('C2c: E"O\\F" never closes at EOF; Bash\'s delimiter is EO\\F', () => {
+    expect(bashRules(`cat <<E"O\\F"\nbody\nEOF\n${RULED}`)).not.toContain('force-push')
+    // control: its own delimiter closes it
+    expect(bashRules(`cat <<E"O\\F"\nbody\nEO\\F\n${RULED}`)).toContain('force-push')
+  })
+  test('B10b: a body line E does not close <<E\'OF\' early', () => {
+    expect(bashRules(`cat <<E'OF'\nE\n${RULED}\nEOF`)).not.toContain('force-push')
+  })
+  test('B11: a quoted body line ending in a backslash is not folded into the closing line', () => {
+    expect(rmTargets("cat <<'EOF'\ny\\\nEOF\nrm -f /var/x")).toEqual([{ path: '/var/x', glob: false }])
+    expect(bashRules(`cat <<'EOF'\ny\\\nEOF\n${RULED}`)).toContain('force-push')
+    // a quoted body keeps its lines, so git reads this trailer on a line of its own
+    expect(bashRules("git commit -F - <<'EOF'\nfix\\\nCo-Authored-By: a\nEOF")).toContain('ai-trailer')
+  })
+  test('control: an unquoted body line ending in a backslash joins the next, as in Bash', () => {
+    expect(bashRules(`cat <<EOF\ny\\\nEOF\n${RULED}`)).toEqual([])
+    expect(bashRules(`cat <<EOF\ny\\\nEOF\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF\ny\\\\\nEOF\n${RULED}`)).toContain('force-push')
+    expect(bashRules("git commit -F - <<EOF\nfix\\\nCo-Authored-By: a\nEOF")).toEqual(['commit'])
+  })
+  test('Review Focus 5: two heredocs on one line close in order', () => {
+    expect(bashRules(`cat <<A <<'B'\na\nA\nb\nB\n${RULED}`)).toContain('force-push')
+    expect(rmTargets("rm -i /reports/x <<A <<'B'\na\nA\nb\nB\nrm -rf /etc/x")).toEqual([
+      { path: '/reports/x', glob: false }, { path: '/etc/x', glob: false },
+    ])
+    // control: the second body is text, and it starts after the first one's closing line
+    expect(bashRules(`cat <<A <<'B'\na\nA\n${RULED}\nB`)).toEqual([])
+    expect(bashRules(`cat <<A <<B\nB\nA\n${RULED}\nB`)).toEqual([])
+  })
+  test('control: the standard commit form stays a commit', () => {
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit merge and git push --force are words here\nEOF\n)\"")).toEqual(['commit'])
+  })
+})
+
+// Task 2 review R1: the text after an unquoted opener is command text, so its quotes, and
+// a comment's, must pair as Bash pairs them. A quote left unpaired there would pair across
+// the body with a later one and hide the lines between.
+describe('batch 5: quotes in a heredoc tail or a comment pair as in Bash', () => {
+  const RULED = 'git push --force origin main'
+  test('a quote in a # comment pairs with nothing', () => {
+    expect(bashRules(`cat > notes.md <<'EOF' # don't expand\ntext\nEOF\ngit commit -m 'notes' && ${RULED}`)).toContain('force-push')
+    expect(bashRules(`cat <<'EOF' # say "hi\ntext\nEOF\n${RULED} "x"`)).toContain('force-push')
+    expect(bashRules(`echo hi # don't\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -m "$(cat <<EOF | grep "it's"\nit's\nEOF\n)" # don't\n${RULED} 'x'`)).toContain('force-push')
+    expect(rmTargets("cat <<'EOF' # don't\ntext\nEOF\nrm -rf /etc/x '/etc/y'")).toEqual([
+      { path: '/etc/x', glob: false }, { path: '/etc/y', glob: false },
+    ])
+    // control: the body is text, and the comment still runs nothing
+    expect(bashRules(`cat > notes.md <<'EOF' # don't expand\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<'EOF' # say "hi\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`echo hi # don't ${RULED}`)).toEqual([])
+  })
+  test('a comment ends at its newline, even after a backslash', () => {
+    expect(bashRules(`# x \\\n${RULED}`)).toContain('force-push')
+    // control: outside a comment the backslash-newline still joins the lines
+    expect(bashRules(`echo x \\\n${RULED}`)).toEqual([])
+  })
+  test('a quoted string in the tail that spans lines ends the opener line after it', () => {
+    expect(bashRules(`cat <<EOF 'a\nb'\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "a\nb"\nbody\nEOF\n${RULED} "x"`)).toContain('force-push')
+    // so does a newline inside arithmetic
+    expect(bashRules(`cat <<EOF $((1 +\n2)); ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(rmTargets("cat <<EOF 'a\nb'\nbody\nEOF\nrm -rf /etc/x '/etc/y'")).toEqual([
+      { path: '/etc/x', glob: false }, { path: '/etc/y', glob: false },
+    ])
+    // control: the body starts after that line
+    expect(bashRules(`cat <<EOF 'a\nb'\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF "a\nb"\n${RULED}\nEOF`)).toEqual([])
+  })
+  test('an escaped quote or a $\'…\' string in the tail opens nothing past the line', () => {
+    expect(bashRules(`cat <<EOF it\\'s\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF a\\"b\nbody\nEOF\n${RULED} "x"`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF $'it\\'s'\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`echo it\\'s\n${RULED} 'x'`)).toContain('force-push')
+    // control: the body is text, and a real string after an escape, or a $'…' string, still masks
+    expect(bashRules(`cat <<EOF it\\'s\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules(`cat <<EOF $'it\\'s'\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules("echo \\' 'a ; git push --force'")).toEqual([])
+    expect(bashRules("echo $'a\\' ; git push --force'")).toEqual([])
+  })
+  test('a quoted << after an unquoted opener is text', () => {
+    expect(bashRules(`cat <<A "x <<B"\na\nA\nb\nB\n${RULED} "y"`)).toContain('force-push')
+    expect(bashRules(`cat <<A "x <<B"\na\nA\n${RULED}\nB`)).toContain('force-push')
+    // control: the first opener's body is text
+    expect(bashRules(`cat <<A "x <<B"\n${RULED}\nA`)).toEqual([])
+  })
+  test('an opener inside "$(…)" keeps its line in the piece', () => {
+    expect(bashRules(`git commit -m "$(cat <<EOF | grep "it's"\nit's\nEOF\n)" && ${RULED} 'x'`)).toContain('force-push')
+    // control: the commit form with that line is still a commit
+    expect(bashRules(`git commit -m "$(cat <<EOF | grep "it's"\nit's git merge\nEOF\n)"`)).toEqual(['commit'])
+  })
+})
+
+// Task 2 review R2 (Rulings 13, 14): quotes nest inside `$(…)`, backticks and `${…}`, which
+// the scan does not model, so an opener line holding one after the delimiter word keeps the
+// 0.9.0 reading; `$$` is the PID, not the start of `$'…'`; a quoted `<<` with no such
+// construct before it on its line is text.
+describe('batch 5: an opener line holding a substitution reads as in 0.9.0', () => {
+  const RULED = 'git push --force origin main'
+  test('a substitution with an odd inner quote in the tail no longer hides the line after the body', () => {
+    expect(bashRules(`cat <<EOF "$(echo "it's")"\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -F - <<EOF --author="$(echo "it's")"\nmsg\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -F - <<EOF -m "$(echo 'say "hi')"\nmsg\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "\`echo "it's"\`"\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "\${x:-"it's"}"\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    // control: the body is text
+    expect(bashRules(`cat <<EOF "$(echo "it's")"\n${RULED}\nEOF`)).toEqual([])
+  })
+  test('a quoted body after such a tail is not read as commands', () => {
+    expect(bashRules(`git commit -F - <<'EOF' --author="$(echo "Bob O'Neil")"\nfix: x\n\ngit push --force words\nEOF`)).toEqual(['commit'])
+  })
+  test('a heredoc opened inside a substitution in the tail does not take the first one\'s place', () => {
+    expect(bashRules(`cat <<A $(cat <<B\nb\nB\n)\na\nA\n${RULED}`)).toContain('force-push')
+    // control: the first heredoc's body is text
+    expect(bashRules(`cat <<A $(cat <<B\nb\nB\n)\n${RULED}\nA`)).toEqual([])
+  })
+  test('control: a tail without a substitution is still command text', () => {
+    expect(bashRules(`cat <<EOF; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF > "$out"; ${RULED}\nbody\nEOF`)).toContain('force-push')
+    // a substitution before the opener is not in its tail
+    expect(bashRules(`echo $(date); cat <<EOF; ${RULED}\nbody\nEOF`)).toContain('force-push')
+  })
+  test('$$ is the PID: the quote after it is a single quote, not $\'…\'', () => {
+    expect(bashRules(`echo $$'a\\' ; ${RULED} ; echo 'b'`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF $$'a\\'\nbody\nEOF\n${RULED} 'x'`)).toContain('force-push')
+    // control: the body is text, and a real $'…' string still masks
+    expect(bashRules(`cat <<EOF $$'a\\'\n${RULED}\nEOF`)).toEqual([])
+    expect(bashRules("echo $'a\\' ; git push --force'")).toEqual([])
+  })
+  test('a quoted << with no substitution before it on its line is text', () => {
+    expect(bashRules(`grep -n "<<EOF" a.sh && ${RULED}\necho done`)).toContain('force-push')
+    expect(bashRules(`echo "x <<EOF y"\n${RULED}\nEOF`)).toContain('force-push')
+    expect(bashRules(`echo 'x <<EOF'\n${RULED}\nEOF`)).toContain('force-push')
+    // a `$(` on an earlier line, closed before a newline outside quotes, does not count
+    expect(bashRules(`echo $(date)\necho "x <<EOF y"\n${RULED}\nEOF`)).toContain('force-push')
+    // control: after a `$(` on its line, even one opened on an earlier line, it opens a heredoc
+    expect(bashRules("git commit -m \"$(\ncat <<'EOF'\nsay \"hi\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: x\n\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
+    // the commit form keeps its line in the piece, whatever quotes that line holds
+    expect(bashRules("git commit -m \"$(cat <<'EOF' | tr -d '\"'\nfix: x\n\ngit merge words\nEOF\n)\"")).toEqual(['commit'])
+  })
+})
+
+// Batch 5, C1 (#724 A1, A2): a `$(…)` or backtick span is a command of its own, read wherever
+// Bash runs it (unquoted, in double quotes, in an unquoted heredoc body) and nowhere else.
+describe('batch 5: substitutions', () => {
+  const RULED = 'git push --force origin main'
+  const nest = (n: number, inner: string) => 'echo ' + '$('.repeat(n) + inner + ')'.repeat(n)
+  test('substitutionsOf: the command text of each span Bash runs', () => {
+    expect(substitutionsOf('git commit -m "$(git push --force)"')).toEqual(['git push --force'])
+    expect(substitutionsOf('git commit -m `git push --force`')).toEqual(['git push --force'])
+    expect(substitutionsOf("echo '$(rm -rf /)'")).toEqual([])
+    expect(substitutionsOf("cat <<'EOF'\n$(rm -rf /)\nEOF")).toEqual([])
+    expect(substitutionsOf('cat <<EOF\n$(git push --force)\nEOF')).toEqual(['git push --force'])
+    // a heredoc before a span on the same level is read too
+    expect(substitutionsOf('cat <<EOF\n$(git push --force)\nEOF\necho $(date)')).toEqual(['git push --force', 'date'])
+  })
+  test('a nested span is listed after the span it sits in', () => {
+    expect(substitutionsOf('echo "$(echo $(git push --force))"')).toEqual(['echo $(git push --force)', 'git push --force'])
+    // inside backticks an escaped backtick opens the nested span
+    expect(substitutionsOf('echo `echo \\`git push --force\\``')).toEqual(['echo `git push --force`', 'git push --force'])
+  })
+  test('control: a $\'…\' string, an escaped opener and a quoted body run nothing', () => {
+    expect(substitutionsOf("echo $'$(git push --force)'")).toEqual([])
+    expect(substitutionsOf("echo $'a\\' $(git push --force)'")).toEqual([])
+    expect(substitutionsOf('echo \\$\\(git push\\) "\\$(git push)" \\`git push\\`')).toEqual([])
+    expect(substitutionsOf("cat <<'EOF'\n`git push --force`\nEOF")).toEqual([])
+    expect(substitutionsOf('cat <<EOF\n\\$(git push --force)\nEOF')).toEqual([])
+    // the unquoted body's backtick runs, and a quote in the body is text
+    expect(substitutionsOf('cat <<EOF\n`git push --force`\nEOF')).toEqual(['git push --force'])
+    expect(substitutionsOf("cat <<EOF\nit's $(git push --force)\nEOF")).toEqual(['git push --force'])
+    // `$$` is the PID: the quote after it is a single quote, closed by the next one
+    expect(substitutionsOf("echo $$'a\\' $(git push --force)")).toEqual(['git push --force'])
+  })
+  test('a span ends at its own closing parenthesis, and # starts a comment only at a word start', () => {
+    expect(substitutionsOf('echo "$( (true); git push --force )"')).toEqual([' (true); git push --force '])
+    expect(substitutionsOf('echo "$(echo ${#x} a#b "c"#d)"')).toEqual(['echo ${#x} a#b "c"#d'])
+    // `$((…); …)` read as arithmetic first: the spans found on that try are not kept
+    expect(substitutionsOf('echo $(($(date)); git push --force)')).toEqual(['($(date)); git push --force', 'date'])
+  })
+  test('$((…)) is arithmetic, walked for the spans in it; $( (…) …) is a substitution', () => {
+    expect(substitutionsOf('echo $((1 + 2))')).toEqual([])
+    expect(substitutionsOf('echo $(( $(git push --force) + 1 ))')).toEqual(['git push --force'])
+    expect(substitutionsOf('echo $((echo a); git push --force)')).toEqual(['(echo a); git push --force'])
+    expect(bashRules('echo "$((echo a); git push --force)"')).toContain('force-push')
+  })
+  test('a # comment inside a double-quoted $(…) ends at its newline, quotes and all', () => {
+    expect(substitutionsOf('git commit -m "$(echo a # it\'s )\n)"')).toEqual(['echo a # it\'s )\n'])
+    // control: a comment outside any span runs nothing
+    expect(substitutionsOf('echo ok # $(git push --force)')).toEqual([])
+  })
+  test('a ruled command in a substitution is refused', () => {
+    expect(bashRules('git commit -m "$(git push --force origin main)"')).toContain('force-push')
+    expect(bashRules('git commit -m `git push --force origin main`')).toContain('force-push')
+    expect(rmTargets('git commit -m "$(rm -rf /etc/x)"')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('cat <<EOF\n$(git push --force origin main)\nEOF')).toContain('force-push')
+    expect(commitMessageFiles('echo "`git commit -F /w/msg`"')).toEqual(['/w/msg'])
+    // control
+    expect(commitMessageFiles("echo '$(git commit -F /w/msg)'")).toEqual([])
+  })
+  test('a substitution nested more than 8 deep is refused (Ruling 3)', () => {
+    const deep = 'echo ' + '$('.repeat(9) + 'true' + ')'.repeat(9)
+    expect(substitutionsOf(deep)).toContain(SUBSTITUTION_TOO_DEEP)
+    expect(bashRules(deep)).toContain('force-push')
+    expect(rmTargets(deep)).toContainEqual({ path: undefined, glob: false })
+    // control: 8 deep is read level by level
+    expect(substitutionsOf(nest(8, 'true'))).toHaveLength(8)
+    expect(substitutionsOf(nest(8, 'true'))).not.toContain(SUBSTITUTION_TOO_DEEP)
+    expect(bashRules(nest(8, 'true'))).toEqual([])
+    expect(rmTargets(nest(8, 'true'))).toEqual([])
+    expect(bashRules(nest(8, RULED))).toContain('force-push')
+    // far deeper than the walk follows: still read as too deep, with no stack overflow
+    const deeper = 'echo "' + '$('.repeat(20000) + 'true' + ')'.repeat(20000) + '"'
+    expect(bashRules(deeper)).toContain('force-push')
+  })
+  test('Ruling 2: a relative rm operand in a substitution is unread when the command changes directory', () => {
+    expect(rmTargets('cd /etc && git commit -m "$(rm -rf x)"')).toEqual([{ path: undefined, glob: false }])
+    // controls: with no cd it reads as a top-level rm would; an absolute operand stays read
+    expect(rmTargets('git commit -m "$(rm -rf x)"')).toEqual([{ path: 'x', glob: false }])
+    expect(rmTargets('cd /etc && git commit -m "$(rm -rf /tmp/x)"')).toEqual([{ path: '/tmp/x', glob: false }])
+    // the list keeps no nesting, so a cd in any substitution counts: here the rm runs in /etc
+    expect(rmTargets('echo "$(cd /etc; echo "$(rm -rf x)")"')).toEqual([{ path: undefined, glob: false }])
+  })
+  test('a span the outer reading already splits is not listed twice', () => {
+    expect(rmTargets('echo $(rm -rf /etc/x)')).toEqual([{ path: '/etc/x', glob: false }])
+  })
+  test('control: plain body text, an honest substitution and the commit form stay allowed', () => {
+    expect(bashRules('cat <<EOF\nplease git merge later\nEOF')).toEqual([])
+    expect(bashRules('git commit -m "release $(date +%F)"')).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfix: it's (done)\n\ngit push --force words\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("gh pr create --title t --body \"$(cat <<'EOF'\n## Summary\n- git merge words\nEOF\n)\"")).toEqual(['pr-create'])
+    expect(rmTargets("git commit -m \"$(cat <<'EOF'\nrm -rf /etc/x\nEOF\n)\"")).toEqual([])
+  })
+  test('a heredoc opened after an opener in quotes keeps its own quoting inside the substitution', () => {
+    // Bash opens both heredocs inside the substitution: B's body runs only when B is unquoted
+    expect(bashRules(`git commit -m "$(cat <<'A' <<'B'\na\nA\n$(${RULED})\nB\n)"`)).toEqual(['commit'])
+    expect(bashRules(`git commit -m "$(cat <<'A' <<B\na\nA\n$(${RULED})\nB\n)"`)).toContain('force-push')
+  })
+  test('an opener line holding a substitution (Ruling 13): the line is command text, the body is body', () => {
+    expect(bashRules(`cat <<'EOF' "$(${RULED})"\nbody\nEOF`)).toContain('force-push')
+    expect(bashRules(`cat <<EOF "$(date)"\n$(${RULED})\nEOF`)).toContain('force-push')
+    // control: the quoted body is text, and so is a comment on the line
+    expect(bashRules(`cat <<'EOF' "$(date)"\n$(${RULED})\nEOF`)).toEqual([])
+    expect(substitutionsOf(`cat <<EOF "$(date)" # $(${RULED})\nbody\nEOF`)).toEqual(['date'])
+  })
+  test('a later opener after a heredoc that never closes has no body of its own', () => {
+    expect(substitutionsOf('cat <<A <<B\n$(git push --force)')).toEqual(['git push --force'])
+    // control: the first body is quoted, so nothing runs; a backtick in the later delimiter is a word
+    expect(substitutionsOf("cat <<'A' <<B\n$(git push --force)")).toEqual([])
+    expect(substitutionsOf('cat <<A <<`x`\nbody')).toEqual([])
+  })
+  test('inner quotes in a double-quoted $(…) pair inside it, as in Bash', () => {
+    expect(bashRules(`git commit -m "$(echo "it's")" && ${RULED} 'x'`)).toContain('force-push')
+    expect(bashRules(`git commit -m \`echo "\` && ${RULED} "x"`)).toContain('force-push')
+    // a backtick span ends at the next unescaped backtick, whatever quotes it holds
+    expect(substitutionsOf(`git commit -m \`echo "\` && ${RULED} "x"`)).toEqual(['echo "'])
+    // a comment inside the span takes its quotes with it
+    expect(bashRules(`git commit -m "$(echo "a" # it"s )\n)" && ${RULED} "x"`)).toContain('force-push')
+    // control: the substitution alone is a commit message
+    expect(bashRules('git commit -m "$(echo "it\'s")"')).toEqual(['commit'])
+    expect(bashRules('git commit -m "$(echo "a;b")"')).toEqual(['commit'])
+    // an inner string is text, as in Bash; a command beside it in the span is still read
+    expect(bashRules(`git commit -m "$(echo "a; ${RULED}")"`)).toEqual(['commit'])
+    expect(bashRules(`git commit -m "$(echo "a"; ${RULED})"`)).toContain('force-push')
+  })
+  test('a span holding a heredoc is sliced from the command in Bash\'s order (Task 3 review C1)', () => {
+    // the opener line's text stays before the body, so the next reading still runs it
+    expect(substitutionsOf(`echo \`cat <<'EOF' ; ${RULED}\nbody\nEOF\n\``)).toEqual([`cat <<'EOF' ; ${RULED}\nbody\nEOF\n`])
+    for (const open of ['echo `', 'x=`', 'echo $(echo `']) {
+      const close = open.endsWith('`') ? (open.includes('$(') ? '`)' : '`') : ')'
+      expect(bashRules(`${open}cat <<'EOF' ; ${RULED}\nbody\nEOF\n${close}`)).toContain('force-push')
+      expect(bashRules(`${open}cat <<EOF | ${RULED}\nbody\nEOF\n${close}`)).toContain('force-push')
+      // control: the body is text
+      expect(bashRules(`${open}cat <<'EOF'\n${RULED}\nEOF\n${close}`)).toEqual([])
+    }
+    expect(rmTargets('x=`cat <<EOF && rm -rf /etc/x\nbody\nEOF\n`')).toEqual([{ path: '/etc/x', glob: false }])
+    expect(bashRules('echo `cat <<EOF ; git commit -n -m x\nbody\nEOF\n`')).toContain('no-verify')
+    // two openers on the line: both bodies follow it, in order
+    expect(substitutionsOf(`echo \`cat <<A <<'B' ; ${RULED}\na\nA\nb\nB\n\``)).toEqual([`cat <<A <<'B' ; ${RULED}\na\nA\nb\nB\n`])
+    expect(bashRules(`echo \`cat <<A <<'B' ; ${RULED}\na\nA\nb\nB\n\``)).toContain('force-push')
+    // control
+    expect(rmTargets("x=`cat <<'EOF'\nrm -rf /etc/x\nEOF\n`")).toEqual([])
+    // a heredoc inside a span is read with the span, once, at the next level
+    expect(substitutionsOf('echo "$(cat <<EOF\n$(date)\nEOF\n)"')).toEqual(['cat <<EOF\n$(date)\nEOF\n', 'date'])
+    // the delimiter word is not command text, even on a line read in the 0.9.0 layout
+    expect(bashRules(`cat <<"$(${RULED})" "$(date)"\nbody\n$(${RULED})`)).toEqual([])
+    // every shell's grammar runs the command after the second `;` here; Bash 5.3.9 alone drops
+    // that `;` (zsh, dash and busybox sh run it), and a rail that adds stops reads it
+    expect(bashRules(`echo "$(cat <<EOF ; echo x ; ${RULED}\nbody\nEOF\n)"`)).toContain('force-push')
+  })
+  test('C5 row 724-A12: a backtick inside ${…} no longer ends the expansion early (Ruling 15)', () => {
+    // Bash: the `}` in the backticks does not close `${`, so the & is in the word and no git runs
+    expect(bashRules('printf x ${x:-`echo }` & git push --force }')).toEqual([])
+    // control: a lone & outside the expansion still splits
+    expect(bashRules('printf x ${x:-`echo }`} & git push --force')).toContain('force-push')
+  })
+})
+
+describe('batch 5: scratch directories', () => {
+  test('scratchDirs: /tmp, plus an absolute TMPDIR below the root, without its trailing slashes', () => {
+    expect(scratchDirs(undefined)).toEqual(['/tmp'])
+    expect(scratchDirs('/var/tmp/x/')).toEqual(['/tmp', '/var/tmp/x'])
+    expect(scratchDirs('/var/tmp/x')).toEqual(['/tmp', '/var/tmp/x'])
+    expect(scratchDirs('/var/tmp/x//')).toEqual(['/tmp', '/var/tmp/x'])
+    // controls: a TMPDIR that names no directory below the root adds nothing (`/` would put every path inside)
+    for (const tmpdir of ['relative', 'rel/dir', '', '/', '//', '///']) expect(scratchDirs(tmpdir)).toEqual(['/tmp'])
+    // /tmp named twice is one place
+    expect(scratchDirs('/tmp')).toEqual(['/tmp'])
+    expect(scratchDirs('/tmp/')).toEqual(['/tmp'])
+  })
+  test('scratchAllow: each scratch directory as given and as resolved, once; one that does not resolve adds nothing', () => {
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/w')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], ['/private/tmp'], '/w')).toEqual(['/tmp', '/private/tmp']) // macOS (Review Focus 4)
+    expect(scratchAllow(['/tmp', '/var/tmp/x'], ['/tmp', '/var/tmp/x'], '/w')).toEqual(['/tmp', '/var/tmp/x'])
+    expect(scratchAllow(['/tmp', '/dangling'], ['/tmp', undefined], '/w')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], [undefined], '/w')).toEqual([])
+    expect(scratchAllow(['/tmp'], ['/tmp'], undefined)).toEqual(['/tmp'])
+  })
+  // placeOf lets an allow directory outrank the worktree, so a scratch directory that holds the worktree would hand a
+  // reviewer its edits: it is left out, as given and as resolved. The worktree beside it, above it or elsewhere keeps it.
+  test('scratchAllow: a scratch directory that holds the worktree is left out', () => {
+    for (const root of ['/tmp/wt', '/tmp', '/tmp/a/b/wt']) expect(scratchAllow(['/tmp'], ['/tmp'], root)).toEqual([])
+    expect(scratchAllow(['/tmp'], ['/private/tmp'], '/private/tmp/wt')).toEqual([])
+    expect(scratchAllow(['/tmp'], ['/private/tmp'], '/private/tmp')).toEqual([])
+    // a resolved '/' (a TMPDIR such as /tmp/.. ) holds every worktree: it can never put everything inside
+    expect(scratchAllow(['/tmp/..'], ['/'], '/w')).toEqual([])
+    // controls: a sibling sharing the prefix, the worktree above the scratch directory, the worktree elsewhere
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/tmpfoo/wt')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/')).toEqual(['/tmp'])
+    expect(scratchAllow(['/tmp'], ['/tmp'], '/w')).toEqual(['/tmp'])
+    expect(scratchAllow(['/w/tmp'], ['/w/tmp'], '/w')).toEqual(['/w/tmp'])
+    // one directory leaving does not take the other with it
+    expect(scratchAllow(['/tmp', '/home/u/t'], ['/tmp', '/home/u/t'], '/tmp/wt')).toEqual(['/home/u/t'])
+  })
+  // Review Focus 3: the scratch directory is a writable place whose own path and ancestors rm still protects.
+  test('over scratchDirs: descendants are inside; the directory itself, its ancestors and everything else are not', () => {
+    const allow = scratchDirs(undefined)
+    expect(placeOf('/tmp/x', '/w', allow)).toBe('allow')
+    expect(placeOf('/tmp/a/b', '/w', allow)).toBe('allow')
+    expect(placeOf('/etc/x', '/w', allow)).toBe('outside')
+    expect(placeOf('/tmpfoo/x', '/w', allow)).toBe('outside')
+    expect(removalOf('/tmp/x', '/w', allow, false)).toEqual({ place: 'allow', protected: false })
+    expect(removalOf('/tmp', '/w', allow, true)).toEqual({ place: 'allow', protected: false }) // rm /tmp/*: the accepted cost
+    expect(removalOf('/tmp', '/w', allow, false).protected).toBe(true) // rm -rf /tmp
+    expect(removalOf('/', '/w', allow, false).protected).toBe(true) // rm -rf /
+    expect(removalOf('/', '/w', allow, true).protected).toBe(true) // rm -rf /*
+    expect(removalOf('/etc/x', '/w', allow, false)).toEqual({ place: 'outside', protected: false })
+    expect(decide('implementer', { kind: 'bash', rules: [], removals: [removalOf('/tmp', '/w', allow, false)] })).toContain('roots or ancestors')
+    expect(decide('implementer', { kind: 'bash', rules: [], removals: [removalOf('/tmp/x', '/w', allow, false)] })).toBeUndefined()
+  })
+})
+
+// Task 5: a relative rm operand after a literal cd, and a "$NAME" after a literal NAME=value, resolve to an
+// absolute path, but only along a plain `;`, `&&` or newline sequence from the command's start (spec §7).
+describe('batch 5: rm after cd', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  // What both glues decide for an implementer whose worktree and session directory are `root`, with the scratch
+  // directories allowed. The glues walk each `..` (through links) before placing; with no links that is lexical.
+  const lexical = (path: string) => {
+    const parts: string[] = []
+    for (const part of path.split('/')) if (part === '..') parts.pop(); else if (part !== '' && part !== '.') parts.push(part)
+    return '/' + parts.join('/')
+  }
+  const verdict = (command: string, root = '/w/wt', role: 'implementer' | 'reviewer' = 'implementer') => decide(role, {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(lexical(target.path.startsWith('/') ? target.path : `${root}/${target.path}`), root, scratchDirs(undefined), target.glob)),
+  })
+  test('the plan: a literal cd or assignment resolves; anything else stays unresolved', () => {
+    expect(rmTargets('cd "/w/wt" && rm -rf pf/__pycache__ tests/__pycache__'))
+      .toEqual([{ path: '/w/wt/pf/__pycache__', glob: false }, { path: '/w/wt/tests/__pycache__', glob: false }])
+    // Ruling 21 amends the plan's value: the cd may fail before the newline, so the bare operand (the session's
+    // directory) is a target too, and both must be allowed.
+    expect(rmTargets('WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/o.pyc'))
+      .toEqual([{ path: 'pf/__pycache__/o.pyc', glob: false }, { path: '/w/wt/pf/__pycache__/o.pyc', glob: false }])
+    expect(rmTargets('WT=/w/wt; rm -f "$WT/x"')).toEqual([{ path: '/w/wt/x', glob: false }])
+    // stays unresolved (refused as today)
+    for (const c of ['cd /w/wt || true; rm x', '(cd /w/wt); rm x', 'if true; then cd /w/wt; fi; rm x',
+      'cd -; rm x', 'cd "$UNSET"; rm x', 'WT=$(pwd); rm "$WT/x"', 'cd /w/wt | cat; rm x', 'rm "$UNSET/x"'])
+      expect(rmTargets(c)).toEqual([{ path: undefined, glob: false }])
+    // a relative cd after a known absolute one. Ruling 21 amends the plan's value: `cd /w` may fail before the `;`,
+    // so `cd wt` joins onto the session's directory too, beside `/w/wt/x`. Fix round 1 (finding 3) writes that join
+    // `./wt`, so no glue reads a leading `~`, `@` or `:` in it: the same place as the bare `wt/x`.
+    expect(rmTargets('cd /w; cd wt && rm x')).toEqual([{ path: './wt/x', glob: false }, { path: '/w/wt/x', glob: false }])
+  })
+  test('adjacent controls: the same shapes with a ruled directory resolve to it and are refused', () => {
+    expect(rmTargets('cd /etc && rm -rf x')).toEqual([t('/etc/x')])
+    expect(rmTargets('WT=/etc; rm -rf "$WT/x"')).toEqual([t('/etc/x')])
+    // Ruling 21: the failed-cd reading is a target beside the cd's own
+    expect(rmTargets('WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc')).toEqual([t('pf/__pycache__/o.pyc'), t('/etc/pf/__pycache__/o.pyc')])
+    expect(rmTargets('cd /; cd etc && rm x')).toEqual([t('./etc/x'), t('/etc/x')]) // `./`: fix round 1 (finding 3)
+    for (const command of ['cd /etc && rm -rf x', 'WT=/etc; rm -rf "$WT/x"', 'WT="/etc"; cd "$WT"\nrm -f pf/__pycache__/o.pyc',
+      'cd /; cd etc && rm x', 'cd "/etc" && rm -rf pf/__pycache__ tests/__pycache__'])
+      expect(verdict(command)).toContain('no rm outside writable places')
+    for (const command of ['cd "/w/wt" && rm -rf pf/__pycache__ tests/__pycache__', 'WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/o.pyc',
+      'WT=/w/wt; rm -f "$WT/x"', 'cd /w; cd wt && rm x'])
+      expect(verdict(command)).toBeUndefined()
+    // the session directory is the worktree here, so an unresolved operand is refused by its own text
+    expect(verdict('cd /w/wt || true; rm x')).toContain('cannot resolve')
+  })
+  test('Review Focus 2: a cd in a subshell, a block, a pipeline, or after || or & does not move the directory', () => {
+    for (const c of ['{ cd /w/wt; }; rm x', 'cd /w/wt & rm x', 'true || cd /w/wt; rm x', 'true | cd /w/wt; rm x',
+      'while true; do cd /w/wt; break; done; rm x', 'for d in /w/wt; do cd "$d"; done; rm x', 'case a in a) cd /w/wt;; esac; rm x',
+      '! cd /w/wt; rm x', 'time cd /w/wt; rm x', 'echo $(cd /w/wt); rm x', 'f() { cd /etc; }; cd /w && f && rm x',
+      'if false; then\ncd /w/wt\nelse\nrm x\nfi', 'if true; then\ncd /w/wt\nfi\nrm x',
+      'function f { cd /etc; }; cd /w && f && rm x', 'cd /w; (cd wt); rm x', '(cd /w/wt && rm x)', 'X=$(cd /w/wt && rm y)', 'cd /w/wt && ls | head; rm x', 'cd /w/wt || exit; rm x'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // the rm inside the plain sequence reads before the || or | that follows it
+    expect(rmTargets('cd /w/wt && rm x || true')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('cd /w/wt && rm x | cat')).toEqual([t('/w/wt/x')])
+    // no cd: a pipeline, subshell or block keeps the session directory, as today
+    for (const c of ['ls | wc -l; rm x', '(true); rm x', 'if true; then :; fi; rm x', 'true || false; rm x'])
+      expect(rmTargets(c)).toEqual([t('x')])
+  })
+  // Ruling 21 (spec §4): a cd may fail, and one behind `&&` may be skipped, so after `;` or a newline the walk keeps
+  // every directory the shell may be in, and a relative operand is one target in each; the rest of a `cd X &&`
+  // list runs in X only.
+  test('Ruling 21: a cd that may fail or be skipped leaves every directory the next command may run in', () => {
+    expect(rmTargets('false && cd /w/wt; rm x')).toEqual([t('x'), t('/w/wt/x')])
+    expect(rmTargets('test -d /w/wt && cd /w/wt\nrm x')).toEqual([t('x'), t('/w/wt/x')])
+    expect(rmTargets('test -d /w/wt && cd /w/wt && rm x')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('cd /w && rm a && cd wt; rm x')).toEqual([t('/w/a'), t('x'), t('/w/x'), t('/w/wt/x')])
+    expect(rmTargets('WT=/w/wt && cd "$WT" && rm a; rm b')).toEqual([t('/w/wt/a'), t('b'), t('/w/wt/b')])
+    expect(rmTargets('cd /w && cd wt; rm x')).toEqual([t('x'), t('/w/x'), t('/w/wt/x')])
+    expect(rmTargets('git status; WT=/w && cd "$WT"; rm x')).toEqual([t('x'), t('/w/x')])
+    expect(rmTargets('cd /a; cd b; rm x')).toEqual([t('x'), t('/a/x'), t('./b/x'), t('/a/b/x')]) // `./`: fix round 1 (finding 3)
+    // the cap: four directories are read, a fifth makes the operand unresolved; an absolute cd && starts again
+    expect(rmTargets('cd /a; cd /b; cd /c; rm x')).toEqual([t('x'), t('/a/x'), t('/b/x'), t('/c/x')])
+    expect(rmTargets('cd /a; cd /b; cd /c; cd /d; rm x')).toEqual([t(undefined)])
+    expect(rmTargets('cd /a; cd /b; cd /c; cd /d; cd /w && rm x')).toEqual([t('/w/x')])
+    // an assignment a failed command may skip is forgotten when its list ends (a failed cd leaves WT unset)
+    for (const c of ['true && WT=/w/wt; rm "$WT/x"', 'cd /w && WT=/w/wt; rm "$WT/x"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // Ruling 24: an assignment behind a cd may be skipped, so it never becomes known; one before the cd holds
+    expect(rmTargets('cd /w && WT=/w/wt && rm "$WT/x"')).toEqual([t(undefined)])
+    expect(rmTargets('WT=/w/wt && cd /w && rm "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('WT=/w/wt X=/w && rm "$WT/x" "$X/y"')).toEqual([t('/w/wt/x'), t('/w/y')])
+    expect(rmTargets('true; WT=/w && X=/x; rm "$X/y"')).toEqual([t('/x/y')])
+    // an unread change inside a list, a directory named twice, a relative cd after an unknown one
+    expect(rmTargets('cd /w && builtin cd /etc && rm x')).toEqual([t(undefined)])
+    expect(rmTargets('cd /w; cd /w; rm x')).toEqual([t('x'), t('/w/x')])
+    expect(rmTargets('cd - && cd wt && rm x')).toEqual([t(undefined)])
+  })
+  test('Ruling 21: the failed-cd hide is refused; the same removal behind && is allowed', () => {
+    // a reviewer whose session directory is the worktree: a failed cd removes the worktree's build
+    expect(verdict('cd /tmp/typo; rm -rf build', '/w/wt', 'reviewer')).toContain('no rm outside writable places')
+    expect(verdict('cd /tmp/typo && rm -rf build', '/w/wt', 'reviewer')).toBeUndefined()
+    expect(verdict('cd /tmp/x; rm -rf *', '/w/wt', 'reviewer')).toContain('no rm outside writable places')
+    expect(verdict('cd /tmp/x && rm -rf *', '/w/wt', 'reviewer')).toBeUndefined()
+    // the implementer's own worktree holds both readings
+    expect(verdict('cd /w/wt/pf; rm -rf build')).toBeUndefined()
+    expect(verdict('cd /etc; rm -rf build')).toContain('no rm outside writable places')
+  })
+  test('Ruling 21: both baton records stay allowed with cwd = root = their worktree; their /etc/x siblings are refused', () => {
+    for (const [command, root] of [['cd "/home/dev/projects/pilot-fourseat/.worktrees/r0.s6.w1" && rm -rf pf/__pycache__ tests/__pycache__ && grep -n \'value:\\.1f\' pf/sizes.py && python3 -m unittest tests.test_sizes; echo "rc=$?"; diff /tmp/sizes.py.orig pf/sizes.py && echo "identical to pre-mutation copy"', '/home/dev/projects/pilot-fourseat/.worktrees/r0.s6.w1'],
+      ['WT="/home/dev/projects/pilot-fourseat/.worktrees/r0.s7.w1"; cd "$WT"\nrm -f pf/__pycache__/ordinal.*.pyc tests/__pycache__/test_ordinal.*.pyc\npython3 -m unittest tests.test_ordinal; echo "post-cache-clear rc=$?"', '/home/dev/projects/pilot-fourseat/.worktrees/r0.s7.w1']] as const) {
+      expect(rmTargets(command).every(target => target.path !== undefined)).toBe(true)
+      expect(verdict(command, root)).toBeUndefined()
+      expect(verdict(command.split(root).join('/etc/x'), root)).toContain('no rm outside writable places')
+    }
+  })
+  test('the variable spellings that resolve, and the ones that do not', () => {
+    expect(rmTargets('WT=/w/wt; rm -f "${WT}/x" ${WT}/y $WT/z "$WT"/q "$WT" ${WT}x')).toEqual([
+      t('/w/wt/x'), t('/w/wt/y'), t('/w/wt/z'), t('/w/wt/q'), t('/w/wt'), t('/w/wtx')])
+    expect(rmTargets("WT=/w/wt; rm -f '$WT/x' \\$WT/y")).toEqual([t('$WT/x'), t('$WT/y')])
+    expect(rmTargets('WT=x; rm "it\'s/$WT"')).toEqual([t("./it's/x")]) // Ruling 24: a bare operand built from a variable is ./
+    expect(rmTargets("WT='/w/wt' X=/w/x; rm -f \"$WT/a\" \"$X/b\"")).toEqual([t('/w/wt/a'), t('/w/x/b')])
+    expect(rmTargets('WT=/w/wt; cd $WT && rm -f a "$WT/b"')).toEqual([t('/w/wt/a'), t('/w/wt/b')])
+    for (const c of ['WT=/w/wt; rm "$WTx"', 'WT=/w/wt; rm "${WT:-/w}/x"', 'WT=/w/wt; rm "$$WT"', 'WT=/w/wt; rm ~$WT',
+      'WT=/w/wt; rm "${#WT}"', 'WT=/w/wt; rm "$1"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // a relative value is a relative operand: it joins a known directory, or the session's, like any other
+    // Ruling 21: after `cd /w;` the session's directory is a target beside /w; a relative cd joins onto each directory
+    // Ruling 24: and a bare one built from a variable is written ./
+    expect(rmTargets('cd /w; WT=wt; rm -rf "$WT/x"')).toEqual([t('./wt/x'), t('/w/wt/x')])
+    expect(rmTargets('WT=wt; rm -rf "$WT/x"')).toEqual([t('./wt/x')])
+    expect(rmTargets('WT=wt; cd "$WT" && rm x')).toEqual([t('./wt/x')]) // `./`: fix round 1 (finding 3)
+    // a glob after a substituted value is placed by its literal prefix
+    expect(rmTargets('WT=/w/wt; rm -f "$WT"/pf/*.pyc')).toEqual([t('/w/wt/pf', true)])
+  })
+  test('a value with an expansion, or one Bash reads differently, never becomes known', () => {
+    for (const c of ['WT=$(pwd); rm "$WT/x"', 'WT="$HOME/x"; rm "$WT/y"', 'WT=`pwd`; rm "$WT/x"', 'WT=~/x; rm "$WT"',
+      "WT='/w/a b'; rm $WT/x", "WT='/w/*'; rm $WT", "WT='~/x'; rm $WT", 'WT=; rm "$WT/x"', 'WT=/w/wt true; rm "$WT/x"',
+      'export WT=/w/wt; rm "$WT/x"', 'local WT=/w/wt; rm "$WT/x"', 'declare WT=/w/wt; rm "$WT/x"', 'readonly WT=/w/wt; rm "$WT/x"',
+      'RANDOM=/w/wt; rm "$RANDOM/x"', 'SECONDS=/w; rm "$SECONDS/x"', 'PWD=/w/wt; rm "$PWD/x"', 'UID=/w; rm "$UID/x"',
+      'WT[0]=/w/wt; rm "$WT/x"', 'WT+=/w/wt; rm "$WT/x"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+  })
+  test('a later command that may change a known variable makes it unknown again', () => {
+    for (const c of ['WT=/w; WT=$(pwd); rm "$WT/x"', 'WT=/w; WT+=/x; rm "$WT/y"', 'WT=/w; WT[0]=/etc; rm "$WT/y"',
+      'WT=/w; unset WT; rm "$WT/y"', 'WT=/w; read WT </dev/null; rm "$WT/y"', 'WT=/w; printf -v WT /etc; rm "$WT/y"',
+      'WT=/w; N=WT; printf -v "$N" /etc; rm "$WT/y"', 'WT=/w; echo ${WT:=/etc}; rm "$WT/y"', 'WT=/w; export WT=/etc; rm "$WT/y"',
+      'WT=/w; eval "WT=/etc"; rm "$WT/y"', 'WT=/w; source ./env.sh; rm "$WT/y"', 'WT=/w; . ./env.sh; rm "$WT/y"',
+      'WT=/w; for WT in /etc; do :; done; rm "$WT/y"', 'WT=/w; let WT=1; rm "$WT/y"', 'WT=/w; mapfile WT </dev/null; rm "$WT/y"',
+      'WT=/w; $CMD; rm "$WT/y"', 'WT=/w; WT=/etc true; rm "$WT/y"', 'WT=/w; echo $((WT=1)); rm "$WT/y"',
+      'WT=/w; WT=`pwd`; rm "$WT/y"', 'WT=/w; WT="$HOME/x"; rm "$WT/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // Ruling 24: any other command forgets every variable, even one that only reads it
+    for (const c of ['WT=/w; git -C "$WT" status; rm "$WT/y"', 'WT=/w; echo "$WT" ${WT}; rm "$WT/y"', 'WT=/w; set -euo pipefail; rm "$WT/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // controls: a literal assignment, a literal cd and an rm keep it
+    for (const c of ['WT=/w; X=1; rm "$WT/y"', 'WT=/w; WT=/w; rm "$WT/y"', 'WT=/w; cd /etc; rm "$WT/y"'])
+      expect(rmTargets(c)).toEqual([t('/w/y')])
+    expect(rmTargets('WT=/w; rm -f a; rm "$WT/y"')).toEqual([t('a'), t('/w/y')])
+  })
+  test('cd spellings: the builtin itself resolves; a wrapper, an option or an unread word does not', () => {
+    for (const c of ['\\cd /w && rm x', '"cd" /w && rm x', "c'd' /w && rm x", 'cd /w/ && rm x', 'cd /w 2>/dev/null && rm x'])
+      expect(rmTargets(c)).toEqual([t('/w/x')])
+    // Ruling 21: after a newline the failed-cd reading is a target too
+    for (const c of ['cd /w # go\nrm x', 'cd "/w"\nrm x']) expect(rmTargets(c)).toEqual([t('x'), t('/w/x')])
+    expect(rmTargets('cd / && rm x')).toEqual([t('/x')])
+    for (const c of ['builtin cd /w; rm x', 'command cd /w; rm x', '/usr/bin/cd /w; rm x', 'A=1 cd /w; rm x', 'cd -- /w; rm x',
+      'cd -P /w; rm x', 'cd /w /etc; rm x', 'cd; rm x', 'cd ~; rm x', 'cd ~/w; rm x', 'cd /w*; rm x', 'cd /w/{a,b}; rm x',
+      'cd ""; rm x', 'cd /w/wt/..; rm x', 'cd /w/wt && cd .. && rm x', 'pushd /w; rm x', 'cd /w; popd; rm x',
+      'cd /w; "pushd" /etc; rm x', 'cd /w; builtin cd /etc; rm x', 'cd /w; "command" cd /etc; rm x', 'cd /w; command cd /etc; rm x',
+      'cd /w; eval "cd /etc"; rm x', 'cd /w; source ./go.sh; rm x', 'cd /w; . ./go.sh; rm x', 'cd /w; C=cd; $C /etc; rm x',
+      'cd /w; `echo cd` /etc; rm x', 'cd /w; trap "cd /etc" DEBUG; rm x', 'cd /w; shopt -s cdable_vars; rm x',
+      'CDPATH=/etc; cd /w; cd ssl && rm x', 'cd /w; export CDPATH=/etc; cd ssl && rm x', 'IFS=/; cd /w && rm x',
+      'cd /w; command -p cd /etc; rm x', 'cd /w; command -- cd /etc; rm x', 'cd /w; builtin -- cd /etc; rm x',
+      'cd /w; command -p $C /etc; rm x', 'cd /w; env -i cd /etc; rm x', 'cd /w; cd - && rm x', 'cd /w; cd ~/x && rm y',
+      'cd /w; coproc { cd /etc; rm x; }', 'cd /w; A=1 $C /etc; rm x', 'if true; then "cd" /etc; fi; rm x', 'cd /w; c[d] /etc; rm x'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // as before batch 5, any word named cd counts, even through an unread folder
+    expect(rmTargets('$D/cd /etc; rm x')).toEqual([t(undefined)])
+    // controls: a command that only runs a program keeps the directories (Ruling 21: the session's, and /w)
+    for (const c of ['cd /w; echo cd /etc; rm x', 'cd /w; git status; rm x', 'cd /w; echo "cd /etc"; rm x', 'cd /w; command rm x',
+      'cd /w; command -p git status; rm x', 'cd /w && cat <<EOF\ncd /etc\nEOF\nrm x', '>/dev/null cd /w; rm x', '""cd /w; rm x'])
+      expect(rmTargets(c)).toEqual([t('x'), t('/w/x')])
+    // no cd before it: a builtin that can change the directory leaves the session's, as today
+    for (const c of ['source venv/bin/activate && rm -rf x', 'eval true; rm x', '$EDITOR f; rm x', 'export A=1; rm x'])
+      expect(rmTargets(c)).toEqual([t('x')])
+  })
+  test('operands keep their kind; a .. is left to placement, which follows links before it', () => {
+    expect(rmTargets("cd /w && rm -rf -- -x ~/x '~/y' /abs ..")).toEqual([t('/w/-x'), t('~/x'), t('/w/~/y'), t('/abs'), t('/w/..')])
+    expect(rmTargets('cd /w/wt && rm -rf ../x')).toEqual([t('/w/wt/../x')])
+    expect(rmTargets('cd /w/wt && rm -f *.pyc pf/__pycache__/o.*.pyc')).toEqual([t('/w/wt/.', true), t('/w/wt/pf/__pycache__', true)])
+    expect(rmTargets('cd /w/wt && rm -f ../*.pyc .*.pyc')).toEqual([t('/w/wt/..', true), t(undefined)])
+    // the real record: globs under a cd through a variable (Task 6 replays it)
+    expect(rmTargets('WT="/w/wt"; cd "$WT"\nrm -f pf/__pycache__/ordinal.*.pyc tests/__pycache__/test_ordinal.*.pyc\npython3 -m unittest tests.test_ordinal; echo "rc=$?"'))
+      .toEqual([t('pf/__pycache__', true), t('/w/wt/pf/__pycache__', true), t('tests/__pycache__', true), t('/w/wt/tests/__pycache__', true)]) // Ruling 21
+    // a `..` out of the worktree is outside; one that stays inside is inside
+    expect(verdict('cd /w/wt && rm -rf ../x')).toContain('no rm outside writable places')
+    expect(verdict('cd /w/wt && rm -rf ..')).toContain('roots or ancestors')
+    expect(verdict('cd /w/wt/pf && rm -rf ../tests/x')).toBeUndefined()
+  })
+  test('Ruling 2: a substitution inherits neither the directory nor the variables', () => {
+    for (const c of ['cd /w && echo "$(rm x)"', 'WT=/w; echo "$(rm "$WT/x")"', 'echo "$(cd /w && rm x)"', 'echo "$(WT=/w; rm "$WT/x")"',
+      'cd /w; X=$(cd /etc); rm y', 'WT=/w; echo `rm "$WT/x"`'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+  })
+})
+
+// Task 5 fix round 1: four ways the walk approved a removal Bash makes elsewhere (base 0572a24c refused each).
+describe('batch 5: rm after cd, fix round 1', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  const lexical = (path: string) => {
+    const parts: string[] = []
+    for (const part of path.split('/')) if (part === '..') parts.pop(); else if (part !== '' && part !== '.') parts.push(part)
+    return '/' + parts.join('/')
+  }
+  const verdict = (command: string, role: 'implementer' | 'reviewer' = 'implementer', root = '/w/wt') => decide(role, {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(lexical(target.path.startsWith('/') ? target.path : `${root}/${target.path}`), root, scratchDirs(undefined), target.glob)),
+  })
+  test('finding 1: a newline after &&, || or | continues the list; a command alone on its line ends it', () => {
+    // Bash skips the assignment with the list, and the rm on the next line removes /x
+    for (const c of ['false &&\nWT=/w/wt\nrm -rf "$WT/x"', 'cd /w/missing &&\nWT=/w/wt\nrm -rf "$WT/x"', 'true &&\n\n  WT=/w/wt\nrm "$WT/x"',
+      'true && # why\nWT=/w/wt\nrm "$WT/x"', 'cd /w ||\nrm x', 'cd /w |\ncat; rm x'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('false &&\nS=/tmp/x\nrm -rf "$S/y"')).toContain('cannot resolve')
+    // controls: the rest of a `cd X &&` list runs in X only, across the newline; a list ends at a newline after a command
+    expect(rmTargets('cd /w/wt &&\nrm -rf build')).toEqual([t('/w/wt/build')])
+    expect(rmTargets('cd /w/wt &&   \n  rm -rf build')).toEqual([t('/w/wt/build')])
+    expect(rmTargets('true\nWT=/w/wt\nrm "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(verdict('cd /tmp/x &&\nrm -rf build', 'reviewer')).toBeUndefined()
+    expect(verdict('cd /tmp/x\nrm -rf build', 'reviewer')).toContain('no rm outside writable places')
+    // the `&` or `|` of a redirection operator separates nothing
+    for (const c of ['cd /w && echo hi >|/tmp/f && rm y', 'cd /w && echo hi 2>&1 && rm y', 'cd /w && echo hi &>/dev/null && rm y',
+      'cd /w && echo hi <&0 && rm y'])
+      expect(rmTargets(c)).toEqual([t('/w/y')])
+    // a command made of a redirection or a heredoc alone is a command: the newline after it ends the list
+    expect(rmTargets('cd /w && >/dev/null\nrm x')).toEqual([t('x'), t('/w/x')])
+    expect(rmTargets('cd /w/missing && <<EOF\nb\nEOF\nrm x')).toEqual([t('x'), t('/w/missing/x')])
+  })
+  test('finding 2: an assignment-only command may fail, so an assignment after its && may be skipped', () => {
+    for (const c of ['A="$(false)" && WT=/w/wt; rm -rf "$WT/x"', 'A=`false` && WT=/w/wt; rm -rf "$WT/x"',
+      'A=1 </nonexistent && WT=/w/wt; rm -rf "$WT/x"', 'A="$(git rev-parse --show-toplevel)" && WT=/w/wt; rm -rf "$WT/x"',
+      'A="$HOME" && WT=/w/wt; rm -rf "$WT/x"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('A="$(git rev-parse --show-toplevel)" && S=/tmp/x; rm -rf "$S/y"')).toContain('cannot resolve')
+    // controls: a literal assignment cannot fail, and within the list the assignment holds
+    expect(rmTargets('A=1 && WT=/w/wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    expect(rmTargets('A=/w X=1 && WT=/w/wt; rm -rf "$WT/x"')).toEqual([t('/w/wt/x')])
+    // Ruling 24: behind a command that may fail, the assignment never becomes known, in its own list too
+    expect(rmTargets('A="$(false)" && WT=/w/wt && rm -rf "$WT/x"')).toEqual([t(undefined)])
+    expect(verdict('A=1 && S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+  test('finding 3: a relative cd from the session directory is written ./ so no glue reads a leading ~, @ or :', () => {
+    expect(rmTargets('cd "~" && rm -rf scratch/x')).toEqual([t('./~/scratch/x')])
+    expect(rmTargets('cd "~/scratch" && rm -rf x')).toEqual([t('./~/scratch/x')])
+    expect(rmTargets('cd \\~ && rm -rf x')).toEqual([t('./~/x')])
+    expect(rmTargets('cd "~"; rm -rf x')).toEqual([t('x'), t('./~/x')])
+    expect(rmTargets('cd @ && rm -rf tmp/x')).toEqual([t('./@/tmp/x')])
+    expect(rmTargets('cd ":~" && rm -rf x')).toEqual([t('./:~/x')])
+    expect(rmTargets('cd file:///tmp && rm -rf x')).toEqual([t('./file:///tmp/x')])
+    expect(rmTargets('cd ./sub && cd ~x && rm y')).toEqual([t(undefined)])
+    expect(rmTargets('cd ./sub && rm y')).toEqual([t('./sub/y')])
+    // controls: an active tilde is HOME, so a cd to it is unknown; a quoted one in an operand stays literal, as before
+    expect(rmTargets('cd ~ && rm -rf scratch/x')).toEqual([t(undefined)])
+    expect(rmTargets('rm -rf "~/scratch/x" ~/scratch/y')).toEqual([t('./~/scratch/x'), t('~/scratch/y')])
+  })
+  test('finding 4: every write to a known variable is read, wherever the segment holds it', () => {
+    for (const c of ['S=/w/wt; X="$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; X=$[S=5]; rm -rf "$S/x"', 'S=/w/wt; A[S=5]=1; rm -rf "$S/x"',
+      'S=/w/wt; cd $[S=5]; rm -rf "$S/x"', 'S=/w/wt; cd "$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; : >"$((S=5))"; rm -rf "$S/x"',
+      'S=/w/wt; true > $[S=5]; rm -rf "$S/x"', 'S=/w/wt; : <<<"$((S=5))"; rm -rf "$S/x"', 'S=/w/wt; true {S}>/dev/null; rm -rf "$S/x"',
+      'S=/w/wt; exec {S}>/dev/null; rm -rf "$S/x"', 'S=/w/wt; : <<EOF\n$((S=5))\nEOF\nrm -rf "$S/x"', 'S=/w/wt; [[ 1 -eq S=5 ]]; rm -rf "$S/x"',
+      'S=/w/wt; echo ${A[S=5]}; rm -rf "$S/x"', 'S=/w/wt X=$((S=5)); rm -rf "$S/x"', 'S=/w/wt; X="${ S=/etc; }"; rm -rf "$S/x"']) {
+      const found = rmTargets(c)
+      expect(found.length > 0 && found.every(target => target.path === undefined)).toBe(true)
+    }
+    // the operand before the write reads S as Bash does, and the write's own operand is unread: still refused
+    expect(rmTargets('S=/w/wt; rm -rf "$S/x" "$[S=5]"')).toEqual([t('/w/wt/x'), t(undefined)])
+    // a Bash 5.3 `${ …; }` runs in the current shell, and a heredoc line read in the 0.9.0 layout hides its tail
+    for (const c of ['cd /w; X="${ cd /etc; }"; rm y', 'cd /w; echo "${| cd /etc; }"; rm y', 'cd /w; cat <<EOF "$(true)"; cd /etc\nbody\nEOF\nrm y'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('S=/tmp/x; X="$((S=5))"; rm -rf "$S/y"', 'reviewer')).toContain('cannot resolve')
+    // Ruling 24: a command that only reads it, a heredoc, an assignment with an expansion forget it too
+    for (const c of ['S=/w/wt; X="$((1+1))"; : >"$S.log"; exec 3>/dev/null; rm -rf "$S/x"', 'S=/w/wt; cat <<EOF\n$S\nEOF\nrm -rf "$S/x"',
+      'X="$((S=5))" S=/w/wt; rm -rf "$S/x"', "S=/w/wt; cat <<'EOF'\nS is $((S=5))\nEOF\nrm -rf \"$S/x\"",
+      'S=/w/wt X="$((S=5))"; rm -rf "$S/x"', 'S=/w/wt A[S=5]=1; rm -rf "$S/x"', 'S=/w/wt S="$HOME/x"; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // controls: only literal assignments, a literal cd and rm between the assignment and its use
+    expect(rmTargets('S=/w/wt; X=1; cd /w; rm -f a; rm -rf "$S/x"')).toEqual([t('a'), t('/w/a'), t('/w/wt/x')])
+    expect(rmTargets('cd /w/wt && git commit -m "$(cat <<\'EOF\'\nmsg\nEOF\n)" && rm -rf build')).toEqual([t('/w/wt/build')])
+    expect(verdict('S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+})
+
+// Task 5 fix round 2 (Ruling 24): a variable stays known only across literal assignments, a literal cd and rm.
+describe('batch 5: rm after cd, fix round 2', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  const verdict = (command: string, role: 'implementer' | 'reviewer' = 'implementer', root = '/w/wt') => decide(role, {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(target.path.startsWith('/') ? target.path : `${root}/${target.path.replace(/^\.\//, '')}`, root, scratchDirs(undefined), target.glob)),
+  })
+  test('open 2: a command made of redirections alone may fail, so the assignment after its && never becomes known', () => {
+    for (const c of ['</nonexistent && S=/tmp/x; rm -rf "$S/y"', '>/nonexistent/d/f && S=/tmp/x; rm -rf "$S/y"',
+      '</nonexistent &&\nS=/tmp/x\nrm -rf "$S/y"', '<"$(false)" && S=/tmp/x; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    for (const role of ['implementer', 'reviewer'] as const)
+      expect(verdict('</nonexistent && S=/tmp/x; rm -rf "$S/y"', role)).toContain('cannot resolve')
+    // a heredoc or here-string is a redirection too, so the command is not a literal assignment (Bash: this one succeeds)
+    for (const c of ['A=1 <<EOF && S=/tmp/x; rm -rf "$S/y"\nbody\nEOF', 'A=1 <<<x && S=/tmp/x; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    // control: the same assignment at the start of its list
+    expect(rmTargets('S=/tmp/x && rm -rf "$S/y"')).toEqual([t('/tmp/x/y')])
+    expect(verdict('S=/tmp/x && rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+  test('open 4: a write through an indirect name is never seen, so any other command forgets every variable', () => {
+    for (const c of ['Z=S=5; S=/tmp/x; : "$((Z))"; rm -rf "$S/y"', 'Z=S=5; S=/tmp/x; : $[Z]; rm -rf "$S/y"',
+      'Z=S=5; S=/tmp/x; X=abcdef; : "${X:Z}"; rm -rf "$S/y"', 'Z=S; S=/tmp/x; : "$(($Z=5))"; rm -rf "$S/y"',
+      'Z=W; WT=/tmp/x; : "$((${Z}T=5))"; rm -rf "$WT/y"', "Z='$((S=5))'; S=/tmp/x; : \"${Z@P}\"; rm -rf \"$S/y\"",
+      'Z=S; S=/tmp/x; compgen -V "$Z" -W /etc >/dev/null; rm -rf "$S/y"', 'WT=/w/wt; echo "$WT"; rm -rf "$WT/x"',
+      'WT=/w/wt; true; rm -rf "$WT/x"', 'WT=/w/wt; : ; rm -rf "$WT/x"', 'WT=/w/wt; >/tmp/log; rm -rf "$WT/x"',
+      'WT=/w/wt; f; rm -rf "$WT/x"', 'WT=/w/wt; cd /w 2>/dev/null; rm -rf "$WT/x"', 'WT=/w/wt; rm -f a 2>/dev/null; rm -rf "$WT/x"',
+      'WT=/w/wt; cd "$UNSET"; rm -rf "$WT/x"'])
+      expect(rmTargets(c).at(-1)).toEqual(t(undefined))
+    expect(verdict('Z=S; S=/tmp/x; compgen -V "$Z" -W /etc >/dev/null; rm -rf "$S/y"', 'reviewer')).toContain('cannot resolve')
+    // an assignment before `&` or `|` runs in a subshell, so the rm after it reads the shell's own, unset variable
+    for (const c of ['WT=/w/wt & rm -rf "$WT/x"', 'WT=/w/wt | rm -rf "$WT/x"']) expect(rmTargets(c)).toEqual([t(undefined)])
+    // control: a pipe after the variable is set leaves it set for an rm in the pipeline
+    expect(rmTargets('WT=/w/wt; rm -rf "$WT/x" | cat')).toEqual([t('/w/wt/x')])
+    // controls: only literal assignments, a literal cd and rm stand between the assignment and its use
+    expect(rmTargets('Z=1; S=/tmp/x; cd /w; rm -f a; rm -rf "$S/y"')).toEqual([t('a'), t('/w/a'), t('/tmp/x/y')])
+    expect(verdict('Z=1; S=/tmp/x; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+  test('introduced by 2b6ee7ba: a bare operand built from a variable is written ./ whatever its first character', () => {
+    expect(rmTargets('S=@; rm -rf "$S/tmp/allow/x"')).toEqual([t('./@/tmp/allow/x')])
+    expect(rmTargets('S=:; rm -rf "$S~/scratch/x"')).toEqual([t('./:~/scratch/x')])
+    expect(rmTargets('S=x; rm -rf "$S" "$S"/*.o')).toEqual([t('./x'), t('./x', true)])
+    expect(rmTargets('S=./sub; rm -rf "$S/x"')).toEqual([t('./sub/x')])
+    // controls: an absolute value is placed as is; a literal operand keeps its old reading
+    expect(rmTargets('S=/tmp/allow; rm -rf "$S/x" sub/y')).toEqual([t('/tmp/allow/x'), t('sub/y')])
+  })
+  test('pre-existing: a ${ …; } funsub runs in the current shell and may cd; it ends the walk', () => {
+    // after a cd the directory is unknown, as 0.9.0 left it after every cd
+    for (const c of ['cd /w && echo "${ cd /etc; }" && rm y', 'cd /w; X="${ cd /etc; }"; rm y', 'cd /w; X="\\${ x; }"; rm y'])
+      expect(rmTargets(c)).toEqual([t(undefined)])
+    expect(verdict('cd /w; X="${ cd /etc; }"; rm -rf y')).toContain('cannot resolve')
+    // known limit (README Limits, #925): with no cd before it, the rm stays in the session directory, as in 0.9.0,
+    // though Bash runs it where the funsub's cd went
+    for (const c of ['X="${ cd /etc; }"; rm -rf y', 'echo "${| cd /etc; }"; rm -rf y', 'X="${ true; }" && rm -rf y'])
+      expect(rmTargets(c)).toEqual([t('y')])
+    // control: a $( … ) runs in a subshell, so its cd stays there
+    expect(rmTargets('X="$(cd /etc)"; rm -rf y')).toEqual([t('y')])
+  })
+  test('minor: the heredoc sentinel holds a NUL, so a word Bash can pass is an operand', () => {
+    expect(rmTargets('rm -rf \u0001')).toEqual([t('\u0001')])
+    expect(rmTargets('rm -rf x \u0001')).toEqual([t('x'), t('\u0001')])
+    expect(rmTargets('rm -i /reports/x <<EOF\ny\nEOF')).toEqual([t('/reports/x')])
+  })
+})
+
+// Task 5 fix round 3 (Ruling 24, type c completed): an rm keeps the variables only as the bare word `rm` after literal
+// assignments, since Bash expands an rm's prefix values and a wrapper's operands in the current shell.
+describe('batch 5: rm after cd, fix round 3', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  const verdict = (command: string, role: 'implementer' | 'reviewer' = 'implementer', root = '/w/wt') => decide(role, {
+    kind: 'bash', rules: bashRules(command),
+    removals: rmTargets(command).map(target => target.path === undefined ? UNREAD
+      : removalOf(target.path.startsWith('/') ? target.path : `${root}/${target.path.replace(/^\.\//, '')}`, root, scratchDirs(undefined), target.glob)),
+  })
+  test('an rm whose prefix or wrapper writes a variable forgets them all (the opposite of mutant N04)', () => {
+    // Bash leaves S=5 and removes 5/y (or /etc/5/y after the cd)
+    for (const c of ['S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; rm -rf "$S/y"', 'S=/tmp/x; X=$[S=5] rm -f /tmp/x/a; rm -rf "$S/y"',
+      'S=/tmp/x; X="$((S=5))" rm -f /tmp/x/a; rm -rf "$S/y"', 'S=/tmp/x; env X="$((S=5))" rm -f /tmp/x/a; rm -rf "$S/y"',
+      'S=/tmp/x; command env X="$[S=5]" rm -f /tmp/x/a; rm -rf "$S/y"', 'Z=S=5; S=/tmp/x; X="$((Z))" rm -f /tmp/x/a; rm -rf "$S/y"',
+      'Z=S=5; S=/tmp/x; X="$[Z]" rm -f /tmp/x/a; rm -rf "$S/y"', 'S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; cd /etc; rm -rf "$S/y"'])
+      expect(rmTargets(c)).toEqual([t('/tmp/x/a'), t(undefined)])
+    expect(verdict('S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; rm -rf "$S/y"', 'reviewer')).toContain('cannot resolve')
+    expect(verdict('S=/tmp/x; X="$[S=5]" rm -f /tmp/x/a; cd /etc; rm -rf "$S/y"')).toContain('cannot resolve')
+    // a wrapper or a path-qualified rm forgets them too, whatever it writes
+    for (const c of ['S=/w/wt; env rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; command rm -f /w/wt/a; rm -rf "$S/x"',
+      'S=/w/wt; sudo rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; /bin/rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; X="$S" rm -f /w/wt/a; rm -rf "$S/x"'])
+      expect(rmTargets(c)).toEqual([t('/w/wt/a'), t(undefined)])
+    // controls: literal assignments before the bare rm keep them, and an escaped rm is the bare word
+    for (const c of ['S=/w/wt; X=1 rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; X=1 Y=/w rm -f /w/wt/a; rm -rf "$S/x"',
+      'S=/w/wt; \\rm -f /w/wt/a; rm -rf "$S/x"', 'S=/w/wt; rm -f /w/wt/a; rm -rf "$S/x"'])
+      expect(rmTargets(c)).toEqual([t('/w/wt/a'), t('/w/wt/x')])
+    expect(verdict('S=/tmp/x; X=1 rm -f /tmp/x/a; rm -rf "$S/y"', 'reviewer')).toBeUndefined()
+  })
+})
+
+
+// Final fix wave, I1 (ledger 117): inside a `$(…)` Bash 5.3 also ends a heredoc at a body line that starts with the
+// delimiter and holds a `)` after it, with a warning, and reads the rest of that line as command text. A top-level
+// heredoc, and one in a backtick span, close only at a line that is exactly the delimiter (probed under Bash 5.3.9).
+describe('batch 5 fix wave: a heredoc in a $(…) closes at a line that starts with its delimiter and holds a `)`', () => {
+  const t = (path: string | undefined, glob = false) => ({ path, glob })
+  test('the `EOF)` commit form: a force-push or an rm after it is read', () => {
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit', 'push', 'force-push'])
+    expect(bashRules("git commit --amend -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force-with-lease")).toEqual(['commit', 'push', 'force-push'])
+    expect(rmTargets("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && rm -rf /etc/x")).toEqual([t('/etc/x')])
+    expect(substitutionsOf("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(["cat <<'EOF'\nmsg\nEOF"])
+  })
+  test('unquoted, after <<-, nested, and with a command between the delimiter and the `)`', () => {
+    expect(bashRules('x=$(cat <<EOF\nmsg\nEOF) && git push --force')).toEqual(['push', 'force-push'])
+    expect(bashRules('x=$(cat <<-EOF\nmsg\n\tEOF) && git push --force')).toEqual(['push', 'force-push'])
+    expect(bashRules('x=$(echo $(cat <<EOF\nmsg\nEOF) && git push --force)')).toEqual(['push', 'force-push'])
+    // Bash reads the rest of the closing line as the next line of the substitution, so it runs the push
+    expect(bashRules('x=$(cat <<EOF\nmsg\nEOF git push --force)')).toEqual(['push', 'force-push'])
+    expect(substitutionsOf('x=$(cat <<EOF\nmsg\nEOF git push --force)')).toEqual(['cat <<EOF\nmsg\nEOF\n git push --force'])
+    expect(rmTargets('x=$(cat <<EOF\nmsg\nEOF rm -rf /etc/x)')).toEqual([t('/etc/x')])
+  })
+  test('control: the standard commit form and a body line that only starts with the delimiter stay allowed', () => {
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nmsg\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nfeat: x\n\ngit push --force is denied.\nEOF\n)\"")).toEqual(['commit'])
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toEqual(['commit'])
+    expect(rmTargets("git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toEqual([])
+    // no `)` after the delimiter: Bash does not close there
+    expect(bashRules("git commit -m \"$(cat <<'EOF'\nEOFs are fine; git push --force\nEOF\n)\"")).toEqual(['commit'])
+  })
+  test('control: a top-level heredoc and one in a backtick span close only at the exact line', () => {
+    expect(bashRules('cat <<EOF\nEOFs are fine\nEOF\n')).toEqual([])
+    expect(bashRules('cat <<EOF\nEOFs are fine (really) && git push --force\nEOF\n')).toEqual([])
+    expect(rmTargets('cat <<EOF\nEOF) && rm -rf /etc/x\nEOF\n')).toEqual([])
+    expect(bashRules('x=`cat <<EOF\nmsg\nEOF) git push --force\n`')).toEqual([])
+  })
+  // Known-limit pins (README Limits): the rule is read only for a `$(` opened on the opener's line, only for the last
+  // opener on that line, and not on a line a backslash joined. Bash runs the push in all three.
+  test('known limit: a $( on an earlier line, an earlier opener on the line, or a joined line is not seen closing', () => {
+    expect(bashRules('x=$(\ncat <<EOF\nmsg\nEOF) && git push --force')).toEqual([])
+    expect(bashRules('x=$(cat <<EOF\nmsg\nEO\\\nF) && git push --force')).toEqual([])
+    expect(bashRules("x=$(cat <<'EOF' <<B\nb\nB\nmsg\nEOF) && git push --force")).toEqual([])
+  })
+  // Ruling 33: the `$(` check reads the opener's logical line, from the last newline outside quotes, not its physical
+  // line, so a quoted string that spans lines neither opens a `$(` that is text nor hides one that is real (probed under
+  // Bash 5.3.9: the first two run no rm and no push, the third runs the push).
+  test('a quoted string spanning lines: a `$(` inside it is text, and one after it is read', () => {
+    expect(rmTargets("printf '%s\\n' 'x\n$(' >/dev/null; git commit -F - <<'EOF'\nmsg\nEOF) ; rm -rf /etc/x\nEOF")).toEqual([])
+    expect(bashRules("printf '%s\\n' 'x\n$(' >/dev/null; git commit -F - <<'EOF'\nmsg\nEOF) ; rm -rf /etc/x\nEOF")).toEqual(['commit'])
+    expect(bashRules("echo '\n$(' ; cat <<EOF\nEOF) && git push --force\nEOF")).toEqual([])
+    expect(bashRules('echo "\n\\$(" ; cat <<EOF\nEOF) && git push --force\nEOF')).toEqual([])
+    expect(bashRules("echo 'a\nb' ; x=$(cat <<EOF\nmsg\nEOF) ; git push --force")).toEqual(['push', 'force-push'])
+    expect(bashRules('echo "a\nb" ; x=$(cat <<EOF\nmsg\nEOF) ; git push --force')).toEqual(['push', 'force-push'])
+    expect(bashRules("git add 'a\nb' && git commit -m \"$(cat <<'EOF'\nmsg\nEOF)\"")).toEqual(['commit'])
+    // a heredoc body on the logical line is not read as its text: here a `'(` in an earlier body would open a `$(`
+    expect(bashRules("y=$(cat <<A\n'(\nA) ; cat <<B\nB) ; git push --force\nB")).toEqual([])
+    // after a heredoc body the line resumes in the opener's quote: here inside the `"…"`, which `)"` closes, so `'$('` is text
+    expect(bashRules("git commit -m \"$(cat <<'A'\na\nA\n)\" ; echo '$(' ; cat <<B\nB) ; git push --force\nB\n")).toEqual(['commit'])
+    // a `$(` before a newline in quotes, or before a backslash-newline, is on the opener's logical line: Bash runs the push
+    expect(bashRules("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit', 'push', 'force-push'])
+    expect(bashRules("git commit -m \"$(\ncat <<'EOF'\nmsg\nEOF)\"")).toEqual(['commit'])
+    expect(bashRules('x=$( \\\ncat <<EOF\nmsg\nEOF) && git push --force')).toEqual(['push', 'force-push'])
+  })
+  // Ruling 34: the scan's own quote reading does not nest quotes inside `$(…)`, so after `"$(echo "it's")"` it sits in a `'`
+  // that Bash never opened. A heredoc body resumed in that quote must not flip the next line's quotes: a seeded reading
+  // closes a heredoc early only when the unseeded one agrees (probed under Bash 5.3.9: no push, no rm).
+  test('a quote the scan misreads inside "$(…)" is not carried past a heredoc body into an early close', () => {
+    expect(bashRules("git commit -m \"$(echo \"it's done\")\" --allow-empty && cat <<'EOF'\nnotes\nEOF\necho 'call $(' ; cat <<EOF\nEOF) ; git push --force\nEOF")).toEqual(['commit'])
+    expect(rmTargets("echo \"$(echo \"'\")\" ; cat <<'X'\nx\nX\necho a' $(' ; cat <<EOF\nEOF) ; rm -rf /etc/x\nEOF")).toEqual([])
+    // controls: the resume after a real `"$(…)"` body still reads a `$(` opened after it
+    expect(bashRules("x=\"$(cat <<A\na\nA\n)\" ; y=$(cat <<B\nB) ; git push --force\nB")).toEqual(['push', 'force-push'])
+  })
+  // Known limit (README Limits): the logical line restarts where the scan resumes after a heredoc body, so a `$(` before
+  // an earlier heredoc's body is not seen. Bash runs the push.
+  test('known limit: a $( before an earlier heredoc body on the line is not seen', () => {
+    expect(bashRules("git commit -m \"$(cat <<'A'\na\nA\ncat <<'EOF'\nmsg\nEOF)\" && git push --force")).toEqual(['commit'])
+  })
+  // Known limit (README Limits, since 85fe6564): after `"$(echo "'")"` and a heredoc body the scan resumes in a `'` Bash never
+  // opened, so the seeded and unseeded readings of the next line disagree and the close is not read. Bash runs the push;
+  // af88a29e's physical-line reading caught it.
+  test('known limit: a quote the scan misreads inside "$(…)" before a heredoc body hides a later close', () => {
+    expect(bashRules("echo \"$(echo \"'\")\" ; cat <<'X'\nx\nX\nx=$(cat <<EOF\nmsg\nEOF) ; git push --force\nEOF\n)\n")).toEqual([])
+  })
+})
+
+describe('PR 923 round 1: an opener line read in the 0.9.0 layout keeps its tail for the rm walk', () => {
+  // The tail after the delimiter word goes into the heredoc piece when it holds a `$(`, a backtick or a `${`. 0.9.0 put
+  // that tail back for rm; the walk must still see an rm there (Bash runs it).
+  test('an rm in a $(…), backtick or ${…} opener tail is seen', () => {
+    for (const x of ['$(x)', '`x`', '${x}']) {
+      expect(rmTargets(`cat <<EOF; rm -rf /boot; echo ${x}\nbody\nEOF`)).toEqual([{ path: '/boot', glob: false }])
+    }
+  })
+  // controls: the body stays input, and the new-layout and quoted-delimiter tails read as before
+  test('the body stays input and other tails still read', () => {
+    expect(rmTargets('cat <<EOF; echo $(x)\nrm -rf /boot\nEOF')).toEqual([])
+    expect(rmTargets('cat <<EOF && rm -rf /boot\nbody\nEOF')).toEqual([{ path: '/boot', glob: false }])
+    expect(rmTargets("cat <<'EOF'; rm -rf /boot\nbody\nEOF")).toEqual([{ path: '/boot', glob: false }])
+  })
+})
+
+describe('PR 923 round 2: a funsub spelling in text Bash does not expand leaves the directory known', () => {
+  // `${ ` or `${|` inside single quotes, after an escape, in a comment or in a heredoc body runs nothing; 0.9.0 placed
+  // the rm in the session directory, and so does this.
+  test('quoted, escaped, commented and heredoc-body spellings do not unknow the directory', () => {
+    for (const c of ["echo '${ x}'; rm scratch.txt", 'echo \\${ x}; rm scratch.txt', 'rm scratch.txt # note ${ x} form',
+      "cat <<'E'\n${ x}\nE\nrm scratch.txt", "echo $'${| x}'; rm scratch.txt"]) {
+      expect(rmTargets(c)).toEqual([{ path: 'scratch.txt', glob: false }])
+    }
+  })
+  // controls: after a cd, a real funsub, unquoted or in double quotes, still makes the directory unknown
+  test('after a cd a real funsub still makes the directory unknown', () => {
+    for (const c of ['cd /w; X="${ cd /etc; }"; rm -rf y', 'cd /w; echo "${| cd /etc; }"; rm -rf y', 'cd /w; X=${ cd /etc; }; rm -rf y']) {
+      expect(rmTargets(c)).toEqual([{ glob: false }])
+    }
+  })
 })

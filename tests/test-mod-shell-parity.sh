@@ -47,7 +47,7 @@ pair() {
   done
 }
 
-pair "seat-mods/hooks/rules.ts" "molt/hooks/shell.ts" "COMMANDS HEREDOC QUOTED WRAPPERS blankHeredocs blank commandOf tokensOf gitOf"
+pair "seat-mods/hooks/rules.ts" "molt/hooks/shell.ts" "COMMANDS HEREDOC QUOTED WRAPPERS blankHeredocs substitutionSpans blank commandOf tokensOf gitOf substitutionsOf SUBSTITUTION_TOO_DEEP"
 pair "molt/hooks/register.tsx" "autonomic/hooks/register.tsx seat-mods/hooks/register.ts" "BELL_TIMEOUT_MS ring"
 pair "autonomic/hooks/ledger.ts" "seat-mods/hooks/redact.ts" "SECRETS redact"
 pair "molt/hooks/records.ts" "seat-mods/hooks/records.ts" "autonomicPath parseAutonomic"

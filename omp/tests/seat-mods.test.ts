@@ -180,6 +180,48 @@ describe('bash cwd (fix wave 2)', () => {
   test('a cwd that is a link out of the worktree is followed', async () => {
     expect(await guard(norm(), 'bash', { command: 'rm x', cwd: 'link' }, child('implementer'))).toContain('no rm outside')
   })
+  // seat-mods batch 5 (Task 5): an operand after a literal cd or variable arrives absolute; the call cwd is not joined to it
+  test('rm after a literal cd or variable is placed where Bash removes it', async () => {
+    const bash = (command: string, cwd?: string) => guard(norm(), 'bash', cwd === undefined ? { command } : { command, cwd }, child('implementer'))
+    for (const [command, cwd] of [['cd /repo/wt/sub && rm -rf build'], ['WT=/repo/wt; rm -rf "$WT/build"'], ['cd /repo/wt && rm -rf build', '/outside'],
+      ['cd /repo/wt/sub && rm -rf ../build']] as const)
+      expect(await bash(command, cwd)).toBeUndefined()
+    for (const [command, cwd] of [['cd /etc && rm -rf x'], ['WT=/etc; rm -rf "$WT/x"'], ['cd /repo/wt/sub && rm -rf ../../x'], ['cd /etc && rm -rf x', '/repo/wt']] as const)
+      expect(await bash(command, cwd)).toContain('no rm outside')
+    expect(await bash('cd /repo/wt || true; rm -rf build')).toContain('cannot resolve')
+  })
+  // seat-mods Ruling 21: the bare operand of a cd that may fail is joined to the call's folder, here the worktree
+  test('reviewer: a cd before `;` that may fail is refused; the same removal behind && is allowed', async () => {
+    const bash = (command: string) => guard(norm(), 'bash', { command }, child('reviewer'))
+    for (const command of ['cd /tmp/typo; rm -rf build', 'cd /tmp/x; rm -rf *']) expect(await bash(command)).toContain('no rm outside')
+    for (const command of ['cd /tmp/typo && rm -rf build', 'cd /tmp/x && rm -rf *']) expect(await bash(command)).toBeUndefined()
+  })
+  // seat-mods fix round 1 (finding 3): omp reads a leading `~`, `@` or `:` in a path, so a relative cd arrives as `./…`
+  test('reviewer: a relative cd to "~", "@" or ":~" is placed in the call folder, not in HOME or the root', async () => {
+    const d = () => deps({ env: { SEAT_MODS_ROLE: 'coordinator', SEAT_MODS_ALLOW: '/home/u/scratch:/tmp/allow', HOME: '/home/u' } })
+    const bash = (command: string) => guard(d(), 'bash', { command }, child('reviewer'))
+    for (const command of ['cd "~" && rm -rf scratch/x', 'cd "~/scratch" && rm -rf x', 'cd @ && rm -rf tmp/allow/x', 'cd ":~" && rm -rf scratch/x'])
+      expect(await bash(command)).toContain('no rm outside')
+    for (const command of ['rm -rf ~/scratch/x', 'rm -rf /tmp/allow/x']) expect(await bash(command)).toBeUndefined()
+  })
+  // seat-mods fix round 2 (Ruling 24): a bare operand built from a variable arrives as `./…`; a redirection-only command may fail
+  test('reviewer: "$S/…" with S=@ or S=: is placed in the call folder; an assignment behind </missing && is not read', async () => {
+    const d = () => deps({ env: { SEAT_MODS_ROLE: 'coordinator', SEAT_MODS_ALLOW: '/home/u/scratch:/tmp/allow', HOME: '/home/u' } })
+    const bash = (command: string, who = 'reviewer') => guard(d(), 'bash', { command }, child(who))
+    for (const command of ['S=@; rm -rf "$S/tmp/allow/x"', 'S=:; rm -rf "$S~/scratch/x"']) expect(await bash(command)).toContain('no rm outside')
+    for (const who of ['reviewer', 'implementer'])
+      for (const command of ['</nonexistent && S=/tmp/allow; rm -rf "$S/x"', '>/nonexistent/d/f && S=/tmp/allow; rm -rf "$S/x"'])
+        expect(await bash(command, who)).toContain('cannot resolve')
+    for (const command of ['S=/tmp/allow; rm -rf "$S/x"', 'S=/tmp/allow && rm -rf "$S/x"']) expect(await bash(command)).toBeUndefined()
+  })
+  // seat-mods fix round 3: an rm's prefix value or a wrapper's operand expands in this shell and may write the next rm's variable
+  test('an rm whose prefix writes a variable leaves it unread; a literal prefix keeps it', async () => {
+    const bash = (command: string, who: string) => guard(deps(), 'bash', { command }, child(who))
+    expect(await bash('S=/tmp/allow; X="$[S=5]" rm -f /tmp/allow/a; rm -rf "$S/x"', 'reviewer')).toContain('cannot resolve')
+    expect(await bash('Z=S=5; S=/tmp/allow; X="$((Z))" rm -f /tmp/allow/a; rm -rf "$S/x"', 'reviewer')).toContain('cannot resolve')
+    expect(await bash('S=/tmp/allow; X="$[S=5]" rm -f /tmp/allow/a; cd /etc; rm -rf "$S/x"', 'implementer')).toContain('cannot resolve')
+    expect(await bash('S=/tmp/allow; X=1 rm -f /tmp/allow/a; rm -rf "$S/x"', 'reviewer')).toBeUndefined()
+  })
   test('a commit message file is read against the call cwd', async () => {
     const seen: string[] = []
     const d = norm({ readFile: async (f: string) => { seen.push(f); return '' } })
@@ -321,7 +363,7 @@ describe('PR 762 round 2: an allow list of omp tools, and one omp path normalise
   const coord = { kind: 'main' } // deps() sets SEAT_MODS_ROLE=coordinator
   const implMain = deps({ env: { SEAT_MODS_ROLE: 'implementer', HOME: '/home/u' } })
   test('finding 1: a write target is read as omp reads it: hashline [path#hash] unwrapped, ~, @/, :/ and file:// expanded', async () => {
-    for (const path of ['[/outside/x#ABCD]', '[/tmp/out]', '~/x', '~', '~user/x', '@/outside/x', ':/outside/x', 'file:///outside/x', ' [/outside/x#abcd] '])
+    for (const path of ['[/outside/x#ABCD]', '[/etc/out]', '~/x', '~', '~user/x', '@/outside/x', ':/outside/x', 'file:///outside/x', ' [/outside/x#abcd] '])
       for (const tool of ['write', 'edit', 'ast_edit'])
         expect(await guard(deps(), tool, { path, content: 'x' }, child('task'))).toContain('no writes outside')
     // adjacent controls: the same spellings inside the worktree still pass
@@ -600,7 +642,8 @@ describe('orchestrator: no subagents (#798)', () => {
 
 // #844: guarded seats lost a turn on each scratch write. omp's `local://` is per-session scratch that omp itself confines
 // (absolute paths and `..` refused, real-path containment under the session's local root), so the write tool may use it.
-// /tmp and xd://report_issue (an outward report to omp's maintainers) stay denied; the deny texts say where to go instead.
+// An absolute path outside the allowed places and xd://report_issue (an outward report to omp's maintainers) stay denied; the deny texts say where to go instead.
+// (/tmp joined the allowed places in batch 5: see 'scratch directories' below.)
 describe('scratch sinks (#844)', () => {
   test('every guarded role may write a local://<name> file with the write tool', async () => {
     for (const role of ['implementer', 'reviewer', 'task'])
@@ -609,9 +652,9 @@ describe('scratch sinks (#844)', () => {
     const env = { HOME: '/home/u' } as Record<string, string | undefined>
     expect(await guard(deps({ env }), 'write', { path: 'local://msg.txt', content: 'x' }, { kind: 'main' })).toBeUndefined()
   })
-  test('adjacent controls: other local:// shapes, other tools, /tmp and report_issue still deny', async () => {
+  test('adjacent controls: other local:// shapes, other tools, an outside path and report_issue still deny', async () => {
     for (const path of ['local://', 'local://../x', 'local://a/../../x', 'local://%2e%2e/x', 'local://a b', 'local://x#abcd', 'local:///etc/x',
-      'LOCAL://x', 'local:/x', ' local://x', 'sub/local://x', '/tmp/x.txt', 'xd://report_issue'])
+      'LOCAL://x', 'local:/x', ' local://x', 'sub/local://x', '/etc/x.txt', 'xd://report_issue'])
       expect(await guard(deps(), 'write', { path, content: 'x' }, child('implementer'))).toBeDefined()
     expect(await guard(deps(), 'edit', { path: 'local://x' }, child('implementer'))).toContain('no writes outside')
     expect(await guard(deps(), 'ast_edit', { path: 'local://x', pattern: 'a', rewrite: 'b' }, child('implementer'))).toContain('no writes outside')
@@ -625,16 +668,16 @@ describe('scratch sinks (#844)', () => {
     for (const [tool, input] of [['write', { content: 'x' }], ['edit', { input: 'no headers' }], ['github', { op: 'pr_checkout', pr: 1 }]] as const) {
       const deny = await guard(deps(), tool, input as Record<string, unknown>, child('implementer'))
       expect(deny).toContain('no writes outside')
-      expect(deny).toContain('go in /tmp/allow.')
+      expect(deny).toContain('go in /tmp/allow, /tmp.')
     }
   })
   test('a write denied outside names the SEAT_MODS_ALLOW folders as the place for scratch files', async () => {
-    const deny = await guard(deps(), 'write', { path: '/tmp/pr861-commit-message.txt', content: 'x' }, child('implementer'))
+    const deny = await guard(deps(), 'write', { path: '/var/pr861-commit-message.txt', content: 'x' }, child('implementer'))
     expect(deny).toContain('no writes outside')
     expect(deny).toContain('/tmp/allow')
   })
   test('an rm operand the guard cannot resolve says to spell the path literally; one outside keeps its own text', async () => {
-    const unresolved = await guard(deps(), 'bash', { command: 'S=/tmp/allow; rm -rf "$S/shallow"' }, child('implementer'))
+    const unresolved = await guard(deps(), 'bash', { command: 'rm -rf "$S/shallow"' }, child('implementer'))
     expect(unresolved).toContain('no rm')
     expect(unresolved).toContain('literal')
     const outside = await guard(deps(), 'bash', { command: 'rm -rf /etc/x' }, child('implementer'))
@@ -642,5 +685,127 @@ describe('scratch sinks (#844)', () => {
     expect(outside).not.toContain('literal')
     // control: the same removal spelled literally, in the allow folder, runs
     expect(await guard(deps(), 'bash', { command: 'rm -rf /tmp/allow/shallow' }, child('implementer'))).toBeUndefined()
+    // batch 5: so does one through a literal assignment, which places it outside when it names outside
+    expect(await guard(deps(), 'bash', { command: 'S=/tmp/allow; rm -rf "$S/shallow"' }, child('implementer'))).toBeUndefined()
+    expect(await guard(deps(), 'bash', { command: 'S=/etc; rm -rf "$S/shallow"' }, child('implementer'))).toContain('no rm outside')
+  })
+})
+
+// Batch 5, Task 4: /tmp and $TMPDIR are writable places for every guarded role, read from the same env as SEAT_MODS_ALLOW.
+// A worker may write and remove their DESCENDANTS; the directory itself and its ancestors stay protected from rm, and a
+// path outside every allowed place stays refused. The accepted cost: a worker can remove another session's file in /tmp.
+describe('scratch directories: /tmp and $TMPDIR (batch 5)', () => {
+  // a realpath that drops trailing slashes and `.` segments, as realpath does (the shared deps().real is the identity)
+  const plain = async (p: string) => `/${p.split('/').filter(part => part !== '' && part !== '.').join('/')}`
+  // macOS: /tmp is a link to /private/tmp
+  const mac = async (p: string) => {
+    const path = await plain(p)
+    return path === '/tmp' || path.startsWith('/tmp/') ? `/private${path}` : path
+  }
+  const seat = (role: string, env: Record<string, string> = {}, real: (p: string) => Promise<string | undefined> = plain) =>
+    deps({ env: { SEAT_MODS_ROLE: role, HOME: '/home/u', ...env }, real })
+  const main = { kind: 'main' }
+  const writes = (d: ReturnType<typeof seat>, path: string) => guard(d, 'write', { path, content: 'x' }, main)
+  const runs = (d: ReturnType<typeof seat>, command: string) => guard(d, 'bash', { command }, main)
+
+  for (const role of ['implementer', 'verifier', 'reviewer']) {
+    test(`${role}: a write inside /tmp passes; a write outside every allowed place is still refused`, async () => {
+      const d = seat(role)
+      for (const path of ['/tmp/r3s2w3-redgate.sh', '/tmp/x', '/tmp/new/dir/y']) expect(await writes(d, path)).toBeUndefined()
+      expect(await guard(d, 'edit', { path: '/tmp/x', old_text: 'a', new_text: 'b' }, main)).toBeUndefined()
+      for (const path of ['/etc/x', '/tmpfoo/x', '/var/tmp/x']) expect(await writes(d, path)).toContain('no writes outside')
+    })
+    test(`${role}: rm inside /tmp passes; /tmp itself and its ancestors are refused (Review Focus 3)`, async () => {
+      const d = seat(role)
+      for (const command of ['rm /tmp/status.py.bak', 'rm -f /tmp/r3s2w3-redgate.sh', 'rm -rf /tmp/x/y', 'rm -rf /tmp/*'])
+        expect(await runs(d, command)).toBeUndefined()
+      for (const command of ['rm -rf /tmp', 'rm -rf /tmp/', 'rm -rf /tmp/.', 'rm -rf /', 'rm -rf /*'])
+        expect(await runs(d, command)).toContain('roots or ancestors')
+      for (const command of ['rm /etc/x', 'rm /tmpfoo/x', 'rm -rf /var/tmp/x', 'rm /tmp/x /etc/x'])
+        expect(await runs(d, command)).toContain('no rm outside')
+    })
+    test(`${role}: $TMPDIR, read from the same env as SEAT_MODS_ALLOW, is a scratch place too`, async () => {
+      const d = seat(role, { TMPDIR: '/var/tmp/x/' })
+      for (const path of ['/var/tmp/x/f', '/var/tmp/x/new/g', '/tmp/f']) expect(await writes(d, path)).toBeUndefined()
+      for (const command of ['rm /var/tmp/x/f', 'rm -rf /var/tmp/x/*']) expect(await runs(d, command)).toBeUndefined()
+      for (const command of ['rm -rf /var/tmp/x', 'rm -rf /var/tmp/x/', 'rm -rf /var/tmp', 'rm -rf /var'])
+        expect(await runs(d, command)).toContain('roots or ancestors')
+      for (const path of ['/var/tmp/y', '/var/y', '/etc/x']) expect(await writes(d, path)).toContain('no writes outside')
+      // the process env is not the source: only deps.env counts
+      const saved = process.env.TMPDIR
+      process.env.TMPDIR = '/var/tmp/z'
+      try { expect(await writes(seat(role), '/var/tmp/z/f')).toContain('no writes outside') } finally {
+        if (saved === undefined) delete process.env.TMPDIR; else process.env.TMPDIR = saved
+      }
+    })
+    for (const TMPDIR of ['/', '//', 'scratch', '']) {
+      test(`${role}: TMPDIR=${JSON.stringify(TMPDIR)} opens nothing beyond /tmp`, async () => {
+        const d = seat(role, { TMPDIR })
+        for (const path of ['/etc/x', '/scratch/x', '/var/x']) expect(await writes(d, path)).toContain('no writes outside')
+        for (const command of ['rm /etc/x', 'rm /scratch/x']) expect(await runs(d, command)).toContain('no rm outside')
+        expect(await writes(d, '/tmp/x')).toBeUndefined()
+      })
+    }
+  }
+  test('a task child gets /tmp too, and keeps the same refusals', async () => {
+    for (const name of ['seat-reviewer', 'reviewer', 'implementer', 'task']) {
+      const d = seat('coordinator') // a child ignores the inherited env's role
+      expect(await guard(d, 'write', { path: '/tmp/x', content: 'x' }, child(name))).toBeUndefined()
+      expect(await guard(d, 'bash', { command: 'rm /tmp/x' }, child(name))).toBeUndefined()
+      expect(await guard(d, 'bash', { command: 'rm -rf /tmp' }, child(name))).toContain('roots or ancestors')
+      expect(await guard(d, 'write', { path: '/etc/x', content: 'x' }, child(name))).toContain('no writes outside')
+    }
+  })
+  test('a symlinked /tmp (macOS: /tmp -> /private/tmp): the resolved path and the given one are both inside (Review Focus 4)', async () => {
+    const d = seat('implementer', {}, mac)
+    for (const path of ['/private/tmp/x', '/tmp/x', '/private/tmp/new/y']) expect(await writes(d, path)).toBeUndefined()
+    for (const command of ['rm /private/tmp/x', 'rm /tmp/x', 'rm -rf /private/tmp/*', 'rm -rf /tmp/*']) expect(await runs(d, command)).toBeUndefined()
+    for (const command of ['rm -rf /private/tmp', 'rm -rf /private/tmp/', 'rm -rf /tmp', 'rm -rf /tmp/', 'rm -rf /private'])
+      expect(await runs(d, command)).toContain('roots or ancestors')
+    for (const path of ['/private/etc/x', '/etc/x']) expect(await writes(d, path)).toContain('no writes outside')
+    expect(await runs(d, 'rm /private/etc/x')).toContain('no rm outside')
+    // the deny names both spellings
+    expect(await writes(d, '/etc/x')).toContain('go in /tmp, /private/tmp.')
+  })
+  test('the deny names the scratch places after the SEAT_MODS_ALLOW ones, each once', async () => {
+    const d = seat('implementer', { SEAT_MODS_ALLOW: '/tmp/allow:/tmp', TMPDIR: '/var/tmp/x' })
+    expect(await writes(d, '/etc/x')).toContain('go in /tmp/allow, /tmp, /var/tmp/x.')
+  })
+  // placeOf lets an allow directory outrank the worktree, so a /tmp that held the worktree would hand a reviewer its edits
+  test('a worktree under /tmp: /tmp adds no place, so the reviewer still cannot edit it and the rest of /tmp stays refused', async () => {
+    const tree = { cwd: '/tmp/wt', worktree: async () => '/tmp/wt' }
+    const reviewer = deps({ env: { SEAT_MODS_ROLE: 'reviewer', HOME: '/home/u' }, real: plain, ...tree })
+    expect(await writes(reviewer, '/tmp/wt/a.ts')).toContain('no edits in the worktree')
+    expect(await runs(reviewer, 'rm /tmp/wt/a.ts')).toContain('no rm outside')
+    expect(await writes(reviewer, '/tmp/other')).toContain('no writes outside')
+    expect(await runs(reviewer, 'rm /tmp/other')).toContain('no rm outside')
+    // the pr_checkout deny names no /tmp for it (control: a worktree elsewhere does)
+    expect(await guard(reviewer, 'github', { op: 'pr_checkout', pr: 1 }, main)).not.toContain('go in')
+    expect(await guard(seat('reviewer'), 'github', { op: 'pr_checkout', pr: 1 }, main)).toContain('go in /tmp.')
+    const implementer = deps({ env: { SEAT_MODS_ROLE: 'implementer', HOME: '/home/u' }, real: plain, ...tree })
+    expect(await writes(implementer, '/tmp/wt/a.ts')).toBeUndefined()
+    expect(await runs(implementer, 'rm /tmp/wt/a.ts')).toBeUndefined()
+    expect(await writes(implementer, '/tmp/other')).toContain('no writes outside')
+    expect(await runs(implementer, 'rm -rf /tmp/wt')).toContain('roots or ancestors')
+    // the same, with /tmp a link to /private/tmp and the worktree reached by its resolved path
+    const onLink = deps({ env: { SEAT_MODS_ROLE: 'reviewer', HOME: '/home/u' }, cwd: '/private/tmp/wt', worktree: async () => '/private/tmp/wt', real: mac })
+    expect(await writes(onLink, '/private/tmp/wt/a.ts')).toContain('no edits in the worktree')
+    expect(await writes(onLink, '/tmp/other')).toContain('no writes outside')
+  })
+  test('a TMPDIR that does not resolve is dropped, as given or resolved', async () => {
+    const d = seat('reviewer', { TMPDIR: '/dangling' }, async p => (p.startsWith('/dangling') ? undefined : plain(p)))
+    expect(await writes(d, '/dangling/x')).toContain('go in /tmp.')
+  })
+  // Final fix wave, M2 (ledger 139): ompPlace drops a leading `@` or `:`, but Bash removes the literal name in the folder,
+  // `<cwd>/@/tmp/x`, inside the worktree, where a reviewer may not remove. Such an operand is placed both ways.
+  test('a reviewer is refused rm -rf @/tmp/x and :/tmp/x: the literal name lies in the worktree', async () => {
+    const tree = { cwd: '/w/wt', worktree: async () => '/w/wt', real: plain }
+    const reviewer = deps({ env: { SEAT_MODS_ROLE: 'coordinator', HOME: '/home/u' }, ...tree })
+    for (const command of ['rm -rf @/tmp/x', 'rm -rf :/tmp/x', 'rm -f @/tmp/x /tmp/y'])
+      expect(await guard(reviewer, 'bash', { command }, child('reviewer'))).toContain('no rm outside')
+    // control: the plain spelling in /tmp is still allowed
+    expect(await guard(reviewer, 'bash', { command: 'rm -rf /tmp/x' }, child('reviewer'))).toBeUndefined()
+    // an implementer may remove in its worktree and in /tmp, so both spellings pass
+    expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'implementer', HOME: '/home/u' }, ...tree }), 'bash', { command: 'rm -rf @/tmp/x' }, main)).toBeUndefined()
   })
 })
