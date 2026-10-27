@@ -16,6 +16,8 @@ All notable changes to the `bot-on-openbot` plugin.
 - `pending()` reads `options: null` as no options, and returns each prompt's `header`.
 - A resolved `settled` the question never offered is read as the bridge's own dismissal: it runs
   nothing, not even typed text to a blocked worker.
+- Settling answers a prompt only while the question's own delivery still runs. The agent runs one turn
+  at a time, so after that delivery ends, a prompt of the same title is a later question's.
 
 ## 0.1.0 - 2026-10-27
 
