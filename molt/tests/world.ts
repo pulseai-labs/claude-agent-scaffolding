@@ -15,6 +15,7 @@ export type World = {
   bellExit?: number            // a bell that runs answers with this exit status
   bellFinished: boolean        // a bell answered (after its delay, if any)
   prompts: string[]
+  plugin: string[]             // the prompts a plugin submitted (molt's requests and seed), in order
   contexts: string[]           // what reached the model beside each prompt, in order
   fills: string[]              // what molt put in the prompt box
   hasBox: boolean              // false: the session binds no prompt box (a -p run)
@@ -41,7 +42,6 @@ export type World = {
   failNotices?: boolean        // molt's notice write is refused (another mod, or the state store)
   slowInfoNotices?: boolean    // an info notice write takes 20 ms (a rejection can land meanwhile)
   failSessionStart?: boolean   // a plugin beneath molt throws in its SessionStart hook
-  stopBlock?: string           // a block another plugin beneath molt returns at Stop
 }
 
 // The test runtime has timers; the engine's types declare none, so reach it through globalThis.
@@ -52,7 +52,7 @@ const ZERO = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, ca
 export function world(on: On, opts: { env?: Record<string, string>; files?: Record<string, string> } = {}): World {
   const w: World = {
     files: new Map(Object.entries(opts.files ?? {})),
-    runs: [], runInits: [], bellRuns: [], bellFinished: false, prompts: [], contexts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
+    runs: [], runInits: [], bellRuns: [], bellFinished: false, prompts: [], plugin: [], contexts: [], fills: [], hasBox: true, clears: 0, clearTo: [], notices: [], dirs: new Set(), toasts: [], statuses: [],
     usage: { tokens: 100_000, window: 1_000_000 },
     session: { id: 's1', cwd: '/repo' },
     messages: [],
@@ -133,6 +133,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     if (w.rejectSeeds && e.origin.kind === 'plugin') throw new Error('prompt refused')
     if (w.dropPrompts) return { drop: 'refused by a hook beneath molt' } as never
     w.prompts.push(e.text)
+    if (e.origin.kind === 'plugin') w.plugin.push(e.text)
     w.contexts.push(...(e.context ?? []))
     return { text: e.text } as never
   })
@@ -140,7 +141,6 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     result: w.staged && (e.tool === 'Write' || e.tool === 'Edit') ? { staged: true } : 'ran',
     text: w.toolText,
   }) as never)
-  on('classic.Stop', () => (w.stopBlock === undefined ? {} : { block: w.stopBlock }))
   on('classic.PostToolUse', () => ({}))
   on('classic.SessionStart', () => {
     if (w.failSessionStart) throw new Error('another plugin failed')
@@ -157,5 +157,16 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('session.end', (_$, e) => ({ sessionId: e.sessionId }) as never)
   return w
 }
+
+// The kit runs a plugin's own $.prompt.submit after the hook that made it returns: a test
+// settles it before reading `plugin`.
+export async function flush(): Promise<void> {
+  const wait = Promise.withResolvers<void>()
+  sleep(wait.resolve, 10)
+  await wait.promise
+}
+
+// molt's handoff requests among them: each asks for a MOLT-HANDOFF line (#929).
+export const requests = (w: World) => w.plugin.filter(text => text.includes('MOLT-HANDOFF:'))
 
 export const MARK = (id = 's1') => `/home/u/.claude/state/molt/active/${id}`

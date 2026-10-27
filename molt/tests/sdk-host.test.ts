@@ -1,10 +1,9 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world } from './world'
+import { world, flush, requests } from './world'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
 const TURN = (answer: string) => ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' }) as never
 const POST = { tool_name: 'Read', tool_input: {}, tool_response: {}, tool_use_id: 't1', session_id: 's1' } as never
-const STOP = { stop_hook_active: false, last_assistant_message: 'done', session_id: 's1' } as never
 const CLEAR = (id: string) => ({ source: 'clear', session_id: id }) as never
 const PROMPT = (kind = 'sdk') => ({ text: 'go on', wait: false, origin: { kind } }) as never
 const RUN = (args: string) =>
@@ -32,7 +31,8 @@ describe('a root under an Agent SDK host (#901)', () => {
   test('after the handoff molt stops pushing; the block stays', async ($, on) => {
     const w = world(on, { env: T3, files: { [H]: '#' } })
     at(w, 67); await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect((await $.classic.Stop(STOP)).block).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
     expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
     at(w, 76)
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeDefined()
@@ -64,19 +64,21 @@ describe('a root under an Agent SDK host (#901)', () => {
     expect(w.files.get(KEPT('s1'))?.trim()).toBe(H)
   })
   // A restart: a fresh module, the same session id, the file the earlier process wrote (#902 review).
-  test('a restarted SDK session still hands off: the note at each prompt, no Stop ask', async ($, on) => {
+  test('a restarted SDK session still hands off: the note at each prompt, no turn-end request', async ($, on) => {
     const w = world(on, { env: T3, files: { [H]: '#', [KEPT('s1')]: `${H}\n` } })
     await $.session.start({ cwd: '/repo' } as never)
     at(w, 67)
-    expect((await $.classic.Stop(STOP)).block).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
     await $.prompt.submit(PROMPT())
     expect(w.contexts.join('\n')).toContain(`resume it from ${H}`)
   })
-  test('no handoff file: a restarted SDK session is asked at Stop as before (control)', async ($, on) => {
+  test('no handoff file: a restarted SDK session is asked at the turn end as before (control)', async ($, on) => {
     const w = world(on, { env: T3, files: { [H]: '#' } })
     await $.session.start({ cwd: '/repo' } as never)
     at(w, 67)
-    expect((await $.classic.Stop(STOP)).block).toBeDefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(1)
   })
   test('a child under an SDK host is still a child', async ($, on) => {
     const S = '/run/status'

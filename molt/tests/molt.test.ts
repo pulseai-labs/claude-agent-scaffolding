@@ -1,10 +1,9 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world } from './world'
+import { world, flush, requests } from './world'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
 const TURN = (answer: string, extra: object = {}) =>
   ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', ...extra }) as never
-const STOP = { stop_hook_active: false, last_assistant_message: 'done', session_id: 's1' } as never
 const CLEAR = (id: string) => ({ source: 'clear', session_id: id }) as never
 const H = '/repo/docs/handoff.md'
 const AUTOPILOT = { '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode":"autopilot","bell":"ring-me"}' }
@@ -104,7 +103,7 @@ describe('a molt from a marker', () => {
     w.staged = true
     w.clearTo.push('s2')
     at(w, 67)
-    await $.classic.Stop(STOP); await $.classic.Stop(STOP)
+    await $.turn.complete(TURN('done')); await $.turn.complete(TURN('done')); await flush()
     await $.tool.call({ tool: 'Edit', file_path: '/repo/old.md', old_string: 'old', new_string: 'h' })
     await $.turn.complete(TURN('done'))
     await $.classic.SessionStart(CLEAR('s2'))
@@ -164,7 +163,7 @@ describe('no handoff', () => {
   test('past the Stop asks: the last markdown written past soft is used', async ($, on) => {
     const w = world(on, { files: { '/repo/h2.md': '# h' } })
     at(w, 67)
-    await $.classic.Stop(STOP); await $.classic.Stop(STOP)
+    await $.turn.complete(TURN('done')); await $.turn.complete(TURN('done')); await flush()
     await $.tool.call({ tool: 'Write', file_path: '/repo/h2.md', content: '# h' })
     w.clearTo.push('s2')
     await $.turn.complete(TURN('done'))
@@ -482,7 +481,8 @@ describe('the mechanical residuals (#665)', () => {
     await $.command.run(RUN('on'))
     await $.turn.complete(TURN('done'))
     expect(w.clears).toBe(0)                          // nothing molts on a file written while off
-    expect((await $.classic.Stop(STOP)).block).toContain('MOLT-HANDOFF:')
+    await flush()
+    expect(requests(w)).toHaveLength(2)               // each turn end at the command asked instead
   })
 
   test('a compact drops a seeded session back to the plain ladder', async ($, on) => {
@@ -522,17 +522,19 @@ describe('/molt now', () => {
     const r = await $.command.run(NOW)
     expect(r.context?.at(-1)).toContain('MOLT-HANDOFF:')
   })
-  test('arms the Stop reflex between the warnings and the command (PR #670 review)', async ($, on) => {
+  test('arms the turn-end request between the warnings and the command (PR #670 review)', async ($, on) => {
     const w = world(on)
     at(w, 45)
     await $.command.run(NOW)
-    expect((await $.classic.Stop(STOP)).block).toContain('MOLT-HANDOFF:')
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(1)
   })
-  test('arms the Stop reflex below soft', async ($, on) => {
+  test('arms the turn-end request below soft', async ($, on) => {
     const w = world(on)
     at(w, 10)
     await $.command.run(NOW)
-    expect((await $.classic.Stop(STOP)).block).toContain('MOLT-HANDOFF:')
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(1)
   })
 
   // #903: below the handoff threshold the built-in instruction's first line says the operator asked, as the OMP glue has
@@ -556,11 +558,12 @@ describe('/molt now', () => {
     expect(r.context?.at(-1)).toStartWith(ASKED(3))
     expect(r.context?.at(-1)).not.toContain('past molt')
   })
-  test('the Stop reflex /molt now arms says the operator asked while the fill is below the threshold (#903)', async ($, on) => {
+  test('the turn-end request /molt now arms says the operator asked while the fill is below the threshold (#903)', async ($, on) => {
     const w = world(on)
     at(w, 45)
     await $.command.run(NOW)
-    expect((await $.classic.Stop(STOP)).block).toStartWith(ASKED(45))
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w).at(-1)).toStartWith(ASKED(45))
   })
   // The controls: the same words, and the line above the threshold, are the built-in default's own.
   for (const percent of [67, 65]) {
@@ -575,14 +578,16 @@ describe('/molt now', () => {
   test('control: the ladder\'s own command text, with /molt now never run, keeps "past"', async ($, on) => {
     const w = world(on)
     at(w, 67)
-    expect((await $.classic.Stop(STOP)).block).toStartWith(PAST(67))
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w).at(-1)).toStartWith(PAST(67))
   })
   test('control: after /molt now at 3%, a fill that rises past the threshold reads "past" again', async ($, on) => {
     const w = world(on)
     at(w, 3)
     await $.command.run(NOW)
     at(w, 70)
-    expect((await $.classic.Stop(STOP)).block).toStartWith(PAST(70))
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w).at(-1)).toStartWith(PAST(70))
   })
   test('control: an operator\'s instructions.md with its own first line is sent as written', async ($, on) => {
     const w = world(on, { files: { [EDITED]: 'Wrap up now, at {{percent}}% of the window, and write MOLT-HANDOFF: <path>.' } })

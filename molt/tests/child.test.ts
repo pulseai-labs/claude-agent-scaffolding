@@ -1,9 +1,8 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world } from './world'
+import { world, flush, requests } from './world'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
 const POST = { tool_name: 'Read', tool_input: {}, tool_response: {}, tool_use_id: 't1', session_id: 's1' } as never
-const STOP = { stop_hook_active: false, last_assistant_message: 'done', session_id: 's1' } as never
 const TURN = (answer: string) => ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' }) as never
 const S = '/run/rep.md.molt-status'
 const CHILD = { MOLT_HANDOFF: 'parent', MOLT_STATUS_PATH: S }
@@ -25,7 +24,8 @@ describe('a child session', () => {
   test('after the handoff molt stops pushing; the block stays', async ($, on) => {
     const w = world(on, { env: CHILD, files: { [H]: '#' } })
     at(w, 67); await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect((await $.classic.Stop(STOP)).block).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
     expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
     at(w, 76)
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeDefined()
@@ -63,10 +63,10 @@ describe('a child session', () => {
     await $.prompt.submit({ text: 'go', wait: false, origin: { kind: 'composer' } } as never)
     expect(events(w)).toEqual([])
   })
-  test('a command-stage Stop on a marker naming a missing file still records handoff required (PR #670 review)', async ($, on) => {
+  test('a command-stage turn end on a marker naming a missing file still records handoff required (PR #670 review)', async ($, on) => {
     const w = world(on, { env: CHILD }); at(w, 70)
-    const r = await $.classic.Stop({ stop_hook_active: false, last_assistant_message: 'MOLT-HANDOFF: /run/missing.md', session_id: 's1' } as never)
-    expect(r.block).toContain('/run/missing.md')
+    await $.turn.complete(TURN('MOLT-HANDOFF: /run/missing.md')); await flush()
+    expect(requests(w).at(-1)).toContain('/run/missing.md')
     expect(events(w)).toContain('handoff required')
   })
   test('MOLT_HANDOFF=Parent is a root: it clears (review focus 4)', async ($, on) => {

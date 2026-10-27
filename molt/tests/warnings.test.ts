@@ -1,10 +1,9 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world } from './world'
+import { world, flush, requests } from './world'
 import { OLD_DEFAULT_INSTRUCTIONS } from '../hooks/templates'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
 const POST = { tool_name: 'Read', tool_input: {}, tool_response: {}, tool_use_id: 't1', session_id: 's1' } as never
-const STOP = { stop_hook_active: false, last_assistant_message: 'done', session_id: 's1' } as never
 const TURN = (answer: string) => ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' }) as never
 const PROMPT = { text: 'go', wait: false, origin: { kind: 'composer' } } as never
 const ctx = (r: { additionalContext?: readonly string[] }) => (r.additionalContext ?? []).join('\n')
@@ -18,7 +17,8 @@ describe('the two warnings', () => {
     expect(ctx(first)).toContain("molt's first warning")
     expect(ctx(first)).not.toContain('write a session handoff now')
     expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
-    expect((await $.classic.Stop(STOP)).block).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
   })
   test('50%: the second warning follows the first, once', async ($, on) => {

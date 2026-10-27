@@ -685,34 +685,6 @@ export const register: Register = (on, options) => {
     }
   })
 
-  on('classic.Stop', async ($, e, next) => {
-    const r = await next(e)
-    try {
-      const sessionId = e.session_id
-      if (off.has(sessionId) || inFlight || paused === sessionId || handedOff.has(sessionId)) return r
-      await measure($, sessionId)
-      if (!atLeast(stage, 'command')) return r
-      const marker = markerPath(e.last_assistant_message ?? '')
-      let missing: string | undefined
-      if (marker !== undefined) {
-        const path = resolvePath(marker, await $.session.cwd(), await home($))
-        if (await isReadableFile($, path)) return r
-        missing = path
-      }
-      const n = stopBlocks.get(sessionId) ?? 0
-      if (n >= MAX_STOP_BLOCKS) return r
-      stopBlocks.set(sessionId, n + 1)
-      await noteCommand($, sessionId)
-      const text = missing === undefined
-        ? await instruction($, sessionId)
-        : fill(MISSING_HANDOFF, { path: missing })
-      return { ...r, block: r.block === undefined ? text : `${r.block}\n\n${text}` }
-    } catch (err) {
-      await log($, `Stop error ${String(err)}`)
-      return r
-    }
-  })
-
   on('turn.step', async function* ($, e, next) {
     if (e.agentId !== undefined) return yield* next(e)
     const before = unmeasured
@@ -749,6 +721,8 @@ export const register: Register = (on, options) => {
       if (!atLeast(stage, 'warn')) return r
       const marker = markerPath(e.answer)
       const resolved = marker === undefined ? undefined : resolvePath(marker, await $.session.cwd(), await home($))
+      // A marker that names no readable file is asked about by its path (review focus 4).
+      const missing = resolved !== undefined && !(await isReadableFile($, resolved)) ? resolved : undefined
       let handoff = pickHandoff(resolved, lastMd.get(sessionId))
       if (handoff !== undefined && !(await isReadableFile($, handoff.path))) {
         await log($, `handoff path missing session=${sessionId} path=${handoff.path}`)
@@ -757,8 +731,19 @@ export const register: Register = (on, options) => {
       if (handoff === undefined) {
         // A warned session may hand off at a point it chose; nothing is asked of it yet.
         if (!atLeast(stage, 'command')) return r
-        // The session still has room to write it: the Stop reflex asks again, up to its cap.
-        if (!atLeast(stage, 'fallback') && (stopBlocks.get(sessionId) ?? 0) < MAX_STOP_BLOCKS) return r
+        // The session still has room to write it: a follow-up turn asks, up to its cap (#929:
+        // classic.Stop, which held the turn open, never runs for a plugin on an org account).
+        const n = stopBlocks.get(sessionId) ?? 0
+        if (!atLeast(stage, 'fallback') && n < MAX_STOP_BLOCKS) {
+          stopBlocks.set(sessionId, n + 1)
+          await noteCommand($, sessionId)
+          const text = missing === undefined ? await instruction($, sessionId) : fill(MISSING_HANDOFF, { path: missing })
+          // Not awaited: the request's turn cannot start until this hook returns.
+          $.prompt.submit({ text }).catch(async (err: unknown) => {
+            await log($, `request failed session=${sessionId} ${String(err)}`)
+          })
+          return r
+        }
         handoff = { path: await fallbackBrief($, sessionId), source: 'fallback' }
       }
       if (await isChild($)) await handOff($, sessionId, handoff)
