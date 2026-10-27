@@ -591,14 +591,14 @@ export const register: Register = (on, options) => {
   on('prompt.submit', async ($, e, next) => {
     // molt's own turn-end request: it runs only in the session that was asked, and never
     // while a molt is in flight: a seed or a clear owns that turn.
-    const request = e.origin.kind === 'plugin' && e.origin.name === 'molt' ? takeRequest(asked, e.text) : undefined
-    if (request !== undefined) {
-      try {
-        if ((await $.session.id()) !== request.sessionId || inFlight) {
-          await log($, `request dropped session=${request.sessionId}`)
-          return { drop: 'molt: the handoff request was dropped: the session moved on' }
-        }
-      } catch {}
+    if (e.origin.kind === 'plugin' && e.origin.name === 'molt') {
+      let now: string | undefined
+      try { now = await $.session.id() } catch {}
+      const request = takeRequest(asked, e.text, now)
+      if (request !== undefined && now !== undefined && (now !== request.sessionId || inFlight)) {
+        await log($, `request dropped session=${request.sessionId}`)
+        return { drop: 'molt: the handoff request was dropped: the session moved on' }
+      }
     }
     try {
       const sessionId = await $.session.id()

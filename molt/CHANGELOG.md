@@ -10,6 +10,7 @@ All notable changes to the `molt` plugin.
   session's request.** molt kept one waiting request per process, so a request the host accepted
   but never ran (after a `/clear` or a resume) stopped every later request in that process. A
   waiting request now stops only its own session, and when it arrives late it is still dropped.
+  An arriving request is matched to its own session's first, since two sessions' texts are often equal.
   Known limit: a request the host accepts and never runs in the same session still stops that
   session's next request.
 - **`run-tests.sh` fails when its `classic.*` check cannot read `hooks/`** (grep exit 2). It passed

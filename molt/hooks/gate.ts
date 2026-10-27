@@ -10,9 +10,12 @@ export type Request = { sessionId: string; text: string }
 // (a /clear, a resume) may never run, and must not stop the new session's request (#933).
 export const waitsIn = (asked: readonly Request[], sessionId: string): boolean => asked.some(a => a.sessionId === sessionId)
 
-// The request a molt prompt is, taken off the list: the oldest one with its text.
-export function takeRequest(asked: Request[], text: string): Request | undefined {
-  const i = asked.findIndex(a => a.text === text)
+// The request a molt prompt is, taken off the list: the one with its text asked in the session
+// it arrives in, else the oldest with its text. The texts carry no session id, so two sessions'
+// requests are often equal; the arriving session's own must not be mistaken for a stale one.
+export function takeRequest(asked: Request[], text: string, sessionId: string | undefined): Request | undefined {
+  let i = asked.findIndex(a => a.text === text && a.sessionId === sessionId)
+  if (i < 0) i = asked.findIndex(a => a.text === text)
   return i < 0 ? undefined : asked.splice(i, 1)[0]
 }
 

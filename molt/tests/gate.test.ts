@@ -509,15 +509,23 @@ describe('turn-end requests waiting to run (#933)', () => {
     expect(waitsIn([{ sessionId: 's2', text: 'a' }, { sessionId: 's1', text: 'a' }], 's1')).toBe(true)
     expect(waitsIn([], 's1')).toBe(false)
   })
-  test("a stale request that arrives later is still known, so it is dropped, not run as a new prompt", () => {
+  test("a session's own request is taken first, though a stale one with the same text is older (#936 review)", () => {
     const asked: Request[] = [{ sessionId: 's1', text: 'ask' }, { sessionId: 's2', text: 'ask' }]
-    expect(takeRequest(asked, 'ask')).toEqual({ sessionId: 's1', text: 'ask' })
-    expect(takeRequest(asked, 'ask')).toEqual({ sessionId: 's2', text: 'ask' })
-    expect(takeRequest(asked, 'ask')).toBeUndefined()
+    expect(takeRequest(asked, 'ask', 's2')).toEqual({ sessionId: 's2', text: 'ask' })
+    expect(asked).toEqual([{ sessionId: 's1', text: 'ask' }])
+  })
+  test('a stale request that arrives later is still known, so it is dropped, not run as a new prompt', () => {
+    const asked: Request[] = [{ sessionId: 's1', text: 'ask' }]
+    expect(takeRequest(asked, 'ask', 's2')).toEqual({ sessionId: 's1', text: 'ask' })
+    expect(takeRequest(asked, 'ask', 's2')).toBeUndefined()
+  })
+  test('with no session id, the oldest request with the text is taken', () => {
+    const asked: Request[] = [{ sessionId: 's1', text: 'ask' }, { sessionId: 's2', text: 'ask' }]
+    expect(takeRequest(asked, 'ask', undefined)).toEqual({ sessionId: 's1', text: 'ask' })
   })
   test('a prompt with other text takes nothing (control)', () => {
     const asked: Request[] = [{ sessionId: 's1', text: 'ask' }]
-    expect(takeRequest(asked, 'other')).toBeUndefined()
+    expect(takeRequest(asked, 'other', 's1')).toBeUndefined()
     expect(asked).toHaveLength(1)
   })
 })
