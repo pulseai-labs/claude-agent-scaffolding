@@ -18,6 +18,7 @@ export type DeliveryRec = {
   offer?: Offer;               // what was asked; the only source of a tap's command
   say?: string;                // a plain message (no offer): the text sent verbatim
   closed_at?: string; closed_by?: "tap" | "settled" | "gone" | "sent";
+  unanswered?: true;           // settled, but its OpenBot prompt is still to be answered "settled"
 };
 
 const logPath = (): string => join(stateDir(), "deliveries.jsonl");

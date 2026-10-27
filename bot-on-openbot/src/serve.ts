@@ -8,6 +8,7 @@ import { log } from "./log.ts";
 import { blockedOffer, offerFor } from "./offer.ts";
 import { OpenBotDown, OpenBotRefused, type Delivery, type OpenBot } from "./openbot.ts";
 import { stateDir } from "./paths.ts";
+import { sweepSettled } from "./settle.ts";
 import { listSpool, removeSpool } from "./spool.ts";
 import { handleTap } from "./tap.ts";
 import { askTask, draftTask, messageTask, parseDraft } from "./task.ts";
@@ -91,6 +92,11 @@ export async function serve(opts: ServeOptions): Promise<void> {
         await poll(opts);
       } catch (e) {
         logError("poll", e);
+      }
+      try {
+        await sweepSettled(opts.bot, opts.now());
+      } catch (e) {
+        logError("settle", e);
       }
     }
   } finally {
