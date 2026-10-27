@@ -126,6 +126,9 @@ jobs:
       - name: bot-on-telegram suite
         run: bash bot-on-telegram/run-tests.sh
 
+      - name: bot-on-openbot suite
+        run: bash bot-on-openbot/run-tests.sh
+
       - name: OMP bin-path module and loader (bun test)
         run: bun test omp/
 
