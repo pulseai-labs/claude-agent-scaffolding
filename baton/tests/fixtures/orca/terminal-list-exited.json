@@ -1,0 +1,22 @@
+{
+  "id": "1467e3fb-cf18-4eb4-b313-52d2cba96422",
+  "ok": true,
+  "result": {
+    "terminals": [],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "topologyRevisions": {
+      "4a7cbd17-3fe6-4ba3-81cc-cde85e007ee1::/home/dev/projects/pulsebase/pulsebase-ai": 72,
+      "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat": 10
+    },
+    "totalCount": 3,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "1710eeed-e8d2-44c9-94dc-e230defa6bce"
+  }
+}

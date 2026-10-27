@@ -8,6 +8,7 @@ import {
 import { randomBytes } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { ThreadStatus } from "./host.ts";
 
 export type Session = {
   nonce: string;
@@ -24,7 +25,16 @@ export type Session = {
   last_progress_at: string;
   progress_mark: string;
   successor_of?: string;
+  /** The thread's state at the last status read in step 3; an end after `interrupted` keeps the thread. */
+  last_state?: ThreadStatus["state"];
 };
+
+/**
+ * A thread whose session ended but whose terminal stays open for the operator to read, with
+ * its directory not yet released (only on a host that defines `close`). `unpark`: closed on the
+ * first tick the unit is not parked; `run-end`: closed when the run is done or disarmed.
+ */
+export type KeptThread = { thread: string; project: string; cwd: string; dir: string; until: "unpark" | "run-end" };
 
 export type UnitState = {
   id: string;
@@ -39,7 +49,9 @@ export type UnitState = {
   seq?: Record<string, number>;
   stalls: number;
   session?: Session;
-  parked?: { reason: string; at: string; escalated?: true };
+  /** `blocked` (reason `blocked`, design §4.5): the worker waits on a question the host cannot read;
+   *  the session stays. `to`: the stage `unpark --to` asked for; the next tick moves the unit. */
+  parked?: { reason: string; at: string; escalated?: true; blocked?: { thread: string; to?: string } };
   /** The live driver for the current park. `lost`: step 0 found no thread for its nonce.
    *  `result_file`: the path rendered for this launch; the only file read as its result. */
   driver?: { key: string; session: Session; result_file: string; lost?: true };
@@ -59,6 +71,8 @@ export type UnitState = {
    * thread for its nonce, so the triage counts as ended.
    */
   triage?: { request_id: string; session: Session; lost?: true };
+  /** Ended sessions' threads kept open; absent when there are none. */
+  kept?: KeptThread[];
 };
 
 /**

@@ -195,7 +195,7 @@ describe("baton t3", () => {
 // ---- T3Host against the stub ------------------------------------------------------------
 
 import { existsSync, readFileSync, realpathSync } from "node:fs";
-import { LaunchError, type LaunchRequest } from "../src/host.ts";
+import { AnswerRefused, LaunchError, type LaunchRequest } from "../src/host.ts";
 import { main } from "../src/cli.ts";
 import { tick } from "../src/engine.ts";
 import { openStore } from "../src/state.ts";
@@ -689,5 +689,39 @@ describe("engine over T3Host", () => {
     const evs = readFileSync(join(w.state, "runs", "r1", "events.jsonl"), "utf8");
     expect(evs).toContain('"kind":"adopted"');
     expect(evs).not.toContain('"kind":"launch failed"');
+  });
+});
+
+describe("T3Host.respond", () => {
+  const answers = { q1: "Yes" };
+
+  test("respond posts t3_pending_request_respond with the given answers", async () => {
+    const w = world();
+    w.tool.t3_pending_request_respond = () => ({ result: { threadId: "mcp:t1", requestId: "req-1", status: "responded" } });
+    await w.host.respond("mcp:t1", "req-1", answers);
+    expect(w.stub.calls).toEqual([
+      { name: "t3_pending_request_respond", args: { threadId: "mcp:t1", requestId: "req-1", answers } },
+    ]);
+  });
+
+  test("a tool error is an AnswerRefused", async () => {
+    const w = world();
+    w.tool.t3_pending_request_respond = () => ({ isError: true, result: { code: "request_not_found", message: "gone" } });
+    const e = await thrown(w.host.respond("mcp:t1", "req-1", answers));
+    expect(e).toBeInstanceOf(AnswerRefused);
+    expect(e.message).toContain("request_not_found");
+  });
+
+  test("an RPC error is a HostDownError, not a refusal", async () => {
+    const w = world(); // the stub answers a tool it has no handler for with a JSON-RPC error
+    const e = await thrown(w.host.respond("mcp:t1", "req-1", answers));
+    expect(e).toBeInstanceOf(HostDownError);
+  });
+
+  test("a protocol failure is a HostDownError, not a refusal", async () => {
+    const s = stub({ token: TOKEN, tools: () => ({ raw: () => new Response("not json", { status: 200 }) }) });
+    const host = new T3Host({ base: s.url, tokenFile: tokenFile(0o600) });
+    const e = await thrown(host.respond("mcp:t1", "req-1", answers));
+    expect(e).toBeInstanceOf(HostDownError);
   });
 });

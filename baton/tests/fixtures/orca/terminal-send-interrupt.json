@@ -1,0 +1,14 @@
+{
+  "id": "4f52f537-66c3-402e-9073-62deb8ede7c1",
+  "ok": true,
+  "result": {
+    "send": {
+      "handle": "term_9ac56063-3b24-4dbe-bd94-9f2c8b308b4c",
+      "accepted": true,
+      "bytesWritten": 1
+    }
+  },
+  "_meta": {
+    "runtimeId": "1710eeed-e8d2-44c9-94dc-e230defa6bce"
+  }
+}

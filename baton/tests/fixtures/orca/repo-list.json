@@ -1,0 +1,21 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "ok": true,
+  "result": {
+    "repos": [
+      {
+        "id": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e",
+        "displayName": "pilot-fourseat",
+        "path": "/home/dev/projects/pilot-fourseat"
+      },
+      {
+        "id": "4a7cbd17-3fe6-4ba3-81cc-cde85e007ee1",
+        "displayName": "pulsebase-ai",
+        "path": "/home/dev/projects/pulsebase/pulsebase-ai"
+      }
+    ]
+  },
+  "_meta": {
+    "runtimeId": "1710eeed-e8d2-44c9-94dc-e230defa6bce"
+  }
+}

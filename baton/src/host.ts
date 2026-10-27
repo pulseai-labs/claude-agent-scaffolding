@@ -53,6 +53,14 @@ export class LaunchError extends Error {
   }
 }
 
+/** The host cannot deliver these answers to this request (a shape it cannot answer). */
+export class AnswerRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AnswerRefused";
+  }
+}
+
 // No host error other than HostAuthError and HostDownError reaches the engine as an
 // exception; LaunchError is a refusal the host is sure of. A launch whose outcome the host
 // cannot tell (the thread may exist) throws HostDownError, so the engine keeps the session
@@ -66,4 +74,13 @@ export interface Host {
   status(threadId: string): Promise<ThreadStatus>;
   interrupt(threadId: string, reason: string): Promise<void>;
   findByNonce(project: string, nonce: string): Promise<string[]>;
+  /**
+   * End the thread's terminal. A thread that is already gone is not an error. A host that
+   * defines it has its terminals closed by the engine at a session end (design §4.7).
+   */
+  close?(threadId: string): Promise<void>;
+  /** The thread's rendered screen as plain text; `""` when the thread is gone. */
+  screen?(threadId: string): Promise<string>;
+  /** Answer the thread's pending request `requestId`: `answers` maps question id to the chosen label. */
+  respond?(threadId: string, requestId: string, answers: Record<string, string>): Promise<void>;
 }

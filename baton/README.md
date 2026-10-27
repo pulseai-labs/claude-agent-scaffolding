@@ -6,7 +6,8 @@ merges a pull request only by the recipe's rule, and notifies on parks, stalls a
 A merge-stage park on red checks or a conflict names the PR and the failing checks in its notice.
 A recipe with a `driver` stage sends the operator only what a driver could not settle (see Driver).
 It judges nothing: anything that needs judgment is a session the recipe launches. It ships a CLI,
-a claim launcher and a timer, and no skill, so Codex has nothing to load. Needs `bun`.
+two claim launchers and a timer, and no skill, so Codex has nothing to load. It runs workers on
+T3 Code (the default) or in Orca terminals (see Orca host). Needs `bun`.
 
 ## Install
 
@@ -31,6 +32,80 @@ read-only**. The code is exchanged the moment the callback arrives and the token
 (mode 600) to `~/.config/spine-autopilot/t3-token.json`; it is never printed. The token lasts 30
 days and the re-approval is manual: `baton t3 token-status` shows the days left.
 
+## Orca host
+
+`"host": "orca"` in the config runs each worker in an Orca terminal instead of a T3 thread; the
+default stays `"t3"`. Any other value fails `arm` and the tick with
+`config: host must be "t3" or "orca"`. A thread is a terminal: its id is the terminal handle, and
+the title ends with `[baton <nonce>]`.
+A recipe's `project` (and the example's `ai_project`) names an Orca repo by its display name; none,
+or two, with that name refuses the launch. The T3 token-expiry notice is raised on the T3 host only.
+
+Config keys (all optional; the `orca` block sits beside `host`):
+
+- `host`: `"t3"` (default) or `"orca"`.
+- `orca.cli`: the `orca` binary, `~` expanded. Default: `orca` when it is on `PATH`, else
+  `~/.config/orca/cli/bin/orca` (the timer's unit has no `orca` on its `PATH`).
+- `orca.launcher`: the script the terminal runs. Default: baton's own `bin/baton-seat`.
+
+The launcher. The host writes the launch message to a file under `<state>/orca/messages/` and runs
+`orca terminal create` with the command
+`cd '<cwd>' && BATON_STATE_DIR='<state dir>' exec '<launcher>' '<message file>'` (an Orca terminal
+inherits orca-serve's environment, not the timer's); only those paths reach a shell.
+`bin/baton-seat` reads the claim for its directory (the same claim file and keys as
+`omp-t3-claim`), reads and deletes the message file, and execs
+`omp-seat <seat> --via <via> <message>`. It refuses with exit 78, one line on stderr and one in
+`<state>/claims/seat.log`, on no claim, a bad claim line, a claim with no seat or via, a message
+file that is missing or 131072 bytes or more, or an `omp-seat` it cannot run (the message file
+stays); it never starts a seat without its claim.
+
+Status and interrupt. From `orca terminal list` and `orca worktree ps`: a terminal not listed is
+`gone` only when `orca terminal read` confirms it (a terminal-gone error or status `exited`), and a
+host outage otherwise; an agent `working` is `active`; `waiting` or `blocked` is `waiting`; `done`
+is `completed` (`interrupted` when Orca says so). A missing agent row or an unknown state is
+`active`, never `completed`, and a truncated list, or one that does not cover the local host, is a
+host outage, never `gone`. Interrupt sends Escape to the terminal. A session end closes its
+terminal before the launch directory is released, except a park (the terminal stays until `unpark`
+or `disarm`) and an end after `interrupted` (it stays until the run ends); triage, driver and
+molt-parent terminals close too.
+
+The blocked park. A worker in `waiting` with no structured question (an omp `ask` dialog shows as
+`blocked` with its text but no options) parks at once, on the next tick, and keeps its terminal: no
+interrupt, claim and directory stay. The notice reads
+`baton <run>/<unit> blocked in <stage> (project <project>): the worker waits on a question — answer it in the worker's terminal — screen: <tail>`.
+Answer in the worker's terminal in Orca; when the worker moves on, the park clears itself and the
+session is watched again. `baton unpark <run> <unit>` clears it by hand, and `--to <stage>` ends
+the session and moves the unit. A stop file wins, `disarm` closes the worker, no driver takes it
+and no stall clock runs on it; the run summary counts it as sent to you.
+
+`baton answer <run> <unit> <label>` sends the unit's pending question the option whose label is
+exactly `<label>`. rc 0 sent, 2 refused (no live session, no pending request, several questions, a
+multi-select, an unknown label, a host with no `respond`), 3 host auth, 4 host down. The triage
+brief uses it. Only the T3 host defines `respond`: Orca reports an omp question's text but not its
+options, so on Orca a question is the blocked park and the operator's, not triage's.
+
+Loss against T3 (design 4.5). T3 gave omp's picker prompts to the engine as structured requests, so
+a triage session could answer them. On Orca it cannot: the worker parks blocked and the operator
+answers in the terminal. A T3 request with several questions is now refused by `baton answer`, so
+triage writes a note for it instead of answering.
+
+Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
+
+- A picker opened between turns (an omp `/review` picker) leaves the agent row `done`, so the worker
+  reads `completed`, not blocked.
+- An aborted omp turn reads `completed`: Orca does not report `interrupted` for it.
+- Escape aborts a plain omp turn, but a worker in an `ask` dialog or with a live async subagent may
+  keep running after it (a subagent keeps the worker `working` until it ends). The first stall ends
+  the session and closes its terminal, but a park (the second stall, or a stop file) keeps the
+  terminal, so such a worker can keep running until `unpark` or `disarm`.
+- `baton disarm` leaves live (non-parked) workers running, as on T3; on Orca their terminals and
+  per-launch worktrees stay until you close them by hand.
+- After an Orca restart the terminals and their processes survive, but a live worker has no agent
+  row until its next hook event and reads `active`: a worker blocked across a restart is caught by
+  the stall rule, not the blocked park.
+- A process that dies leaves the terminal list and reads `gone`; a `baton-seat` refusal reads the
+  same way. Orca has no failure state to map.
+
 ## Commands
 
     baton validate <recipe.json>
@@ -38,6 +113,7 @@ days and the re-approval is manual: `baton t3 token-status` shows the days left.
     baton status [<run>]            baton report <run>
     baton disarm <run>              baton tick [--run <id>]
     baton unpark <run> [<unit>] [--to <stage>]
+    baton answer <run> <unit> <label>
     baton t3 login | token-status | call <tool> <json-object>
     baton timer install|remove
 
@@ -55,7 +131,9 @@ message may use `{pending.thread}`, `{pending.request}`, `{pending.questions}` a
 `{pending.stage}` (`note_file` may not). `stop_file`, `watch`, `before` and `after_launch` are
 accepted there and ignored; no other stage may then be named `triage`. The triage session does one of three things:
 
-- **Answers** the prompt through T3: the seat goes on (`triage answered`).
+- **Answers** the prompt with `baton answer <run> <unit> <label>` (one question, one option, by its
+  exact label): the seat goes on (`triage answered`). A refusal, such as a request with several
+  questions, means the triage writes a note.
 - **Writes the note file**: baton relaunches the seat (`triage relaunch`) and the brief tells it
   to read the note first. A relaunch counts toward the two-stall park, but is logged as
   `triage relaunch`, so `report`'s `stall` count leaves it out.
@@ -125,6 +203,7 @@ State lives in `${BATON_STATE_DIR:-~/.local/state/baton}`: `runs/<id>/run.json` 
 
 Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every key is optional:
 
+- `host`: `"t3"` (default) or `"orca"`; `orca.cli` and `orca.launcher` (see Orca host).
 - `t3.base`: the T3 `/mcp` URL (default `https://draco-desk.tail71316d.ts.net:8445/mcp`).
 - `t3.tokenFile`: the token path, `~` expanded (default `~/.config/spine-autopilot/t3-token.json`).
 - `notify`: an argv run with no shell for each notice, `{message}` replaced by the notice text
@@ -215,7 +294,8 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - A coordinator seat still has bash (`crontab`, background `sleep`); its brief governs.
 - A Claude DAG seat would also need T3's MCP wake tools removed; none is in use.
 - A seat that clears in place without a handoff line is seen only through the quiet window.
-- `findByNonce` depends on T3 keeping the thread title.
+- `findByNonce` depends on the host keeping the thread title (T3) or the terminal title (Orca).
+- On Orca: see the known limits under Orca host.
 - The 30-day token re-approval is manual.
 - A driver's judgment is prose: a driver that picks the wrong result is caught only by the closed
   checks on its result file and by the operator reading the ledger.

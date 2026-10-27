@@ -185,6 +185,27 @@ test("arm refuses an invalid recipe and a bad run id", async () => {
   expect((await runIn(st, "arm", RELAY, ...PARAMS)).rc).toBe(64);
 });
 
+test("arm refuses a bad host key and arms nothing; a good one arms", async () => {
+  const st = newState();
+  const cfg = join(st, "config.json");
+  const arm = () =>
+    Bun.spawn([BIN, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer"], {
+      stdout: "pipe", stderr: "pipe", env: { ...process.env, BATON_STATE_DIR: st, BATON_CONFIG: cfg },
+    });
+  const result = async (p: ReturnType<typeof arm>) => {
+    const [err, rc] = await Promise.all([new Response(p.stderr).text(), p.exited]);
+    return { err, rc };
+  };
+  writeFileSync(cfg, JSON.stringify({ host: "orcaa" }));
+  const bad = await result(arm());
+  expect(bad.rc).toBe(2);
+  expect(bad.err).toBe('config: host must be "t3" or "orca"\n');
+  expect(existsSync(join(st, "runs", "r1"))).toBe(false);
+  writeFileSync(cfg, JSON.stringify({ host: "orca" }));
+  expect((await result(arm())).rc).toBe(0);
+  expect(runJson(st, "r1").status).toBe("armed");
+});
+
 test("status prints one line per unit", async () => {
   const st = newState();
   await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer");
