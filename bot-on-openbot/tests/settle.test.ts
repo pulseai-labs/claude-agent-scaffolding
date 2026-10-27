@@ -19,6 +19,9 @@ let posts: { path: string; body: unknown }[];
 
 beforeEach(() => {
   env = makeEnv();
+  // A question's prompt shows while its delivery runs (spike: status-running-while-prompt-pending.json).
+  env.status("d1", "running", "turn-1");
+  env.status("d2", "running", "turn-2");
   prompts = [];
   posts = [];
   server = Bun.serve({
@@ -233,6 +236,26 @@ test("a question whose delivery ended is not waited for", async () => {
   clearPark();
   await sweepSettled(env.bot, T0);
   expect(find(PARK)!.unanswered).toBeUndefined();
+});
+
+test("a settled question whose delivery ended never answers a newer prompt of the same title", async () => {
+  const r = parkRec();
+  env.status("d1", "running", "turn-1");
+  clearPark();
+  await sweepSettled(env.bot, T0);
+  expect(find(PARK)).toMatchObject({ phase: "closed", unanswered: true });
+  // Its turn ends without a prompt; a later park of the same unit asks under the same title.
+  env.status("d1", "completed", "turn-1", "x");
+  prompts = [promptOf(r, "req-new")];
+  await sweepSettled(env.bot, T0);
+  expect(posts).toEqual([]);
+  expect(find(PARK)!.unanswered).toBeUndefined();
+  // and an asked record whose own delivery ended settles without touching a same-title prompt
+  const r2 = parkRec({ key: `${PARK}#2`, ask_id: "d2" });
+  env.status("d2", "completed", "turn-2", "x");
+  prompts = [promptOf(r2, "req-new")];
+  await sweepSettled(env.bot, T0);
+  expect(posts).toEqual([]);
 });
 
 test("a drafting record of a settled park closes with no question asked", async () => {

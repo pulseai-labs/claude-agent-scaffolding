@@ -47,20 +47,22 @@ function settled(r: DeliveryRec): boolean {
 
 // Answer the record's prompt with `settled` when it is on /pending. True when there is nothing left to
 // answer: answered, already closed (409), or the delivery ended without one. False: try next loop.
+// The delivery is read first: the agent runs one turn at a time, so a prompt is the record's only
+// while its own delivery still runs. Once it has ended, a prompt of the same title belongs to a later
+// question (a new park of the same unit) and is never answered.
 async function answerSettled(bot: OpenBot, r: DeliveryRec): Promise<boolean> {
-  const p = promptOf(r, await bot.pending());
-  if (p) {
-    await bot.answer(p, SETTLED_LABEL); // "closed" is fine: someone answered first
-    return true;
-  }
   if (!r.ask_id) return true; // never sent
   try {
     const d = await bot.status(r.ask_id);
-    return d.state === "completed" || d.state === "failed";
+    if (d.state === "completed" || d.state === "failed") return true;
   } catch (e) {
     if (e instanceof OpenBotRefused) return true; // OpenBot does not know the delivery
     throw e;
   }
+  const p = promptOf(r, await bot.pending());
+  if (!p) return false;
+  await bot.answer(p, SETTLED_LABEL); // "closed" is fine: someone answered first
+  return true;
 }
 
 // Returns the number of records settled this sweep. A question whose prompt is not on /pending yet (it
