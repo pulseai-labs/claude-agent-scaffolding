@@ -36,9 +36,10 @@ function row(kind: PickerKind, s: string): { cursor: boolean; num: number | null
 /**
  * The one live picker on `screen`, or null. A live picker is a box of a known title whose option
  * rows sit in one block, followed by a footer line holding `⏎ select`, with exactly one cursor row.
- * omp-ask: the question is the last text line above the rows; the `Other (type your own)` row must be
- * last and sets `other` (its row number), and is left out of `options`. numbered: rows `<n>. <label>`
- * with n = 1..k, no gap; the question is the box title. Repeated labels are null (an answer is
+ * omp-ask: the question is the last text line above the box's first `├` separator, the rows the
+ * block below it; the `Other (type your own)` row must be last and sets `other` (its row number),
+ * and is left out of `options`. numbered: rows `<n>. <label>` with n = 1..k, no gap; the question
+ * is the box title. Repeated labels are null (an answer is
  * checked by its label).
  */
 export function parsePicker(screen: string): Picker | null {
@@ -54,15 +55,26 @@ export function parsePicker(screen: string): Picker | null {
   if (!kind) return null;
 
   type Line = { text: string; row: ReturnType<typeof row> };
-  const body: Line[] = lines.slice(head + 1, foot)
-    .filter((l) => !l.trim().startsWith("├"))
-    .map((l) => ({ text: inner(l), row: row(kind, inner(l)) }));
+  const toLines = (ls: string[]): Line[] =>
+    ls.filter((l) => !l.trim().startsWith("├")).map((l) => ({ text: inner(l), row: row(kind, inner(l)) }));
+  let inBox = lines.slice(head + 1, foot);
+  // omp-ask draws the question above a `├` separator and the rows below it. The rows are read only
+  // below it, so a question line that looks like a row (`○ …`) is never an option (review #937 F1).
+  let above: Line[] = [];
+  if (kind === "omp-ask") {
+    const sep = inBox.findIndex((l) => l.trim().startsWith("├"));
+    if (sep < 0) return null;
+    above = toLines(inBox.slice(0, sep));
+    inBox = inBox.slice(sep + 1);
+  }
+  const body = toLines(inBox);
   const first = body.findIndex((b) => b.row);
   if (first < 0) return null;
   let last = first;
   while (last + 1 < body.length && body[last + 1].row) last++;
-  // Below the block only blank lines; a second block, or any text, is not a picker we know.
+  // Around the block only blank lines; a second block, or any text, is not a picker we know.
   if (body.slice(last + 1).some((b) => b.text !== "")) return null;
+  if (kind === "omp-ask" && body.slice(0, first).some((b) => b.text !== "")) return null;
   const rows = body.slice(first, last + 1).map((b) => b.row!);
   if (rows.filter((r) => r.cursor).length !== 1) return null;
   const labels = rows.map((r) => r.label);
@@ -73,7 +85,7 @@ export function parsePicker(screen: string): Picker | null {
     if (rows.some((r, i) => r.num !== i + 1)) return null;
     return { kind, question: title, options: rows.map((r, i) => ({ n: i + 1, label: r.label })), other: null };
   }
-  const text = body.slice(0, first).filter((b) => b.text !== "");
+  const text = above.filter((b) => b.text !== "");
   if (text.length === 0) return null;
   const otherAt = labels.indexOf(OTHER_LABEL);
   if (otherAt >= 0 && otherAt !== labels.length - 1) return null;

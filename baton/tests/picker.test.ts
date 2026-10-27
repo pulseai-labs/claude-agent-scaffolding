@@ -107,6 +107,21 @@ test("an omp ask box with a repeated label, or Other not last, is null", () => {
   expect(parsePicker(ask(["❯ ○ a", "  ○ b"]).replace("│ q?   │\n", ""))).toBeNull();
 });
 
+test("an omp ask question that looks like a row is the question, never an option (review #937 F1)", () => {
+  const box = (question: string[], rows: string[]) => [
+    "╭─ Ask ──────╮", ...question.map((q) => `│ ${q}   │`), "├──────┤", ...rows.map((r) => `│ ${r}  │`), "├──────┤",
+    "│ ⏎ select · n note · ↑/↓ move · ⎋ cancel │", "╰──────╯",
+  ].join("\n");
+  const rows = ["❯ ○ a", "  ○ b", "  ○ Other (type your own)"];
+  const want = { kind: "omp-ask", options: [{ n: 1, label: "a" }, { n: 2, label: "b" }], other: 3 };
+  expect(parsePicker(box(["○ q?"], rows))).toEqual({ ...want, question: "○ q?" });
+  expect(parsePicker(box(["pick one:", "○ q?"], rows))).toEqual({ ...want, question: "○ q?" });
+  // Rows above the separator, or text in the row block, are not a picker we know.
+  expect(parsePicker(box(["q?"], ["❯ ○ a", "  ○ b", "note", "  ○ c"]))).toBeNull();
+  // With no separator between the question and the rows, the rows cannot be told from the question.
+  expect(parsePicker(box(["q?"], rows).replace("├──────┤\n", ""))).toBeNull();
+});
+
 const ask = () => parsePicker(screenOf("terminal-read-omp-ask.json"))!;
 const numbered = () => parsePicker(screenOf("terminal-read-screen.json"))!;
 
