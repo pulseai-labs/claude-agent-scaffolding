@@ -36,6 +36,13 @@ test("a torn line is skipped", () => {
   expect(all().map((r) => r.key)).toEqual(["a", "c"]);
 });
 
+test("a torn tail with no newline does not swallow the next record (review #938 1)", () => {
+  record(rec("a"));
+  appendFileSync(join(dir, "deliveries.jsonl"), '{"key":"b","pha');
+  record(rec("c"));
+  expect(all().map((r) => r.key)).toEqual(["a", "c"]);
+});
+
 test("follow-up keys count past the highest in use, from the notice key", () => {
   expect(followUpKey("r1/u1/park/x")).toBe("r1/u1/park/x#1");
   record(rec("r1/u1/park/x#1"));

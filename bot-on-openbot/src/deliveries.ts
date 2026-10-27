@@ -2,7 +2,7 @@
 // message). Every appended line is the full record; the last line per key wins. The offer recorded
 // with a question is the only source of the command a tap runs.
 
-import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, mkdirSync, openSync, readFileSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Offer, Picker } from "./offer.ts";
 import { stateDir } from "./paths.ts";
@@ -23,9 +23,29 @@ export type DeliveryRec = {
 
 const logPath = (): string => join(stateDir(), "deliveries.jsonl");
 
+// True when the file ends mid-line: a write torn by a crash. The next record then starts on a new line,
+// or it would join the torn fragment and be skipped with it (review #938 finding 1).
+function tornTail(path: string): boolean {
+  let size: number;
+  try {
+    size = statSync(path).size;
+  } catch {
+    return false;
+  }
+  if (size === 0) return false;
+  const fd = openSync(path, "r");
+  try {
+    const b = Buffer.alloc(1);
+    readSync(fd, b, 0, 1, size - 1);
+    return b[0] !== 0x0a;
+  } finally {
+    closeSync(fd);
+  }
+}
+
 export function record(r: DeliveryRec): void {
   mkdirSync(stateDir(), { recursive: true });
-  appendFileSync(logPath(), JSON.stringify(r) + "\n");
+  appendFileSync(logPath(), (tornTail(logPath()) ? "\n" : "") + JSON.stringify(r) + "\n");
 }
 
 // Last record per key, in the order each key first appeared.
