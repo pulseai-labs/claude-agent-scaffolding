@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The mods' shared readers are copied, never imported (plugins do not import each other).
-# This holds every copy byte-identical to its source, declaration by declaration. A copy
+# This holds every copy byte-identical to its source, declaration by declaration, except a
+# renamed copy, whose definition line alone is compared (see renamed below). A copy
 # that lacks a declaration fails: an empty extraction is never a match.
 #
 # Four pairs, and one renamed copy (molt's stage path in seat-mods). seat-mods' shell reader in molt's shell.ts. autonomic's bell to molt's,

@@ -19,8 +19,8 @@ All notable changes to the `molt` plugin.
   which only the CHANGELOG held.
 - Tests: the kit's `followUp` runs molt's submitted request as its own turn. New tests pin that
   this turn molts on a marker, asks once more with no handoff, and neither asks nor spends a request
-  when it is interrupted, fails or is refused. A sibling plugin that throws at `session.end` no
-  longer stops the seed. "A resume in place resets the stage" keeps the session id.
+  when it is interrupted, fails or is refused. A test pins that a sibling plugin throwing at
+  `session.end` does not stop the seed. "A resume in place resets the stage" keeps the session id.
 - Comments that cited the review process now give the reason.
 
 ## 0.4.0 — 2026-10-27
