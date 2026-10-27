@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { find, open, record, type DeliveryRec } from "../src/deliveries.ts";
 import { blockedOffer, offerFor } from "../src/offer.ts";
 import { serve } from "../src/serve.ts";
 import { SETTLE_MODE, sweepSettled } from "../src/settle.ts";
 import { handleTap } from "../src/tap.ts";
-import { captureErr, COLOURS, defaultRun, makeEnv, P1, P5, type Env } from "./helpers.ts";
+import { captureErr, COLOURS, defaultRun, FIX, makeEnv, P1, P5, type Env } from "./helpers.ts";
 
 const TOKEN = "FIXTURE-OPENBOT-TOKEN-do-not-leak";
 const AGENT_ID = "agent-7a6bdc91-f17f-4c79-9dae-4a7d3b1a0eb6";
@@ -19,6 +19,9 @@ let posts: { path: string; body: unknown }[];
 
 beforeEach(() => {
   env = makeEnv();
+  // A question's prompt shows while its delivery runs (spike: status-running-while-prompt-pending.json).
+  env.status("d1", "running", "turn-1");
+  env.status("d2", "running", "turn-2");
   prompts = [];
   posts = [];
   server = Bun.serve({
@@ -138,15 +141,75 @@ test("answers the matching prompt with settled, and only that one", async () => 
   expect(posts.map((p) => p.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-mine/answer`]);
 });
 
-test("leaves a prompt with other labels alone", async () => {
+test("a prompt of its title with other labels is its own prompt, malformed: settle dismisses it", async () => {
   const r = parkRec();
   env.status("d1", "running", "turn-1");
-  // same question; one label differs, and another prompt has fewer labels
-  prompts = [promptOf(r, "req-1", ["Unpark", "Unpark to stage…", "Show question", "Merge"]), promptOf(r, "req-2", ["Unpark", "Disarm"])];
+  // same question; one label differs (the agent asked it its own way)
+  prompts = [promptOf(r, "req-1", ["Unpark", "Unpark to stage…", "Show question", "Merge"])];
   clearPark();
   expect(await sweepSettled(env.bot, T0)).toBe(1);
-  expect(posts).toEqual([]);
+  expect(posts).toEqual([{ path: `/v1/agents/${AGENT_ID}/prompts/req-1/answer`, body: { answers: { reply: ["settled"] } } }]);
   expect(find(PARK)).toMatchObject({ phase: "closed", closed_by: "settled" });
+  expect(find(PARK)!.unanswered).toBeUndefined();
+});
+
+test("the exact prompt wins over a malformed one of the same title", async () => {
+  const r = parkRec();
+  prompts = [promptOf(r, "req-bad", ["Unpark"]), promptOf(r, "req-exact")];
+  clearPark();
+  await sweepSettled(env.bot, T0);
+  expect(posts.map((p) => p.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-exact/answer`]);
+});
+
+// The prompt recorded in the dry run (issue #939): options null, the labels a list in the question.
+const NO_OPTIONS = () => JSON.parse(readFileSync(join(FIX, "pending-prompt-no-options.json"), "utf8")).prompts[0];
+const blockedRec = (): DeliveryRec => {
+  const offer = blockedOffer("m", "r1", "u5", COLOURS as never, null);
+  const r: DeliveryRec = { key: `r1/u5/park/${P5}`, phase: "asked", run: "r1", unit: "u5", park_at: P5, title: offer.title, offer, ask_id: "d1" };
+  record(r);
+  return r;
+};
+const clearBlocked = () => env.writeRun(defaultRun({ units: { u5: { id: "u5", stage: "build", parked: null, vars: {} } } }));
+
+test("settle dismisses the malformed prompt (options null) of a settled park, found by its title", async () => {
+  const r = blockedRec();
+  env.status("d1", "running", "turn-1");
+  prompts = [NO_OPTIONS()];
+  clearBlocked();
+  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(posts).toEqual([{ path: `/v1/agents/${AGENT_ID}/prompts/5b0e9c4a-8d31-4f6e-b2a7-c94e1f03d6b8/answer`, body: { answers: { reply: ["settled"] } } }]);
+  expect(find(r.key)).toMatchObject({ phase: "closed", closed_by: "settled" });
+  expect(find(r.key)!.unanswered).toBeUndefined();
+});
+
+test("a prompt is found by its header alone, or by its question's first line alone", async () => {
+  for (const [header, question] of [["r1/u5 waits on a question", "Pick one:\n- red"], ["Pick one", "r1/u5 waits on a question\n- red"]]) {
+    posts = [];
+    const r = blockedRec();
+    env.status("d1", "running", "turn-1");
+    prompts = [{ ...NO_OPTIONS(), questions: [{ id: "reply", header, question, options: null }] }];
+    clearBlocked();
+    expect(await sweepSettled(env.bot, T0)).toBe(1);
+    expect(posts.length).toBe(1);
+    expect(find(r.key)).toMatchObject({ phase: "closed", closed_by: "settled" });
+  }
+});
+
+test("a prompt with another title is never answered, whatever its labels", async () => {
+  const r = blockedRec();
+  env.status("d1", "running", "turn-1");
+  const other = (header: string, question: string, options: unknown) =>
+    ({ ...NO_OPTIONS(), requestId: `req-${header}`, questions: [{ id: "reply", header, question, options }] });
+  const labels = r.offer!.options.map((o) => ({ label: o.label, description: "" }));
+  prompts = [
+    other("r1/u5 waits on a question?", "r1/u5 waits on a question?\n- red", null), // a title that only nearly matches
+    other("Something else", "Something else\nr1/u5 waits on a question", labels), // our title on line 2, our labels
+    other("", "", null),
+  ];
+  clearBlocked();
+  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(posts).toEqual([]);
+  expect(find(r.key)).toMatchObject({ phase: "closed", closed_by: "settled", unanswered: true });
 });
 
 test("a question not yet shown is closed now and answered once it shows", async () => {
@@ -173,6 +236,26 @@ test("a question whose delivery ended is not waited for", async () => {
   clearPark();
   await sweepSettled(env.bot, T0);
   expect(find(PARK)!.unanswered).toBeUndefined();
+});
+
+test("a settled question whose delivery ended never answers a newer prompt of the same title", async () => {
+  const r = parkRec();
+  env.status("d1", "running", "turn-1");
+  clearPark();
+  await sweepSettled(env.bot, T0);
+  expect(find(PARK)).toMatchObject({ phase: "closed", unanswered: true });
+  // Its turn ends without a prompt; a later park of the same unit asks under the same title.
+  env.status("d1", "completed", "turn-1", "x");
+  prompts = [promptOf(r, "req-new")];
+  await sweepSettled(env.bot, T0);
+  expect(posts).toEqual([]);
+  expect(find(PARK)!.unanswered).toBeUndefined();
+  // and an asked record whose own delivery ended settles without touching a same-title prompt
+  const r2 = parkRec({ key: `${PARK}#2`, ask_id: "d2" });
+  env.status("d2", "completed", "turn-2", "x");
+  prompts = [promptOf(r2, "req-new")];
+  await sweepSettled(env.bot, T0);
+  expect(posts).toEqual([]);
 });
 
 test("a drafting record of a settled park closes with no question asked", async () => {

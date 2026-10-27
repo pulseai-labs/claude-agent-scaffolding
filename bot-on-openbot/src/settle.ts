@@ -13,14 +13,27 @@ export const SETTLED_LABEL = "settled";
 
 const norm = (s: string): string => s.replace(/\s+/g, " ").trim();
 
-// The record's prompt on /pending: the question OpenBot shows is "<title>\n<text>" (pending-prompt.json)
-// and its labels are exactly the offered ones, in order. /pending carries no turnId to match by.
+/** The prompt is the record's: its header, or the first line of its question, is the record's title. */
+export function ours(r: DeliveryRec, p: Prompt): boolean {
+  const title = norm(r.title);
+  return norm(p.header) === title || norm(p.question.split("\n")[0]!) === title;
+}
+
+/** The prompt offers exactly the record's labels, in order. */
+export function wellFormed(r: DeliveryRec, p: Prompt): boolean {
+  const labels = r.offer?.options.map((o) => o.label) ?? [];
+  return p.options.length === labels.length && p.options.every((l, i) => l === labels[i]);
+}
+
+// The record's prompt on /pending. /pending carries no turnId to match by. First the prompt as asked:
+// its question "<title>\n<text>" (pending-prompt.json) and exactly the offered labels, in order. Else a
+// prompt of its title asked some other way (issue #939: options null, pending-prompt-no-options.json),
+// so a malformed prompt is dismissed too. One delivery is open at a time, so the agent shows at most
+// one of the bridge's prompts; a prompt whose title is not the record's is never matched.
 function promptOf(r: DeliveryRec, prompts: Prompt[]): Prompt | undefined {
   if (!r.offer) return undefined;
   const question = norm(`${r.title}\n${r.offer.text}`);
-  const labels = r.offer.options.map((o) => o.label);
-  return prompts.find((p) =>
-    norm(p.question) === question && p.options.length === labels.length && p.options.every((l, i) => l === labels[i]));
+  return prompts.find((p) => norm(p.question) === question && wellFormed(r, p)) ?? prompts.find((p) => ours(r, p));
 }
 
 // Left its park: the run ended, or (for a park question) the unit is no longer in that park.
@@ -34,20 +47,22 @@ function settled(r: DeliveryRec): boolean {
 
 // Answer the record's prompt with `settled` when it is on /pending. True when there is nothing left to
 // answer: answered, already closed (409), or the delivery ended without one. False: try next loop.
+// The delivery is read first: the agent runs one turn at a time, so a prompt is the record's only
+// while its own delivery still runs. Once it has ended, a prompt of the same title belongs to a later
+// question (a new park of the same unit) and is never answered.
 async function answerSettled(bot: OpenBot, r: DeliveryRec): Promise<boolean> {
-  const p = promptOf(r, await bot.pending());
-  if (p) {
-    await bot.answer(p, SETTLED_LABEL); // "closed" is fine: someone answered first
-    return true;
-  }
   if (!r.ask_id) return true; // never sent
   try {
     const d = await bot.status(r.ask_id);
-    return d.state === "completed" || d.state === "failed";
+    if (d.state === "completed" || d.state === "failed") return true;
   } catch (e) {
     if (e instanceof OpenBotRefused) return true; // OpenBot does not know the delivery
     throw e;
   }
+  const p = promptOf(r, await bot.pending());
+  if (!p) return false;
+  await bot.answer(p, SETTLED_LABEL); // "closed" is fine: someone answered first
+  return true;
 }
 
 // Returns the number of records settled this sweep. A question whose prompt is not on /pending yet (it

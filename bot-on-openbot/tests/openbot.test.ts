@@ -16,6 +16,7 @@ let server: ReturnType<typeof Bun.serve> | undefined;
 let requests: { method: string; path: string; auth: string | null; body: string }[];
 let answerReplies: { status: number; body: string }[];
 let pendingStatus: number;
+let pendingFile: string;
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "bot-openbot-"));
@@ -23,6 +24,7 @@ beforeEach(() => {
   requests = [];
   answerReplies = [];
   pendingStatus = 200;
+  pendingFile = "pending-prompt.json";
 });
 afterEach(() => {
   server?.stop(true);
@@ -46,7 +48,7 @@ function startApi(): string {
       if (req.headers.get("authorization") !== `Bearer ${TOKEN}`) return Response.json({ error: "no" }, { status: 401 });
       if (req.method === "GET" && path === "/v1/agents") return Response.json([{ id: AGENT_ID, name: "Autopilot" }, { id: "agent-x", name: "Other" }]);
       if (req.method === "GET" && path === `/v1/agents/${AGENT_ID}/pending`) {
-        return new Response(fixture("pending-prompt.json"), { status: pendingStatus });
+        return new Response(pendingFile.startsWith("{") ? pendingFile : fixture(pendingFile), { status: pendingStatus });
       }
       if (req.method === "POST" && path.startsWith(`/v1/agents/${AGENT_ID}/prompts/`) && path.endsWith("/answer")) {
         const r = answerReplies.shift() ?? { status: 200, body: '{"ok":true}' };
@@ -211,11 +213,31 @@ test("pending parses the prompt", async () => {
   expect(await bot({ automationDir }).pending()).toEqual([{
     requestId: "1d7ac7e2-2e24-4153-a481-a359257800c9",
     questionId: "reply",
+    header: "spike — bridge test 1 (tap any option)\nThis is a test of the baton OpenBot bridge. Tap any option.",
     question: "spike — bridge test 1 (tap any option)\nThis is a test of the baton OpenBot bridge. Tap any option.",
     options: ["Unpark", "Unpark to stage…", "Show question", "Disarm"],
   }]);
   expect(requests.map((r) => `${r.method} ${r.path}`)).toEqual(["GET /v1/agents", `GET /v1/agents/${AGENT_ID}/pending`]);
   expect(requests.every((r) => r.auth === `Bearer ${TOKEN}`)).toBe(true);
+});
+
+test("pending parses a prompt asked with options null (issue #939) as one with no options", async () => {
+  const automationDir = startApi();
+  pendingFile = "pending-prompt-no-options.json";
+  expect(await bot({ automationDir }).pending()).toEqual([{
+    requestId: "5b0e9c4a-8d31-4f6e-b2a7-c94e1f03d6b8",
+    questionId: "reply",
+    header: "r1/u5 waits on a question",
+    question: "r1/u5 waits on a question\n\n- red\n- green\n- blue\n- amber\n- Show question\n- Unpark\n- Disarm",
+    options: [],
+  }]);
+});
+
+test("pending still leaves out a prompt whose options are missing or carry a label that is not text", async () => {
+  const automationDir = startApi();
+  const q = (options: unknown) => ({ requestId: "r", questions: [{ id: "reply", question: "t", ...(options === undefined ? {} : { options }) }] });
+  pendingFile = JSON.stringify({ prompts: [q(undefined), q([{ label: 3 }]), q("red"), q([])] });
+  expect(await bot({ automationDir }).pending()).toEqual([{ requestId: "r", questionId: "reply", header: "", question: "t", options: [] }]);
 });
 
 test("answer posts the label; 409 is closed", async () => {

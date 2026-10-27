@@ -6,9 +6,9 @@ import { close, find, followUp, open, record, type DeliveryRec } from "./deliver
 import { parseKey } from "./notice.ts";
 import { log } from "./log.ts";
 import { blockedOffer, offerFor } from "./offer.ts";
-import { OpenBotDown, OpenBotRefused, type Delivery, type OpenBot } from "./openbot.ts";
+import { OpenBotDown, OpenBotRefused, type Delivery, type OpenBot, type Prompt } from "./openbot.ts";
 import { stateDir } from "./paths.ts";
-import { sweepSettled } from "./settle.ts";
+import { ours, SETTLED_LABEL, sweepSettled, wellFormed } from "./settle.ts";
 import { listSpool, removeSpool } from "./spool.ts";
 import { handleTap } from "./tap.ts";
 import { askTask, draftTask, messageTask, parseDraft } from "./task.ts";
@@ -192,10 +192,11 @@ async function poll(opts: ServeOptions): Promise<void> {
   }
 }
 
-// A follow-up opened unsent: its question or message goes now. OpenBot refusing leaves it for later.
+// A follow-up opened unsent, or a question to ask again: it goes now. OpenBot refusing leaves it for
+// later. A re-ask needs its own --id: the same id would return the first delivery.
 async function send(rec: DeliveryRec, opts: ServeOptions): Promise<DeliveryRec> {
-  const task = rec.offer ? askTask(rec.offer) : messageTask(rec.say ?? rec.title);
-  const { deliveryId } = await opts.bot.run(task, rec.key);
+  const task = rec.offer ? askTask(rec.offer, rec.reasks === 1) : messageTask(rec.say ?? rec.title);
+  const { deliveryId } = await opts.bot.run(task, rec.reasks === 1 ? `${rec.key}#reask` : rec.key);
   const sent: DeliveryRec = { ...rec, ask_id: deliveryId };
   record(sent);
   return sent;
@@ -228,13 +229,60 @@ async function afterAsk(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
       followUp(closed, { say: `${rec.title}: your answer could not be read, so nothing ran. Act in the Orca terminal or with baton.` });
       return;
     }
+    if (r !== "none" && r.answer === SETTLED_LABEL && !rec.offer.options.some((o) => o.label === SETTLED_LABEL)) {
+      // Our own dismissal of a malformed prompt, read back after a crash before the re-ask was
+      // recorded (or the operator typed it): never a tap, never text for the worker.
+      log(`${rec.key}: the prompt was answered settled; nothing ran`);
+      await malformed(rec, opts);
+      return;
+    }
     if (r !== "none") {
       await handleTap(rec, r.answer, { bot: opts.bot, runner: opts.runner, now: opts.now });
       return;
     }
   }
+  if (d.state === "running") {
+    await checkShape(rec, opts);
+    return;
+  }
   if (ended) {
     log(`${rec.key}: the question ended with no answer; nothing ran`);
     close(rec, "gone", opts.now());
   }
+}
+
+// ---- prompt shape (issue #939) -----------------------------------------------------------------
+// The agent can ask a question without its options (pending-prompt-no-options.json). While the
+// question waits, its prompt on /pending is found by title (settle.ts `ours`) and checked: exactly the
+// offered labels, in order. No prompt yet: wait (a turn that ends with none closes as gone above).
+
+async function checkShape(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
+  let prompts: Prompt[];
+  try {
+    prompts = await opts.bot.pending();
+  } catch (e) {
+    if (!(e instanceof OpenBotDown)) throw e;
+    log(`${rec.key}: prompt check: ${e.message}`); // checked again next loop
+    return;
+  }
+  const mine = prompts.filter((p) => ours(rec, p));
+  if (mine.length === 0 || mine.some((p) => wellFormed(rec, p))) return;
+  // Dismissed with `settled`, which unblocks the agent. 409: someone answered first; the next poll
+  // reads that answer as any other.
+  if ((await opts.bot.answer(mine[0]!, SETTLED_LABEL)) === "closed") return;
+  log(`${rec.key}: the agent asked the question without its options; dismissed`);
+  await malformed(rec, opts);
+}
+
+// A dismissed malformed prompt: asked again once, firmer; the second time, closed with a message.
+async function malformed(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
+  if (rec.reasks === undefined) {
+    const again: DeliveryRec = { ...rec, reasks: 1 };
+    delete again.ask_id; // the old turn is never read again; unsent, the next loop sends it
+    record(again);
+    await send(again, opts);
+    return;
+  }
+  const closed = close(rec, "gone", opts.now());
+  followUp(closed, { say: `${rec.title}: the question could not be asked with options; act in the Orca terminal or with baton.` });
 }

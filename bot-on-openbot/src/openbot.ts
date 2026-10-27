@@ -9,7 +9,7 @@ import { Database } from "bun:sqlite";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-export type Prompt = { requestId: string; questionId: string; question: string; options: string[] };
+export type Prompt = { requestId: string; questionId: string; header: string; question: string; options: string[] };
 export type Delivery = { state: "queued" | "running" | "completed" | "failed"; turnId: string | null; text: string | null };
 export type Resolved = { questionId: string; answer: string } | "none" | "unreadable";
 
@@ -207,8 +207,9 @@ export function makeOpenBot(cfg: OpenBotConfig): OpenBot {
       }
     },
 
-    // GET /v1/agents/<id>/pending (pending-prompt.json): prompts[].{requestId, questions[0].{id, question, options[].label}}.
-    // A prompt that is not one question with labelled options is left out: the bridge never asks one.
+    // GET /v1/agents/<id>/pending (pending-prompt.json): prompts[].{requestId, questions[0].{id, header, question, options[].label}}.
+    // `options: null` is a question asked with no options (pending-prompt-no-options.json): it is kept,
+    // with none, so the bridge can find it by its title and dismiss it. Any other shape is left out.
     async pending() {
       const id = await agentId();
       const r = await http("pending", "GET", `/v1/agents/${encodeURIComponent(id)}/pending`);
@@ -217,10 +218,13 @@ export function makeOpenBot(cfg: OpenBotConfig): OpenBot {
       for (const p of r.json.prompts) {
         if (!isObj(p) || typeof p.requestId !== "string" || !Array.isArray(p.questions) || p.questions.length !== 1) continue;
         const q = p.questions[0];
-        if (!isObj(q) || typeof q.id !== "string" || typeof q.question !== "string" || !Array.isArray(q.options)) continue;
-        const labels = q.options.map((o) => (isObj(o) && typeof o.label === "string" ? o.label : null));
+        if (!isObj(q) || typeof q.id !== "string" || typeof q.question !== "string") continue;
+        const options: unknown[] | null = q.options === null ? [] : Array.isArray(q.options) ? q.options : null;
+        if (options === null) continue;
+        const labels = options.map((o) => (isObj(o) && typeof o.label === "string" ? o.label : null));
         if (labels.some((l) => l === null)) continue;
-        out.push({ requestId: p.requestId, questionId: q.id, question: q.question, options: labels as string[] });
+        const header = typeof q.header === "string" ? q.header : "";
+        out.push({ requestId: p.requestId, questionId: q.id, header, question: q.question, options: labels as string[] });
       }
       return out;
     },

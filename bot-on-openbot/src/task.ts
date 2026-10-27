@@ -12,10 +12,20 @@ const WHY_MAX = 300;
 // A sentence gets a full stop unless it already ends in one (the spike's task-ask-1.txt wording).
 const stop = (s: string): string => (/[.!?…]$/.test(s) ? s : `${s}.`);
 
-export function askTask(o: Offer): string {
+// `firm`: the second ask of a question the agent asked without its options (issue #939).
+export function askTask(o: Offer, firm = false): string {
+  if (!firm) {
+    return [
+      `Ask the operator one question. Title: ${stop(o.title)} Show this text: ${stop(o.text)} Offer exactly these options, verbatim, in this order:`,
+      ...o.options.map((x) => `- ${x.label}`),
+      ...(o.allowOther ? ["Also let the operator type their own answer."] : []),
+      "Do not answer it yourself.",
+    ].join("\n");
+  }
   return [
-    `Ask the operator one question. Title: ${stop(o.title)} Show this text: ${stop(o.text)} Offer exactly these options, verbatim, in this order:`,
+    `Ask the operator one question. Use your question tool. Title: ${stop(o.title)} Show this text in the question: ${stop(o.text)} Give the question tool exactly these options, each as a separate choice, verbatim, in this order:`,
     ...o.options.map((x) => `- ${x.label}`),
+    "Each option must be its own choice in the question tool, never as text inside the question.",
     ...(o.allowOther ? ["Also let the operator type their own answer."] : []),
     "Do not answer it yourself.",
   ].join("\n");
