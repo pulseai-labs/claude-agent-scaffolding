@@ -71,6 +71,24 @@ test("screen refuses while an unpark --to is in flight", async () => {
   expect(r.err).toContain("unpark --to");
 });
 
+test("screen refuses a disarmed run, and a session that is not the park's thread", async () => {
+  await p.blockedAt1(ASK);
+  const st = openStore(p.state());
+  let run = st.readRun("r");
+  run.units.u1.session!.thread_id = "thread-9";
+  st.writeRun(run);
+  expect(await p.run("screen", "r", "u1")).toMatchObject({ rc: 2, err: "baton screen: unit u1 has no live session on thread-1\n" });
+  run = st.readRun("r");
+  delete run.units.u1.session;
+  st.writeRun(run);
+  expect((await p.run("screen", "r", "u1")).rc).toBe(2);
+  run = st.readRun("r");
+  run.units.u1.session = p.runState().units.u1.session;
+  st.writeRun(run);
+  expect(await main(["disarm", "r"])).toBe(0);
+  expect(await p.run("screen", "r", "u1")).toMatchObject({ rc: 2, err: "baton screen: run r is disarmed\n" });
+});
+
 test("screen on a host without screen refuses", async () => {
   await p.blockedAt1(ASK);
   setHostForTest(new FakeHost({}, { withOptional: false }));

@@ -7,7 +7,7 @@ import { GhForge } from "./forge.ts";
 import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.ts";
 import { hostKind, makeHost } from "./hosts/select.ts";
 import { notifyOnce } from "./notify.ts";
-import { parsePicker } from "./picker.ts";
+import { CONTROL_BYTE, keysFor, parsePicker, textKeys } from "./picker.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
 import { openStore, replaceFileSync, type KeptThread, type RunState, type UnitState } from "./state.ts";
 import { installTimer, removeTimer } from "./timer.ts";
@@ -19,6 +19,8 @@ const USAGE = [
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
   "       baton answer <run> <unit> <label>",
+  "       baton answer <run> <unit> --park <at> --screen <n> <label>",
+  "       baton answer <run> <unit> --park <at> --screen-text <text> --question <line>",
   "       baton screen <run> <unit>",
   "       baton report <run>",
   "       baton tick [--run <id>]",
@@ -339,6 +341,7 @@ async function unparkCmd(args: string[]): Promise<number> {
 // else is left to whoever can read the screen.
 
 async function answerCmd(args: string[]): Promise<number> {
+  if (args.length === 7 || args.length === 8) return answerScreenCmd(args);
   if (args.length !== 3) return usage();
   const [runId, unitId, label] = args;
   return locked(async () => {
@@ -375,18 +378,96 @@ async function answerCmd(args: string[]): Promise<number> {
   });
 }
 
+// ---- answer --screen / --screen-text ----------------------------------------------------
+// Answer a blocked park's picker with its fixed keys (picker.ts), only while the same park and the
+// same picker line are on a fresh screen. Every check only refuses (skill-first question 3): what
+// passes is still what the operator chose. rc 0 sent, 2 refused, 3 host auth, 4 host down, 64 usage.
+//
+//   <run> <unit> --park <at> --screen <n> <label>                    option n, whose label is <label>
+//   <run> <unit> --park <at> --screen-text <text> --question <line>  typed text through the Other row
+
+type ScreenAnswer = { run: string; unit: string; park: string } & (
+  | { kind: "pick"; n: number; label: string }
+  | { kind: "text"; text: string; question: string }
+);
+
+/** The two argv shapes, exactly, in this order; anything else is null (usage). */
+function parseScreenAnswer(args: string[]): ScreenAnswer | null {
+  const [run, unit, parkFlag, park, form, a, b, c] = args;
+  if (parkFlag !== "--park") return null;
+  if (args.length === 7 && form === "--screen" && /^[1-9][0-9]*$/.test(a)) {
+    return { run, unit, park, kind: "pick", n: Number(a), label: b };
+  }
+  if (args.length === 8 && form === "--screen-text" && b === "--question") {
+    return { run, unit, park, kind: "text", text: a, question: c };
+  }
+  return null;
+}
+
+async function answerScreenCmd(args: string[]): Promise<number> {
+  const req = parseScreenAnswer(args);
+  if (!req) return usage();
+  const refuse = (msg: string) => fail(`baton answer: ${msg}`);
+  if (req.kind === "text") {
+    if (req.text === "") return refuse("empty text");
+    // An Enter, an Escape or any control key would act on the terminal, not arrive as the answer.
+    if (CONTROL_BYTE.test(req.text)) return refuse("text has a control byte");
+  }
+  return locked(async () => {
+    const store = openStore();
+    let run: RunState;
+    try {
+      run = store.readRun(req.run);
+    } catch {
+      return refuse(`no such run: ${req.run}`);
+    }
+    const b = blockedThread(run, req.unit);
+    if (typeof b === "string") return refuse(b);
+    if (b.at !== req.park) return refuse(`the park is ${b.at}, not ${req.park}`);
+    try {
+      const host = makeHost();
+      if (!host.screen) return refuse("host cannot read a screen");
+      if (!host.keys) return refuse("host cannot send keys");
+      const picker = parsePicker(await host.screen(b.thread));
+      if (!picker) return refuse("no picker on screen");
+      if (req.kind === "pick") {
+        const opt = picker.options.find((o) => o.n === req.n);
+        if (!opt || opt.label !== req.label) return refuse(`option ${req.n} is not "${req.label}"`);
+        await host.keys(b.thread, keysFor(picker, req.n));
+        store.event(req.run, { kind: "answered", unit: req.unit, screen: req.n, label: req.label });
+        return 0;
+      }
+      if (picker.question !== req.question) return refuse(`the question on screen is not "${req.question}"`);
+      if (picker.other === null) return refuse("the picker has no Other row");
+      for (const k of textKeys(picker, req.text)) await host.keys(b.thread, k);
+      // The text itself is not logged.
+      store.event(req.run, { kind: "answered", unit: req.unit, screen_text: true });
+      return 0;
+    } catch (e) {
+      return hostFail("baton answer", e);
+    }
+  });
+}
+
 // ---- screen ---------------------------------------------------------------------------
 // A blocked park's fresh screen and the picker parsed from it, so a caller offers the options the
 // answer check will compare against (one parser for both). Reads only: no lock, nothing sent.
 
-/** A blocked park's thread, or the refusal: unit missing, not in a blocked park, or a move in flight. */
+/**
+ * A blocked park's thread, or the refusal: a run that ended, a unit missing or not in a blocked
+ * park, a move in flight, or a session that is not the park's thread.
+ */
 function blockedThread(run: RunState, unitId: string): { thread: string; at: string } | string {
+  // disarm closes a blocked park's worker and leaves the park record; nothing is left to read.
+  if (run.status === "disarmed" || run.status === "done") return `run ${run.id} is ${run.status}`;
   const unit = own(run.units, unitId);
   if (!unit) return `no such unit: ${unitId}`;
   const parked = unit.parked;
   if (parked?.reason !== "blocked" || !parked.blocked) return `unit ${unitId} is not in a blocked park`;
   // `unpark --to` ends the session at the next tick; the worker is no longer the operator's to answer.
   if (parked.blocked.to !== undefined) return `unit ${unitId} has an unpark --to in flight`;
+  // A blocked park keeps its session on the same thread; anything else is a record we do not trust.
+  if (unit.session?.thread_id !== parked.blocked.thread) return `unit ${unitId} has no live session on ${parked.blocked.thread}`;
   return { thread: parked.blocked.thread, at: parked.at };
 }
 
