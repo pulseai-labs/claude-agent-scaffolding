@@ -117,10 +117,14 @@ export function blockedOffer(message: string, run: string, unit: string, picker:
     ];
     text = `${draft!.summary}\nRecommended: ${draft!.why || rec.label}`;
   }
+  // The recommended option's own label stays accepted, not shown, so typing it picks that option.
+  const alias: Option[] = options[0] && rec && options[0].label !== rec.label
+    ? [{ label: rec.label, act: { do: "pick", n: rec.n, label: rec.label }, shown: false }]
+    : [];
   // The escapes stay accepted, not shown, so a typed "Disarm" is still Disarm; a worker label wins.
-  const taken = options.map((o) => o.label);
+  const taken = [...options, ...alias].map((o) => o.label);
   const typed = escapes().filter((e) => !taken.includes(e.label)).map((e) => ({ ...e, shown: false }));
-  return { title, text, options: [...options, { label: LABELS.more, act: { do: "more" } }, ...typed], allowOther };
+  return { title, text, options: [...options, { label: LABELS.more, act: { do: "more" } }, ...alias, ...typed], allowOther };
 }
 
 function escapes(): Option[] {

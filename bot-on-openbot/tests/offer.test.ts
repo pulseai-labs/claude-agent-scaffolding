@@ -188,7 +188,7 @@ test("shown defaults to true; shownLabels keeps the offer's order", () => {
 test("a blocked park with 4 options shows the 4, the recommended first, then More…", () => {
   const o = blockedOffer(MSG, "r1", "u5", picker(4), { summary: "S", recommended: 3, why: "W" });
   expect(shownLabels(o)).toEqual(["opt3 (recommended)", "opt1", "opt2", "opt4", "More…"]);
-  expect(hidden(o)).toEqual(["Show question", "Unpark", "Disarm"]);
+  expect(hidden(o)).toEqual(["opt3", "Show question", "Unpark", "Disarm"]);
   expect(o.options.find((x) => x.label === "Disarm")!.act).toEqual({ do: "disarm" });
   expect(o.options[4]!.act).toEqual({ do: "more" });
   expect(o.allowOther).toBe(true);
@@ -259,4 +259,13 @@ test("the stage list pages 4 at a time with More stages…, and accepts every st
   });
   // exactly 4 stages: one page, with Cancel
   withStages(4, () => expect(shownLabels(stageOffer("r9", "t"))).toEqual(["s1", "s2", "s3", "s4", "Cancel"]));
+});
+
+test("a recommended worker label equal to an action label stays the worker's when typed (CodeRabbit #942)", () => {
+  const p: Picker = { kind: "omp-ask", question: "q?", options: [{ n: 1, label: "Unpark" }, { n: 2, label: "Keep" }], other: 3 };
+  const o = blockedOffer("m", "r1", "u5", p, { summary: "S", recommended: 1, why: "W" });
+  const typed = o.options.filter((x) => x.label === "Unpark");
+  expect(typed).toEqual([{ label: "Unpark", act: { do: "pick", n: 1, label: "Unpark" }, shown: false }]);
+  expect(o.options.find((x) => x.label === "Unpark (recommended)")!.act).toEqual({ do: "pick", n: 1, label: "Unpark" });
+  expect(new Set(o.options.map((x) => x.label)).size).toBe(o.options.length);
 });

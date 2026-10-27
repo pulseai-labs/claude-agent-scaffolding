@@ -17,6 +17,8 @@ All notable changes to the `bot-on-openbot` plugin.
 - `Unpark to stage…` pages the recipe's stages 4 at a time, with `More stages…` while more remain
   and `Cancel` on the last page. Every stage, and Cancel, is accepted on every page.
 - An offer with labels not shown tells the agent to let the operator type an answer.
+- The recommended worker option's own label stays accepted (not shown), so typing it picks that
+  option, even when it equals an action label such as `Unpark`.
 
 ## 0.1.1 - 2026-10-28
 
