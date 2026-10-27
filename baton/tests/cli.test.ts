@@ -199,7 +199,7 @@ test("arm refuses a bad host key and arms nothing; a good one arms", async () =>
   writeFileSync(cfg, JSON.stringify({ host: "orcaa" }));
   const bad = await result(arm());
   expect(bad.rc).toBe(2);
-  expect(bad.err).toBe('config: host must be "t3" or "orca"\n');
+  expect(bad.err).toBe('config: host must be "orca"\n');
   expect(existsSync(join(st, "runs", "r1"))).toBe(false);
   writeFileSync(cfg, JSON.stringify({ host: "orca" }));
   expect((await result(arm())).rc).toBe(0);

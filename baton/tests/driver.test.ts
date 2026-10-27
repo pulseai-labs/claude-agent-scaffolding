@@ -78,7 +78,7 @@ test("state file sections", () => {
   const ev = [
     { at: "t1", kind: "transition", unit: "b", from: "x", to: "land" },
     { at: "t2", kind: "park", unit: "b", stage: "land", reason: "outcome", thread: "th1", pr: "https://pr/2", pr_state: "red", failing: ["tests"] },
-    { at: "t3", kind: "transition", unit: "a", from: "x", to: "land" },
+    { at: "t4", kind: "transition", unit: "a", from: "x", to: "land" },
   ];
   const old = [
     { at: "t0", kind: "park", unit: "b", stage: "land", reason: "old" },
@@ -97,7 +97,7 @@ test("state file sections", () => {
   expect(after).toContain('"t2"');
   expect(after).not.toContain('"t1"');
   expect(after).not.toContain('"t0"');
-  expect(after).not.toContain('"t3"');
+  expect(after).not.toContain('"t4"');
   expect(text).toContain("/p/stop");
   const order = ["# Driver", "## Run", "## Units", "## This park", "## Events since", "## Paths"].map((s) => text.indexOf(s));
   expect(order).toEqual([...order].sort((x, y) => x - y));
