@@ -10,7 +10,7 @@
 # Every refusal exits 78 with one line on stderr and one line in <state>/claims/seat.log:
 #   <utc> <result> cwd <cwd>
 # where <result> is the claim nonce, or none | invalid <line> | nomsg | toolong | noseat | noexec.
-# The claim validation is copied from omp-t3-claim on purpose; it retires with T3.
+# The claim keys keep the OMP_T3_ names from the retired T3 launcher, so staged recipes still run.
 
 set -u
 

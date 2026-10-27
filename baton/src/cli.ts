@@ -5,13 +5,10 @@ import { removeClaim } from "./claims.ts";
 import { exitCode, tick, unparkUnit } from "./engine.ts";
 import { GhForge } from "./forge.ts";
 import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.ts";
-import { callTool, readToken } from "./hosts/mcp.ts";
 import { hostKind, makeHost } from "./hosts/select.ts";
-import { loadT3Config } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
 import { openStore, replaceFileSync, type KeptThread, type RunState, type UnitState } from "./state.ts";
-import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
 const USAGE = [
@@ -23,9 +20,6 @@ const USAGE = [
   "       baton answer <run> <unit> <label>",
   "       baton report <run>",
   "       baton tick [--run <id>]",
-  "       baton t3 call <tool> <json-object>",
-  "       baton t3 token-status",
-  "       baton t3 login",
   "       baton timer install|remove",
   "",
 ].join("\n");
@@ -50,7 +44,6 @@ export async function main(argv: string[]): Promise<number> {
     case "answer": return answerCmd(rest);
     case "report": return reportCmd(rest);
     case "tick": return tickCmd(rest);
-    case "t3": return t3Cmd(rest);
     case "timer": return timerCmd(rest);
   }
   return usage();
@@ -416,25 +409,12 @@ function reportCmd(args: string[]): number {
 // ---- tick -----------------------------------------------------------------------------
 // rc 0 done (a busy lock included), 3 host auth, 4 host down, 1 anything else.
 
-const DAY_MS = 86_400_000;
-
 async function tickCmd(args: string[]): Promise<number> {
   let runId: string | undefined;
   if (args.length === 2 && args[0] === "--run" && RUN_ID_RE.test(args[1]) && !isProtoName(args[1])) runId = args[1];
   else if (args.length !== 0) return usage();
   try {
     const host = makeHost();
-    if (hostKind() === "t3") {
-      // Only `expires_at` is read from the token here; the token itself stays inside the host.
-      let expiresAt: number | undefined;
-      try {
-        expiresAt = readToken(loadT3Config().tokenFile).expires_at;
-      } catch { /* a missing or unreadable token surfaces as a host auth error when used */ }
-      if (expiresAt !== undefined && expiresAt * 1000 - Date.now() < 3 * DAY_MS) {
-        const day = new Date().toISOString().slice(0, 10);
-        await notifyOnce(`token/${day}`, `t3 token expires ${new Date(expiresAt * 1000).toISOString()} — run baton t3 login`);
-      }
-    }
     const r = await tick({
       store: openStore(), host, forge: new GhForge(), notify: notifyOnce, now: () => new Date(), runId,
     });
@@ -446,27 +426,7 @@ async function tickCmd(args: string[]): Promise<number> {
   }
 }
 
-// ---- t3 -------------------------------------------------------------------------------
-// rc 0 ok; 1 the tool returned an error (printed as JSON); 2 bad config or token file;
-// 3 token expired or rejected; 4 host unreachable. The token itself is never printed.
-
-async function t3Cmd(args: string[]): Promise<number> {
-  const [sub, ...rest] = args;
-  if (sub === "token-status" && rest.length === 0) return t3TokenStatus();
-  if (sub === "call" && rest.length === 2) return t3Call(rest[0], rest[1]);
-  if (sub === "login" && rest.length === 0) return t3Login();
-  return usage();
-}
-
-async function t3Login(): Promise<number> {
-  try {
-    const cfg = loadT3Config();
-    await login({ base: cfg.base, tokenFile: cfg.tokenFile, out: (l) => process.stdout.write(l + "\n") });
-    return 0;
-  } catch (e) {
-    return fail(`baton t3 login: ${(e as Error).message}`);
-  }
-}
+// ---- timer ----------------------------------------------------------------------------
 
 async function timerCmd(args: string[]): Promise<number> {
   if (args.length !== 1 || (args[0] !== "install" && args[0] !== "remove")) return usage();
@@ -479,52 +439,3 @@ async function timerCmd(args: string[]): Promise<number> {
   }
 }
 
-function t3TokenStatus(): number {
-  let tokenFile: string;
-  try {
-    tokenFile = loadT3Config().tokenFile;
-  } catch (e) {
-    return fail(`baton config: ${(e as Error).message}`);
-  }
-  let t: ReturnType<typeof readToken>;
-  try {
-    t = readToken(tokenFile);
-  } catch (e) {
-    return fail((e as Error).message);
-  }
-  const days = Math.floor((t.expires_at * 1000 - Date.now()) / 86_400_000);
-  process.stdout.write(`scope: ${t.scope ?? "-"}\n`);
-  if (t.expires_at * 1000 <= Date.now()) {
-    process.stdout.write("expired\n");
-    return 3;
-  }
-  process.stdout.write(`days_left: ${days}\n`);
-  return 0;
-}
-
-async function t3Call(tool: string, json: string): Promise<number> {
-  let callArgs: unknown;
-  try {
-    callArgs = JSON.parse(json);
-  } catch {
-    return usage();
-  }
-  if (callArgs === null || typeof callArgs !== "object" || Array.isArray(callArgs)) return usage();
-  try {
-    const { base, tokenFile } = loadT3Config();
-    const t = readToken(tokenFile);
-    if (t.expires_at * 1000 <= Date.now()) {
-      process.stderr.write("token expired\n");
-      return 3;
-    }
-    const r = await callTool(base, t.access_token, tool, callArgs as Record<string, unknown>);
-    process.stdout.write(JSON.stringify(r, null, 2) + "\n");
-    const isError = r !== null && typeof r === "object" && "error" in r && Object.keys(r).length === 1;
-    return isError ? 1 : 0;
-  } catch (e) {
-    process.stderr.write(`baton t3: ${(e as Error).message}\n`);
-    if (e instanceof HostAuthError) return /^token (rejected|expired)$/.test((e as Error).message) ? 3 : 2;
-    if (e instanceof HostDownError) return 4;
-    return 2;
-  }
-}

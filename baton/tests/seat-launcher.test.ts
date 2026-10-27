@@ -2,6 +2,7 @@ import { beforeEach, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { writeClaim } from "../src/claims.ts";
 
 const LAUNCHER = join(import.meta.dir, "..", "bin", "baton-seat");
 let base: string, state: string, home: string, proj: string, fake: string, msg: string, ran: string;
@@ -41,13 +42,13 @@ function run(cwd: string, file: string | null = msg, env: Record<string, string>
 }
 
 test("claim values reach the seat and argv is exact", () => {
-  writeFileSync(claimFile(proj), GOOD + "OMP_T3_DROP_T3_MCP=1\nX=$HOME\n");
+  writeFileSync(claimFile(proj), GOOD + "EXTRA_KEY=1\nX=$HOME\n");
   writeFileSync(msg, "hello 'x' $HOME");
   const r = run(proj);
   expect(r.rc).toBe(0);
   expect(r.json.argv).toEqual(["worker", "--via", "/v/w", "hello 'x' $HOME"]);
   expect(r.json.env.X).toBe("$HOME");
-  expect(r.json.env.OMP_T3_DROP_T3_MCP).toBe("1");
+  expect(r.json.env.EXTRA_KEY).toBe("1");
   expect(readFileSync(logFile(), "utf8")).toMatch(new RegExp(`^\\d{4}-\\d\\d-\\d\\dT\\d\\d:\\d\\d:\\d\\dZ n1 cwd ${proj}\\n$`));
 });
 
@@ -185,4 +186,68 @@ test("a seat program that cannot run refuses noexec and keeps the message file",
   // Control: the same claim and message with a runnable seat start it.
   expect(run(proj).rc).toBe(0);
   expect(existsSync(ran)).toBe(true);
+});
+
+// Claim-file cases carried over from the retired omp-t3-claim launcher's suite (0.6.0): the
+// validation they pin is the one baton-seat copied from it.
+
+test("literal values are not expanded", () => {
+  writeFileSync(claimFile(proj), GOOD + "Y=`id`\nZ=\"q\"\n");
+  const r = run(proj);
+  expect(r.rc).toBe(0);
+  expect(r.json.env.Y).toBe("`id`");
+  expect(r.json.env.Z).toBe('"q"');
+});
+
+const asRoot = process.getuid?.() === 0;
+
+test.skipIf(asRoot)("an unreadable claim refuses with invalid 0", () => {
+  const f = claimFile(proj);
+  writeFileSync(f, GOOD);
+  chmodSync(f, 0o000);
+  const r = run(proj);
+  expect(r.rc).toBe(78);
+  expect(existsSync(ran)).toBe(false);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ invalid 0 cwd /);
+});
+
+test("control: the same claim at mode 600 runs the seat", () => {
+  const f = claimFile(proj);
+  writeFileSync(f, GOOD);
+  chmodSync(f, 0o600);
+  expect(run(proj).rc).toBe(0);
+  expect(existsSync(ran)).toBe(true);
+});
+
+test("a directory at the claim path refuses with invalid 0", () => {
+  mkdirSync(claimFile(proj));
+  const r = run(proj);
+  expect(r.rc).toBe(78);
+  expect(existsSync(ran)).toBe(false);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ invalid 0 cwd /);
+});
+
+test("parity: every key claims.ts refuses, the launcher refuses", () => {
+  const bad = ["lower", "1A", "A-B", "A B", "", "PATH", "HOME", "USER", "SHELL", "IFS", "ENV", "BASH_ENV", "LD_PRELOAD", "LD_LIBRARY_PATH"];
+  const good = ["A", "FOO_1", "EXTRA_KEY"];
+  const saved = { s: process.env.BATON_STATE_DIR, h: process.env.HOME };
+  process.env.BATON_STATE_DIR = state;
+  process.env.HOME = home;
+  try {
+    for (const k of bad) {
+      expect(() => writeClaim(proj, { [k]: "v" }, "n1")).toThrow();
+      writeFileSync(claimFile(proj), `${GOOD}${k}=v\n`);
+      writeFileSync(msg, "hello");
+      expect([k, run(proj).rc]).toEqual([k, 78]);
+    }
+    for (const k of good) {
+      expect(() => writeClaim(proj, { [k]: "v" }, "n1")).not.toThrow();
+      writeFileSync(claimFile(proj), `${GOOD}${k}=v\n`);
+      writeFileSync(msg, "hello");
+      expect([k, run(proj).rc]).toEqual([k, 0]);
+    }
+  } finally {
+    process.env.BATON_STATE_DIR = saved.s;
+    process.env.HOME = saved.h;
+  }
 });

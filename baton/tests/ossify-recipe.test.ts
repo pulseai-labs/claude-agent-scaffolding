@@ -58,10 +58,9 @@ describe("ossify-spine recipe", () => {
     expect(stray).toEqual([]);
   });
 
-  test("every session stage drops T3 MCP and runs molt as a child", () => {
+  test("every session stage names its seat and runs molt as a child", () => {
     for (const [name, s] of sessions(loadRecipe())) {
       const where = `stage ${name}`;
-      expect([where, s.env.OMP_T3_DROP_T3_MCP]).toEqual([where, "1"]);
       expect([where, s.env.OMP_T3_SEAT]).toEqual([where, "worker"]);
       expect([where, s.env.OMP_T3_VIA]).toEqual([where, "{param.via}"]);
       expect([where, s.env.MOLT_HANDOFF]).toEqual([where, "parent"]);
@@ -359,12 +358,9 @@ describe("ossify-spine triage", () => {
   const triage = () => loadRecipe().triage!;
   const NOTE = "{run.dir}/out/{unit.id}/triage-note.md";
 
-  test("triage stage keeps T3 tools", () => {
-    expect(triage().env.OMP_T3_DROP_T3_MCP).toBeUndefined();
+  test("no stage carries the retired T3 drop key", () => {
     expect(triage().env.OMP_T3_SEAT).toBe("worker");
-    for (const [name, s] of sessions(loadRecipe())) {
-      expect([name, s.env.OMP_T3_DROP_T3_MCP]).toEqual([name, "1"]);
-    }
+    expect(JSON.stringify(loadRecipe())).not.toContain("DROP_T3_MCP");
   });
 
   test("triage env carries stop file and ledger", () => {
