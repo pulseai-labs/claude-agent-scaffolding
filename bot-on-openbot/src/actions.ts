@@ -1,3 +1,5 @@
+import type { Picker } from "./offer.ts";
+
 export type Runner = (argv: string[]) => Promise<{ rc: number; stdout: string; stderr: string }>;
 
 const TIMEOUT_MS = 60_000;
@@ -55,3 +57,24 @@ export const answerScreen = (
 export const answerText = (
   run: string, unit: string, parkAt: string, text: string, question: string, runner: Runner = defaultRunner,
 ) => runner(["baton", "answer", run, unit, "--park", parkAt, "--screen-text", text, "--question", question]);
+
+const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+// `baton screen`'s one JSON line. A picker of any other shape reads as no picker.
+export function parseScreen(stdout: string): { park_at: string; screen: string; picker: Picker | null } | null {
+  let v: unknown;
+  try {
+    v = JSON.parse(stdout);
+  } catch {
+    return null;
+  }
+  if (!isObj(v) || typeof v.park_at !== "string" || typeof v.screen !== "string") return null;
+  return { park_at: v.park_at, screen: v.screen, picker: isPicker(v.picker) ? v.picker : null };
+}
+
+function isPicker(p: unknown): p is Picker {
+  if (!isObj(p) || (p.kind !== "omp-ask" && p.kind !== "numbered") || typeof p.question !== "string") return false;
+  if (!(p.other === null || (typeof p.other === "number" && Number.isInteger(p.other)))) return false;
+  return Array.isArray(p.options) && p.options.length > 0 && p.options.every((o, i) =>
+    isObj(o) && o.n === i + 1 && typeof o.label === "string" && o.label !== "");
+}

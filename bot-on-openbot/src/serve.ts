@@ -1,13 +1,15 @@
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { screen, type Runner } from "./actions.ts";
+import { parseScreen, screen, type Runner } from "./actions.ts";
 import { readUnit } from "./baton-state.ts";
 import { close, find, followUp, open, record, type DeliveryRec } from "./deliveries.ts";
 import { parseKey } from "./notice.ts";
-import { blockedOffer, offerFor, type Picker } from "./offer.ts";
+import { log } from "./log.ts";
+import { blockedOffer, offerFor } from "./offer.ts";
 import { OpenBotDown, OpenBotRefused, type Delivery, type OpenBot } from "./openbot.ts";
 import { stateDir } from "./paths.ts";
 import { listSpool, removeSpool } from "./spool.ts";
+import { handleTap } from "./tap.ts";
 import { askTask, draftTask, messageTask, parseDraft } from "./task.ts";
 
 export class LockHeldError extends Error {
@@ -67,10 +69,6 @@ function takeLock(): () => void {
   }
   throw new LockHeldError();
 }
-
-export const log = (line: string): void => {
-  process.stderr.write(`bot-on-openbot: ${line.split("\n")[0]}\n`);
-};
 
 const logError = (what: string, e: unknown): void => log(`${what}: ${e instanceof Error ? e.message : "unknown error"}`);
 
@@ -166,27 +164,6 @@ async function deliverBlocked(key: string, message: string, run: string, unit: s
   record({ ...base, phase: "asked", offer, ask_id: deliveryId });
 }
 
-const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
-
-// `baton screen`'s one JSON line. A picker of any other shape reads as no picker.
-export function parseScreen(stdout: string): { park_at: string; screen: string; picker: Picker | null } | null {
-  let v: unknown;
-  try {
-    v = JSON.parse(stdout);
-  } catch {
-    return null;
-  }
-  if (!isObj(v) || typeof v.park_at !== "string" || typeof v.screen !== "string") return null;
-  return { park_at: v.park_at, screen: v.screen, picker: isPicker(v.picker) ? v.picker : null };
-}
-
-function isPicker(p: unknown): p is Picker {
-  if (!isObj(p) || (p.kind !== "omp-ask" && p.kind !== "numbered") || typeof p.question !== "string") return false;
-  if (!(p.other === null || (typeof p.other === "number" && Number.isInteger(p.other)))) return false;
-  return Array.isArray(p.options) && p.options.length > 0 && p.options.every((o, i) =>
-    isObj(o) && o.n === i + 1 && typeof o.label === "string" && o.label !== "");
-}
-
 // ---- poll ------------------------------------------------------------------------------------
 
 async function statusOf(bot: OpenBot, id: string): Promise<Delivery> {
@@ -246,9 +223,7 @@ async function afterAsk(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
       return;
     }
     if (r !== "none") {
-      // Task 10 maps the label to its command; until then nothing runs.
-      log(`${rec.key}: answered; nothing ran`);
-      close(rec, "tap", opts.now());
+      await handleTap(rec, r.answer, { bot: opts.bot, runner: opts.runner, now: opts.now });
       return;
     }
   }
