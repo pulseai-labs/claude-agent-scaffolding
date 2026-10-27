@@ -36,6 +36,7 @@ export type World = {
   failWrites?: RegExp          // fs.write to a matching path is refused (a read-only or full disk)
   failReads?: RegExp           // fs.read of a matching path is refused though the file exists (no read permission)
   rejectSeeds?: boolean        // a plugin's prompt.submit is refused
+  failSessionEnd?: boolean     // a sibling plugin throws at session.end, beneath molt
   dropPrompts?: boolean        // a hook beneath molt refuses every prompt (the result's drop arm)
   slowWrites?: RegExp          // fs.write to a matching path takes 20 ms
   staged?: boolean             // Write/Edit results come back staged: held for review, file unchanged
@@ -157,7 +158,10 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
     return { turnId: s.turnId, index: s.index, answer: '', toolUses: [], usage: { ...w.stepUsage } } as never
   })
   on('session.start', (_$, e) => ({ cwd: e.cwd }) as never)
-  on('session.end', (_$, e) => ({ sessionId: e.sessionId }) as never)
+  on('session.end', (_$, e) => {
+    if (w.failSessionEnd) throw new Error('a sibling plugin failed at session.end')
+    return { sessionId: e.sessionId } as never
+  })
   return w
 }
 
@@ -167,6 +171,15 @@ export async function flush(): Promise<void> {
   const wait = Promise.withResolvers<void>()
   sleep(wait.resolve, 10)
   await wait.promise
+}
+
+// The kit submits a plugin's prompt but never runs it as a turn. followUp ends the last prompt
+// molt submitted as its own turn, as the host does: a new turnId, on the root agent (#933).
+let followUps = 0
+export async function followUp($: { turn: { complete: (e: never) => Promise<unknown> } }, w: World, answer: string, extra: object = {}): Promise<unknown> {
+  if (w.plugin.length === 0) throw new Error('followUp: molt submitted no prompt to run')
+  followUps += 1
+  return $.turn.complete({ answer, durationMs: 1, isAborted: false, turnId: `f${followUps}`, reason: 'answer', ...extra } as never)
 }
 
 // molt's handoff requests among them: each asks for a MOLT-HANDOFF line (#929).

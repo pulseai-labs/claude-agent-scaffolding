@@ -94,6 +94,61 @@ Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
 - A process that dies leaves the terminal list and reads `gone`; a `baton-seat` refusal reads the
   same way. Orca has no failure state to map.
 
+## Answering a blocked park
+
+A blocked park's worker waits on a picker baton cannot answer through the host. Two commands let
+a caller (the operator, or a bridge acting on the operator's tap) answer it from outside the Orca
+terminal, with keys checked against a fresh screen:
+
+    baton screen <run> <unit>
+    baton answer <run> <unit> --park <at> --screen <n> <label>
+    baton answer <run> <unit> --park <at> --screen-text <text> --question <line>
+
+`baton screen` prints one JSON line, `{"park_at", "thread", "screen", "picker"}`: the park's `at`
+(the last part of its notice key), the worker's terminal, its screen read now, and the picker parsed
+from it, `{"kind", "question", "options": [{"n", "label"}], "other"}` or `null`. It reads only:
+no lock, nothing sent. rc 2 when the run is disarmed or done, the unit is not in a blocked park, an
+`unpark --to` is in flight, the unit's session is not the park's thread, or the host has no
+`screen`; 3 host auth, 4 host down.
+
+Two picker kinds are known, as omp v18.11.3 draws them: `omp-ask` (the `ask` tool's box, headed
+`Ask`, `○` rows, an `Other (type your own)` row last, which `other` numbers and `options` leaves
+out) and `numbered` (omp's `/review` box, `Review Mode`, rows `<n>. <label>`; its question is the box
+title). Only a box followed by a `⏎ select` footer is live: the `ask` call above it, an answered
+picker and the free-text box read as no picker.
+
+`--screen` selects option `<n>` and `--screen-text` types `<text>` through the Other row. Both run
+under the store lock, read the screen again, and send keys only when every check passes; each
+failed check is rc 2 with one line `baton answer: <reason>` and nothing sent:
+
+- the run is disarmed or done; the unit is missing, not in a blocked park, has an `unpark --to` in
+  flight, or its session is not the park's thread;
+- `--park` is not the unit's park `at` (the park was cleared and a new one opened);
+- the host has no `screen` or no `keys`;
+- the screen shows no live picker;
+- `--screen`: option `<n>` is not labelled exactly `<label>`;
+- `--screen-text`: the picker's question line is not exactly `<line>`, the picker has no Other row,
+  or `<text>` is empty or holds a control byte (any byte below 0x20, and 0x7f: an Enter, an Escape
+  or a tab would act on the terminal, not arrive as the answer).
+
+The keys are fixed per kind: Up once per row (the Other row counted; Up stops at row 1), Down to
+the row, Enter, in one send. Free text is three sends: to the Other row and Enter, the text, Enter.
+An answer records `{"kind": "answered", "unit", "screen": n, "label"}` or
+`{"kind": "answered", "unit", "screen_text": true}`; the text itself is not logged. rc 64 for any
+other argument shape; the three-argument `baton answer <run> <unit> <label>` is unchanged.
+
+Known limits:
+
+- A picker of any other shape reads as no picker, and both answer forms refuse it. Answer it in the
+  terminal.
+- `--screen-text` needs an Other row, so it works on `omp-ask` only.
+- The numbered `/review` picker rarely reaches a blocked park on Orca: a picker opened between turns
+  leaves the agent row `done` (see Known limits on Orca).
+- The free-text sends are not checked between each other: a host failure after the first leaves the
+  free-text box open, and the answer is rc 4 with no event.
+- The check and the send are separate Orca calls: a picker that changes between the read and the
+  send gets keys meant for the one read.
+
 ## Commands
 
     baton validate <recipe.json>
@@ -102,6 +157,9 @@ Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
     baton disarm <run>              baton tick [--run <id>]
     baton unpark <run> [<unit>] [--to <stage>]
     baton answer <run> <unit> <label>
+    baton answer <run> <unit> --park <at> --screen <n> <label>
+    baton answer <run> <unit> --park <at> --screen-text <text> --question <line>
+    baton screen <run> <unit>
     baton timer install|remove
 
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused

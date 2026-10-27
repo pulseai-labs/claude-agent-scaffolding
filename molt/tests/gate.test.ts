@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { gateAllows, isProgress } from '../hooks/gate'
+import { gateAllows, isProgress, takeRequest, waitsIn } from '../hooks/gate'
+import type { Request } from '../hooks/gate'
 import { gitSubcommands } from '../hooks/shell'
 import * as shell from '../hooks/shell'
 
@@ -495,5 +496,36 @@ describe('batch 5: substitutions', () => {
     expect(bash('git commit -m $(date +%F)')).toBe(false)
     // control: the quoted form is a commit message
     expect(bash('git commit -m "$(date +%F)"')).toBe(true)
+  })
+})
+
+// The kit runs a plugin's own submit as soon as the hook that made it returns, so it cannot
+// leave a request accepted but never run. These pin the two decisions instead (#933).
+describe('turn-end requests waiting to run (#933)', () => {
+  test("a request waiting in another session does not stop this session's", () => {
+    expect(waitsIn([{ sessionId: 's1', text: 'a' }], 's2')).toBe(false)
+  })
+  test('a request waiting in the same session stops a second one (control)', () => {
+    expect(waitsIn([{ sessionId: 's2', text: 'a' }, { sessionId: 's1', text: 'a' }], 's1')).toBe(true)
+    expect(waitsIn([], 's1')).toBe(false)
+  })
+  test("a session's own request is taken first, though a stale one with the same text is older (#936 review)", () => {
+    const asked: Request[] = [{ sessionId: 's1', text: 'ask' }, { sessionId: 's2', text: 'ask' }]
+    expect(takeRequest(asked, 'ask', 's2')).toEqual({ sessionId: 's2', text: 'ask' })
+    expect(asked).toEqual([{ sessionId: 's1', text: 'ask' }])
+  })
+  test('a stale request that arrives later is still known, so it is dropped, not run as a new prompt', () => {
+    const asked: Request[] = [{ sessionId: 's1', text: 'ask' }]
+    expect(takeRequest(asked, 'ask', 's2')).toEqual({ sessionId: 's1', text: 'ask' })
+    expect(takeRequest(asked, 'ask', 's2')).toBeUndefined()
+  })
+  test('with no session id, the oldest request with the text is taken', () => {
+    const asked: Request[] = [{ sessionId: 's1', text: 'ask' }, { sessionId: 's2', text: 'ask' }]
+    expect(takeRequest(asked, 'ask', undefined)).toEqual({ sessionId: 's1', text: 'ask' })
+  })
+  test('a prompt with other text takes nothing (control)', () => {
+    const asked: Request[] = [{ sessionId: 's1', text: 'ask' }]
+    expect(takeRequest(asked, 'other', 's1')).toBeUndefined()
+    expect(asked).toHaveLength(1)
   })
 })

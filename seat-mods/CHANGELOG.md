@@ -2,7 +2,21 @@
 
 All notable changes to the `seat-mods` plugin.
 
-## 0.11.0 — unreleased
+## 0.11.1 — 2026-10-27
+
+#933, the test and wording follow-ups from PR #932's review. No change in behaviour.
+
+- **`tests/test-mod-shell-parity.sh` holds `moltStagePath` to molt's `stagePath`.** A path that
+  drifted would silently stop the redo drop while molt hands off.
+- **`run-tests.sh` fails when its `classic.*` check cannot read `hooks/`** (grep exit 2). It passed
+  silently before.
+- **The README lists 0.11.0's known limits** (`claude -p`, an unprobed Agent SDK host, molt's
+  pause), which only the CHANGELOG held.
+- Test 15 is split: a molt stage below `command` keeps the redo (15), and so does no stage file (15b).
+- Comments: the OMP status entry says OMP's `session_stop` still blocks, and the redo turn is
+  Claude Code's; a comment that cited the review now gives the reason.
+
+## 0.11.0 — 2026-10-27
 
 #929: the orchestrator status-block check works on org accounts. Claude Code skips a plugin's
 `classic.*` hooks there, with no error, so the check on `classic.Stop` never ran and status turns

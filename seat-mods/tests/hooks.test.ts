@@ -1030,9 +1030,19 @@ describe('orchestrator status block (#867, #929)', () => {
     expect(w.toasts).toEqual([STATUS_WARNING])
   })
 
-  test("15. a molt stage below command keeps the redo; so does no stage file", async ($, on) => {
+  test("15. a molt stage below command keeps the redo", async ($, on) => {
     const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' }, undefined, undefined,
       { files: { '/home/u/.claude/state/molt/stage/s1': '{"stage":"warnAgain"}\n' } })
+    await $.prompt.submit(notify())
+    await ends($, 'Done.')
+    await flush()
+    expect(redos(w).map(p => p.text)).toEqual([SHAPE])
+    expect(w.toasts).toEqual([])
+  })
+
+  test("15b. no molt stage file keeps the redo (molt not installed, or off)", async ($, on) => {
+    // The fixture holds no file under /home/u/.claude/state/molt/stage/.
+    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' })
     await $.prompt.submit(notify())
     await ends($, 'Done.')
     await flush()

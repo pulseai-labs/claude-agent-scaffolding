@@ -2,6 +2,30 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.7.0 - 2026-10-27
+
+A blocked park can be answered from outside the Orca terminal, through a screen check that only
+refuses (README, "Answering a blocked park").
+
+- **Added: `baton screen <run> <unit>`.** One JSON line `{park_at, thread, screen, picker}` for a
+  unit in a blocked park: its screen read now and the picker parsed from it, or `picker: null`. No
+  lock, nothing sent. rc 2 when the unit is not in a blocked park (or the run is disarmed or done,
+  an `unpark --to` is in flight, or the host has no `screen`).
+- **Added: `baton answer <run> <unit> --park <at> --screen <n> <label>` and
+  `--screen-text <text> --question <line>`.** Under the store lock, they read the screen again and
+  send the picker's fixed keys only while the same blocked park and the same option label (or
+  question line) are on screen. Every failed check is rc 2 with one line and nothing sent.
+  `--screen-text` refuses empty text and any control byte. Events: `answered` with `screen` and
+  `label`, or `screen_text: true` (the text is not logged). The three-argument form is unchanged.
+- **Added: `src/picker.ts`.** `parsePicker` reads one live picker of two kinds, omp's `ask` box and
+  its numbered `/review` box, and only a box with a `⏎ select` footer (the `ask` call above it and
+  answered pickers read as none). `keysFor` and `textKeys` are the key sequences recorded on
+  omp v18.11.3 (Up over every row, Down to the row, Enter; free text through the Other row).
+- **Added: `Host.keys?(threadId, text)`.** The Orca host sends the text unchanged with
+  `orca terminal send --text`; a gone terminal is `AnswerRefused("terminal gone")`.
+- Known limits: other picker shapes read as no picker; free text needs an Other row; the check and
+  the send are separate Orca calls.
+
 ## 0.6.0 - 2026-10-27
 
 Orca is the only host (operator ruling 2026-10-27: no move back to T3).

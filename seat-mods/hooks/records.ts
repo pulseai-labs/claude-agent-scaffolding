@@ -7,7 +7,8 @@ const STATE = '.claude/state'
 
 export const autonomicPath = (home: string, id: string) => `${home}/${STATE}/autonomic/sessions/${id}.json`
 
-// molt's stage file (#929): the same path molt's stagePath builds.
+// molt's stage file (#929): the same path molt's stagePath builds. tests/test-mod-shell-parity.sh
+// holds the definition line to molt's (#933).
 export const moltStagePath = (home: string, id: string) => `${home}/${STATE}/molt/stage/${id}`
 
 export const seatLogPath = (home: string) => `${home}/${STATE}/seat-mods/seat-mods.log`

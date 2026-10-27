@@ -250,6 +250,10 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   hooks modules behind a rollout flag (`tengu_plugin_hooks_modules`).
 - **Tool output not yet measured is an estimate.** Between responses, molt adds tool output at
   four characters per token to the last measured fill.
+- **The turn-end request is a follow-up turn** (0.4.0). Under `claude -p` the printed result is
+  the request's reply, not the turn that needed it; an Agent SDK host (`sdk-ts`, `sdk-py`) is asked
+  by follow-up like any root, which was not probed live. A request the host accepts but never runs
+  stops that session's next request; one from a session that has since moved on does not (0.4.1).
 - **Auto-compact must sit above the block.** molt does not turn auto-compact off; it stays the
   backstop. If it runs at or below the block threshold, it acts first. `/molt status` checks.
 - **Past the block threshold, a heredoc opener line holding a `$(…)`, a backtick or a `${…}` after

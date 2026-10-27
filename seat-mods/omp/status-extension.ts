@@ -1,6 +1,7 @@
 // seat-mods on OMP, second entry: the orchestrator's status-block check and idle stop, the same
-// rules as hooks/register.ts's prompt.submit / turn.complete (and its redo, #929), over OMP's input,
-// before_agent_start and session_stop. A separate entry because OMP runs session_stop and
+// rules as hooks/register.ts's prompt.submit / turn.complete, over OMP's input,
+// before_agent_start and session_stop. On Claude Code a failed reply gets a redo turn (#929);
+// OMP's stop is session_stop, which still blocks. A separate entry because OMP runs session_stop and
 // tool_call handlers in extension order and stops at the first block: the guard (omp/extension.ts)
 // must load first, and this check must load last, after molt and autonomic, so their stop blocks
 // win as they do beneath seat-mods on Claude Code (AI workspace spec
