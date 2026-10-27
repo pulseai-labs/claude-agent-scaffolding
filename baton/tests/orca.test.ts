@@ -186,7 +186,11 @@ describe("launch", () => {
     const run = cmd.replace(`'/opt/bin/baton-seat'`, shellQuote(probe));
     const file = join(stateDir, "orca", "messages", `${encodeURIComponent("r/u/s/1")}.txt`);
     // The terminal's own environment has another state dir; the command's must win.
-    for (const sh of ["bash", "sh", "zsh"]) {
+    // zsh is the operator's shell, not every CI image's; bash and sh must always be there.
+    const shells = ["bash", "sh", "zsh"].filter((sh) => Bun.which(sh) !== null);
+    expect(shells).toContain("bash");
+    expect(shells).toContain("sh");
+    for (const sh of shells) {
       const out = Bun.spawnSync([sh, "-c", run], { env: { ...process.env, BATON_STATE_DIR: "/from/orca-serve" } });
       expect([sh, out.stderr.toString()]).toEqual([sh, ""]);
       expect([sh, out.stdout.toString().split("\n")]).toEqual([sh, [cwd, stateDir, file, ""]]);
