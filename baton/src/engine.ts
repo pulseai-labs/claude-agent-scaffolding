@@ -1,8 +1,10 @@
 // The tick: one pass, under the store lock, over every armed run. Per run, in order:
-// 0 orphan recovery, 1 sources, 2 stop files, 3 live sessions, 4 wait stages,
-// 5 merge stages, 6 launches due, 7 drivers, 8 done. A host that refuses the credentials or
-// cannot be reached stops the tick with nothing marked. Step 3 also runs the decision procedure
-// for a session waiting on a pending request: wait, triage it once, act on the triage's result.
+// closing the threads an ended park kept (a host with `close` only), 0 orphan recovery,
+// 1 sources, 2 stop files, then blocked parks, 3 live sessions, 4 wait stages, 5 merge stages,
+// 6 launches due, 7 drivers, 8 done. A host that refuses the credentials or cannot be reached
+// stops the tick with nothing marked. Step 3 also runs the decision procedure for a session
+// waiting on a pending request: wait, triage it once, act on the triage's result. A session
+// waiting with no request to read and no triage out gets a blocked park (design §4.5).
 // Step 7, with a driver in the recipe: a parked unit gets one driver session, whose result
 // resumes it, escalates it to the operator, or stops the run. Only an escalate or a stop notifies.
 
@@ -25,7 +27,7 @@ import {
 import { mergeUnit, type ParkPr } from "./merge.ts";
 import { runSummary } from "./summary.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
-import { enterStage, type RunState, type Session, type Store, type UnitState } from "./state.ts";
+import { enterStage, type KeptThread, type RunState, type Session, type Store, type UnitState } from "./state.ts";
 
 export type TickReport = {
   launched: string[];
@@ -71,6 +73,9 @@ const STALLS_TO_PARK = 2;
 const DOWN_NOTIFY_MS = 30 * MIN;
 const HOOK_TIMEOUT_MS = 10 * MIN;
 const WALK_LIMIT = 5000;
+/** A blocked park's notice carries the last lines of the screen, cut to this many characters. */
+const SCREEN_LINES = 12;
+const SCREEN_CHARS = 1500;
 
 const emptyReport = (): TickReport => ({ launched: [], transitioned: [], parked: [], merged: [], errors: [] });
 const isHostError = (e: unknown) => e instanceof HostAuthError || e instanceof HostDownError;
@@ -292,17 +297,43 @@ class RunTick {
   /**
    * End the unit's session: interrupt (if asked), remove its claim, release its directory. A
    * triage still running for it is interrupted and released first: every exit ends the triage.
+   *
+   * On a host with `close` (design §4.7) the thread's terminal is closed before the release,
+   * which removes the directory it runs in. A park (`keep`), or an end after an `interrupted`
+   * status, closes nothing and releases nothing: the thread goes to `u.kept`, for the operator
+   * to read, until the unit is unparked or the run ends.
    */
-  private async endSession(u: UnitState, o: { interrupt?: string; release?: boolean } = {}): Promise<void> {
+  private async endSession(u: UnitState, o: { interrupt?: string; release?: boolean; keep?: "unpark" } = {}): Promise<void> {
     await this.endTriage(u, { interrupt: true });
     const s = u.session;
     if (!s) return;
     const { stage, scope } = this.ctx(u);
     if (o.interrupt && s.thread_id) await this.host.interrupt(s.thread_id, o.interrupt);
-    removeClaim(s.claim_key, s.claim_nonce);
-    if (o.release !== false && stage.kind === "session") await this.release(u, stage, scope, s.launch_dir, s);
+    const closing = this.host.close !== undefined && s.thread_id !== undefined && stage.kind === "session";
+    const until = o.keep ?? (s.last_state === "interrupted" ? "run-end" : undefined);
+    if (closing && until !== undefined) {
+      removeClaim(s.claim_key, s.claim_nonce);
+      const w = this.launchedWith(stage, scope, s);
+      u.kept = [...(u.kept ?? []), { thread: s.thread_id!, project: w.project, cwd: w.cwd, dir: s.launch_dir, until }];
+      this.ev("kept", { unit: u.id, thread: s.thread_id, until });
+    } else {
+      if (closing) await this.host.close!(s.thread_id!);
+      removeClaim(s.claim_key, s.claim_nonce);
+      if (o.release !== false && stage.kind === "session") await this.release(u, stage, scope, s.launch_dir, s);
+    }
     delete u.session;
     delete u.quiet_since;
+    this.save();
+  }
+
+  /** Close a kept thread, then release its directory; the entry goes only once both are done. */
+  private async closeKeptThread(u: UnitState, k: KeptThread): Promise<void> {
+    await this.host.close!(k.thread);
+    await this.releaseDir(u, k.dir, () => ({ project: k.project, cwd: k.cwd }));
+    const rest = (u.kept ?? []).filter((x) => x !== k);
+    if (rest.length) u.kept = rest;
+    else delete u.kept;
+    this.ev("closed", { unit: u.id, thread: k.thread });
     this.save();
   }
 
@@ -334,7 +365,7 @@ class RunTick {
     o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr } = {},
   ): Promise<void> {
     const thread = u.session?.thread_id ?? o.thread; // endSession deletes the session; a caller that ended it first passes it
-    await this.endSession(u, o);
+    await this.endSession(u, { ...o, keep: "unpark" });
     const at = this.nowIso();
     u.parked = { reason, at };
     this.save();
@@ -410,7 +441,8 @@ class RunTick {
     const note = m.o.notify === undefined ? undefined : render(m.o.notify, m.scope);
     if (!this.hooks(m.o.run, m.scope, hookCwd)) return this.park(u, "run failed");
     const thread = u.session?.thread_id; // endSession deletes the session; a park by outcome still records it
-    await this.endSession(u);
+    // A park by outcome keeps the thread as any park does.
+    await this.endSession(u, m.o.to === "park" ? { keep: "unpark" } : {});
     await this.move(u, m.o, note, thread);
   }
 
@@ -447,9 +479,11 @@ class RunTick {
 
   async tick(): Promise<void> {
     try {
+      await this.closeKept();
       await this.orphans();
       if (!(await this.sources())) return;
       await this.stops();
+      await this.blocked();
       await this.live();
       await this.waits();
       await this.merges();
@@ -459,6 +493,17 @@ class RunTick {
     } finally {
       // Whatever ran stays recorded, including on a host error mid-tick.
       this.save();
+    }
+  }
+
+  /** Before step 0: a unit no longer parked closes the threads its park kept. */
+  private async closeKept(): Promise<void> {
+    if (!this.host.close) return;
+    for (const u of this.ordered()) {
+      if (u.parked || !u.kept) continue;
+      await this.guard(u, async () => {
+        for (const k of u.kept!.filter((x) => x.until === "unpark")) await this.closeKeptThread(u, k);
+      });
     }
   }
 
@@ -646,6 +691,41 @@ class RunTick {
     }
   }
 
+  /**
+   * After step 2: each blocked park, in order: a stop file turns it into a `stop` park (the
+   * terminal kept); an `unpark --to` ends the session as a normal end and enters that stage; a
+   * worker no longer waiting with no request is unblocked, and step 3 reads it this same tick.
+   * Otherwise nothing changes: a blocked park runs no stall clock.
+   */
+  private async blocked(): Promise<void> {
+    for (const u of this.ordered()) {
+      const b = u.parked?.blocked;
+      if (!b) continue;
+      await this.guard(u, async () => {
+        const { stage, scope } = this.ctx(u);
+        if (stage?.kind === "session" && stage.stop_file !== undefined && existsSync(render(stage.stop_file, scope))) {
+          return this.park(u, "stop", { interrupt: "stop" });
+        }
+        if (b.to !== undefined) {
+          await this.endSession(u, { interrupt: "stop" });
+          unparkUnit(this.run, this.recipe, u, b.to, this.nowIso());
+          this.entered.add(u.id);
+          this.report.transitioned.push(u.id);
+          this.save();
+          this.ev("unpark", { unit: u.id, stage: b.to });
+          return;
+        }
+        const s = u.session;
+        const st = s?.thread_id ? await this.host.status(s.thread_id) : undefined;
+        if (st?.state === "waiting" && !st.pending) return;
+        delete u.parked;
+        if (s) s.last_progress_at = this.nowIso();
+        this.save();
+        this.ev("unblocked", { unit: u.id, thread: b.thread });
+      });
+    }
+  }
+
   /** The newest mtime over the stage's watch and done-file paths, plus the thread's activity. */
   private progressMark(stage: SessionStage, scope: Scope, activity: string): string {
     const paths: string[] = [];
@@ -688,12 +768,16 @@ class RunTick {
         const { stage, scope } = this.ctx(u);
         if (stage.kind !== "session") throw new Error(`session in non-session stage ${u.stage}`);
         const st = await this.host.status(s.thread_id!);
+        s.last_state = st.state;
         const mark = this.progressMark(stage, scope, st.activity);
         if (mark !== s.progress_mark) {
           s.progress_mark = mark;
           s.last_progress_at = this.nowIso();
         }
         if (await this.prompt(u, s, st)) return;
+        // No request to read and no triage out: the question is the operator's, at once. Only on
+        // a host that can show the screen; any other host keeps the 0.4.0 path (the stall clock).
+        if (this.host.screen !== undefined && st.state === "waiting" && !st.pending && !u.triage) return this.blockedPark(u, s, this.launchedWith(stage, scope, s).project);
         const idle = this.nowMs() - Date.parse(s.last_progress_at);
         const max = stage.max_launches ?? DEFAULT_MAX_LAUNCHES;
         const launches = own(u.launches, u.stage) ?? 0;
@@ -723,6 +807,38 @@ class RunTick {
       });
       this.save();
     }
+  }
+
+  /**
+   * Park a worker that waits on a question the host cannot read (design §4.5), on a host with
+   * `screen`. Its session, claim and directory stay and nothing is interrupted; the notice goes
+   * out with or without a driver. The screen is read first: a host error there leaves nothing
+   * marked, so the next tick parks.
+   */
+  private async blockedPark(u: UnitState, s: Session, project: string): Promise<void> {
+    const thread = s.thread_id!;
+    const tail = await this.screenTail(thread);
+    const at = this.nowIso();
+    u.parked = { reason: "blocked", at, blocked: { thread } };
+    this.save();
+    this.ev("park", { unit: u.id, stage: u.stage, reason: "blocked", thread });
+    this.report.parked.push(u.id);
+    await this.notify(`${this.run.id}/${u.id}/park/${at}`,
+      `baton ${this.run.id}/${u.id} blocked in ${u.stage} (project ${project}): the worker waits on a question — answer it in the worker's terminal — screen: ${tail}`);
+  }
+
+  /** The screen's last non-empty lines, trimmed and joined; `unavailable` with nothing to read. */
+  private async screenTail(thread: string): Promise<string> {
+    let text: string;
+    try {
+      text = await this.host.screen!(thread);
+    } catch (e) {
+      if (isHostError(e)) throw e;
+      return "unavailable";
+    }
+    const lines = text.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+    if (lines.length === 0) return "unavailable";
+    return lines.slice(-SCREEN_LINES).join(" | ").slice(-SCREEN_CHARS);
   }
 
   /** `kind` names the event: a triage that asks for a relaunch logs `triage relaunch`. */
@@ -816,7 +932,8 @@ class RunTick {
 
   /**
    * Clear the unit's triage: remove its claim and release its directory. With `interrupt`, a
-   * triage thread still at work is interrupted first (`triage dropped`).
+   * triage thread still at work is interrupted first (`triage dropped`). A host with `close`
+   * closes the thread before the release.
    */
   private async endTriage(u: UnitState, o: { interrupt?: boolean; release?: boolean } = {}): Promise<void> {
     const t = u.triage;
@@ -826,6 +943,7 @@ class RunTick {
       await this.host.interrupt(ts.thread_id, "stop");
       this.ev("triage dropped", { unit: u.id, nonce: ts.nonce, request: t.request_id });
     }
+    if (this.host.close && ts.thread_id && !t.lost) await this.host.close(ts.thread_id);
     removeClaim(ts.claim_key, ts.claim_nonce);
     if (o.release !== false) await this.releaseDir(u, ts.launch_dir, () => ({ project: ts.project!, cwd: ts.cwd! }));
     delete u.triage;
@@ -932,6 +1050,8 @@ class RunTick {
 
   private async successor(u: UnitState, stage: SessionStage, old: Session, path: string): Promise<void> {
     await this.endTriage(u, { interrupt: true });
+    // The parent's terminal closes; its claim and directory pass to the successor, unreleased.
+    if (this.host.close && old.thread_id) await this.host.close(old.thread_id);
     const n = this.mint(u);
     const scope = this.scope(u, { handoff_path: path });
     const req: LaunchRequest = {
@@ -1145,7 +1265,8 @@ class RunTick {
     if (!drv) return;
     for (const u of this.ordered()) {
       // Checked per unit: a driver's stop parks the run partway through this loop.
-      if (this.run.status !== "armed" || !u.parked || u.parked.escalated) continue;
+      // A blocked park is the operator's question: no driver takes it.
+      if (this.run.status !== "armed" || !u.parked || u.parked.escalated || u.parked.blocked) continue;
       await this.guard(u, async () => {
         try {
           if (u.driver) await this.driverResult(u, drv);
@@ -1176,12 +1297,14 @@ class RunTick {
     // The path stored at launch, never re-rendered: a result binds to the launch that wrote it.
     // A valid result is removed once read; a refused one stays for the operator (no later launch reads it).
     const res = readDriverResult(d.result_file, drv, u.stage);
+    // Ended before the result file goes: a host error in its close leaves the driver and its
+    // result in place for the next tick to read again.
+    await this.endDriver(u);
     if (!("invalid" in res)) {
       try {
         removeFile(d.result_file);
-      } catch { /* best-effort: the next launch's path differs */ }
+      } catch { /* best-effort: the next launch's path differs, or removes it before launching */ }
     }
-    await this.endDriver(u);
     if ("invalid" in res) return this.escalate(u, `driver gave no valid result (${res.invalid})`);
     const path = render(drv.ledger, scope);
     mkdirSync(dirname(path), { recursive: true });
@@ -1218,11 +1341,12 @@ class RunTick {
     return true;
   }
 
-  /** Clear the unit's driver: remove its claim and release its directory. */
+  /** Clear the unit's driver: remove its claim and release its directory; a host with `close` closes the thread first. */
   private async endDriver(u: UnitState, o: { release?: boolean } = {}): Promise<void> {
     const d = u.driver;
     if (!d) return;
     const ds = d.session;
+    if (this.host.close && ds.thread_id && !d.lost) await this.host.close(ds.thread_id);
     removeClaim(ds.claim_key, ds.claim_nonce);
     delete u.driver;
     this.save();
@@ -1358,6 +1482,10 @@ class RunTick {
   private async done(): Promise<void> {
     const units = Object.values(this.run.units);
     if (units.length === 0 || !units.every((u) => u.stage === "done")) return;
+    // Every kept thread closes before the run is marked done: a host error retries next tick.
+    if (this.host.close) {
+      for (const u of this.ordered()) for (const k of [...(u.kept ?? [])]) await this.closeKeptThread(u, k);
+    }
     this.run.status = "done";
     this.save();
     this.ev("done");

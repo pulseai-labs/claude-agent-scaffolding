@@ -30,7 +30,7 @@
     "cwd": "{param.ai_root}",
     "launch_dir": "worktree",
     "title": "triage {unit.id}",
-    "message": "Read {param.briefs}/triage.md and follow it. Stuck thread: {pending.thread}. Stage: {pending.stage}. Unit: {unit.id}. Request: {pending.request}. Questions: {pending.questions}. Note file: {run.dir}/out/{unit.id}/triage-note.md. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+    "message": "Read {param.briefs}/triage.md and follow it. Stuck thread: {pending.thread}. Stage: {pending.stage}. Run: {run.id}. Unit: {unit.id}. Request: {pending.request}. Questions: {pending.questions}. Note file: {run.dir}/out/{unit.id}/triage-note.md. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
     "env": {
       "SEAT_MODS_ROLE": "orchestrator",
       "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",

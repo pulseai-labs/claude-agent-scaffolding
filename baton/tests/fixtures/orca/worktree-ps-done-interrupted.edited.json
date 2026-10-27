@@ -1,0 +1,78 @@
+{
+  "id": "7a34495e-dd11-4177-8593-d7a7b64f5517",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+        "repoId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e",
+        "hostId": "local",
+        "terminalPlatform": "linux",
+        "repo": "pilot-fourseat",
+        "path": "/home/dev/projects/pilot-fourseat",
+        "branch": "refs/heads/main",
+        "isArchived": false,
+        "isMainWorktree": true,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": true,
+        "worktreeInstanceId": "6d70ff84-ff58-4928-85bd-49a7e3a1acee",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "displayName": "main",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1793015876707,
+        "lastActivityAt": 1792942133220,
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": false,
+        "liveTerminalCount": 1,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1793033531490,
+        "preview": "che/plugins/claude-agent-scaffolding___seat-mods___0.9.0\nplugin bin path skipped: molt has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___molt___0.3.5\nplugin bin path skipped: crew has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___crew___0.4.3",
+        "status": "active",
+        "agents": [
+          {
+            "paneKey": "65ef09a7-ba88-45eb-a72c-543f923e6b3b:037f73cd-bff0-448b-a33b-44fb694b1693",
+            "parentPaneKey": null,
+            "state": "done",
+            "agentType": "omp",
+            "prompt": "Reply with the single word ok.",
+            "taskTitle": null,
+            "displayName": null,
+            "lastAssistantMessage": "ok",
+            "toolName": null,
+            "toolInput": null,
+            "interrupted": true,
+            "stateStartedAt": 1793033531004,
+            "updatedAt": 1793033531004,
+            "programStatus": {
+              "state": "done",
+              "observedAt": 1793033530996
+            }
+          }
+        ],
+        "terminalVerdict": "live"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "totalCount": 84,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "1710eeed-e8d2-44c9-94dc-e230defa6bce"
+  }
+}

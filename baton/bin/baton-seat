@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+#
+# baton-seat - launcher for a baton worker in an Orca terminal.
+#
+#   cd '<cwd>' && BATON_STATE_DIR='<state>' exec baton-seat '<message file>'
+#
+# Looks up <state>/claims/<sha256 of the real cwd>.env, exports its keys, reads the
+# message file (then deletes it: one message starts at most one seat), and execs
+#   omp-seat "$OMP_T3_SEAT" --via "$OMP_T3_VIA" "<message text>"
+# Every refusal exits 78 with one line on stderr and one line in <state>/claims/seat.log:
+#   <utc> <result> cwd <cwd>
+# where <result> is the claim nonce, or none | invalid <line> | nomsg | toolong | noseat | noexec.
+# The claim validation is copied from omp-t3-claim on purpose; it retires with T3.
+
+set -u
+
+# Lowercase on purpose: claim keys are uppercase, so no claim line can replace the exec target.
+omp_seat_bin="${BATON_OMP_SEAT:-$HOME/.local/bin/omp-seat}"
+state="${BATON_STATE_DIR:-$HOME/.local/state/baton}"
+msgfile="${1-}"
+
+# Linux MAX_ARG_STRLEN is 131072 bytes and counts the terminating NUL.
+max_msg=131071
+
+cwd="$(realpath . 2>/dev/null)" || cwd="$PWD"
+claims="$state/claims"
+key="$(printf '%s' "$cwd" | sha256sum | cut -d' ' -f1)"
+claim="$claims/$key.env"
+nonce=none
+
+log_line() {
+  local log="$claims/seat.log" size
+  {
+    if [ -f "$log" ]; then
+      size="$(wc -c <"$log")"
+      if [ "$size" -gt 1048576 ]; then mv -f "$log" "$log.1"; fi
+    fi
+    printf '%s %s cwd %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$1" "$cwd" >>"$log"
+  } 2>/dev/null || true
+}
+
+refuse() {
+  log_line "$1"
+  printf 'baton-seat: refused (%s) in %s\n' "$1" "$cwd" >&2
+  exit 78
+}
+
+# 1. No claim is a refusal: a seat without its claim would start with the wrong identity.
+if [ ! -e "$claim" ] && [ ! -L "$claim" ]; then
+  refuse none
+fi
+
+# 2. Validate every line before exporting anything. The -f check comes before the open,
+# so a FIFO is never opened and cannot hang the terminal.
+if [ ! -f "$claim" ]; then
+  refuse "invalid 0"
+fi
+if ! { exec 3<"$claim"; } 2>/dev/null; then
+  refuse "invalid 0"
+fi
+keys=() vals=()
+n=0
+first=1
+while IFS= read -r line || [ -n "$line" ]; do
+  n=$((n + 1))
+  if [ "$first" = 1 ] && [[ "$line" == "# baton "* ]]; then
+    nonce="${line#\# baton }"
+    first=0
+    continue
+  fi
+  first=0
+  [ -z "$line" ] && continue
+  k="${line%%=*}"
+  if [[ "$line" != *=* ]] || ! [[ "$k" =~ ^[A-Z][A-Z0-9_]*$ ]]; then
+    refuse "invalid $n"
+  fi
+  case "$k" in
+    PATH|HOME|USER|SHELL|IFS|ENV|BASH_ENV|LD_PRELOAD|LD_LIBRARY_PATH)
+      refuse "invalid $n"
+      ;;
+  esac
+  keys+=("$k")
+  vals+=("${line#*=}")
+done <&3
+exec 3<&-
+
+# 3. Export literally: no expansion, no quoting. The seat identity comes from the claim
+# alone, never from the terminal's own environment.
+unset OMP_T3_SEAT OMP_T3_VIA
+for i in "${!keys[@]}"; do
+  export "${keys[$i]}=${vals[$i]}"
+done
+if [ -z "${OMP_T3_SEAT:-}" ] || [ -z "${OMP_T3_VIA:-}" ]; then
+  refuse noseat
+fi
+
+# 4. The message: a regular file (checked before any open, so a FIFO cannot hang) that
+# fits one argument.
+if [ -z "$msgfile" ] || [ ! -f "$msgfile" ]; then
+  refuse nomsg
+fi
+size="$(wc -c <"$msgfile" 2>/dev/null)" || refuse nomsg
+if [ "$size" -gt "$max_msg" ]; then
+  refuse toolong
+fi
+# 5. The seat program must be runnable before the message is spent: a refusal keeps the file.
+if [ ! -f "$omp_seat_bin" ] || [ ! -x "$omp_seat_bin" ]; then
+  refuse noexec
+fi
+text="$(cat -- "$msgfile" 2>/dev/null; printf x)"
+text="${text%x}"
+rm -f -- "$msgfile"
+
+# 6. Log and launch. exec leaves no wrapper between the terminal and omp.
+log_line "$nonce"
+exec "$omp_seat_bin" "$OMP_T3_SEAT" --via "$OMP_T3_VIA" "$text"

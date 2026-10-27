@@ -1,0 +1,41 @@
+{
+  "id": "176f1eca-212a-4b0c-bda5-aef58e3204f6",
+  "ok": true,
+  "result": {
+    "terminals": [
+      {
+        "handle": "term_9ce372e1-8d73-4999-b4db-e85223e7f6e5",
+        "ptyId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat@@050039d2",
+        "incarnationId": "1e347a0f-1fdb-4097-bdf4-f802385aa72b",
+        "orphaned": false,
+        "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+        "worktreePath": "/home/dev/projects/pilot-fourseat",
+        "branch": "refs/heads/main",
+        "tabId": "dafb4bc6-ca08-4759-b13c-7e963f530665",
+        "leafId": "43f233b7-a46b-48a0-846f-10102411b84b",
+        "title": "fixture [baton s/u/st/5]",
+        "connected": true,
+        "writable": true,
+        "lastOutputAt": 1793041186727,
+        "preview": "che/plugins/claude-agent-scaffolding___seat-mods___0.9.0\nplugin bin path skipped: molt has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___molt___0.3.5\nplugin bin path skipped: crew has no bin/ at /home/dev/.omp/plugins/cache/plugins/claude-agent-scaffolding___crew___0.4.3",
+        "executionHostId": "local",
+        "agentIdentity": "omp"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "topologyRevisions": {
+      "4a7cbd17-3fe6-4ba3-81cc-cde85e007ee1::/home/dev/projects/pulsebase/pulsebase-ai": 72,
+      "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat": 15
+    },
+    "totalCount": 2,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "26a412c9-87ac-4172-9872-b1eca867b633"
+  }
+}

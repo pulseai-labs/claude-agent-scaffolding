@@ -35,3 +35,15 @@ test("summary driver counts, ledger, no merges, bad lines", () => {
     "baton r3-s2 done — 1 units, 0 merged; parks 1: driver resumed 1, sent to you 2, operator unparks 0; " +
     "drivers 3; wall 0h07m; ledger /l/ledger.md");
 });
+
+test("a blocked park counts as sent to you; other parks do not", () => {
+  const text = log(
+    { kind: "park", unit: "a", reason: "blocked", thread: "t1" },
+    { kind: "park", unit: "b", reason: "stalled" },
+    { kind: "unblocked", unit: "a", thread: "t1" },
+  );
+  const s = runSummary(run(["a", "b"], "2026-10-25T05:00:00Z"), text, "2026-10-25T05:01:00Z");
+  expect(s).toBe(
+    "baton r3-s2 done — 2 units, 0 merged; parks 2: driver resumed 0, sent to you 1, operator unparks 0; " +
+    "drivers 0; wall 0h01m");
+});

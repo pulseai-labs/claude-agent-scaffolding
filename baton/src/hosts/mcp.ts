@@ -146,7 +146,7 @@ export async function callToolClassified(base: string, token: string, name: stri
     jsonrpc: "2.0",
     id: 1,
     method: "initialize",
-    params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "baton", version: "0.4.0" } },
+    params: { protocolVersion: PROTOCOL_VERSION, capabilities: {}, clientInfo: { name: "baton", version: "0.5.0" } },
   });
   const hello = await reply(init.res, 1);
   const bad = classify(hello);

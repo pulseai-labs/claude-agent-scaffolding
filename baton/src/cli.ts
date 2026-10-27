@@ -4,12 +4,13 @@ import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
 import { exitCode, tick, unparkUnit } from "./engine.ts";
 import { GhForge } from "./forge.ts";
-import { HostAuthError, HostDownError } from "./host.ts";
+import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.ts";
 import { callTool, readToken } from "./hosts/mcp.ts";
-import { loadT3Config, T3Host } from "./hosts/t3.ts";
+import { hostKind, makeHost } from "./hosts/select.ts";
+import { loadT3Config } from "./hosts/t3.ts";
 import { notifyOnce } from "./notify.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
-import { openStore, replaceFileSync, type RunState, type UnitState } from "./state.ts";
+import { openStore, replaceFileSync, type KeptThread, type RunState, type UnitState } from "./state.ts";
 import { login } from "./hosts/t3-login.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
@@ -19,6 +20,7 @@ const USAGE = [
   "       baton status [<run>]",
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
+  "       baton answer <run> <unit> <label>",
   "       baton report <run>",
   "       baton tick [--run <id>]",
   "       baton t3 call <tool> <json-object>",
@@ -45,6 +47,7 @@ export async function main(argv: string[]): Promise<number> {
     case "status": return statusCmd(rest);
     case "disarm": return disarmCmd(rest);
     case "unpark": return unparkCmd(rest);
+    case "answer": return answerCmd(rest);
     case "report": return reportCmd(rest);
     case "tick": return tickCmd(rest);
     case "t3": return t3Cmd(rest);
@@ -101,6 +104,12 @@ async function armCmd(args: string[]): Promise<number> {
   if (file === undefined || runId === undefined) return usage();
   if (!RUN_ID_RE.test(runId)) return fail(`run id "${runId}" must match ^[a-z0-9_-]+$`);
   if (isProtoName(runId)) return fail(`run id "${runId}" ${PROTO_NAME_ERROR}`);
+  // A host key the tick would refuse fails here, before a run exists for the timer to tick.
+  try {
+    hostKind();
+  } catch (e) {
+    return fail((e as Error).message);
+  }
 
   let bytes: Buffer;
   try {
@@ -205,11 +214,56 @@ async function disarmCmd(args: string[]): Promise<number> {
       if (!u.session) continue;
       removeClaim(u.session.claim_key, u.session.claim_nonce);
     }
+    await closeKept(run);
     run.status = "disarmed";
     store.writeRun(run);
     store.event(id, { kind: "disarmed" });
     return 0;
   });
+}
+
+/**
+ * Close every kept thread of the run, and a blocked park's worker thread, then release its
+ * directory. A failure is printed and the disarm goes on; an entry that could not be closed stays
+ * in `u.kept` (a blocked park's in `u.session`), its directory unreleased.
+ */
+async function closeKept(run: RunState): Promise<void> {
+  let host: Host | undefined;
+  let hostErr = "";
+  try {
+    host = makeHost();
+  } catch (e) {
+    hostErr = (e as Error).message;
+  }
+  /** Close, then release; false when the close failed (the directory is then not released). */
+  const closeThenRelease = async (k: { thread: string; project: string; cwd: string; dir: string }): Promise<boolean> => {
+    try {
+      if (!host) throw new Error(hostErr);
+      if (!host.close) throw new Error("host cannot close");
+      await host.close(k.thread);
+    } catch (e) {
+      process.stderr.write(`baton disarm: could not close ${k.thread}: ${(e as Error).message}\n`);
+      return false;
+    }
+    try {
+      await host.release(k.project, k.cwd, k.dir);
+    } catch (e) {
+      process.stderr.write(`baton disarm: could not release ${k.dir}: ${(e as Error).message}\n`);
+    }
+    return true;
+  };
+  for (const u of Object.values(run.units)) {
+    const left: KeptThread[] = [];
+    for (const k of u.kept ?? []) if (!(await closeThenRelease(k))) left.push(k);
+    if (left.length) u.kept = left;
+    else delete u.kept;
+    // A blocked park's worker is still open; on a host with `close` it goes as a kept thread does.
+    // Its session has project and cwd: blocked parks are newer than sessions without them.
+    const s = u.session;
+    if (u.parked?.blocked && s?.thread_id && (!host || host.close)) {
+      if (await closeThenRelease({ thread: s.thread_id, project: s.project!, cwd: s.cwd!, dir: s.launch_dir })) delete u.session;
+    }
+  }
 }
 
 async function unparkCmd(args: string[]): Promise<number> {
@@ -261,10 +315,67 @@ async function unparkCmd(args: string[]): Promise<number> {
         recipe = undefined;
       }
     }
+    if (unit.parked?.blocked) {
+      // A blocked park keeps its session. In place, the park goes and the counts stand (the live
+      // launch still counts); a worker still waiting parks again next tick. `--to` is left to the
+      // tick, which ends the session before the move.
+      if (to === undefined) {
+        delete unit.parked;
+        store.writeRun(run);
+        store.event(runId!, { kind: "unpark", unit: unitId, stage: unit.stage });
+      } else {
+        unit.parked.blocked.to = to;
+        store.writeRun(run);
+        store.event(runId!, { kind: "unpark requested", unit: unitId, stage: to });
+      }
+      return 0;
+    }
     const { stage, consumed } = unparkUnit(run, recipe, unit, to, new Date().toISOString());
     store.writeRun(run);
     store.event(runId!, { kind: "unpark", unit: unitId, stage, ...(consumed !== undefined ? { consumed } : {}) });
     return 0;
+  });
+}
+
+// ---- answer ---------------------------------------------------------------------------
+// The one answer path for a worker's pending question. rc 0 sent, 2 refused, 3 host auth, 4 host down.
+// It answers one question with one option, by the option's exact label (byte for byte); anything
+// else is left to whoever can read the screen.
+
+async function answerCmd(args: string[]): Promise<number> {
+  if (args.length !== 3) return usage();
+  const [runId, unitId, label] = args;
+  return locked(async () => {
+    const store = openStore();
+    let run: RunState;
+    try {
+      run = store.readRun(runId);
+    } catch {
+      return fail(`no such run: ${runId}`);
+    }
+    const unit = own(run.units, unitId);
+    if (!unit) return fail(`no such unit: ${unitId}`);
+    const thread = unit.session?.thread_id;
+    if (!thread) return fail("no live session");
+    try {
+      const host = makeHost();
+      if (!host.respond) return fail("host cannot answer");
+      const pending = (await host.status(thread)).pending;
+      if (!pending || pending.questions.length === 0) return fail("no pending request");
+      if (pending.questions.length > 1) return fail("several questions");
+      const q = pending.questions[0];
+      if (q.multiSelect === true) return fail("multi-select");
+      if (!q.options.some((o) => o.label === label)) return fail(`no option labelled "${label}"`);
+      await host.respond(thread, pending.id, { [q.id]: label });
+      store.event(runId, { kind: "answered", unit: unitId, request: pending.id, label });
+      return 0;
+    } catch (e) {
+      process.stderr.write(`baton answer: ${(e as Error).message}\n`);
+      if (e instanceof AnswerRefused) return 2;
+      if (e instanceof HostAuthError) return 3;
+      if (e instanceof HostDownError) return 4;
+      return 2;
+    }
   });
 }
 
@@ -312,18 +423,20 @@ async function tickCmd(args: string[]): Promise<number> {
   if (args.length === 2 && args[0] === "--run" && RUN_ID_RE.test(args[1]) && !isProtoName(args[1])) runId = args[1];
   else if (args.length !== 0) return usage();
   try {
-    const cfg = loadT3Config();
-    // Only `expires_at` is read from the token here; the token itself stays inside the host.
-    let expiresAt: number | undefined;
-    try {
-      expiresAt = readToken(cfg.tokenFile).expires_at;
-    } catch { /* a missing or unreadable token surfaces as a host auth error when used */ }
-    if (expiresAt !== undefined && expiresAt * 1000 - Date.now() < 3 * DAY_MS) {
-      const day = new Date().toISOString().slice(0, 10);
-      await notifyOnce(`token/${day}`, `t3 token expires ${new Date(expiresAt * 1000).toISOString()} — run baton t3 login`);
+    const host = makeHost();
+    if (hostKind() === "t3") {
+      // Only `expires_at` is read from the token here; the token itself stays inside the host.
+      let expiresAt: number | undefined;
+      try {
+        expiresAt = readToken(loadT3Config().tokenFile).expires_at;
+      } catch { /* a missing or unreadable token surfaces as a host auth error when used */ }
+      if (expiresAt !== undefined && expiresAt * 1000 - Date.now() < 3 * DAY_MS) {
+        const day = new Date().toISOString().slice(0, 10);
+        await notifyOnce(`token/${day}`, `t3 token expires ${new Date(expiresAt * 1000).toISOString()} — run baton t3 login`);
+      }
     }
     const r = await tick({
-      store: openStore(), host: new T3Host(cfg), forge: new GhForge(), notify: notifyOnce, now: () => new Date(), runId,
+      store: openStore(), host, forge: new GhForge(), notify: notifyOnce, now: () => new Date(), runId,
     });
     for (const e of r.errors) process.stderr.write(`baton tick: ${e}\n`);
     return exitCode(r);
