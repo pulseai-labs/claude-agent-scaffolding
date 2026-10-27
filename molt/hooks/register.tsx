@@ -52,6 +52,9 @@ const lastMd = new Map<string, string>()  // the last .md a session wrote past t
 const forced = new Set<string>()          // /molt now: the command stage whatever the fill
 let unattended = 0                        // molts since the operator last sent a prompt
 let pending: { oldSession: string; handoff: string; chain: string; depth: number } | undefined
+// The turn-end request molt submitted and that has not yet arrived at prompt.submit (#929):
+// one at a time, and it runs only in the session that was asked.
+let asked: { sessionId: string; text: string } | undefined
 const warned = new Map<string, number>()   // warnings delivered per session: 0, 1 or 2
 const handedOff = new Set<string>()        // child sessions that have named their handoff
 const commandNoted = new Set<string>()     // child sessions whose status file says HANDOFF_REQUIRED
@@ -585,6 +588,18 @@ export const register: Register = (on, options) => {
   })
 
   on('prompt.submit', async ($, e, next) => {
+    // molt's own turn-end request: it runs only in the session that was asked, and never
+    // while a molt is in flight (#929 review).
+    if (asked !== undefined && e.origin.kind === 'plugin' && e.origin.name === 'molt' && e.text === asked.text) {
+      const request = asked
+      asked = undefined
+      try {
+        if ((await $.session.id()) !== request.sessionId || inFlight) {
+          await log($, `request dropped session=${request.sessionId}`)
+          return { drop: 'molt: the handoff request was dropped: the session moved on' }
+        }
+      } catch {}
+    }
     try {
       const sessionId = await $.session.id()
       // An Agent SDK host (T3 Code) delivers the operator's message as an `sdk` prompt.
@@ -749,11 +764,17 @@ export const register: Register = (on, options) => {
         // classic.Stop, which held the turn open, never runs for a plugin on an org account).
         const n = stopBlocks.get(sessionId) ?? 0
         if (!atLeast(stage, 'fallback') && n < MAX_STOP_BLOCKS) {
+          // A turn that never answered (an API error, a refusal) is not asked; nor is one that
+          // ends while the last request still waits its turn (#929 review).
+          if (e.reason === 'error' || e.reason === 'refusal' || asked !== undefined) return r
           stopBlocks.set(sessionId, n + 1)
           await noteCommand($, sessionId)
           const text = missing === undefined ? await instruction($, sessionId) : fill(MISSING_HANDOFF, { path: missing })
           // Not awaited: the request's turn cannot start until this hook returns.
+          const mine = { sessionId, text }
+          asked = mine
           $.prompt.submit({ text }).catch(async (err: unknown) => {
+            if (asked === mine) asked = undefined
             await log($, `request failed session=${sessionId} ${String(err)}`)
           })
           return r

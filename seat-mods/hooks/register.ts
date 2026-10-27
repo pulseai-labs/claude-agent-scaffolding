@@ -1,7 +1,7 @@
 import type { EngineInterface, Register } from 'claude-code'
 import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
-import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, waitingOnOperator, rewriteReason, redoDrop, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, WAITING_NOTICE } from './status'
+import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, waitingOnOperator, rewriteReason, redoDrop, REDO_ORPHAN, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, WAITING_NOTICE } from './status'
 import { autonomicPath, moltStagePath, parseAutonomic, seatLogPath } from './records'
 
 type Engine = EngineInterface
@@ -13,11 +13,22 @@ type Engine = EngineInterface
 // started in.
 let turn: { status: boolean; redone: boolean; sessionId: string } | undefined
 
-// The redo seat-mods submitted at a failed status turn's end, until it arrives at
-// prompt.submit (#929: classic.Stop, which held the turn open, never runs for a plugin on
-// an org account). `warning` is the failure's flag, shown if the redo never runs;
-// `superseded` marks another turn that started first.
-let pending: { sessionId: string; warning: string; superseded: boolean } | undefined
+// The redos seat-mods submitted at failed status turns' ends, oldest first, until each
+// arrives at prompt.submit (#929: classic.Stop, which held the turn open, never runs for a
+// plugin on an org account). The host runs queued prompts in order, so each seat-mods
+// prompt that arrives answers the oldest entry. `warning` is the failure's flag and `reply`
+// the failed reply, shown and rung if the redo never runs; `superseded` marks another turn
+// that started first.
+type Redo = { sessionId: string; warning: string; reply: string; superseded: boolean }
+const pending: Redo[] = []
+
+// A redo that never runs leaves the failed reply as the turn that stands: its flag, and its
+// waiting-on-operator notice and bell (#873), are shown as toasts.
+async function standAlone($: Engine, redo: Redo): Promise<void> {
+  $.ui.toast(redo.warning)
+  const notice = await noticeFor($, redo.reply)
+  if (notice !== undefined) $.ui.toast(notice)
+}
 
 async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
@@ -202,14 +213,18 @@ export const register: Register = on => {
     if (state.kind !== 'free' || state.role !== 'orchestrator') return next(e)
     // seat-mods' own redo (#929): it runs only in the session whose turn failed, before any
     // other turn, while molt does not act on that turn end (molt's handoff wins).
-    const redo = e.origin.kind === 'plugin' && e.origin.name === 'seat-mods' && e.turnId === undefined ? pending : undefined
+    const mine = e.origin.kind === 'plugin' && e.origin.name === 'seat-mods' && e.turnId === undefined
+    const redo = mine ? pending.shift() : undefined
+    // seat-mods submits nothing but redos: one with no entry (a reloaded module) never runs
+    // as a status turn of its own, which could earn it a second redo.
+    if (mine && redo === undefined) return { drop: REDO_ORPHAN }
     if (redo !== undefined) {
       const [homeDir, id] = await Promise.all([$.env.get('HOME'), $.session.id()])
       const stage = await $.fs.read(moltStagePath(homeDir ?? '', redo.sessionId)).catch(() => undefined)
       const drop = redoDrop({ pendingSession: redo.sessionId, currentSession: id, superseded: redo.superseded, moltStage: typeof stage === 'string' ? stage : undefined })
       if (drop !== undefined) {
-        pending = undefined
-        $.ui.toast(redo.warning)
+        // In another session the old flag means nothing; elsewhere the failed reply stands.
+        if (id === redo.sessionId) await standAlone($, redo)
         return { drop }
       }
     }
@@ -222,13 +237,15 @@ export const register: Register = on => {
     const r = await next(withContext ? { ...e, context: [...(e.context ?? []), STATUS_CONTEXT] } : e)
     // A refused prompt never entered: its result stands and the turn is untouched
     // (Codex, PR #874 round 4).
-    if (r.drop !== undefined) return r
+    if (r.drop !== undefined) {
+      if (redo !== undefined) await standAlone($, redo)
+      return r
+    }
     // With the prompt confirmed in: a new turn sets the record from its kind; a
     // non-waiting operator prompt typed into the running turn frees it. Any other new
     // turn starting while a redo waits goes first, so the redo is dropped on arrival.
     if (e.turnId === undefined) {
-      if (redo !== undefined) pending = undefined
-      else if (pending !== undefined) pending.superseded = true
+      if (redo === undefined) for (const queued of pending) queued.superseded = true
       turn = { status: kind === 'status', redone: redo !== undefined, sessionId: await $.session.id() }
     } else if (kind === 'operator' && e.wait !== true && turn !== undefined) {
       turn.status = false
@@ -245,7 +262,9 @@ export const register: Register = on => {
     // The main turn is over.
     const ended = turn
     turn = undefined
-    if (ended?.status !== true || e.isAborted) return r
+    // An interrupted turn, and one that ended in an API error or a refusal, never answered:
+    // classic.Stop did not run on them either (#929 review).
+    if (ended?.status !== true || e.isAborted || e.reason === 'error' || e.reason === 'refusal') return r
     const reply = e.answer ?? ''
     if (hasMoltHandoff(reply)) return r
     // The shape failure first, else the idle failure (#876): one redo per turn is shared
@@ -257,11 +276,12 @@ export const register: Register = on => {
     if (failure !== undefined && !ended.redone) {
       // One redo turn (#929), not awaited: it starts once this turn is over. The reply
       // stands as it is meanwhile — no flag and no bell while its redo is pending.
-      const mine = { sessionId: ended.sessionId, warning: failure.warning, superseded: false }
-      pending = mine
+      const mine: Redo = { sessionId: ended.sessionId, warning: failure.warning, reply, superseded: false }
+      pending.push(mine)
       $.prompt.submit({ text: failure.reason }).catch(async (err: unknown) => {
-        if (pending === mine) pending = undefined
-        $.ui.toast(mine.warning)
+        const at = pending.indexOf(mine)
+        if (at !== -1) pending.splice(at, 1)
+        await standAlone($, mine)
         await log($, `redo failed ${String(err)}`)
       })
       return r

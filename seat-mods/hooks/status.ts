@@ -50,8 +50,9 @@ export function isCrewTagged(text: string): boolean {
 // sdk turn is a `claude -p` host turn, which may be typed by the operator —
 // the anti-goal on typed turns outranks goal 1). A plugin prompt is status
 // unless it is autonomic's: its only `$.prompt.submit` is the pain-band press,
-// the operator's own chosen option. molt's are its handoff requests and its seed
-// (#929): a request asks for a MOLT-HANDOFF line, never the status block. `unclassified` and any unknown kind stay
+// the operator's own chosen option. molt's handoff requests (#929) are not status
+// turns either: each asks for a MOLT-HANDOFF line, never the status block. molt's seed
+// (no MOLT-HANDOFF line) starts the next session's work and stays a status turn. `unclassified` and any unknown kind stay
 // on the operator fallback; only they are untagged.
 export function classifyPrompt(origin: { kind: string; name?: string }, text: string): 'status' | 'operator' {
   switch (origin.kind) {
@@ -66,7 +67,7 @@ export function classifyPrompt(origin: { kind: string; name?: string }, text: st
     case 'auto-continuation':
       return 'status'
     case 'plugin':
-      return (origin.name === 'autonomic' || origin.name === 'molt') && !isCrewTagged(text) ? 'operator' : 'status'
+      return (origin.name === 'autonomic' || (origin.name === 'molt' && text.includes('MOLT-HANDOFF:'))) && !isCrewTagged(text) ? 'operator' : 'status'
     case 'composer':
     case 'bridge':
     case 'channel':
@@ -209,6 +210,7 @@ export function moltActs(stageFile: string | undefined): boolean {
 // only in the session whose turn failed, before any other turn, while molt does not act
 // on that turn end (operator ruling 2026-10-27: molt's handoff wins).
 const REDO_DROPPED = 'seat-mods: the status rewrite was dropped: '
+export const REDO_ORPHAN = `${REDO_DROPPED}no failed status turn is waiting for it`
 
 export function redoDrop(r: { pendingSession: string; currentSession: string; superseded: boolean; moltStage: string | undefined }): string | undefined {
   if (r.currentSession !== r.pendingSession) return `${REDO_DROPPED}the session changed`

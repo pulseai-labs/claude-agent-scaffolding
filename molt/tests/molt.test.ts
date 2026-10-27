@@ -29,6 +29,17 @@ describe('a molt from a marker', () => {
       .toEqual({ from: 's1', chain: 's1', depth: 1, handoff: H })
     expect(w.prompts.at(-1)).toContain(H)
   })
+  test("the host's order: session.end (clear) before the switch, then the seed (#929 review)", async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.clearTo.push('s2')
+    w.beforeClear = () => $.session.end(CLEARED('s1'))
+    at(w, 67)
+    await $.turn.complete(TURN(`done\nMOLT-HANDOFF: ${H}`))
+    await flush()
+    expect(w.prompts.at(-1)).toContain(H)
+    expect(JSON.parse(w.files.get('/home/u/.claude/state/molt/lineage/s2.json') ?? '{}'))
+      .toEqual({ from: 's1', chain: 's1', depth: 1, handoff: H })
+  })
   test('a seed into a session already past the first warning carries no warning (PR #670 review)', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
     w.clearTo.push('s2')

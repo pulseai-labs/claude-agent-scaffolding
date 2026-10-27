@@ -47,6 +47,21 @@ describe('past soft', () => {
     await $.turn.complete(TURN('done', { agentId: 'a1' })); await flush()
     expect(requests(w)).toEqual([])
   })
+  test('no request on an error or a refusal turn end (#929 review)', async ($, on) => {
+    const w = world(on); at(w, 67)
+    await $.turn.complete(TURN('', { reason: 'error' })); await flush()
+    await $.turn.complete(TURN('', { reason: 'refusal', refusal: { category: 'other' } })); await flush()
+    expect(requests(w)).toEqual([])
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(1)
+  })
+  test('a request that arrives in another session is dropped (#929 review)', async ($, on) => {
+    const w = world(on); at(w, 67)
+    // The session moves on while molt's turn end runs: at its stage write, after it read the id.
+    w.onWrite = path => { if (path.includes('/molt/stage/')) w.session.id = 's2' }
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
+  })
   test('a refused request is logged and the turn end still resolves (#929)', async ($, on) => {
     const w = world(on); at(w, 67)
     w.rejectSeeds = true

@@ -1047,7 +1047,8 @@ describe('orchestrator status block (#867, #929)', () => {
     await ends($, 'Done.')
     await flush()
     expect(redos(w)).toEqual([])
-    expect(w.toasts).toEqual([STATUS_WARNING])
+    // The old session's flag is not shown in the new one.
+    expect(w.toasts).toEqual([])
   })
 
   test('17. a rejected redo logs, flags, and turn.complete still resolves', async ($, on) => {
@@ -1060,6 +1061,51 @@ describe('orchestrator status block (#867, #929)', () => {
     await flush()
     expect(w.toasts).toEqual([STATUS_WARNING])
     expect(w.runs.filter(argv => argv.join(' ').includes('redo failed')).length).toBe(1)
+  })
+})
+
+describe('the redo turn, review fixes (#929)', () => {
+  test('no redo on an error or a refusal turn end', async ($, on) => {
+    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    await $.prompt.submit(notify())
+    expect((await ends($, '', { reason: 'error' })).text).toBe('')
+    await flush()
+    await $.prompt.submit(notify())
+    await ends($, '', { reason: 'refusal', refusal: { category: 'other' } })
+    await flush()
+    expect(redos(w)).toEqual([])
+  })
+
+  test('a seat-mods prompt with no redo pending is dropped, never an unmarked status turn', async ($, on) => {
+    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    const r = await $.prompt.submit({ text: SHAPE, origin: SEAT_MODS, wait: false } as never)
+    expect(r.drop).toBeDefined()
+    expect(redos(w)).toEqual([])
+  })
+
+  test('a dropped redo still rings the failed reply\'s waiting-on-operator notice', async ($, on) => {
+    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' }, undefined, undefined, { files: {
+      '/home/u/.claude/state/molt/stage/s1': '{"stage":"command"}\n',
+      '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode":"autopilot","bell":"notify-me"}',
+    } })
+    await $.prompt.submit(notify())
+    await ends($, 'Done.\nWaiting on operator: decision: merge #12 now?')
+    await flush()
+    expect(redos(w)).toEqual([])
+    expect(w.toasts).toEqual([STATUS_WARNING, 'seat-mods: waiting on operator — decision: merge #12 now?'])
+    expect(w.bellRuns.length).toBe(1)
+  })
+
+  test('a rejected redo still rings the failed reply\'s waiting-on-operator notice', async ($, on) => {
+    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' }, undefined, (e, call) => {
+      if (call === 2) throw new Error('prompt refused')
+      return { text: e.text, context: e.context }
+    }, { files: { '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode":"autopilot","bell":"notify-me"}' } })
+    await $.prompt.submit(notify())
+    await ends($, 'Done.\nWaiting on operator: decision: merge #12 now?')
+    await flush()
+    expect(w.toasts).toEqual([STATUS_WARNING, 'seat-mods: waiting on operator — decision: merge #12 now?'])
+    expect(w.bellRuns.length).toBe(1)
   })
 })
 

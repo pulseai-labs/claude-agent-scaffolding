@@ -16,6 +16,8 @@ export type World = {
   bellFinished: boolean        // a bell answered (after its delay, if any)
   prompts: string[]
   plugin: string[]             // the prompts a plugin submitted (molt's requests and seed), in order
+  beforeClear?: () => Promise<unknown>   // runs inside /clear before the session id switches
+  onWrite?: (path: string) => void       // runs at each fs.write, before it lands
   contexts: string[]           // what reached the model beside each prompt, in order
   fills: string[]              // what molt put in the prompt box
   hasBox: boolean              // false: the session binds no prompt box (a -p run)
@@ -81,6 +83,7 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   })
   on('fs.write', async (_$, e) => {
     if (w.slowWrites?.test(e.path)) await new Promise(resolve => sleep(resolve, 20))
+    w.onWrite?.(e.path)
     if (w.failWrites?.test(e.path)) return { deny: `EROFS: ${e.path}` } as never
     w.files.set(e.path, e.text)
     return { value: undefined } as never
@@ -117,10 +120,15 @@ export function world(on: On, opts: { env?: Record<string, string>; files?: Reco
   on('command.register', () => ({ value: undefined }) as never)
   // With an id queued, the clear switches the session before it resolves, as the host does;
   // with none, it answers { text } and clears nothing, as a hook that swallows /clear would.
-  on('command.run', { command: 'clear' }, () => {
+  on('command.run', { command: 'clear' }, async () => {
     w.clears += 1
     const next = w.clearTo.shift()
-    if (next !== undefined) w.session.id = next
+    // A hook's $ cannot raise session.end, so a test that wants the host's order (the ending
+    // session's session.end before the switch) raises it here with its own $.
+    if (next !== undefined) {
+      if (w.beforeClear !== undefined) await w.beforeClear()
+      w.session.id = next
+    }
     return { text: '' }
   })
   on('prompt.fill', (_$, e) => {

@@ -11,7 +11,9 @@ molt registers no `classic.*` hook now, on any host.
 - **The turn-end request is a follow-up turn.** Past the command threshold, a turn that ends with
   no usable `MOLT-HANDOFF:` line gets one prompt from molt once it is over: the instruction, or the
   missing-file text naming the path. At most twice per window, as the Stop block was; then the
-  fallback brief. Not on an interrupted turn or a subagent's. A refused request is logged.
+  fallback brief. Not on an interrupted turn, a subagent's, or one that ended in an API error or a
+  refusal. One request waits at a time; one that arrives in another session or during a molt is
+  dropped. A refused request is logged.
 - **The warnings ride the tool result** (`tool.call`'s model-only `context`), once each, as they
   rode `classic.PostToolUse`. A subagent's result and a refused call carry none.
 - **Window resets come from the session events:** a `/clear` or a resume from `session.end`, a

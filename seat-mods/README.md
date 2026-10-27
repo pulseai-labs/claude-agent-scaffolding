@@ -232,10 +232,13 @@ error (#929):
   `⚠ seat-mods: status block missing — this status reply is not in the required form.` It changes
   neither the answer nor the transcript. An interrupted turn, a subagent's turn end and a turn that
   ends on molt's `MOLT-HANDOFF:` line are not checked.
-- The redo is dropped when it arrives, and the line shows as a toast instead, if the session
-  changed (a `/clear` or a molt), if another prompt started a turn first (the operator's, a
+- No redo follows a turn that never answered: an interrupted turn, an API error, a refusal.
+- The redo is dropped when it arrives if another prompt started a turn first (the operator's, a
   notification), or if molt's stage file (`~/.claude/state/molt/stage/<id>`) reads `command`,
-  `block` or `fallback`: molt acts on that turn end, and its handoff wins.
+  `block` or `fallback`: molt acts on that turn end, and its handoff wins. The line, and the
+  failed reply's waiting-on-operator notice, show as toasts instead. In another session (a
+  `/clear` or a molt) it is dropped quietly. molt's handoff requests are not status turns; its
+  seed is.
 
 On the same block, an **idle check** (#876) reads three fields. When both wait fields — Waiting
 on (seats live) and Waiting on operator — read `none` while Next steps names work, the

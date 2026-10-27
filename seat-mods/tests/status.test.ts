@@ -190,8 +190,9 @@ describe('waitingOnOperator (#873)', () => {
 })
 
 describe('the redo turn (#929)', () => {
-  test("molt's prompts are not status turns; seat-mods' own redo is", () => {
-    expect(classifyPrompt({ kind: 'plugin', name: 'molt' }, 'write the handoff')).toBe('operator')
+  test("molt's handoff requests are not status turns; its seed and seat-mods' own redo are", () => {
+    expect(classifyPrompt({ kind: 'plugin', name: 'molt' }, 'Write the handoff, then end your reply with MOLT-HANDOFF: <path>.')).toBe('operator')
+    expect(classifyPrompt({ kind: 'plugin', name: 'molt' }, '↪ molt: this session continues from the handoff at /h.md.')).toBe('status')
     expect(classifyPrompt({ kind: 'plugin', name: 'molt' }, '[crew report implementer] T1 final /r.md')).toBe('status')
     expect(classifyPrompt({ kind: 'plugin', name: 'seat-mods' }, 'x')).toBe('status')
   })
