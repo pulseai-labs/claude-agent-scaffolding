@@ -6,7 +6,7 @@ import { blockedOffer, offerFor, type Offer, type Picker } from "../src/offer.ts
 import { serve } from "../src/serve.ts";
 import { spoolNotice } from "../src/spool.ts";
 import { handleTap } from "../src/tap.ts";
-import { captureErr, COLOURS, HEAD, makeEnv, P1, P5, PR, screenJson, type Env } from "./helpers.ts";
+import { captureErr, COLOURS, defaultRun, HEAD, makeEnv, P1, P5, PR, screenJson, type Env } from "./helpers.ts";
 
 const T0 = new Date("2026-10-27T17:00:00Z");
 const PARK = `r1/u1/park/${P1}`;
@@ -54,6 +54,24 @@ test("Unpark runs baton unpark and reports the result", async () => {
   expect(next(PARK)).toMatchObject({ phase: "asked", say: "r1/u1 parked: Unpark — done" });
   expect(next(PARK).ask_id).toBeUndefined();
   expect(taps()).toEqual([{ at: T0.toISOString(), key: PARK, label: "Unpark", other: false, act: "unpark", rc: 0 }]);
+});
+
+test("Unpark on a question whose park was replaced runs nothing (CodeRabbit #938)", async () => {
+  const r = park();
+  const run = defaultRun();
+  (run.units as Record<string, any>).u1.parked = { reason: "stalled", at: "2026-10-27T16:00:00.000Z" };
+  env.writeRun(run);
+  for (const label of ["Unpark", "Unpark to stage…"]) {
+    record({ ...r, phase: "asked" });
+    await handleTap(r, label, ctx());
+  }
+  expect(env.runs).toEqual([]);
+  expect(next(PARK).say).toBe("r1/u1 parked: the park this question was for is gone; nothing ran.");
+  // and a stage tapped on the stage list of the old park
+  const stage = { ...r, key: `${PARK}#9`, offer: { ...r.offer!, options: [{ label: "review", act: { do: "unpark-stage" as const, stage: "review" } }] } };
+  record(stage);
+  await handleTap(stage, "review", ctx());
+  expect(env.runs).toEqual([]);
 });
 
 test("a failing command reports its first stderr line", async () => {

@@ -114,6 +114,13 @@ async function act(rec: DeliveryRec, a: Act, ctx: TapCtx): Promise<number | unde
     return res.rc;
   };
   const noUnit = (what: string): number => result(what, { rc: 1, stderr: "the question carries no unit" });
+  // An unpark acts on whatever park the unit is in now; a question asked for an older park runs
+  // nothing. (A screen answer has the same check inside baton, through --park.)
+  if ((a.do === "unpark" || a.do === "unpark-to" || a.do === "unpark-stage") && rec.unit && rec.park_at
+    && readUnit(rec.run, rec.unit)?.parked?.at !== rec.park_at) {
+    say(`${rec.title}: the park this question was for is gone; nothing ran.`);
+    return undefined;
+  }
 
   switch (a.do) {
     case "unpark":
