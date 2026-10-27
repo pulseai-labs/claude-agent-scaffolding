@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world, flush, requests, CLEARED, COMPACT, READ } from './world'
+import { world, flush, requests, CLEARED, COMPACT, MARK, READ } from './world'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
 const TURN = (answer: string, extra: object = {}) =>
@@ -39,6 +39,19 @@ describe('a molt from a marker', () => {
     expect(w.prompts.at(-1)).toContain(H)
     expect(JSON.parse(w.files.get('/home/u/.claude/state/molt/lineage/s2.json') ?? '{}'))
       .toEqual({ from: 's1', chain: 's1', depth: 1, handoff: H })
+  })
+  test('nothing after the clear stops the seed: another plugin failing at session.end (#933)', async ($, on) => {
+    const w = world(on, { files: { [H]: '# handoff' } })
+    w.failSessionEnd = true
+    w.clearTo.push('s2')
+    // The host goes on with the clear when a session.end listener throws.
+    w.beforeClear = () => $.session.end(CLEARED('s1')).catch(() => undefined)
+    at(w, 67)
+    await $.turn.complete(TURN(`done\nMOLT-HANDOFF: ${H}`))
+    await flush()
+    expect(w.prompts.at(-1)).toContain(H)
+    // molt's own session.end work ran before the sibling threw.
+    expect(w.files.has(MARK('s1'))).toBe(false)
   })
   test('a seed into a session already past the first warning carries no warning (PR #670 review)', async ($, on) => {
     const w = world(on, { files: { [H]: '# handoff' } })
