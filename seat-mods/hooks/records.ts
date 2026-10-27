@@ -1,4 +1,4 @@
-// seat-mods' files: the one record of another plugin it reads, and its own log. Every path
+// seat-mods' files: the records of other plugins it reads, and its own log. Every path
 // is under ~/.claude/state, keyed by session id; the id must be a plain name to be a file
 // name. autonomicPath and parseAutonomic are molt's, copied byte for byte; tests/
 // test-mod-shell-parity.sh holds the pair identical.
@@ -6,6 +6,9 @@
 const STATE = '.claude/state'
 
 export const autonomicPath = (home: string, id: string) => `${home}/${STATE}/autonomic/sessions/${id}.json`
+
+// molt's stage file (#929): the same path molt's stagePath builds.
+export const moltStagePath = (home: string, id: string) => `${home}/${STATE}/molt/stage/${id}`
 
 export const seatLogPath = (home: string) => `${home}/${STATE}/seat-mods/seat-mods.log`
 

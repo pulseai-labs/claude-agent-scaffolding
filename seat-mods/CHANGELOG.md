@@ -2,6 +2,30 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.11.0 — unreleased
+
+#929: the orchestrator status-block check works on org accounts. Claude Code skips a plugin's
+`classic.*` hooks there, with no error, so the check on `classic.Stop` never ran and status turns
+came back in any shape.
+
+- **The check moved to `turn.complete`, with one redo turn.** A status turn whose reply misses the
+  block (or idles, #876) ends as it is; seat-mods then submits one prompt with the failing reason,
+  which starts once the turn is over. The redo is checked too; its miss stands, with the same
+  warning line as before. This is the one path on every host, personal accounts included. The
+  waiting-on-operator notice and bell (#873) fire only on the turn that stands, never on a reply
+  whose redo is pending.
+- **The redo is dropped when it arrives**, with the warning as a toast, if the session changed (a
+  `/clear` or a molt), if another prompt started a turn first, or if molt's stage file reads
+  `command`, `block` or `fallback`: molt acts on that turn end, and its handoff wins (operator
+  ruling 2026-10-27).
+- **molt's prompts are operator turns**, like autonomic's: a molt handoff request asks for a
+  `MOLT-HANDOFF:` line, so it gets no status-block context.
+- **`run-tests.sh` refuses a `classic.*` hook registration** in `hooks/`.
+- Known limits: under `claude -p` the printed result is the redo's reply, not the first one; an
+  Agent SDK host was not probed; a block raised by a `classic.Stop` hook beneath seat-mods is no
+  longer seen; a molt pause (unattended or no progress) is not in molt's stage file, so a redo can
+  still run on a paused session's last turn.
+
 ## 0.10.0 — 2026-10-26
 
 Batch 5 (#724, #702): fewer false stops on honest work, and the hiding spellings that can be closed
