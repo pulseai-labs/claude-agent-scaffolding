@@ -2,6 +2,36 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.11.0 — unreleased
+
+#929: the orchestrator status-block check works on org accounts. Claude Code skips a plugin's
+`classic.*` hooks there, with no error, so the check on `classic.Stop` never ran and status turns
+came back in any shape.
+
+- **The check moved to `turn.complete`, with one redo turn.** A status turn whose reply misses the
+  block (or idles, #876) ends as it is; seat-mods then submits one prompt with the failing reason,
+  which starts once the turn is over. The redo is checked too; its miss stands, with the same
+  warning line as before. This is the one path on every host, personal accounts included. The
+  waiting-on-operator notice and bell (#873) fire only on the turn that stands, never on a reply
+  whose redo is pending.
+- **No redo on a turn that never answered**: an interrupted turn, an API error or a refusal.
+  `classic.Stop` did not run on those either.
+- **The redo is dropped when it arrives** if another prompt started a turn first, or if molt's
+  stage file reads `command`, `block` or `fallback` (molt acts on that turn end, and its handoff
+  wins, operator ruling 2026-10-27). The failed reply then stands: its warning, and its
+  waiting-on-operator notice and bell (#873), come as toasts. A redo that arrives in another
+  session (a `/clear` or a molt) is dropped with no toast. Each redo answers the failed turn that
+  submitted it, oldest first; a seat-mods prompt with none waiting (a reloaded module) is dropped,
+  never run as a status turn of its own.
+- **molt's handoff requests are operator turns**, like autonomic's prompts: each asks for a
+  `MOLT-HANDOFF:` line, so it gets no status-block context. molt's seed stays a status turn.
+- **`run-tests.sh` refuses a `classic.*` hook registration** in `hooks/`.
+- Known limits: under `claude -p` the printed result is the redo's reply, not the first one; an
+  Agent SDK host was not probed; a block raised by a `classic.Stop` hook beneath seat-mods is no
+  longer seen; while molt is paused, or after a child or an SDK root handed off, molt's stage file
+  still reads `command` or later, so every redo in that session is dropped and only the toasts
+  show; a molt seed edited to carry a `MOLT-HANDOFF:` line is read as a request.
+
 ## 0.10.0 — 2026-10-26
 
 Batch 5 (#724, #702): fewer false stops on honest work, and the hiding spellings that can be closed

@@ -1,9 +1,8 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world } from './world'
+import { world, flush, requests, CLEARED, COMPACT, READ } from './world'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
-const POST = { tool_name: 'Read', tool_input: {}, tool_response: {}, tool_use_id: 't1', session_id: 's1' } as never
-const STOP = (text: string) => ({ stop_hook_active: false, last_assistant_message: text, session_id: 's1' }) as never
+const TURN = (answer: string, extra: object = {}) => ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', ...extra }) as never
 const RUN = (args: string) =>
   ({ command: 'molt', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } }) as never
 
@@ -11,65 +10,114 @@ describe('below soft', () => {
   test('nothing gates, nudges or blocks', async ($, on) => {
     const w = world(on); at(w, 30)
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
-    expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
-    expect((await $.classic.Stop(STOP('done'))).block).toBeUndefined()
+    expect((await $.tool.call(READ)).context).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
   })
   test('no figure: nothing gates (review focus 1)', async ($, on) => {
     const w = world(on); w.usage = { window: 0 }
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
-    expect((await $.classic.Stop(STOP('done'))).block).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
   })
 })
 
 describe('past soft', () => {
   test('one nudge after a tool result, never two', async ($, on) => {
     const w = world(on); at(w, 67)
-    await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)
-    const first = await $.classic.PostToolUse(POST)
-    expect(first.additionalContext?.join('\n')).toContain('MOLT-HANDOFF:')
-    const second = await $.classic.PostToolUse(POST)
-    expect(second.additionalContext).toBeUndefined()
+    const first = await $.tool.call(READ)
+    expect(first.context?.join('\n')).toContain('MOLT-HANDOFF:')
+    const second = await $.tool.call(READ)
+    expect(second.context).toBeUndefined()
   })
-  test('Stop blocks twice with the instruction, then lets the turn end', async ($, on) => {
+  test('two turn ends each submit the instruction, then the third molts on the fallback brief (#929)', async ($, on) => {
     const w = world(on); at(w, 67)
-    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
-    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
-    expect((await $.classic.Stop(STOP('done'))).block).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(1)
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(2)
+    expect(w.clears).toBe(0)
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(2)
+    expect(w.clears).toBe(1)
+  })
+  test('no request on an interrupted turn or a subagent turn (#929)', async ($, on) => {
+    const w = world(on); at(w, 67)
+    await $.turn.complete(TURN('done', { isAborted: true })); await flush()
+    await $.turn.complete(TURN('done', { agentId: 'a1' })); await flush()
+    expect(requests(w)).toEqual([])
+  })
+  test('no request on an error or a refusal turn end (#929 review)', async ($, on) => {
+    const w = world(on); at(w, 67)
+    await $.turn.complete(TURN('', { reason: 'error' })); await flush()
+    await $.turn.complete(TURN('', { reason: 'refusal', refusal: { category: 'other' } })); await flush()
+    expect(requests(w)).toEqual([])
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(1)
+  })
+  test('a request that arrives in another session is dropped (#929 review)', async ($, on) => {
+    const w = world(on); at(w, 67)
+    // The session moves on while molt's turn end runs: at its stage write, after it read the id.
+    w.onWrite = path => { if (path.includes('/molt/stage/')) w.session.id = 's2' }
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
+  })
+  test('a refused request is logged and the turn end still resolves (#929)', async ($, on) => {
+    const w = world(on); at(w, 67)
+    w.rejectSeeds = true
+    expect((await $.turn.complete(TURN('done'))).text).toBe('done')
+    await flush()
+    expect(requests(w)).toEqual([])
+    expect(w.runs.filter(r => r.join(' ').includes('request failed'))).toHaveLength(1)
   })
   test('a reply that carries the marker is not blocked', async ($, on) => {
     const w = world(on, { files: { '/r/h.md': '#' } }); at(w, 67)
-    expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/h.md'))).block).toBeUndefined()
+    await $.turn.complete(TURN('ok\nMOLT-HANDOFF: /r/h.md')); await flush()
+    expect(requests(w)).toEqual([])
   })
   test('a /clear of your own resets the stage: no figure afterwards gates nothing', async ($, on) => {
     const w = world(on); at(w, 85)
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeDefined()
+    await $.session.end(CLEARED('s1'))
     w.session.id = 's2'
-    await $.classic.SessionStart({ source: 'clear', session_id: 's2' } as never)
     w.usage = { window: 1_000_000 }
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
   })
-  test('after /compact the nudge and both Stop asks come back', async ($, on) => {
+  test('a resume in place resets the stage too (#929)', async ($, on) => {
+    const w = world(on); at(w, 85)
+    expect((await $.tool.call(READ)).deny).toBeDefined()
+    await $.session.end({ reason: 'resume', sessionId: 's1', resume: { sessionId: 's1' } } as never)
+    w.session.id = 's2'
+    w.usage = { window: 1_000_000 }
+    expect((await $.tool.call(READ)).deny).toBeUndefined()
+  })
+  test("a subagent's compaction keeps the main window's requests spent (#929)", async ($, on) => {
     const w = world(on); at(w, 67)
-    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
-    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
-    expect((await $.classic.Stop(STOP('done'))).block).toBeUndefined()
-    await $.classic.SessionStart({ source: 'compact', session_id: 's1' } as never)
-    expect((await $.classic.Stop(STOP('done'))).block).toContain('MOLT-HANDOFF:')
+    await $.turn.complete(TURN('done')); await $.turn.complete(TURN('done')); await flush()
+    await $.session.compact({ trigger: 'auto', agentId: 'a1', messages: [{ role: 'user', text: 'x', toolUses: [] }] } as never)
+    w.clearTo.push('s2')
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(2)
+    expect(w.clears).toBe(1)
+  })
+  test('after /compact the nudge and both requests come back', async ($, on) => {
+    const w = world(on); at(w, 67)
+    await $.turn.complete(TURN('done')); await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(2)
+    await $.session.compact(COMPACT)
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(3)
+    expect(w.clears).toBe(0)
   })
   test('a marker that names a directory is blocked like a missing file', async ($, on) => {
     const w = world(on); w.dirs.add('/r/docs'); at(w, 67)
-    expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/docs'))).block).toContain('/r/docs')
+    await $.turn.complete(TURN('ok\nMOLT-HANDOFF: /r/docs')); await flush()
+    expect(requests(w).at(-1)).toContain('/r/docs')
   })
   test('a marker that names a missing file is blocked with its path (review focus 4)', async ($, on) => {
     const w = world(on); at(w, 67)
-    expect((await $.classic.Stop(STOP('ok\nMOLT-HANDOFF: /r/typo.md'))).block).toContain('/r/typo.md does not exist')
-  })
-  test("another plugin's block is kept, and molt's text is added to it", async ($, on) => {
-    const w = world(on); at(w, 67)
-    w.stopBlock = 'Autopilot: proceed.'
-    const r = await $.classic.Stop(STOP('done'))
-    expect(r.block).toStartWith('Autopilot: proceed.')
-    expect(r.block).toContain('MOLT-HANDOFF:')
+    await $.turn.complete(TURN('ok\nMOLT-HANDOFF: /r/typo.md')); await flush()
+    expect(requests(w).at(-1)).toContain('/r/typo.md does not exist')
   })
   test('reads still run past soft (control for the hard gate)', async ($, on) => {
     const w = world(on); at(w, 70)
@@ -95,11 +143,12 @@ describe('past hard', () => {
     await $.command.run(RUN('off'))
     expect((await $.tool.call({ tool: 'Read', file_path: '/r/a' } as never)).deny).toBeUndefined()
   })
-  test('/molt off also silences the nudge and the Stop reflex', async ($, on) => {
+  test('/molt off also silences the nudge and the request', async ($, on) => {
     const w = world(on); at(w, 76)
     await $.command.run(RUN('off'))
-    expect((await $.classic.PostToolUse(POST)).additionalContext).toBeUndefined()
-    expect((await $.classic.Stop(STOP('done'))).block).toBeUndefined()
+    expect((await $.tool.call(READ)).context).toBeUndefined()
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toEqual([])
   })
   test('unmeasured tool output counts toward the gate', async ($, on) => {
     const w = world(on); at(w, 74)

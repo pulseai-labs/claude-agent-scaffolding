@@ -1,5 +1,5 @@
 // seat-mods on OMP, second entry: the orchestrator's status-block check and idle stop, the same
-// rules as hooks/register.ts's prompt.submit / classic.Stop / turn.complete, over OMP's input,
+// rules as hooks/register.ts's prompt.submit / turn.complete (and its redo, #929), over OMP's input,
 // before_agent_start and session_stop. A separate entry because OMP runs session_stop and
 // tool_call handlers in extension order and stops at the first block: the guard (omp/extension.ts)
 // must load first, and this check must load last, after molt and autonomic, so their stop blocks

@@ -1,5 +1,6 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { checkBlock, classifyPrompt, isCrewTagged, hasMoltHandoff, isIdleStop, waitingOnOperator, IDLE_REASON, IDLE_WARNING, STATUS_CONTEXT } from '../hooks/status'
+import { checkBlock, classifyPrompt, isCrewTagged, hasMoltHandoff, isIdleStop, waitingOnOperator, moltActs, redoDrop, IDLE_REASON, IDLE_WARNING, STATUS_CONTEXT } from '../hooks/status'
+import { moltStagePath } from '../hooks/records'
 
 const BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Waiting on operator:** none'
 
@@ -185,5 +186,30 @@ describe('waitingOnOperator (#873)', () => {
   })
   test('a decision word inside other prose is not the line', () => {
     expect(waitingOnOperator('I made the decision: to wait.\n**Waiting on operator:** none')).toBeUndefined()
+  })
+})
+
+describe('the redo turn (#929)', () => {
+  test("molt's handoff requests are not status turns; its seed and seat-mods' own redo are", () => {
+    expect(classifyPrompt({ kind: 'plugin', name: 'molt' }, 'Write the handoff, then end your reply with MOLT-HANDOFF: <path>.')).toBe('operator')
+    expect(classifyPrompt({ kind: 'plugin', name: 'molt' }, '↪ molt: this session continues from the handoff at /h.md.')).toBe('status')
+    expect(classifyPrompt({ kind: 'plugin', name: 'molt' }, '[crew report implementer] T1 final /r.md')).toBe('status')
+    expect(classifyPrompt({ kind: 'plugin', name: 'seat-mods' }, 'x')).toBe('status')
+  })
+  test("moltStagePath is molt's stage file", () => {
+    expect(moltStagePath('/home/u', 's1')).toBe('/home/u/.claude/state/molt/stage/s1')
+  })
+  test('moltActs: command, block and fallback act; anything else does not', () => {
+    for (const stage of ['command', 'block', 'fallback']) expect(moltActs(`{"stage":"${stage}","percent":70}\n`)).toBe(true)
+    for (const stage of ['below', 'warn', 'warnAgain', 'off']) expect(moltActs(`{"stage":"${stage}"}`)).toBe(false)
+    for (const text of [undefined, '', 'not json', '[]', '{"stage":3}']) expect(moltActs(text)).toBe(false)
+  })
+  test('redoDrop: the redo runs only in its own session, first in line, with molt idle', () => {
+    const base = { pendingSession: 's1', currentSession: 's1', superseded: false, moltStage: undefined }
+    expect(redoDrop(base)).toBeUndefined()
+    expect(redoDrop({ ...base, currentSession: 's2' })).toBe('seat-mods: the status rewrite was dropped: the session changed')
+    expect(redoDrop({ ...base, superseded: true })).toBe('seat-mods: the status rewrite was dropped: another prompt came first')
+    expect(redoDrop({ ...base, moltStage: '{"stage":"command"}' })).toBe('seat-mods: the status rewrite was dropped: molt is handing off')
+    expect(redoDrop({ ...base, moltStage: '{"stage":"warnAgain"}' })).toBeUndefined()
   })
 })

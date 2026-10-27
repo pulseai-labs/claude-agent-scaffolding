@@ -1,5 +1,5 @@
 // seat-mods status logic: the pure functions behind the orchestrator's status
-// block check, wired to prompt.submit, classic.Stop and turn.complete by
+// block check, wired to prompt.submit and turn.complete (#929) by
 // register.ts. No `$` and no model call here; the copy is the plans' verbatim
 // (AI workspace docs/superpowers/plans/2026-10-18-orchestrator-status-block.md
 // and 2026-10-18-idle-stop-status-block.md).
@@ -50,7 +50,9 @@ export function isCrewTagged(text: string): boolean {
 // sdk turn is a `claude -p` host turn, which may be typed by the operator —
 // the anti-goal on typed turns outranks goal 1). A plugin prompt is status
 // unless it is autonomic's: its only `$.prompt.submit` is the pain-band press,
-// the operator's own chosen option. `unclassified` and any unknown kind stay
+// the operator's own chosen option. molt's handoff requests (#929) are not status
+// turns either: each asks for a MOLT-HANDOFF line, never the status block. molt's seed
+// (no MOLT-HANDOFF line) starts the next session's work and stays a status turn. `unclassified` and any unknown kind stay
 // on the operator fallback; only they are untagged.
 export function classifyPrompt(origin: { kind: string; name?: string }, text: string): 'status' | 'operator' {
   switch (origin.kind) {
@@ -65,7 +67,7 @@ export function classifyPrompt(origin: { kind: string; name?: string }, text: st
     case 'auto-continuation':
       return 'status'
     case 'plugin':
-      return origin.name === 'autonomic' && !isCrewTagged(text) ? 'operator' : 'status'
+      return (origin.name === 'autonomic' || (origin.name === 'molt' && text.includes('MOLT-HANDOFF:'))) && !isCrewTagged(text) ? 'operator' : 'status'
     case 'composer':
     case 'bridge':
     case 'channel':
@@ -189,3 +191,31 @@ export function hasMoltHandoff(reply: string): boolean {
   }
   return false
 }
+
+// The redo turn (#929). molt's stage file, as molt writes it: `command`, `block` and
+// `fallback` are the stages where molt acts at a turn end (its handoff request, a
+// fallback brief, a molt). A missing or unreadable file is a molt that does not act.
+const MOLT_ACTS = new Set(['command', 'block', 'fallback'])
+
+export function moltActs(stageFile: string | undefined): boolean {
+  try {
+    const v = JSON.parse(stageFile ?? '') as { stage?: unknown }
+    return typeof v.stage === 'string' && MOLT_ACTS.has(v.stage)
+  } catch {
+    return false
+  }
+}
+
+// Whether seat-mods' own redo, arriving at prompt.submit, is dropped, and why. It runs
+// only in the session whose turn failed, before any other turn, while molt does not act
+// on that turn end (operator ruling 2026-10-27: molt's handoff wins).
+const REDO_DROPPED = 'seat-mods: the status rewrite was dropped: '
+export const REDO_ORPHAN = `${REDO_DROPPED}no failed status turn is waiting for it`
+
+export function redoDrop(r: { pendingSession: string; currentSession: string; superseded: boolean; moltStage: string | undefined }): string | undefined {
+  if (r.currentSession !== r.pendingSession) return `${REDO_DROPPED}the session changed`
+  if (r.superseded) return `${REDO_DROPPED}another prompt came first`
+  if (moltActs(r.moltStage)) return `${REDO_DROPPED}molt is handing off`
+  return undefined
+}
+

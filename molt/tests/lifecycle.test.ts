@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { MARK, world } from './world'
+import { world, flush, STARTED, MARK } from './world'
 
 const START = { cwd: '/repo', surface: 'terminal', isInteractive: true } as never
 const RUN = (args: string) =>
@@ -47,8 +47,9 @@ describe('the active marker (spec §7.1)', () => {
     w.session.id = '../escape'
     await $.session.start(START)
     // The engine normalizes `..` before the write lands, so an escape shows up under
-    // another name: no file at all may be written.
-    expect([...w.files.keys()]).toEqual([])
+    // another name: no state file at all may be written. (The process start writes the
+    // missing templates, which no session id names, #929.)
+    expect([...w.files.keys()].filter(path => !path.startsWith('/home/u/.claude/molt/'))).toEqual([])
   })
 
   test('a paused session drops it and keeps it off; a message from you brings it back (#668)', async ($, on) => {
@@ -59,7 +60,7 @@ describe('the active marker (spec §7.1)', () => {
     for (const id of ['s1', 's2']) {
       w.clearTo.push(`${id}x`); w.session.id = id
       await $.turn.complete(TURN)
-      await $.classic.SessionStart({ source: 'clear', session_id: `${id}x` } as never)
+      await flush()
     }
     w.session.id = 's3'
     await $.turn.complete(TURN)
@@ -79,7 +80,7 @@ describe('the active marker (spec §7.1)', () => {
     for (const id of ['s1', 's2']) {
       w.clearTo.push(`${id}x`); w.session.id = id
       await $.turn.complete(TURN)
-      await $.classic.SessionStart({ source: 'clear', session_id: `${id}x` } as never)
+      await flush()
     }
     w.session.id = 's3'
     await $.turn.complete(TURN)
@@ -93,13 +94,13 @@ describe('the active marker (spec §7.1)', () => {
 describe('templates on first start', () => {
   test('missing templates are written', async ($, on) => {
     const w = world(on)
-    await $.classic.SessionStart({ source: 'startup', session_id: 's1' } as never)
+    await $.session.start(STARTED)
     expect(w.files.get('/home/u/.claude/molt/instructions.md')).toContain('MOLT-HANDOFF:')
     expect(w.files.get('/home/u/.claude/molt/seed.md')).toContain('{{path}}')
   })
   test('an existing template is never overwritten', async ($, on) => {
     const w = world(on, { files: { '/home/u/.claude/molt/seed.md': 'mine {{path}}' } })
-    await $.classic.SessionStart({ source: 'startup', session_id: 's1' } as never)
+    await $.session.start(STARTED)
     expect(w.files.get('/home/u/.claude/molt/seed.md')).toBe('mine {{path}}')
   })
 })

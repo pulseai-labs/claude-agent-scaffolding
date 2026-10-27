@@ -1,19 +1,34 @@
 import type { EngineInterface, Register } from 'claude-code'
 import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
-import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, waitingOnOperator, rewriteReason, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, WAITING_NOTICE } from './status'
-import { autonomicPath, parseAutonomic, seatLogPath } from './records'
+import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, waitingOnOperator, rewriteReason, redoDrop, REDO_ORPHAN, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, WAITING_NOTICE } from './status'
+import { autonomicPath, moltStagePath, parseAutonomic, seatLogPath } from './records'
 
 type Engine = EngineInterface
 
 // The live turn's status state, one session per process: set at prompt.submit,
-// read at classic.Stop, cleared at the main loop's turn.complete. It is defined
-// only inside an orchestrator's turn, so every check below skips otherwise.
-// `warning` is the line of the failure that stood at the last stop — the shape
-// check's or the idle check's (#876) — or undefined. `notice` is the
-// waiting-on-operator line the status block handed the operator (#873), shown
-// at turn.complete; it is set only on a stop that ends the turn.
-let turn: { status: boolean; blocked: boolean; warning: string | undefined; notice: string | undefined } | undefined
+// checked and cleared at the main loop's turn.complete. It is defined only inside an
+// orchestrator's turn, so every check below skips otherwise. `redone` marks seat-mods'
+// own redo turn, which is checked but never redone; `sessionId` is the session the turn
+// started in.
+let turn: { status: boolean; redone: boolean; sessionId: string } | undefined
+
+// The redos seat-mods submitted at failed status turns' ends, oldest first, until each
+// arrives at prompt.submit (#929: classic.Stop, which held the turn open, never runs for a
+// plugin on an org account). The host runs queued prompts in order, so each seat-mods
+// prompt that arrives answers the oldest entry. `warning` is the failure's flag and `reply`
+// the failed reply, shown and rung if the redo never runs; `superseded` marks another turn
+// that started first.
+type Redo = { sessionId: string; warning: string; reply: string; superseded: boolean }
+const pending: Redo[] = []
+
+// A redo that never runs leaves the failed reply as the turn that stands: its flag, and its
+// waiting-on-operator notice and bell (#873), are shown as toasts.
+async function standAlone($: Engine, redo: Redo): Promise<void> {
+  $.ui.toast(redo.warning)
+  const notice = await noticeFor($, redo.reply)
+  if (notice !== undefined) $.ui.toast(notice)
+}
 
 async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
@@ -196,6 +211,23 @@ export const register: Register = on => {
   on('prompt.submit', async ($, e, next) => {
     const state = await roleOf($)
     if (state.kind !== 'free' || state.role !== 'orchestrator') return next(e)
+    // seat-mods' own redo (#929): it runs only in the session whose turn failed, before any
+    // other turn, while molt does not act on that turn end (molt's handoff wins).
+    const mine = e.origin.kind === 'plugin' && e.origin.name === 'seat-mods' && e.turnId === undefined
+    const redo = mine ? pending.shift() : undefined
+    // seat-mods submits nothing but redos: one with no entry (a reloaded module) never runs
+    // as a status turn of its own, which could earn it a second redo.
+    if (mine && redo === undefined) return { drop: REDO_ORPHAN }
+    if (redo !== undefined) {
+      const [homeDir, id] = await Promise.all([$.env.get('HOME'), $.session.id()])
+      const stage = await $.fs.read(moltStagePath(homeDir ?? '', redo.sessionId)).catch(() => undefined)
+      const drop = redoDrop({ pendingSession: redo.sessionId, currentSession: id, superseded: redo.superseded, moltStage: typeof stage === 'string' ? stage : undefined })
+      if (drop !== undefined) {
+        // In another session the old flag means nothing; elsewhere the failed reply stands.
+        if (id === redo.sessionId) await standAlone($, redo)
+        return { drop }
+      }
+    }
     const kind = classifyPrompt(e.origin, e.text)
     // The context rides only a status prompt that will run as (or inside) a
     // status turn: a new turn whose kind is status, or a mid-turn status prompt
@@ -205,68 +237,66 @@ export const register: Register = on => {
     const r = await next(withContext ? { ...e, context: [...(e.context ?? []), STATUS_CONTEXT] } : e)
     // A refused prompt never entered: its result stands and the turn is untouched
     // (Codex, PR #874 round 4).
-    if (r.drop !== undefined) return r
+    if (r.drop !== undefined) {
+      if (redo !== undefined) await standAlone($, redo)
+      return r
+    }
     // With the prompt confirmed in: a new turn sets the record from its kind; a
-    // non-waiting operator prompt typed into the running turn frees it.
+    // non-waiting operator prompt typed into the running turn frees it. Any other new
+    // turn starting while a redo waits goes first, so the redo is dropped on arrival.
     if (e.turnId === undefined) {
-      turn = { status: kind === 'status', blocked: false, warning: undefined, notice: undefined }
+      if (redo === undefined) for (const queued of pending) queued.superseded = true
+      turn = { status: kind === 'status', redone: redo !== undefined, sessionId: await $.session.id() }
     } else if (kind === 'operator' && e.wait !== true && turn !== undefined) {
       turn.status = false
     }
     return r
   })
 
-  on('classic.Stop', async ($, e, next) => {
+  on('turn.complete', async ($, e, next) => {
     const r = await next(e)
-    // autonomic's block (or any beneath one) passes unchanged and is not seat-mods' rewrite.
-    if (r.block !== undefined) return r
+    // A subagent's turn end: not the main loop's, so it neither checks nor clears turn.
+    if (e.agentId !== undefined) return r
     const state = await roleOf($)
-    if (state.kind !== 'free' || state.role !== 'orchestrator' || turn?.status !== true) return r
-    const reply = e.last_assistant_message ?? ''
-    if (hasMoltHandoff(reply)) {
-      turn.warning = undefined
-      return r
-    }
-    // The shape failure first, else the idle failure (#876): one block per turn
-    // is shared by both checks, in either order.
+    if (state.kind !== 'free' || state.role !== 'orchestrator') return r
+    // The main turn is over.
+    const ended = turn
+    turn = undefined
+    // An interrupted turn, and one that ended in an API error or a refusal, never answered:
+    // classic.Stop did not run on them either (#929 review).
+    if (ended?.status !== true || e.isAborted || e.reason === 'error' || e.reason === 'refusal') return r
+    const reply = e.answer ?? ''
+    if (hasMoltHandoff(reply)) return r
+    // The shape failure first, else the idle failure (#876): one redo per turn is shared
+    // by both checks, in either order.
     const check = checkBlock(reply)
     const failure = !check.ok
       ? { reason: rewriteReason(check.failed), warning: STATUS_WARNING }
       : isIdleStop(reply) ? { reason: IDLE_REASON, warning: IDLE_WARNING } : undefined
-    if (failure === undefined) {
-      turn.warning = undefined
-    } else if (turn.blocked) {
-      // The one block stands: let this stop through, and mark it for turn.complete.
-      turn.warning = failure.warning
-    } else {
-      turn.blocked = true
-      return { ...r, block: failure.reason }
+    if (failure !== undefined && !ended.redone) {
+      // One redo turn (#929), not awaited: it starts once this turn is over. The reply
+      // stands as it is meanwhile — no flag and no bell while its redo is pending.
+      const mine: Redo = { sessionId: ended.sessionId, warning: failure.warning, reply, superseded: false }
+      pending.push(mine)
+      $.prompt.submit({ text: failure.reason }).catch(async (err: unknown) => {
+        const at = pending.indexOf(mine)
+        if (at !== -1) pending.splice(at, 1)
+        await standAlone($, mine)
+        await log($, `redo failed ${String(err)}`)
+      })
+      return r
     }
-    // The turn ends here, whether the block passed or was let through after its
-    // one rewrite: a status block that hands the operator a decision or an action
-    // rings in autopilot (#873, design §5.2 — a malformed block that still waits
+    const warning = failure?.warning
+    // The turn that stands: a status block that hands the operator a decision or an
+    // action rings in autopilot (#873, design §5.2 — a malformed block that still waits
     // on the operator rings too).
-    turn.notice = await noticeFor($, reply)
-    return r
-  })
-
-  on('turn.complete', async ($, e, next) => {
-    const r = await next(e)
-    // A subagent's turn end: not the main loop's, so neither warns nor clears turn.
-    if (e.agentId !== undefined) return r
-    const state = await roleOf($)
-    if (state.kind !== 'free' || state.role !== 'orchestrator') return r
-    const warning = turn?.warning
-    const notice = turn?.notice
-    // The main turn is over.
-    turn = undefined
+    const notice = await noticeFor($, reply)
     // Core's result text repeats `e.answer`; only a text a mod beneath set is
     // output of its own. The warning replaces core's text (the reply would
     // otherwise show twice) and appends after any other, its own last line
     // (review round 2, PR #874; the idle warning takes the same place, #876).
-    // The waiting-on-operator notice follows the warning, as its own line (#873). The
-    // warning stands in for core's text (the reply would show twice); a notice on a
-    // block that passed appends to the reply, which is still the turn's own text.
+    // The waiting-on-operator notice follows the warning, as its own line (#873); a
+    // notice on a block that passed appends to the reply, which is still the turn's own text.
     const added = [warning, notice].filter((line): line is string => line !== undefined)
     if (added.length === 0) return r
     const base = warning !== undefined && (r.text === '' || r.text === e.answer) ? '' : r.text

@@ -218,37 +218,45 @@ operator did not start by typing — must end with only the five-field status bl
 One field per line, in that order; each label bold or plain, followed on the same line by its
 content ("none" is content), nothing before the first label or after the fifth; a blank
 (whitespace-only) line between fields is skipped. Waiting on operator takes `none`,
-`decision: <question>` or `action: <what the operator must do>`. Three hooks carry it:
+`decision: <question>` or `action: <what the operator must do>`. Two hooks carry it, and no
+`classic.*` hook does: Claude Code skips a plugin's `classic.*` hooks on an org account, with no
+error (#929):
 
 - `prompt.submit` classifies the turn and, on a status turn, adds one line of model-only context
   (tool calls only, then the block). A prompt the operator types into a running status turn makes
   that turn the operator's, and it is not checked; a queued prompt (`ctrl+x enter`, `wait: true`)
   waits for a later turn and leaves the status turn alone.
-- `classic.Stop` checks `last_assistant_message`. A miss blocks the stop **once per turn** with the
-  failing reason; a second miss lets the stop through. A block raised beneath seat-mods —
-  autonomic's autopilot push — passes unchanged and is not counted as seat-mods' rewrite. A turn
-  that ends on molt's `MOLT-HANDOFF:` line is exempt.
-- `turn.complete` adds one line under the reply when the second miss stands:
+- `turn.complete` checks the reply of the main loop's turn. A miss submits **one redo turn**, a
+  prompt from seat-mods with the failing reason, which starts once the turn is over; the redo is
+  checked too, and its miss stands. Then one line goes under the reply:
   `⚠ seat-mods: status block missing — this status reply is not in the required form.` It changes
-  neither the answer nor the transcript, and a subagent's turn end is ignored.
+  neither the answer nor the transcript. An interrupted turn, a subagent's turn end and a turn that
+  ends on molt's `MOLT-HANDOFF:` line are not checked.
+- No redo follows a turn that never answered: an interrupted turn, an API error, a refusal.
+- The redo is dropped when it arrives if another prompt started a turn first (the operator's, a
+  notification), or if molt's stage file (`~/.claude/state/molt/stage/<id>`) reads `command`,
+  `block` or `fallback`: molt acts on that turn end, and its handoff wins. The line, and the
+  failed reply's waiting-on-operator notice, show as toasts instead. In another session (a
+  `/clear` or a molt) it is dropped quietly. molt's handoff requests are not status turns; its
+  seed is.
 
 On the same block, an **idle check** (#876) reads three fields. When both wait fields — Waiting
 on (seats live) and Waiting on operator — read `none` while Next steps names work, the
-block contradicts itself and does not end the turn: the first stop is blocked with
+block contradicts itself and does not end the turn: its redo is asked for with
 `seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the
-next step now, or name the seat, wake, or operator decision or action you wait on.`, and the
-second adds
+next step now, or name the seat, wake, or operator decision or action you wait on.`, and a miss on
+the redo adds
 `⚠ seat-mods: status block says nothing waits, but Next steps names work.` under the reply, the
 way the shape warning sits. A field reads `none` when its content starts with the word `none`,
-any case: `none. No seats are live.` counts, `nonetheless` does not. The one block per turn is
-shared with the shape check, in either order: a turn already nudged for idling gets no later shape
-rewrite, and a turn whose shape rewrite is spent takes the idle warning only, not a second block.
+any case: `none. No seats are live.` counts, `nonetheless` does not. The one redo per turn is
+shared with the shape check, in either order: a redo asked for idling gets no second redo for its
+shape, and a redo asked for the shape takes the idle warning only, not a second redo.
 
 The check calls no model and never calls herdr, Orca or Paseo. Only `SEAT_MODS_ROLE=orchestrator`
 sessions are affected; every other role and an unset role are untouched.
 
-When a status turn that ends hands the operator a `decision:` or an `action:` — whether the block
-passed or was let through after its one rewrite — and autonomic's session record
+When a status turn that stands hands the operator a `decision:` or an `action:` — whether the block
+passed or its redo missed too; never a reply whose redo is pending — and autonomic's session record
 (`~/.claude/state/autonomic/sessions/<id>.json`) says `mode: autopilot`, seat-mods rings the
 record's `bell` (when set) and shows `seat-mods: waiting on operator — <field 5 text>`: on Claude
 Code as a line under the reply in `turn.complete`; on OMP in the notification its status entry
