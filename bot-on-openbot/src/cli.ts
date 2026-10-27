@@ -2,11 +2,15 @@ import { defaultRunner } from "./actions.ts";
 import { readBotConfig } from "./config.ts";
 import { makeOpenBot } from "./openbot.ts";
 import { LockHeldError, serve } from "./serve.ts";
+import { installService, removeService } from "./service.ts";
 import { spoolNotice } from "./spool.ts";
+import { statusText } from "./status.ts";
 
 const USAGE = [
   "usage: bot-on-openbot notify <key> <message>",
   "       bot-on-openbot serve",
+  "       bot-on-openbot service install|remove",
+  "       bot-on-openbot status",
   "",
 ].join("\n");
 
@@ -20,6 +24,11 @@ export async function main(argv: string[]): Promise<number> {
   switch (cmd) {
     case "notify": return notifyCmd(rest);
     case "serve": return rest.length === 0 ? serveCmd() : usage();
+    case "service": return rest.length === 1 ? serviceCmd(rest[0]) : usage();
+    case "status":
+      if (rest.length !== 0) return usage();
+      process.stdout.write(statusText());
+      return 0;
   }
   return usage();
 }
@@ -54,5 +63,16 @@ async function serveCmd(): Promise<number> {
   } catch (e) {
     process.stderr.write(`bot-on-openbot: ${(e as Error).message}\n`);
     return e instanceof LockHeldError ? 3 : 1;
+  }
+}
+
+async function serviceCmd(sub: string): Promise<number> {
+  if (sub !== "install" && sub !== "remove") return usage();
+  try {
+    await (sub === "install" ? installService() : removeService());
+    return 0;
+  } catch (e) {
+    process.stderr.write(`bot-on-openbot: ${(e as Error).message}\n`);
+    return 1;
   }
 }

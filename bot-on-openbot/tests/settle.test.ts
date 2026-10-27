@@ -220,3 +220,26 @@ test("serve settles each loop", async () => {
   expect(posts.length).toBe(1);
   expect(find(PARK)!.closed_by).toBe("settled");
 });
+
+test("token sweep: after serve settles, taps and fails, no state file and no stderr line holds the token", async () => {
+  const r = parkRec();
+  env.status("d1", "running", "turn-1");
+  prompts = [promptOf(r)];
+  clearPark();
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const { err } = await captureErr(async () => {
+    await serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter: 1, pollMs: 0 });
+    server.stop(true); // OpenBot gone: the next sweeps fail and log
+    record({ ...r, phase: "asked" });
+    await serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter: 1, pollMs: 0 });
+  });
+  expect(err.join("")).toContain("settle");
+  expect(err.join("")).not.toContain(TOKEN);
+  const walk = (d: string): string[] =>
+    readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)]));
+  const files = walk(join(env.dir, "state"));
+  expect(files.length).toBeGreaterThan(0);
+  for (const f of files) expect(readFileSync(f, "utf8")).not.toContain(TOKEN);
+  // control: the token did reach the stub, so the sweep is not vacuous
+  expect(posts.length).toBe(1);
+});
