@@ -19,6 +19,7 @@ export type DeliveryRec = {
   say?: string;                // a plain message (no offer): the text sent verbatim
   closed_at?: string; closed_by?: "tap" | "settled" | "gone" | "sent";
   unanswered?: true;           // settled, but its OpenBot prompt is still to be answered "settled"
+  reasks?: 1;                  // asked again once, firmer, after the agent asked it without its options (#939)
 };
 
 const logPath = (): string => join(stateDir(), "deliveries.jsonl");

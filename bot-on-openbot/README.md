@@ -28,6 +28,12 @@ are on, and `gh` (with its own auth) and `baton` on the service's PATH.
   Typed text, when the worker's picker has an Other row, runs `baton answer … --screen-text <text>
   --question <line>` under the same check.
 - When the park clears by any route, the question is answered `settled` and closed (see Settling).
+- While a question waits, `serve` checks the agent asked it as told: its prompt on OpenBot's `/pending`
+  (the one whose header, or the first line of its question, is the question's title) must offer exactly
+  the offered labels, in order. A prompt asked another way, such as the labels as text with no
+  buttons, is answered `settled` to dismiss it, and the question is asked once more with firmer
+  wording. If that one is malformed too, it is dismissed, the question closes, and a message says to
+  act in the Orca terminal or with baton.
 
 ## Install
 
@@ -119,7 +125,8 @@ closed question (settled, or answered already) runs nothing and says it is no lo
 When the unit is no longer in the park a question was asked for (you answered in the Orca terminal,
 a driver or a later tick moved it), or its run is disarmed or done, the bot closes the question and
 answers its OpenBot prompt with the label `settled`, so the agent's queue moves on. The bot finds its
-prompt on OpenBot's `/pending` list by its question text and its exact labels. A question not shown
+prompt on OpenBot's `/pending` list by its question text and its exact labels, or else by its title
+(a prompt the agent asked another way); a prompt with another title is never answered. A question not shown
 yet is closed at once and answered once it shows. Settling is checked on every `serve` loop.
 
 ## State
@@ -142,9 +149,14 @@ Only one `serve` runs at a time; a second exits with code 3.
 - A picker that is neither omp's ask picker nor omp's numbered `/review` picker reads as no picker: the
   question then offers only Show question, Unpark and Disarm, and says to answer in the Orca terminal.
 - Free text reaches a worker only through a picker's Other row; elsewhere typed text runs nothing.
-- Settling answers the prompt with `settled`, a label it never offered; OpenBot accepts that today.
-  If the agent rewords the question or its labels, the bot cannot find its prompt on `/pending`, and
-  that question stays open on the phone until the operator answers it (the answer then runs nothing).
+- Settling, and dismissing a malformed prompt, answer it with `settled`, a label it never offered;
+  OpenBot accepts that today. If the agent rewords the title as well, the bot cannot find its prompt on
+  `/pending`: a malformed one is not dismissed, and a settled one stays open on the phone until the
+  operator answers it (the answer then runs nothing).
+- A malformed prompt costs a second run (the re-ask), and the shape check reads `/pending` on every
+  loop while a question waits. A typed answer `settled`, where `settled` is not an offered label, reads
+  as the bridge's own dismissal: nothing runs and the question is asked again (or closed, the second
+  time).
 - Delivery is at least once: a crash between a run and the spool delete runs it again with the same
   `--id`, which OpenBot answers with the same delivery.
 - The draft is the model's: its summary and recommendation can be wrong. A draft that is not the JSON

@@ -9,6 +9,9 @@ with `<redacted>`; no token appears in any file.
 - `status-*.json`: `openbot-cli status Autopilot <deliveryId> --json`, while a question waits
   (`running`) and after it was answered (`completed`; `answer` is the model's text).
 - `pending-prompt.json`: `GET <url>/v1/agents/<agent id>/pending` while one question waited.
+- `pending-prompt-no-options.json`: the same call during the bridge dry run (`dry-a`, 2026-10-27,
+  issue #939), when the agent asked a 7-label offer as free text: `options` is `null`, the labels are a
+  bullet list in `question`, and the summary is gone. The title is replaced with the tests' `r1/u5`.
 - `answer-unoffered-label.txt`, `answer-second-409.txt`: `POST …/prompts/<requestId>/answer` with
   `{"answers":{"reply":["settled"]}}`, the reply body and its HTTP status, once and again.
 - `openbot-db-*.json`: `payload_json` of `orchestration_events` rows in `~/.config/OpenBot/openbot.db`
