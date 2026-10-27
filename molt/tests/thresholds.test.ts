@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { world, flush, requests, CLEARED, COMPACT, READ } from './world'
+import { world, flush, followUp, requests, CLEARED, COMPACT, READ } from './world'
 
 const at = (w: ReturnType<typeof world>, percent: number) => { w.usage = { tokens: percent * 10_000, window: 1_000_000 } }
 const TURN = (answer: string, extra: object = {}) => ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', ...extra }) as never
@@ -62,6 +62,37 @@ describe('past soft', () => {
     await $.turn.complete(TURN('done')); await flush()
     expect(requests(w)).toEqual([])
   })
+  test("the request's own turn, answered with the marker, molts and asks no more (#933)", async ($, on) => {
+    const w = world(on, { files: { '/r/h.md': '#' } }); at(w, 67)
+    w.clearTo.push('s2')
+    await $.turn.complete(TURN('done')); await flush()
+    expect(requests(w)).toHaveLength(1)
+    await followUp($, w, 'written\nMOLT-HANDOFF: /r/h.md'); await flush()
+    expect(requests(w)).toHaveLength(1)
+    expect(w.clears).toBe(1)
+  })
+  test("the request's own turn, still with no handoff, asks once more, then falls back (#933)", async ($, on) => {
+    const w = world(on); at(w, 67)
+    await $.turn.complete(TURN('done')); await flush()
+    await followUp($, w, 'still working'); await flush()
+    expect(requests(w)).toHaveLength(2)
+    expect(w.clears).toBe(0)
+    await followUp($, w, 'still working'); await flush()
+    expect(requests(w)).toHaveLength(2)
+    expect(w.clears).toBe(1)
+  })
+  test("the request's own turn interrupted, or failed, neither asks again nor spends a request (#933)", async ($, on) => {
+    const w = world(on); at(w, 67)
+    await $.turn.complete(TURN('done')); await flush()
+    await followUp($, w, '', { isAborted: true }); await flush()
+    await followUp($, w, '', { reason: 'error' }); await flush()
+    await followUp($, w, '', { reason: 'refusal', refusal: { category: 'other' } }); await flush()
+    expect(requests(w)).toHaveLength(1)
+    // The second request is still there to spend.
+    await $.turn.complete(TURN('done', { turnId: 't2' })); await flush()
+    expect(requests(w)).toHaveLength(2)
+    expect(w.clears).toBe(0)
+  })
   test('a refused request is logged and the turn end still resolves (#929)', async ($, on) => {
     const w = world(on); at(w, 67)
     w.rejectSeeds = true
@@ -86,8 +117,8 @@ describe('past soft', () => {
   test('a resume in place resets the stage too (#929)', async ($, on) => {
     const w = world(on); at(w, 85)
     expect((await $.tool.call(READ)).deny).toBeDefined()
+    // The same id goes on: a stage kept per id would still gate here (#933).
     await $.session.end({ reason: 'resume', sessionId: 's1', resume: { sessionId: 's1' } } as never)
-    w.session.id = 's2'
     w.usage = { window: 1_000_000 }
     expect((await $.tool.call(READ)).deny).toBeUndefined()
   })

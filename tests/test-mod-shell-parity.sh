@@ -3,7 +3,7 @@
 # This holds every copy byte-identical to its source, declaration by declaration. A copy
 # that lacks a declaration fails: an empty extraction is never a match.
 #
-# Four pairs. seat-mods' shell reader in molt's shell.ts. autonomic's bell to molt's,
+# Four pairs, and one renamed copy (molt's stage path in seat-mods). seat-mods' shell reader in molt's shell.ts. autonomic's bell to molt's,
 # plus seat-mods' own copy of that bell (#873). seat-mods' redactor to autonomic's (#873).
 # seat-mods' autonomic-record reader to molt's (#873). Same rule, same extractor: a copy
 # that drifts fails CI.
@@ -51,4 +51,20 @@ pair "seat-mods/hooks/rules.ts" "molt/hooks/shell.ts" "COMMANDS HEREDOC QUOTED W
 pair "molt/hooks/register.tsx" "autonomic/hooks/register.tsx seat-mods/hooks/register.ts" "BELL_TIMEOUT_MS ring"
 pair "autonomic/hooks/ledger.ts" "seat-mods/hooks/redact.ts" "SECRETS redact"
 pair "molt/hooks/records.ts" "seat-mods/hooks/records.ts" "autonomicPath parseAutonomic"
+
+# renamed <source> <name> <copy> <copy name>: a one-line const copied under another name. Only
+# the definition line is compared, with the copy's name put back; the comments may differ.
+renamed() {
+  local want got
+  want="$(decl "$ROOT/$1" "$2" | tail -n 1)"
+  got="$(decl "$ROOT/$3" "$4" | tail -n 1)"
+  if [ -z "$want" ]; then echo "FAIL: $2 not found in $1"; fail=1; return; fi
+  if [ -z "$got" ]; then echo "FAIL: $4 not found in $3"; fail=1; return; fi
+  if [ "$want" != "${got/const $4/const $2}" ]; then echo "FAIL: $3: $4 differs from $1's $2"; fail=1
+  else echo "ok: $3: $4 (molt's $2)"; fi
+}
+
+# seat-mods reads molt's stage file to drop its redo while molt acts (#929, #933): a path that
+# drifts silently stops the drop.
+renamed "molt/hooks/records.ts" stagePath "seat-mods/hooks/records.ts" moltStagePath
 exit "$fail"

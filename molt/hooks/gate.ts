@@ -3,6 +3,19 @@ import { SUBSTITUTION_TOO_DEEP, gitSubcommands, gitSubcommandsThatRun, innerComm
 // The Stop reflex asks for the handoff at most twice before falling back.
 export const MAX_STOP_BLOCKS = 2
 
+// A turn-end request molt submitted that has not yet arrived at prompt.submit (#929).
+export type Request = { sessionId: string; text: string }
+
+// A request waits for its own session only. One accepted in a session that has since moved on
+// (a /clear, a resume) may never run, and must not stop the new session's request (#933).
+export const waitsIn = (asked: readonly Request[], sessionId: string): boolean => asked.some(a => a.sessionId === sessionId)
+
+// The request a molt prompt is, taken off the list: the oldest one with its text.
+export function takeRequest(asked: Request[], text: string): Request | undefined {
+  const i = asked.findIndex(a => a.text === text)
+  return i < 0 ? undefined : asked.splice(i, 1)[0]
+}
+
 // Past the hard threshold only the handoff's own tools run: the file tools that write
 // it, Skill (the instruction names a handoff skill), and Bash made only of git add and
 // git commit segments. Everything else, reads included, is refused: a read is what

@@ -4,7 +4,8 @@ import type { Notice } from '../types'
 import { DEFAULTS, parseConfig } from './config'
 import type { MoltConfig } from './config'
 import { CHARS_PER_TOKEN, atLeast, projectedPercent, stageOf, thresholdsFor } from './measure'
-import { MAX_STOP_BLOCKS, gateAllows, isProgress } from './gate'
+import { MAX_STOP_BLOCKS, gateAllows, isProgress, takeRequest, waitsIn } from './gate'
+import type { Request } from './gate'
 import { markerPath } from './handoff'
 import { briefPrompt, extractFacts, factsBrief, isUsableSummary, pickHandoff, resolvePath } from './handoff'
 import type { Handoff, Message } from './handoff'
@@ -52,9 +53,9 @@ const lastMd = new Map<string, string>()  // the last .md a session wrote past t
 const forced = new Set<string>()          // /molt now: the command stage whatever the fill
 let unattended = 0                        // molts since the operator last sent a prompt
 let pending: { oldSession: string; handoff: string; chain: string; depth: number } | undefined
-// The turn-end request molt submitted and that has not yet arrived at prompt.submit (#929):
-// one at a time, and it runs only in the session that was asked.
-let asked: { sessionId: string; text: string } | undefined
+// The turn-end requests molt submitted that have not yet arrived at prompt.submit (#929): one
+// at a time per session, and each runs only in the session that was asked.
+const asked: Request[] = []
 const warned = new Map<string, number>()   // warnings delivered per session: 0, 1 or 2
 const handedOff = new Set<string>()        // child sessions that have named their handoff
 const commandNoted = new Set<string>()     // child sessions whose status file says HANDOFF_REQUIRED
@@ -222,7 +223,7 @@ async function staleRecord($: Engine, sessionId: string): Promise<Successor | un
 }
 
 // An SDK host may restart the process and resume this same session: the handoff it
-// made is read back from its file, once per process, so it is not lost (#902 review).
+// made is read back from its file, once per process, so it is not lost (#902).
 async function sdkHandoff($: Engine, sessionId: string): Promise<string | undefined> {
   if (!safeSessionId(sessionId)) return undefined
   if (!sdkHandoffs.has(sessionId)) {
@@ -589,10 +590,9 @@ export const register: Register = (on, options) => {
 
   on('prompt.submit', async ($, e, next) => {
     // molt's own turn-end request: it runs only in the session that was asked, and never
-    // while a molt is in flight (#929 review).
-    if (asked !== undefined && e.origin.kind === 'plugin' && e.origin.name === 'molt' && e.text === asked.text) {
-      const request = asked
-      asked = undefined
+    // while a molt is in flight: a seed or a clear owns that turn.
+    const request = e.origin.kind === 'plugin' && e.origin.name === 'molt' ? takeRequest(asked, e.text) : undefined
+    if (request !== undefined) {
       try {
         if ((await $.session.id()) !== request.sessionId || inFlight) {
           await log($, `request dropped session=${request.sessionId}`)
@@ -750,7 +750,7 @@ export const register: Register = (on, options) => {
       if (!atLeast(stage, 'warn')) return r
       const marker = markerPath(e.answer)
       const resolved = marker === undefined ? undefined : resolvePath(marker, await $.session.cwd(), await home($))
-      // A marker that names no readable file is asked about by its path (review focus 4).
+      // A marker that names no readable file is asked about by its path, so the session can fix it.
       const missing = resolved !== undefined && !(await isReadableFile($, resolved)) ? resolved : undefined
       let handoff = pickHandoff(resolved, lastMd.get(sessionId))
       if (handoff !== undefined && !(await isReadableFile($, handoff.path))) {
@@ -765,16 +765,17 @@ export const register: Register = (on, options) => {
         const n = stopBlocks.get(sessionId) ?? 0
         if (!atLeast(stage, 'fallback') && n < MAX_STOP_BLOCKS) {
           // A turn that never answered (an API error, a refusal) is not asked; nor is one that
-          // ends while the last request still waits its turn (#929 review).
-          if (e.reason === 'error' || e.reason === 'refusal' || asked !== undefined) return r
+          // ends while the last request still waits its turn: one request at a time.
+          if (e.reason === 'error' || e.reason === 'refusal' || waitsIn(asked, sessionId)) return r
           stopBlocks.set(sessionId, n + 1)
           await noteCommand($, sessionId)
           const text = missing === undefined ? await instruction($, sessionId) : fill(MISSING_HANDOFF, { path: missing })
           // Not awaited: the request's turn cannot start until this hook returns.
-          const mine = { sessionId, text }
-          asked = mine
+          const mine: Request = { sessionId, text }
+          asked.push(mine)
           $.prompt.submit({ text }).catch(async (err: unknown) => {
-            if (asked === mine) asked = undefined
+            const i = asked.indexOf(mine)
+            if (i >= 0) asked.splice(i, 1)
             await log($, `request failed session=${sessionId} ${String(err)}`)
           })
           return r

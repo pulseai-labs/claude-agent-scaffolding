@@ -2,7 +2,27 @@
 
 All notable changes to the `molt` plugin.
 
-## 0.4.0 — unreleased
+## 0.4.1 — 2026-10-27
+
+#933, the follow-ups from PR #932's review.
+
+- **A turn-end request accepted in a session that has since moved on no longer stops the new
+  session's request.** molt kept one waiting request per process, so a request the host accepted
+  but never ran (after a `/clear` or a resume) stopped every later request in that process. A
+  waiting request now stops only its own session, and when it arrives late it is still dropped.
+  Known limit: a request the host accepts and never runs in the same session still stops that
+  session's next request.
+- **`run-tests.sh` fails when its `classic.*` check cannot read `hooks/`** (grep exit 2). It passed
+  silently before.
+- **The README lists the follow-up turn's known limits** (`claude -p`, an unprobed Agent SDK host),
+  which only the CHANGELOG held.
+- Tests: the kit's `followUp` runs molt's submitted request as its own turn. New tests pin that
+  this turn molts on a marker, asks once more with no handoff, and neither asks nor spends a request
+  when it is interrupted, fails or is refused. A sibling plugin that throws at `session.end` no
+  longer stops the seed. "A resume in place resets the stage" keeps the session id.
+- Comments that cited the review process now give the reason.
+
+## 0.4.0 — 2026-10-27
 
 #929: molt works on org accounts. Claude Code skips a plugin's `classic.*` hooks there, with no
 error, so molt's warnings, its turn-end handoff request and its seed after a molt never ran.
