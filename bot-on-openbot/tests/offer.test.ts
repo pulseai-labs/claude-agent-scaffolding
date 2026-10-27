@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { join } from "node:path";
-import { blockedOffer, confirmOffer, LABELS, offerFor, stageOffer, type Offer, type Picker } from "../src/offer.ts";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import {
+  blockedOffer, confirmOffer, LABELS, MAX_SHOWN, moreOffer, offerFor, refusedOffer, shownLabels, stageOffer, type Offer, type Picker,
+} from "../src/offer.ts";
 
 beforeEach(() => {
   process.env.BATON_STATE_DIR = join(import.meta.dir, "fixtures", "baton");
@@ -53,7 +57,7 @@ test("run done and plain are null; so is a unit or run that cannot be read", () 
 
 test("blocked offer puts the recommended option first with the mark", () => {
   const o = blockedOffer(MSG, "r1", "u5", pick3, { summary: "It asks which.", recommended: 2, why: "b is safest" });
-  expect(labels(o)).toEqual(["b (recommended)", "a", "c", "Show question", "Unpark", "Disarm"]);
+  expect(shownLabels(o)).toEqual(["b (recommended)", "a", "c", "More…"]);
   expect(o.options[0]!.act).toEqual({ do: "pick", n: 2, label: "b" });
   expect(o.options[1]!.act).toEqual({ do: "pick", n: 1, label: "a" });
   expect(o.text).toBe("It asks which.\nRecommended: b is safest");
@@ -61,13 +65,13 @@ test("blocked offer puts the recommended option first with the mark", () => {
 
 test("blocked offer with a draft whose number is not on the picker has no mark", () => {
   const o = blockedOffer(MSG, "r1", "u5", pick3, { summary: "It asks which.", recommended: 9, why: "?" });
-  expect(labels(o)).toEqual(["a", "b", "c", "Show question", "Unpark", "Disarm"]);
+  expect(shownLabels(o)).toEqual(["a", "b", "c", "More…"]);
   expect(o.text).toBe("It asks which.");
 });
 
 test("blocked offer with a picker and no draft keeps screen order and the notice text", () => {
   const o = blockedOffer(MSG, "r1", "u5", pick3, null);
-  expect(labels(o)).toEqual(["a", "b", "c", "Show question", "Unpark", "Disarm"]);
+  expect(shownLabels(o)).toEqual(["a", "b", "c", "More…"]);
   expect(o.text).toBe(MSG);
 });
 
@@ -83,17 +87,19 @@ test("blocked offer allows Other only when the picker has an Other row", () => {
   expect(blockedOffer(MSG, "r1", "u5", { ...pick3, other: null }, null).allowOther).toBe(false);
 });
 
-test("a worker label equal to an action label is offered once, as the worker's", () => {
+test("a worker label equal to an action label is the worker's; the action is on the More… question", () => {
   const p: Picker = { kind: "numbered", question: "Q", other: null, options: [{ n: 1, label: "Disarm" }, { n: 2, label: "keep" }] };
   const o = blockedOffer(MSG, "r1", "u5", p, null);
-  expect(labels(o)).toEqual(["Disarm", "keep", "Show question", "Unpark"]);
+  expect(shownLabels(o)).toEqual(["Disarm", "keep", "More…"]);
+  expect(o.options.filter((x) => x.label === "Disarm").length).toBe(1);
   expect(o.options[0]!.act).toEqual({ do: "pick", n: 1, label: "Disarm" });
+  expect(labels(moreOffer(o))).toEqual(["Show question", "Unpark", "Disarm"]);
 });
 
 test("a recommended mark that would repeat another label is dropped", () => {
   const p: Picker = { kind: "numbered", question: "Q", other: null, options: [{ n: 1, label: "b" }, { n: 2, label: "b (recommended)" }] };
   const o = blockedOffer(MSG, "r1", "u5", p, { summary: "s", recommended: 1, why: "w" });
-  expect(labels(o)).toEqual(["b", "b (recommended)", "Show question", "Unpark", "Disarm"]);
+  expect(shownLabels(o)).toEqual(["b", "b (recommended)", "More…"]);
   expect(new Set(labels(o)).size).toBe(labels(o).length);
 });
 
@@ -116,4 +122,150 @@ test("confirm offers Yes with the carried act, and No", () => {
   expect(o.options).toEqual([{ label: LABELS.yes, act: carry }, { label: LABELS.no, act: { do: "no" } }]);
   expect(o.text).toBe("Merge PR #7 (head aaaaaaa) into main?");
   expect(confirmOffer("disarm", { do: "disarm-yes" }, "t", "Disarm run r1?").options[0]!.act).toEqual({ do: "disarm-yes" });
+});
+
+// ---- issue #941: an OpenBot question shows at most 5 options ----------------------------------
+
+const picker = (n: number, other: number | null = n + 1): Picker => ({
+  kind: "omp-ask", question: "which?", other,
+  options: Array.from({ length: n }, (_, i) => ({ n: i + 1, label: `opt${i + 1}` })),
+});
+const hidden = (o: Offer) => o.options.filter((x) => x.shown === false).map((x) => x.label);
+
+function withStages(n: number, f: () => void): void {
+  const dir = mkdtempSync(join(tmpdir(), "bot-ob-stages-"));
+  const rd = join(dir, "runs", "r9");
+  mkdirSync(rd, { recursive: true });
+  writeFileSync(join(rd, "recipe.json"), JSON.stringify({ stages: Object.fromEntries(Array.from({ length: n }, (_, i) => [`s${i + 1}`, {}])) }));
+  const was = process.env.BATON_STATE_DIR;
+  process.env.BATON_STATE_DIR = dir;
+  try {
+    f();
+  } finally {
+    process.env.BATON_STATE_DIR = was;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test("MAX_SHOWN is 5", () => {
+  expect(MAX_SHOWN).toBe(5);
+});
+
+test("no builder shows more than 5 labels, and labels within an offer are unique", () => {
+  const offers: Offer[] = [
+    offerFor({ kind: "unit-park", run: "r1", unit: "u1", at: "x" }, MSG, "r1")!,
+    offerFor({ kind: "unit-move", run: "r1", unit: "u2", stage: "spine_ack" }, "m", "r1")!,
+    offerFor({ kind: "run-park", run: "r1" }, "m", "r1")!,
+    blockedOffer(MSG, "r1", "u5", null, null),
+    confirmOffer("disarm", { do: "disarm-yes" }, "t", "Disarm run r1?"),
+    refusedOffer("t", "Not sent: x"),
+    stageOffer("r1", "t"),
+  ];
+  for (let n = 1; n <= 9; n++) {
+    for (const draft of [null, { summary: "s", recommended: 1, why: "w" }]) {
+      const o = blockedOffer(MSG, "r1", "u5", picker(n), draft);
+      offers.push(o, moreOffer(o));
+    }
+  }
+  withStages(13, () => {
+    for (let from = 0; from < 13; from += 4) offers.push(stageOffer("r9", "t", from));
+  });
+  for (const o of offers) {
+    expect(shownLabels(o).length).toBeGreaterThan(0);
+    expect(shownLabels(o).length).toBeLessThanOrEqual(MAX_SHOWN);
+    expect(new Set(labels(o)).size).toBe(labels(o).length);
+  }
+});
+
+test("shown defaults to true; shownLabels keeps the offer's order", () => {
+  const o: Offer = {
+    title: "t", text: "x", allowOther: false,
+    options: [{ label: "a", act: { do: "no" } }, { label: "b", act: { do: "no" }, shown: false }, { label: "c", act: { do: "no" }, shown: true }],
+  };
+  expect(shownLabels(o)).toEqual(["a", "c"]);
+});
+
+test("a blocked park with 4 options shows the 4, the recommended first, then More…", () => {
+  const o = blockedOffer(MSG, "r1", "u5", picker(4), { summary: "S", recommended: 3, why: "W" });
+  expect(shownLabels(o)).toEqual(["opt3 (recommended)", "opt1", "opt2", "opt4", "More…"]);
+  expect(hidden(o)).toEqual(["opt3", "Show question", "Unpark", "Disarm"]);
+  expect(o.options.find((x) => x.label === "Disarm")!.act).toEqual({ do: "disarm" });
+  expect(o.options[4]!.act).toEqual({ do: "more" });
+  expect(o.allowOther).toBe(true);
+  expect(o.text).toBe("S\nRecommended: W");
+});
+
+test("More… asks Show question, Unpark, Disarm, and Show question goes back to the worker's options", () => {
+  const o = blockedOffer(MSG, "r1", "u5", picker(2), null);
+  const m = moreOffer(o);
+  expect(labels(m)).toEqual(["Show question", "Unpark", "Disarm"]);
+  expect(m.options.map((x) => x.act)).toEqual([{ do: "show" }, { do: "unpark" }, { do: "disarm" }]);
+  expect(m.title).toBe(o.title);
+  expect(m.allowOther).toBe(false);
+  expect(m.back).toEqual(o);
+});
+
+test("a worker label equal to More… shows no worker buttons", () => {
+  const p: Picker = { kind: "numbered", question: "Q", other: null, options: [{ n: 1, label: "More…" }, { n: 2, label: "keep" }] };
+  const o = blockedOffer(MSG, "r1", "u5", p, null);
+  expect(shownLabels(o)).toEqual(["Show question", "Unpark", "Disarm"]);
+  expect(hidden(o)).toEqual(["More…", "keep"]);
+});
+
+test("a blocked park with 5 or more options shows only the escapes, and accepts every worker label typed", () => {
+  for (const n of [5, 7]) {
+    const o = blockedOffer(MSG, "r1", "u5", picker(n), null);
+    expect(shownLabels(o)).toEqual(["Show question", "Unpark", "Disarm"]);
+    expect(hidden(o)).toEqual(Array.from({ length: n }, (_, i) => `opt${i + 1}`));
+    expect(o.options.find((x) => x.label === `opt${n}`)!.act).toEqual({ do: "pick", n, label: `opt${n}` });
+    expect(o.allowOther).toBe(true);
+    const last = o.text.split("\n").at(-1)!;
+    expect(last).toBe(`Type one option's exact label to answer: ${Array.from({ length: n }, (_, i) => `"opt${i + 1}"`).join(", ")}`);
+    expect(o.text.startsWith(`${MSG}\n`)).toBe(true);
+  }
+  // control: 4 is still shown as buttons
+  expect(shownLabels(blockedOffer(MSG, "r1", "u5", picker(4), null))).toEqual(["opt1", "opt2", "opt3", "opt4", "More…"]);
+});
+
+test("5 or more options with a draft: the summary, the recommended label named, then the typing line", () => {
+  const o = blockedOffer(MSG, "r1", "u5", picker(6, null), { summary: "S", recommended: 2, why: "W" });
+  expect(o.text).toBe(`S\nRecommended: opt2 (W)\nType one option's exact label to answer: "opt1", "opt2", "opt3", "opt4", "opt5", "opt6"`);
+  expect(o.allowOther).toBe(false);
+});
+
+test("5 or more options: a worker label equal to an escape is the escape's", () => {
+  const p = picker(5);
+  p.options[0] = { n: 1, label: "Disarm" };
+  const o = blockedOffer(MSG, "r1", "u5", p, null);
+  expect(o.options.filter((x) => x.label === "Disarm").map((x) => x.act)).toEqual([{ do: "disarm" }]);
+});
+
+test("the stage list pages 4 at a time with More stages…, and accepts every stage on every page", () => {
+  withStages(9, () => {
+    const all = Array.from({ length: 9 }, (_, i) => `s${i + 1}`);
+    const p1 = stageOffer("r9", "t");
+    expect(shownLabels(p1)).toEqual(["s1", "s2", "s3", "s4", "More stages…"]);
+    expect(p1.options.find((x) => x.label === "More stages…")!.act).toEqual({ do: "stages", from: 4 });
+    const p2 = stageOffer("r9", "t", 4);
+    expect(shownLabels(p2)).toEqual(["s5", "s6", "s7", "s8", "More stages…"]);
+    expect(p2.options.find((x) => x.label === "More stages…")!.act).toEqual({ do: "stages", from: 8 });
+    const p3 = stageOffer("r9", "t", 8);
+    expect(shownLabels(p3)).toEqual(["s9", "Cancel"]);
+    for (const p of [p1, p2, p3]) {
+      expect(labels(p).filter((l) => /^s\d$/.test(l)).sort()).toEqual(all);
+      expect(p.options.find((x) => x.label === "s7")!.act).toEqual({ do: "unpark-stage", stage: "s7" });
+      expect(p.options.find((x) => x.label === "Cancel")!.act).toEqual({ do: "no" });
+    }
+  });
+  // exactly 4 stages: one page, with Cancel
+  withStages(4, () => expect(shownLabels(stageOffer("r9", "t"))).toEqual(["s1", "s2", "s3", "s4", "Cancel"]));
+});
+
+test("a recommended worker label equal to an action label stays the worker's when typed (CodeRabbit #942)", () => {
+  const p: Picker = { kind: "omp-ask", question: "q?", options: [{ n: 1, label: "Unpark" }, { n: 2, label: "Keep" }], other: 3 };
+  const o = blockedOffer("m", "r1", "u5", p, { summary: "S", recommended: 1, why: "W" });
+  const typed = o.options.filter((x) => x.label === "Unpark");
+  expect(typed).toEqual([{ label: "Unpark", act: { do: "pick", n: 1, label: "Unpark" }, shown: false }]);
+  expect(o.options.find((x) => x.label === "Unpark (recommended)")!.act).toEqual({ do: "pick", n: 1, label: "Unpark" });
+  expect(new Set(o.options.map((x) => x.label)).size).toBe(o.options.length);
 });

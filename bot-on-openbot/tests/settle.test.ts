@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { find, open, record, type DeliveryRec } from "../src/deliveries.ts";
 import { blockedOffer, offerFor } from "../src/offer.ts";
 import { serve } from "../src/serve.ts";
-import { SETTLE_MODE, sweepSettled } from "../src/settle.ts";
+import { SETTLE_MODE, sweepSettled, wellFormed } from "../src/settle.ts";
 import { handleTap } from "../src/tap.ts";
 import { captureErr, COLOURS, defaultRun, FIX, makeEnv, P1, P5, type Env } from "./helpers.ts";
 
@@ -325,4 +325,27 @@ test("token sweep: after serve settles, taps and fails, no state file and no std
   for (const f of files) expect(readFileSync(f, "utf8")).not.toContain(TOKEN);
   // control: the token did reach the stub, so the sweep is not vacuous
   expect(posts.length).toBe(1);
+});
+
+// Issue #941: labels accepted but not shown are no part of the prompt's shape.
+test("wellFormed compares the shown labels only, in order", () => {
+  const six = { ...COLOURS, options: ["a1", "b2", "c3", "d4", "e5", "f6"].map((label, i) => ({ n: i + 1, label })) };
+  const offer = blockedOffer("m", "r1", "u5", six as never, null);
+  const r: DeliveryRec = { key: "k", phase: "asked", run: "r1", title: offer.title, offer };
+  const p = (options: string[]) => ({ requestId: "q", questionId: "reply", header: r.title, question: r.title, options });
+  expect(wellFormed(r, p(["Show question", "Unpark", "Disarm"]))).toBe(true);
+  expect(wellFormed(r, p(offer.options.map((o) => o.label)))).toBe(false);
+  expect(wellFormed(r, p(["Unpark", "Show question", "Disarm"]))).toBe(false);
+});
+
+test("settle finds the exact prompt of an offer with labels not shown", async () => {
+  const six = { ...COLOURS, options: ["a1", "b2", "c3", "d4", "e5", "f6"].map((label, i) => ({ n: i + 1, label })) };
+  const offer = blockedOffer("m", "r1", "u5", six as never, null);
+  const r: DeliveryRec = { key: `r1/u5/park/${P5}`, phase: "asked", run: "r1", unit: "u5", park_at: P5, title: offer.title, offer, ask_id: "d1" };
+  record(r);
+  env.status("d1", "running", "turn-1");
+  prompts = [promptOf(r, "req-bad", ["Show question"]), promptOf(r, "req-exact", ["Show question", "Unpark", "Disarm"])];
+  env.writeRun(defaultRun({ units: { u5: { id: "u5", stage: "build", parked: null, vars: {} } } }));
+  await sweepSettled(env.bot, T0);
+  expect(posts.map((x) => x.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-exact/answer`]);
 });

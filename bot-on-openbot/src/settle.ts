@@ -5,6 +5,7 @@
 import { readUnit, runReadable, runStatus } from "./baton-state.ts";
 import { all, record, type DeliveryRec } from "./deliveries.ts";
 import { log } from "./log.ts";
+import { shownLabels } from "./offer.ts";
 import { OpenBotDown, OpenBotRefused, type OpenBot, type Prompt } from "./openbot.ts";
 
 /** Spike: OpenBot accepts an answer with a label the prompt never offered (answer-unoffered-label.txt). */
@@ -19,9 +20,9 @@ export function ours(r: DeliveryRec, p: Prompt): boolean {
   return norm(p.header) === title || norm(p.question.split("\n")[0]!) === title;
 }
 
-/** The prompt offers exactly the record's labels, in order. */
+/** The prompt offers exactly the record's shown labels, in order (an accepted label not shown is no button). */
 export function wellFormed(r: DeliveryRec, p: Prompt): boolean {
-  const labels = r.offer?.options.map((o) => o.label) ?? [];
+  const labels = r.offer ? shownLabels(r.offer) : [];
   return p.options.length === labels.length && p.options.every((l, i) => l === labels[i]);
 }
 

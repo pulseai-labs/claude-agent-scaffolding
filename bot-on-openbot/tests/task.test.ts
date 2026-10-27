@@ -99,3 +99,22 @@ test("parseDraft falls back on any reply it cannot use", () => {
   expect(long.summary.length).toBe(2000);
   expect(long.why).toBe("");
 });
+
+test("askTask lists only the shown labels, and lets the operator type when some are not shown (#941)", () => {
+  const o = offer({
+    allowOther: false,
+    options: [
+      { label: "Show question", act: { do: "show" } },
+      { label: "opt1", act: { do: "pick", n: 1, label: "opt1" }, shown: false },
+      { label: "Disarm", act: { do: "disarm" }, shown: true },
+    ],
+  });
+  for (const firm of [false, true]) {
+    const t = askTask(o, firm);
+    expect(t).toContain("in this order:\n- Show question\n- Disarm\n");
+    expect(t).not.toContain("- opt1");
+    expect(t).toContain("Also let the operator type their own answer.");
+  }
+  // control: every label shown and no Other, no typing line
+  expect(askTask(offer({ allowOther: false }))).not.toContain("type their own answer");
+});

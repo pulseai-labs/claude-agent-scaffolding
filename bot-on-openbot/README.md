@@ -22,15 +22,17 @@ are on, and `gh` (with its own auth) and `baton` on the service's PATH.
   with that option, with no shell. A label that matches nothing runs nothing.
 - A blocked park: `serve` calls `baton screen <run> <unit>` and takes the picker baton parsed. The
   agent drafts first (a summary, a recommended option number, a reason); the question then offers the
-  worker's options in screen order with the recommended one first, marked `(recommended)`, then Show
-  question, Unpark and Disarm. A tap runs `baton answer <run> <unit> --park <at> --screen <n> <label>`,
+  worker's options in screen order with the recommended one first, marked `(recommended)`, then
+  `More…`, which asks Show question, Unpark and Disarm as a follow-up. OpenBot's question tool takes at
+  most 5 options, so a picker of 5 or more shows only Show question, Unpark and Disarm, and the text
+  asks the operator to type one option's exact label (see Options). A tap runs `baton answer <run> <unit> --park <at> --screen <n> <label>`,
   which sends the keys only while the same park and the same label on line n are still on screen.
   Typed text, when the worker's picker has an Other row, runs `baton answer … --screen-text <text>
   --question <line>` under the same check.
 - When the park clears by any route, the question is answered `settled` and closed (see Settling).
 - While a question waits, `serve` checks the agent asked it as told: its prompt on OpenBot's `/pending`
   (the one whose header, or the first line of its question, is the question's title) must offer exactly
-  the offered labels, in order. A prompt asked another way, such as the labels as text with no
+  the shown labels, in order. A prompt asked another way, such as the labels as text with no
   buttons, is answered `settled` to dismiss it, and the question is asked once more with firmer
   wording. If that one is malformed too, it is dismissed, the question closes, and a message says to
   act in the Orca terminal or with baton.
@@ -89,7 +91,7 @@ bot-on-telegram is this one edit.
 | Notice | Sent as |
 |---|---|
 | Unit parked | a question: Unpark, Unpark to stage…, Show question, Disarm |
-| Unit blocked on a question in its terminal | a drafted question: the worker's options, one marked recommended, then Show question, Unpark, Disarm |
+| Unit blocked on a question in its terminal | a drafted question: the worker's options, one marked recommended, then More… (Show question, Unpark, Disarm); with 5 or more worker options, Show question, Unpark, Disarm and a line asking for an option's exact label |
 | Unit moved to a stage | a question: Merge (when the unit has a PR and a reviewed head), Open PR (when it has a PR), Disarm |
 | Run parked | a question: Disarm |
 | Run done, and anything else | a plain message, verbatim |
@@ -102,7 +104,9 @@ notice waits in the spool until the open one is answered, settled or ends.
 | Option | Runs | Then |
 |---|---|---|
 | Unpark | `baton unpark <run> <unit>` | a message with the result |
-| Unpark to stage… | nothing | a question listing the recipe's stages, and Cancel |
+| Unpark to stage… | nothing | a question listing the recipe's stages 4 at a time, then More stages… while more remain, else Cancel |
+| More stages… | nothing | the next 4 stages, the same way |
+| More… (a blocked park) | nothing | a question: Show question, Unpark, Disarm; Show question there asks the worker's options again |
 | a stage | `baton unpark <run> <unit> --to <stage>` | a message with the result |
 | Show question | nothing (a blocked park: `baton screen <run> <unit>`) | the same question again, its text the unit's stage, park reason, questions and thread, and for a blocked park the screen's tail |
 | Disarm | nothing | a Yes/No question |
@@ -111,10 +115,15 @@ notice waits in the spool until the open one is answered, settled or ends.
 | Yes (Merge) | `gh pr merge <pr> --merge --match-head-commit <reviewed head>` | a message with the result |
 | No, Cancel | nothing | the message "Cancelled." |
 | Open PR | nothing | a message with the PR URL |
-| a worker option | `baton answer <run> <unit> --park <at> --screen <n> <label>` | a message; refused: the question again, its text `Not sent: <baton's reason>`, with Show question and Disarm |
+| a worker option, tapped or typed exactly | `baton answer <run> <unit> --park <at> --screen <n> <label>` | a message; refused: the question again, its text `Not sent: <baton's reason>`, with Show question and Disarm |
 | typed text, on a blocked park whose picker has an Other row | `baton answer <run> <unit> --park <at> --screen-text <text> --question <line>` | as a worker option |
 | typed text, anywhere else | nothing | the message "Typed answers only go to a blocked worker; nothing ran." |
 | a label not offered | nothing | one log line, and the message "That option is not one I offered; nothing ran." |
+
+A question shows at most 5 options, the limit of OpenBot's question tool. Some labels an offer
+accepts are not shown: the worker's options when the picker has 5 or more, Show question, Unpark and
+Disarm under a blocked park's `More…`, and the stages and Cancel of other stage pages. Typed exactly,
+such a label is that option; typed text that equals no label is handled as typed text below.
 
 A command's result arrives as a message: `<title>: <what> — done`, or `— failed: <first error line>`.
 A question is closed before its command runs, so one answer runs at most one command. A tap on a
@@ -161,7 +170,12 @@ Only one `serve` runs at a time; a second exits with code 3.
   `--id`, which OpenBot answers with the same delivery.
 - The draft is the model's: its summary and recommendation can be wrong. A draft that is not the JSON
   asked for, or recommends a number not on the picker, is dropped and the question goes without one.
-- A typed answer that equals an offered label is that option, not text.
+- A typed answer that equals an offered label, shown or not, is that option, not text. So text meant
+  for the worker that equals Show question, Unpark or Disarm is that escape.
+- A picker of 5 or more options has no buttons for the worker's options: the operator types one
+  exactly. A worker label equal to Show question, Unpark or Disarm is then the escape's, and only the
+  Orca terminal can pick it.
+- On a stage page that shows More stages…, Cancel is not a button; type it, or page to the end.
 - `deliveries.jsonl` and `taps.jsonl` are never compacted.
 - The unit's `ExecStart` path is not quoted: keep the install path free of spaces and `%`.
 - A command that runs past 60 s is sent SIGTERM only; one that ignores it keeps running, and `serve`

@@ -2,7 +2,7 @@
 // fixed text plus data, never an instruction taken from a notice or a screen (design §6.2); the
 // draft is model text, so anything the parse cannot use falls back to a question with no draft.
 
-import type { Draft, Offer, Picker } from "./offer.ts";
+import { shownLabels, type Draft, type Offer, type Picker } from "./offer.ts";
 
 /** The screen's last characters that go into a draft; one request may be 32 KiB. */
 export const SCREEN_MAX_CHARS = 8000;
@@ -13,20 +13,23 @@ const WHY_MAX = 300;
 const stop = (s: string): string => (/[.!?…]$/.test(s) ? s : `${s}.`);
 
 // `firm`: the second ask of a question the agent asked without its options (issue #939).
+// Only the shown labels are listed; an offer with labels not shown lets the operator type one (#941).
 export function askTask(o: Offer, firm = false): string {
+  const labels = shownLabels(o).map((l) => `- ${l}`);
+  const other = o.allowOther || o.options.some((x) => x.shown === false) ? ["Also let the operator type their own answer."] : [];
   if (!firm) {
     return [
       `Ask the operator one question. Title: ${stop(o.title)} Show this text: ${stop(o.text)} Offer exactly these options, verbatim, in this order:`,
-      ...o.options.map((x) => `- ${x.label}`),
-      ...(o.allowOther ? ["Also let the operator type their own answer."] : []),
+      ...labels,
+      ...other,
       "Do not answer it yourself.",
     ].join("\n");
   }
   return [
     `Ask the operator one question. Use your question tool. Title: ${stop(o.title)} Show this text in the question: ${stop(o.text)} Give the question tool exactly these options, each as a separate choice, verbatim, in this order:`,
-    ...o.options.map((x) => `- ${x.label}`),
+    ...labels,
     "Each option must be its own choice in the question tool, never as text inside the question.",
-    ...(o.allowOther ? ["Also let the operator type their own answer."] : []),
+    ...other,
     "Do not answer it yourself.",
   ].join("\n");
 }

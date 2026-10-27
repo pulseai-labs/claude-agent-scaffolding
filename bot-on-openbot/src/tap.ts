@@ -10,7 +10,7 @@ import {
 } from "./actions.ts";
 import { newestPark, readUnit } from "./baton-state.ts";
 import { close, find, followUp, type DeliveryRec } from "./deliveries.ts";
-import { confirmOffer, LABELS, stageOffer, type Act, type Offer } from "./offer.ts";
+import { confirmOffer, moreOffer, refusedOffer, stageOffer, type Act, type Offer } from "./offer.ts";
 import type { OpenBot } from "./openbot.ts";
 import { stateDir } from "./paths.ts";
 import { log } from "./log.ts";
@@ -116,7 +116,7 @@ async function act(rec: DeliveryRec, a: Act, ctx: TapCtx): Promise<number | unde
   const noUnit = (what: string): number => result(what, { rc: 1, stderr: "the question carries no unit" });
   // An unpark acts on whatever park the unit is in now; a question asked for an older park runs
   // nothing. (A screen answer has the same check inside baton, through --park.)
-  if ((a.do === "unpark" || a.do === "unpark-to" || a.do === "unpark-stage") && rec.unit && rec.park_at
+  if ((a.do === "unpark" || a.do === "unpark-to" || a.do === "unpark-stage" || a.do === "stages") && rec.unit && rec.park_at
     && readUnit(rec.run, rec.unit)?.parked?.at !== rec.park_at) {
     say(`${rec.title}: the park this question was for is gone; nothing ran.`);
     return undefined;
@@ -130,12 +130,18 @@ async function act(rec: DeliveryRec, a: Act, ctx: TapCtx): Promise<number | unde
       if (!rec.unit) return noUnit("Unpark to stage");
       ask(stageOffer(rec.run, rec.title));
       return undefined;
+    case "stages":
+      ask(stageOffer(rec.run, rec.title, a.from));
+      return undefined;
+    case "more":
+      ask(moreOffer(rec.offer!));
+      return undefined;
     case "unpark-stage":
       if (!rec.unit) return noUnit(`Unpark to ${a.stage}`);
       return result(`Unpark to ${a.stage}`, await unparkTo(rec.run, rec.unit, a.stage, runner));
     case "show":
       if (!rec.unit) return noUnit("Show question");
-      ask({ ...rec.offer!, text: await showText(rec, runner) });
+      ask({ ...(rec.offer!.back ?? rec.offer!), text: await showText(rec, runner) });
       return undefined;
     case "disarm":
       ask(confirmOffer("disarm", { do: "disarm-yes" }, rec.title, `Disarm run ${rec.run}?`));
@@ -177,15 +183,7 @@ async function act(rec: DeliveryRec, a: Act, ctx: TapCtx): Promise<number | unde
 
 // A refused screen answer: ask again with baton's reason, offering only Show question and Disarm.
 function notSent(rec: DeliveryRec, res: { rc: number; stderr: string }): void {
-  followUp(rec, {
-    offer: {
-      title: rec.title,
-      text: `Not sent: ${failure(res.rc, res.stderr)}`,
-      options: [{ label: LABELS.show, act: { do: "show" } }, { label: LABELS.disarm, act: { do: "disarm" } }],
-      allowOther: false,
-    },
-    ...(rec.picker ? { picker: rec.picker } : {}),
-  });
+  followUp(rec, { offer: refusedOffer(rec.title, `Not sent: ${failure(res.rc, res.stderr)}`), ...(rec.picker ? { picker: rec.picker } : {}) });
 }
 
 // What Show question shows: the unit's stage, the park reason, its questions and thread, and for a
