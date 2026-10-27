@@ -1,0 +1,93 @@
+{
+  "detail": {
+    "turnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f",
+    "requestId": 4,
+    "status": "answered"
+  },
+  "changedMessages": [
+    {
+      "id": "question-prompt:01a17e48-feb8-7281-b5be-ec01e0b24c9f:4",
+      "turnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f",
+      "author": "assistant",
+      "source": "assistant",
+      "text": "Question: spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green.\nAnswer: green",
+      "createdAt": "2026-10-27T16:54:41.190Z",
+      "status": "completed",
+      "itemType": "question_prompt",
+      "questionPrompt": {
+        "requestId": 4,
+        "questions": [
+          {
+            "id": "reply",
+            "header": "spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green.",
+            "question": "spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green.",
+            "isSecret": false,
+            "options": [
+              {
+                "label": "red",
+                "description": ""
+              },
+              {
+                "label": "green",
+                "description": ""
+              },
+              {
+                "label": "blue",
+                "description": ""
+              }
+            ]
+          }
+        ],
+        "resolution": {
+          "status": "answered",
+          "responses": {
+            "reply": {
+              "status": "answered",
+              "answers": [
+                "green"
+              ]
+            }
+          }
+        }
+      },
+      "uiBlock": {
+        "version": 1,
+        "blockId": "10c434d5-95dc-4fe2-8142-2b8fa80e67c6",
+        "spec": {
+          "type": "quick_replies",
+          "options": [
+            {
+              "id": "red",
+              "label": "red"
+            },
+            {
+              "id": "green",
+              "label": "green"
+            },
+            {
+              "id": "blue",
+              "label": "blue"
+            }
+          ],
+          "title": "spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green."
+        },
+        "state": {
+          "status": "answered",
+          "response": {
+            "actionId": "green"
+          },
+          "respondedBy": {
+            "id": "476e739e-7e03-415f-857c-ff1489dfa9e1",
+            "name": "<redacted>"
+          },
+          "respondedAt": "2026-10-27T16:54:45.868Z",
+          "outcome": "green"
+        }
+      },
+      "reactions": [],
+      "reaction": null
+    }
+  ],
+  "removedMessageIds": [],
+  "activeTurnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f"
+}
