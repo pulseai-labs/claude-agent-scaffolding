@@ -34,6 +34,8 @@ texts = {
     'PAUSED_NO_PROGRESS': 'molt paused: no progress since the last molt ',
     'MISSING_HANDOFF': 'molt: the MOLT-HANDOFF line names ',
     'STATUS_METER': '`molt ${Math.round',
+    'PAST_LEAD': "Context is at {{percent}}% of the window, past molt's handoff threshold",
+    'OPERATOR_LEAD': 'and the operator asked for a handoff now',
 }
 failures = []
 for glue in ['molt/omp/core.ts', 'molt/hooks/register.tsx']:
@@ -53,5 +55,5 @@ for name in texts:
 if failures:
     print('\n'.join('FAIL: ' + failure for failure in failures))
     sys.exit(1)
-print('PASS: both glues import the Stop cap and all 21 shared texts from the pure modules')
+print('PASS: both glues import the Stop cap and all 23 shared texts from the pure modules')
 PY

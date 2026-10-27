@@ -22,7 +22,7 @@ state; it reads two environment variables.
 | 40% (`warnPercent`) | Once, after the next tool result (or with the next prompt when the turn ended first), a warning: find a good point to hand off. Work continues. | The same, plus "tell your parent". molt appends `warned 40` to the status file. |
 | 50% (`warnAgainPercent`) | Once, a second warning: the handoff is past due. Work continues. | The same; `warned 50`. |
 | 65% (`commandPercent`) | Once, after a tool result: finish the step in hand and write the handoff now. At the end of a turn with no `MOLT-HANDOFF:` line, or with one that names a file that does not exist, the Stop reflex blocks the stop and asks again, at most twice. | The same; `handoff required`. |
-| 75% (`blockPercent`) | Only Write, Edit, Skill, and Bash whose every command is `git add` or `git commit` run — a leading head word (`if`, `then`, `elif`, `else`, `!`, `{`, `time`) is skipped, a segment that only closes one (`fi`, `}`) is ignored, and a lone `&` splits commands as `;` does (`&&` and the redirections that carry `&` are untouched). A loop head (`while`, `until`, `do`) is not skipped, so a loop stays refused. Every other tool call, reads included, is refused with the instruction and a note on the block. | The same. |
+| 75% (`blockPercent`) | Only Write, Edit, Skill, and Bash whose every command is `git add` or `git commit` run — a leading head word (`if`, `then`, `elif`, `else`, `!`, `{`, `time`) is skipped, a segment that only closes one (`fi`, `}`) is ignored, and a lone `&` splits commands as `;` does (`&&` and the redirections that carry `&` are untouched). A loop head (`while`, `until`, `do`) is not skipped, so a loop stays refused. Every other tool call, reads included, is refused with the instruction and a note on the block. A command substitution in such a Bash call is read as commands of its own and goes through only if each is `git add`, `git commit`, `cat` on its stdin, `date` without `-f`, `printf` or `echo` (The gate, below). | The same. |
 | 80% (block + `fallbackMargin`) | molt stops waiting. With no handoff, it writes one: Haiku summarises the transcript into `~/.claude/state/molt/briefs/<id>.md`, above the facts molt extracts itself (files written, commits, issues, the last request). If Haiku fails, the facts alone stand in. molt molts on that brief. | The brief is written and handed off: `handed-off <brief path>`. No clear. |
 
 A warning never blocks a stop. Past 65% only the command is delivered; a warning the session
@@ -62,6 +62,36 @@ A seeded session gets room before its first warning: the ladder starts at least 
 points above the fill it started at, with the gaps between the steps kept. The ladder moves up
 only as far as keeps the fallback at 99% or below, so a session that starts very full is warned
 sooner rather than never gated.
+
+## The gate past the block threshold
+
+Past 75% (`blockPercent`) the gate refuses every tool call except Write, Edit, Skill and a Bash
+call whose every command is `git add` or `git commit`. It is a steering gate, not a security
+boundary: it only refuses. A call it lets through is not approved; it goes on to the session's
+permission mode like any other call. It reads the command text with the shell reader seat-mods
+ships, a copy `tests/test-mod-shell-parity.sh` holds identical. A command it cannot read as add or
+commit is refused; a form the reader mis-reads goes through (Limits).
+
+- **Command words.** An escaped head (`\git add f`), a named-descriptor prefix
+  (`{log}>/tmp/f git add f`) and a redirection glued to a word (`git add f>/dev/null`) read as
+  `git add`, and a read behind the same spelling (`\cat huge.log`) is refused. A wrapper named by a
+  relative path (`./env git add f`) may be any local program and is refused; `/usr/bin/env` reads as
+  `env`. A segment that is only a redirection (`git add f; > out`) names no command and is skipped.
+  A redirect after a brace group or a `fi` (`{ git add f; git commit -m m; } >log`) is not a
+  command either, so that group is allowed.
+- **Heredocs.** A heredoc's delimiter is its word after quote removal, several heredocs on one line
+  close in order, a heredoc inside a `$(…)` also closes at a line that starts with its delimiter and
+  holds a `)` after it (`EOF)`), as in Bash 5.3, a `<<` inside `$((…))`, `((…))` or a `#` comment
+  opens none, and a quoted body is text, never read for commands. A command on the opener line
+  after the delimiter is read (the exception is in Limits).
+- **Substitutions (INNER_OK).** A `$(…)` or backtick span runs before the call does, so it is read
+  as commands of its own, in an unquoted heredoc body too. A call with a substitution goes through
+  only if every command in it is `git add` or `git commit`, `cat` with no file operand (`-` or
+  nothing: its stdin, a heredoc included), `date` without `-f` or `--file`, `printf` or `echo`.
+  So `git commit -m "$(cat <<'EOF' … EOF)"` and `git commit -m "release $(date +%F)"` go through.
+  Refused: `cat file` and `cat < file`, `$(<file)` (Bash's own file read), `date -f file`, any
+  other command (`sed`, `tr`, `git log`), a command word reached by a relative path (`./date`), and
+  a substitution nested more than 8 deep.
 
 ## Child sessions
 
@@ -157,7 +187,8 @@ session's file carries none until its first response measures where it started. 
 rewrites the file whenever the stage or a threshold changes, at `/molt off`, `/molt on` and
 `/molt now`, and when a clear, compact or resume resets the stage. A child writes it too. The
 write is best-effort: a failure is logged once and never stops a warning, a handoff or a molt.
-`autonomic` 0.1.1+ reads it to leave the turn end to molt from the command stage on.
+`autonomic` reads it for `/autopilot status` and, on Claude Code, to tell molt's own block deny from a
+seat guard's. It leaves no turn end to molt: autonomic 0.11.0 judges none (#887).
 
 The three templates are written with their defaults on first start, only where no file exists
 (and the one 0.1.0 default above). Edit them freely; an empty or unreadable template falls back
@@ -167,7 +198,7 @@ to the default text.
 
 | Command | Effect |
 |---|---|
-| `/molt now` | Treats the session as past the handoff command whatever the fill, and puts the handoff instruction in the prompt box: press Enter to send it. Where the session has no prompt box, the next prompt you send carries it. It also lifts a pause and `/molt off`, and brings the active marker back in the same command. |
+| `/molt now` | Treats the session as past the handoff command whatever the fill, and puts the handoff instruction in the prompt box: press Enter to send it. Where the session has no prompt box, the next prompt you send carries it. Below the handoff threshold the instruction's first line says you asked for the handoff, not that the fill is past the threshold (#903); an `instructions.md` you edited with another first line is sent as written. It also lifts a pause and `/molt off`, and brings the active marker back in the same command. |
 | `/molt off` | molt stops measuring, warning, blocking, gating and molting in this session, and removes the active marker, so the crew context-ceiling hooks speak again here. |
 | `/molt on` | Turns it back on. In a stale session it also lifts the stale-resume guard and removes the successor record. |
 | `/molt status` | The fill and the ladder, the mode `autonomic` records, any settings problem, and whether auto-compact runs above the block threshold. |
@@ -215,11 +246,49 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   four characters per token to the last measured fill.
 - **Auto-compact must sit above the block.** molt does not turn auto-compact off; it stays the
   backstop. If it runs at or below the block threshold, it acts first. `/molt status` checks.
+- **Past the block threshold, a heredoc opener line holding a `$(…)`, a backtick or a `${…}` after
+  its word keeps the 0.3.7 reading.** The commands after the substitution on that line are not
+  read (`git commit -F - <<EOF $(date); cat huge.log`, then a body line and `EOF`). Inside a
+  substitution such a line is read, and so are the substitutions on it.
+- **C6, the gate reads shapes, not grammar.** A construct other than the head words of the ladder
+  table is refused even when everything in it is `git add` or `git commit`: a loop (`for`, `while`,
+  `until`, `select`), `case`, `[[ … ]]`, `(( … ))`, `coproc`, the no-op `:` (`git add f; :`), and
+  a function body (`f() { git commit -m m; }`, which only defines the function). A line that is a
+  syntax error and runs nothing (`if git add f; git commit -m m`) reads as the commands it spells,
+  and passes.
+- **An `EOF)` closing line in a `$(` opened before an earlier heredoc's body is not seen
+  closing,** so past the block threshold `git commit -m "$(cat <<'A'`, a body line, `A`,
+  `cat <<'EOF'`, a body line and `EOF)"` is refused; with the `)` on a line of its own it goes
+  through. A `$(` opened before a newline outside quotes is not seen either, but the gate refuses
+  an unquoted `$(cat …)` as it stands. With the `$(` on the opener's line, or before a newline
+  inside quotes (`git commit -m "$(`, a newline, `cat <<'EOF'` …), the `EOF)` close goes through.
+- **`>|` splits a command at its `|`.** `git add f >| out`, a redirection that overrides
+  `noclobber`, is refused past the block threshold, though Bash runs `git add f`;
+  `git add f > out` goes through.
+- **A relative command word reads as git outside a substitution.** `./git add f` and
+  `bin/git add f` pass, as before; inside a substitution a relative command word is refused.
+- **The substitution reader is not a parser,** and in molt a miss lets a read through. A `#` after
+  a blank in a quoted string inside a double-quoted `$(…)` hides the rest of the line
+  (`git commit -m "$(echo "a # b")" && cat huge.log`), as in molt 0.3.7. A Bash 5.3 funsub,
+  `"${ cat huge.log; }"`, is read by no rail. A backslash-newline between `$` and `(`
+  (`"$\<newline>(cat huge.log)"`) hides the span. The gate steers: what it misses goes on to the
+  session's permission mode and its own care.
+- **A `<<` inside an unquoted `$[…]` or a `${…}` still opens a heredoc for the reader** (as in
+  seat-mods), though Bash runs it as arithmetic or a pattern. The lines after it read as body, so a
+  read there passes the gate: `git add f $[1<<2]` then a newline and `cat huge.log`, and the same
+  with `${x/<<a/b}`.
+- **`date` with a `$'…'` or `$"…"` flag passes inside a substitution.**
+  `git commit -m "$(date $'-f' huge.log)"` and `$(date $"-f" huge.log)` are not refused, though
+  `date` reads the file; `-f`, `'-f'`, `"-f"` and `--file` are.
 - **A Bash write is not progress unless it commits.** The autopilot loop guard counts Write,
   Edit, NotebookEdit and `git commit`; `sed -i` or `cat >` alone reads as no progress. A
   `git commit` counts only bare, or behind `time`: a `{ … }` segment cannot be told from a
   function definition's body (`f() { git commit -m m; }`, which runs no commit), and one behind
   `if`, `then`, `elif`, `else` or `!` may not run, so neither counts.
+- **C7, the progress count reads text, not control flow.** A bare `git commit` counts even when
+  the line does not run it or it commits nothing: `false && git commit -m m` (the commit never
+  runs), `time false && git commit -m m`, and `git commit -m m || git add f` (the commit may
+  fail while the add makes the line succeed). A second command inside a `{ … }` group counts too.
 - **Any Agent SDK prompt is a message from you, to molt.** A headless SDK driver that loops a
   root session therefore resets the manual pause count at each prompt, as a worker's ping does
   below; such a loop is bounded only by minimum room. The OMP extension keeps its own count and
@@ -253,7 +322,7 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   re-arm what its handoff lists. `/molt now` sends the instruction as an `aside`, which starts a turn on an idle session.
 - There is no manifest UI on OMP: `~/.omp/agent/molt.json` holds the same keys as the settings table below, and a file that is not valid
   JSON falls back to the defaults with a notice. The state files (`~/.claude/state/molt/`) are the ones `autonomic` reads.
-- Past the block threshold only `write`, `edit`, `apply_patch`, `ast_edit`, a `skill://` read and `git add` / `git commit` run.
+- Past the block threshold only `write`, `edit`, `apply_patch`, `ast_edit`, a `skill://` read and `git add` / `git commit` run, with the gate and the substitution rule above.
 - Main limit: there is no handoff in `-p` mode (no command context to arm, so the session keeps going, gated). The clear is measured
   in rpc mode only (two cycles); the TUI is unmeasured.
 
