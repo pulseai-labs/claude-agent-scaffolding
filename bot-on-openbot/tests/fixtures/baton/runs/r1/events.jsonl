@@ -1,0 +1,5 @@
+{"at":"t1","kind":"park","unit":"u1","stage":"build","reason":"first","thread":"th-1"}
+{"at":"t1b","kind":"park","unit":"u2","stage":"build","reason":"other"}
+garbage line
+{"at":"t2","kind":"park","unit":"u1","stage":"build","reason":"second prompt","thread":"th-2","questions":"[{\"id\":\"q1\",\"header\":\"Database\",\"question\":\"which db?\",\"options\":[{\"label\":\"postgres\"},{\"label\":\"sqlite\",\"description\":\"file-backed\"}]},{\"id\":\"q2\",\"header\":\"Migrate\",\"question\":\"run migrations now?\",\"options\":[{\"label\":\"yes\"},{\"label\":\"no\"}]}]"}
+{"at":"t3","kind":"move","unit":"u1"}

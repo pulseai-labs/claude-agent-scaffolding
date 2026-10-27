@@ -1,0 +1,212 @@
+{
+  "detail": {
+    "turnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f",
+    "requestId": 4
+  },
+  "changedMessages": [
+    {
+      "id": "2f92b8be-c86a-4032-95c9-e54b6ef2218a",
+      "turnId": "01a173c7-441f-7321-9f2f-99a727cf2859",
+      "author": "user",
+      "source": "user",
+      "text": "Your ongoing role is: This agent is going to be an autopilot communicator, which would be helping me with communicating with Spine automated workflows.",
+      "senderMember": {
+        "id": "<redacted>",
+        "name": "<redacted>"
+      },
+      "attachments": [],
+      "replyToMessageId": null,
+      "delivery": {
+        "id": "2f92b8be-c86a-4032-95c9-e54b6ef2218a",
+        "status": "completed",
+        "position": null
+      },
+      "createdAt": "2026-10-25T15:56:41.260Z",
+      "status": "completed",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "1c6816de-624b-40a7-b8ed-8f7a1f52ba53",
+      "turnId": "01a173cb-b571-7670-b02f-666d7f128c25",
+      "author": "user",
+      "source": "user",
+      "text": "AUTOPILOT SPIKE 1 (a test; nothing real happens).\n\nAsk the operator this question with your tool for asking the user a question with options. Use exactly this text and exactly these two options, in this order:\n\nQuestion: \"Spike 1: unit r0.s0 of pilot-fourseat passed review. Merge PR #0 at head abc1234?\"\nOptions: \"Merge\", \"Not now\"\n\nDo not run any command, do not read or write files, and do not add other options.\nAfter the operator answers, reply with only the label of the option they chose, exactly as written above, and nothing else.",
+      "attachments": [],
+      "replyToMessageId": null,
+      "delivery": {
+        "id": "1c6816de-624b-40a7-b8ed-8f7a1f52ba53",
+        "status": "completed",
+        "position": null
+      },
+      "createdAt": "2026-10-25T16:01:32.421Z",
+      "status": "completed",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "0d6bf167-3a6d-4835-94f0-cb7e1f039300",
+      "turnId": "01a173cc-c310-7a32-b0ec-3bdb1e69bb97",
+      "author": "user",
+      "source": "user",
+      "text": "AUTOPILOT SPIKE 2 (a test; nothing real happens).\n\nAsk the operator this question with your tool for asking the user a question with options. Use exactly this text and exactly these two options, in this order:\n\nQuestion: \"Spike 2: worker r0.s0.w1 in pilot-fourseat is blocked on a question. Unpark it?\"\nOptions: \"Unpark\", \"Leave parked\"\n\nDo not run any command, do not read or write files, and do not add other options.\nAfter the operator answers, reply with only the label of the option they chose, exactly as written above, and nothing else.",
+      "attachments": [],
+      "replyToMessageId": null,
+      "delivery": {
+        "id": "0d6bf167-3a6d-4835-94f0-cb7e1f039300",
+        "status": "completed",
+        "position": null
+      },
+      "createdAt": "2026-10-25T16:02:41.531Z",
+      "status": "completed",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "50f8f805-83f4-434f-90d8-28f083f0dc7d",
+      "turnId": "01a173cd-19ae-7951-bd0f-51bbe07f9ad7",
+      "author": "user",
+      "source": "user",
+      "text": "AUTOPILOT SPIKE 3 (a test; nothing real happens).\n\nAsk the operator this question with your tool for asking the user a question with options. Use exactly this text and exactly these two options, in this order:\n\nQuestion: \"Spike 3 (a script answers this one; please do not tap): worker r0.s0.w2 in pilot-fourseat is blocked on a question. Unpark it?\"\nOptions: \"Unpark\", \"Leave parked\"\n\nDo not run any command, do not read or write files, and do not add other options.\nAfter the operator answers, reply with only the label of the option they chose, exactly as written above, and nothing else.",
+      "attachments": [],
+      "replyToMessageId": null,
+      "delivery": {
+        "id": "50f8f805-83f4-434f-90d8-28f083f0dc7d",
+        "status": "completed",
+        "position": null
+      },
+      "createdAt": "2026-10-25T16:03:03.703Z",
+      "status": "completed",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "99156f0f-929e-4651-ac0e-450449be32af",
+      "turnId": "01a17e42-dfd6-7402-be76-4cd9d4e76c3a",
+      "author": "user",
+      "source": "user",
+      "text": "Ask the operator one question. Title: spike — bridge test 1 (tap any option). Show this text: This is a test of the baton OpenBot bridge. Tap any option. Offer exactly these options, verbatim, in this order:\n- Unpark\n- Unpark to stage…\n- Show question\n- Disarm\nAlso let the operator type their own answer.\nDo not answer it yourself.",
+      "attachments": [],
+      "replyToMessageId": null,
+      "delivery": {
+        "id": "99156f0f-929e-4651-ac0e-450449be32af",
+        "status": "completed",
+        "position": null
+      },
+      "createdAt": "2026-10-27T16:47:54.120Z",
+      "status": "completed",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "8699aed6-9391-4cf8-9458-b8f1efd15216",
+      "turnId": "01a17e46-fce5-7d40-bc28-a554f07cf4ea",
+      "author": "user",
+      "source": "user",
+      "text": "Ask the operator one question. Title: spike — bridge test 2 (please answer by typing your own text: teal). Show this text: This is a test of the baton OpenBot bridge. Use the free-text answer and type teal. Offer exactly these options, verbatim, in this order:\n- red\n- green\n- blue\nAlso let the operator type their own answer.\nDo not answer it yourself.",
+      "attachments": [],
+      "replyToMessageId": null,
+      "delivery": {
+        "id": "8699aed6-9391-4cf8-9458-b8f1efd15216",
+        "status": "completed",
+        "position": null
+      },
+      "createdAt": "2026-10-27T16:52:23.886Z",
+      "status": "completed",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "4494ade1-6d02-4478-9c7b-1199df7be52a",
+      "turnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f",
+      "author": "user",
+      "source": "user",
+      "text": "Ask the operator one question. Title: spike — bridge test 3 (please tap green). Show this text: This is a test of the baton OpenBot bridge. Tap green. Offer exactly these options, verbatim, in this order:\n- red\n- green\n- blue\nDo not answer it yourself.",
+      "attachments": [],
+      "replyToMessageId": null,
+      "delivery": {
+        "id": "4494ade1-6d02-4478-9c7b-1199df7be52a",
+        "status": "running",
+        "position": null
+      },
+      "createdAt": "2026-10-27T16:52:23.918Z",
+      "status": "completed",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "rs_0b55d6b327cd3797016ae0d75054448191a66e3555cbf1e726",
+      "turnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f",
+      "author": "assistant",
+      "text": "",
+      "createdAt": "2026-10-27T16:54:40.550Z",
+      "status": "completed",
+      "itemType": "commentary",
+      "reactions": [],
+      "reaction": null
+    },
+    {
+      "id": "question-prompt:01a17e48-feb8-7281-b5be-ec01e0b24c9f:4",
+      "turnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f",
+      "author": "assistant",
+      "source": "assistant",
+      "text": "Question: spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green.",
+      "createdAt": "2026-10-27T16:54:41.190Z",
+      "status": "completed",
+      "itemType": "question_prompt",
+      "questionPrompt": {
+        "requestId": 4,
+        "questions": [
+          {
+            "id": "reply",
+            "header": "spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green.",
+            "question": "spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green.",
+            "isSecret": false,
+            "options": [
+              {
+                "label": "red",
+                "description": ""
+              },
+              {
+                "label": "green",
+                "description": ""
+              },
+              {
+                "label": "blue",
+                "description": ""
+              }
+            ]
+          }
+        ],
+        "resolution": null
+      },
+      "uiBlock": {
+        "version": 1,
+        "blockId": "10c434d5-95dc-4fe2-8142-2b8fa80e67c6",
+        "spec": {
+          "type": "quick_replies",
+          "options": [
+            {
+              "id": "red",
+              "label": "red"
+            },
+            {
+              "id": "green",
+              "label": "green"
+            },
+            {
+              "id": "blue",
+              "label": "blue"
+            }
+          ],
+          "title": "spike — bridge test 3 (please tap green)\nThis is a test of the baton OpenBot bridge. Tap green."
+        },
+        "state": {
+          "status": "pending"
+        }
+      }
+    }
+  ],
+  "removedMessageIds": [],
+  "activeTurnId": "01a17e48-feb8-7281-b5be-ec01e0b24c9f"
+}

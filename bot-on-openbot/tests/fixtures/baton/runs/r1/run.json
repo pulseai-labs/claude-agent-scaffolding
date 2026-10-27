@@ -1,0 +1,87 @@
+{
+ "units": {
+  "u1": {
+   "id": "u1",
+   "stage": "build",
+   "parked": {
+    "reason": "second prompt",
+    "at": "2026-10-23T10:00:00Z"
+   },
+   "vars": {},
+   "group": "g",
+   "order": 0,
+   "launches": 1,
+   "seq": 1,
+   "stalls": 0
+  },
+  "u2": {
+   "id": "u2",
+   "stage": "spine_ack",
+   "vars": {
+    "pr_url": "https://github.com/o/r/pull/7"
+   },
+   "group": "g",
+   "order": 0,
+   "launches": 1,
+   "seq": 1,
+   "stalls": 0,
+   "parked": null
+  },
+  "u3": {
+   "id": "u3",
+   "stage": "spine_ack",
+   "vars": {
+    "pr_url": "https://github.com/o/r/pull/8"
+   },
+   "group": "g",
+   "order": 0,
+   "launches": 1,
+   "seq": 1,
+   "stalls": 0,
+   "parked": null
+  },
+  "u4": {
+   "id": "u4",
+   "stage": "build",
+   "vars": {},
+   "group": "g",
+   "order": 0,
+   "launches": 1,
+   "seq": 1,
+   "stalls": 0,
+   "parked": null
+  },
+  "u5": {
+   "id": "u5",
+   "stage": "build",
+   "parked": {
+    "reason": "blocked",
+    "at": "2026-10-27T16:50:00.000Z",
+    "blocked": {
+     "thread": "thread-1"
+    }
+   },
+   "vars": {},
+   "group": "g",
+   "order": 0,
+   "launches": 1,
+   "seq": 1,
+   "stalls": 0
+  },
+  "u6": {
+   "id": "u6",
+   "stage": "build",
+   "parked": {
+    "reason": "blocked",
+    "at": "2026-10-27T16:50:00.000Z",
+    "blocked": "thread-1"
+   },
+   "vars": {},
+   "group": "g",
+   "order": 0,
+   "launches": 1,
+   "seq": 1,
+   "stalls": 0
+  }
+ }
+}

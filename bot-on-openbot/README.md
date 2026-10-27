@@ -1,0 +1,156 @@
+# bot-on-openbot
+
+Sends [baton](../baton) notices to the operator as OpenBot questions on the phone,
+and turns a tapped option into the matching `baton` or `gh` command. For a worker blocked on a question
+in its terminal, the OpenBot agent drafts a summary and a recommendation, the question offers the
+worker's own options, and a tap answers the worker through baton's screen check. A CLI and a
+long-running service; no skill, no dependencies beyond [bun](https://bun.sh). It needs baton 0.7.0 or
+later (`baton screen` and `baton answer --screen`), OpenBot v0.50.x with an agent whose Local scripts
+are on, and `gh` (with its own auth) and `baton` on the service's PATH.
+
+## How it works
+
+- `bot-on-openbot notify <key> <message>` is what baton runs for each notice. It only writes a file
+  into `<state>/spool/` and exits, so baton's tick never waits on the network.
+- `bot-on-openbot serve` (the service) sends the spool in order through `openbot-cli run <agent> -
+  --id <notice key> --json`, one delivery at a time. Each task is fixed wording plus data: ask the
+  operator one question with exactly these labels, send a message verbatim, or draft a summary of a
+  screen as JSON. The agent asks; it never answers alone.
+- The tapped label is read from OpenBot's own database (`openbot.db`, opened read-only: the
+  `prompt.resolved` row of the delivery's turn), never from the agent's reply text. It is matched
+  exactly against the options recorded for that question, and runs the one fixed command recorded
+  with that option, with no shell. A label that matches nothing runs nothing.
+- A blocked park: `serve` calls `baton screen <run> <unit>` and takes the picker baton parsed. The
+  agent drafts first (a summary, a recommended option number, a reason); the question then offers the
+  worker's options in screen order with the recommended one first, marked `(recommended)`, then Show
+  question, Unpark and Disarm. A tap runs `baton answer <run> <unit> --park <at> --screen <n> <label>`,
+  which sends the keys only while the same park and the same label on line n are still on screen.
+  Typed text, when the worker's picker has an Other row, runs `baton answer … --screen-text <text>
+  --question <line>` under the same check.
+- When the park clears by any route, the question is answered `settled` and closed (see Settling).
+
+## Install
+
+```sh
+ln -sf "$PWD/bot-on-openbot/bin/bot-on-openbot" ~/.local/bin/bot-on-openbot
+```
+
+Point the symlink at the plugin directory again after a plugin update moves it. Then:
+
+```sh
+bot-on-openbot service install     # writes the user unit, enable --now
+bot-on-openbot service remove
+bot-on-openbot status
+```
+
+The unit carries `BATON_STATE_DIR`, `BATON_CONFIG`, `BOT_ON_OPENBOT_CONFIG_DIR` and
+`BOT_ON_OPENBOT_STATE_DIR` as they are set when you run `service install`, and a `PATH` that reaches
+`~/.local/bin` (baton), `~/.bun/bin` (bun) and `/usr/bin` (gh).
+
+## Agent
+
+1. In OpenBot, pick or make the agent that talks to you (the one this was built with is `Autopilot`)
+   and turn its **Local scripts** on. OpenBot then writes `~/.config/OpenBot/automation/{url,token}`.
+2. Write `~/.config/bot-on-openbot/config.json`:
+
+   ```json
+   { "agent": "Autopilot" }
+   ```
+
+   `agent` is the agent's name or id. Optional keys, each with its default:
+   `"cli": ["bun", "/opt/OpenBot/app/resources/cli/openbot-cli.mjs"]`,
+   `"db": "~/.config/OpenBot/openbot.db"`, `"automationDir": "~/.config/OpenBot/automation"`
+   (spell paths out in full: they must be absolute).
+
+The bot reads OpenBot's token from the automation folder on each call and sends it only in a request
+header. It never writes it to a file, a log line or an error. `bot-on-openbot status` shows the agent
+and whether `openbot-cli list` finds it; it never prints the token.
+
+## The baton line
+
+In `~/.config/baton/config.json`, spell out the absolute path. The `notify` argv runs with no shell,
+so `~` is not expanded:
+
+```json
+{ "notify": ["/home/<user>/.local/bin/bot-on-openbot", "notify", "{key}", "{message}"] }
+```
+
+baton's `notify` names one program, so only the bot it names receives notices. Switching from
+bot-on-telegram is this one edit.
+
+## Notices
+
+| Notice | Sent as |
+|---|---|
+| Unit parked | a question: Unpark, Unpark to stage…, Show question, Disarm |
+| Unit blocked on a question in its terminal | a drafted question: the worker's options, one marked recommended, then Show question, Unpark, Disarm |
+| Unit moved to a stage | a question: Merge (when the unit has a PR and a reviewed head), Open PR (when it has a PR), Disarm |
+| Run parked | a question: Disarm |
+| Run done, and anything else | a plain message, verbatim |
+
+One delivery is open at a time: an unanswered OpenBot question blocks the agent's queue, so the next
+notice waits in the spool until the open one is answered, settled or ends.
+
+## Options
+
+| Option | Runs | Then |
+|---|---|---|
+| Unpark | `baton unpark <run> <unit>` | a message with the result |
+| Unpark to stage… | nothing | a question listing the recipe's stages, and Cancel |
+| a stage | `baton unpark <run> <unit> --to <stage>` | a message with the result |
+| Show question | nothing (a blocked park: `baton screen <run> <unit>`) | the same question again, its text the unit's stage, park reason, questions and thread, and for a blocked park the screen's tail |
+| Disarm | nothing | a Yes/No question |
+| Yes (Disarm) | `baton disarm <run>` | a message with the result |
+| Merge | `gh pr view <pr> --json number,baseRefName` | a Yes/No question naming the PR, head and base; a failed check is a message saying why |
+| Yes (Merge) | `gh pr merge <pr> --merge --match-head-commit <reviewed head>` | a message with the result |
+| No, Cancel | nothing | the message "Cancelled." |
+| Open PR | nothing | a message with the PR URL |
+| a worker option | `baton answer <run> <unit> --park <at> --screen <n> <label>` | a message; refused: the question again, its text `Not sent: <baton's reason>`, with Show question and Disarm |
+| typed text, on a blocked park whose picker has an Other row | `baton answer <run> <unit> --park <at> --screen-text <text> --question <line>` | as a worker option |
+| typed text, anywhere else | nothing | the message "Typed answers only go to a blocked worker; nothing ran." |
+| a label not offered | nothing | one log line, and the message "That option is not one I offered; nothing ran." |
+
+A command's result arrives as a message: `<title>: <what> — done`, or `— failed: <first error line>`.
+A question is closed before its command runs, so one answer runs at most one command. A tap on a
+closed question (settled, or answered already) runs nothing and says it is no longer open.
+
+## Settling
+
+When the unit is no longer in the park a question was asked for (you answered in the Orca terminal,
+a driver or a later tick moved it), or its run is disarmed or done, the bot closes the question and
+answers its OpenBot prompt with the label `settled`, so the agent's queue moves on. The bot finds its
+prompt on OpenBot's `/pending` list by its question text and its exact labels. A question not shown
+yet is closed at once and answered once it shows. Settling is checked on every `serve` loop.
+
+## State
+
+`${BOT_ON_OPENBOT_STATE_DIR:-~/.local/state/bot-on-openbot}`: `spool/`, `spool-bad/`,
+`deliveries.jsonl` (every delivery, what it offered, and how it closed), `taps.jsonl` (every answer,
+its act and the command's exit code; typed text is not logged), `serve.lock`.
+Only one `serve` runs at a time; a second exits with code 3.
+
+## Known limits
+
+- The answer is read from `openbot.db`, an internal OpenBot schema with no docs, and OpenBot's updater
+  stays on. When an update changes its shape, nothing runs, one line is logged, and the operator gets
+  a message to act in the Orca terminal or with baton.
+- One question at a time: an unanswered question holds every later notice, a merge included, until it
+  is answered, settled or ends.
+- One agent.
+- OpenBot allows 30 runs per agent per hour. A refused or failed run keeps the notice in the spool, in
+  order; a busy spine waits there. Follow-up questions and result messages each take a run.
+- A picker that is neither omp's ask picker nor omp's numbered `/review` picker reads as no picker: the
+  question then offers only Show question, Unpark and Disarm, and says to answer in the Orca terminal.
+- Free text reaches a worker only through a picker's Other row; elsewhere typed text runs nothing.
+- Settling answers the prompt with `settled`, a label it never offered; OpenBot accepts that today.
+  If the agent rewords the question or its labels, the bot cannot find its prompt on `/pending`, and
+  that question stays open on the phone until the operator answers it (the answer then runs nothing).
+- Delivery is at least once: a crash between a run and the spool delete runs it again with the same
+  `--id`, which OpenBot answers with the same delivery.
+- The draft is the model's: its summary and recommendation can be wrong. A draft that is not the JSON
+  asked for, or recommends a number not on the picker, is dropped and the question goes without one.
+- A typed answer that equals an offered label is that option, not text.
+- `deliveries.jsonl` and `taps.jsonl` are never compacted.
+- The unit's `ExecStart` path is not quoted: keep the install path free of spaces and `%`.
+- A command that runs past 60 s is sent SIGTERM only; one that ignores it keeps running, and `serve`
+  waits for it.

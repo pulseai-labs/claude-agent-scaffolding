@@ -1,0 +1,95 @@
+{
+  "detail": {
+    "turnId": "01a17e46-fce5-7d40-bc28-a554f07cf4ea",
+    "requestId": 2,
+    "status": "answered"
+  },
+  "changedMessages": [
+    {
+      "id": "question-prompt:01a17e46-fce5-7d40-bc28-a554f07cf4ea:2",
+      "turnId": "01a17e46-fce5-7d40-bc28-a554f07cf4ea",
+      "author": "assistant",
+      "source": "assistant",
+      "text": "Question: spike — bridge test 2 (please answer by typing your own text: teal)\nThis is a test of the baton OpenBot bridge.\nAnswer: teal",
+      "createdAt": "2026-10-27T16:52:29.377Z",
+      "status": "completed",
+      "itemType": "question_prompt",
+      "questionPrompt": {
+        "requestId": 2,
+        "questions": [
+          {
+            "id": "reply",
+            "header": "spike — bridge test 2 (please answer by typing your own text: teal)\nThis is a test of the baton OpenBot bridge.",
+            "question": "spike — bridge test 2 (please answer by typing your own text: teal)\nThis is a test of the baton OpenBot bridge.",
+            "isSecret": false,
+            "options": [
+              {
+                "label": "red",
+                "description": ""
+              },
+              {
+                "label": "green",
+                "description": ""
+              },
+              {
+                "label": "blue",
+                "description": ""
+              }
+            ]
+          }
+        ],
+        "resolution": {
+          "status": "answered",
+          "responses": {
+            "reply": {
+              "status": "answered",
+              "answers": [
+                "teal"
+              ]
+            }
+          }
+        }
+      },
+      "uiBlock": {
+        "version": 1,
+        "blockId": "df2ed7a1-eba0-48c2-8d3c-d618fe49b69f",
+        "spec": {
+          "type": "quick_replies",
+          "options": [
+            {
+              "id": "red",
+              "label": "red"
+            },
+            {
+              "id": "green",
+              "label": "green"
+            },
+            {
+              "id": "blue",
+              "label": "blue"
+            }
+          ],
+          "title": "spike — bridge test 2 (please answer by typing your own text: teal)\nThis is a test of the baton OpenBot bridge.",
+          "allowText": true
+        },
+        "state": {
+          "status": "answered",
+          "response": {
+            "actionId": "_text",
+            "text": "teal"
+          },
+          "respondedBy": {
+            "id": "476e739e-7e03-415f-857c-ff1489dfa9e1",
+            "name": "<redacted>"
+          },
+          "respondedAt": "2026-10-27T16:54:32.643Z",
+          "outcome": "teal"
+        }
+      },
+      "reactions": [],
+      "reaction": null
+    }
+  ],
+  "removedMessageIds": [],
+  "activeTurnId": "01a17e46-fce5-7d40-bc28-a554f07cf4ea"
+}

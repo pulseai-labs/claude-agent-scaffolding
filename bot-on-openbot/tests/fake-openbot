@@ -1,0 +1,37 @@
+#!/usr/bin/env bun
+// A stand-in for `openbot-cli`. FAKE_OPENBOT_DIR/replies.json maps a subcommand ("run", "status",
+// "list"), or "status <deliveryId>" first when present, to a reply: a fixture file name (exit 0),
+// `{ "file": name, "rc": n }`, or a list of either used in order (the last repeats). A name is looked up
+// in FAKE_OPENBOT_DIR first, then in tests/fixtures/openbot. `{ "stdout": text, "rc": n }` prints text.
+// Every call appends `{ argv, stdin }` to argv.jsonl; stdin is read for `run` only.
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+type Reply = string | { file?: string; stdout?: string; rc?: number };
+const dir = process.env.FAKE_OPENBOT_DIR!;
+const argv = process.argv.slice(2);
+const stdin = argv[0] === "run" ? await new Response(Bun.stdin.stream()).text() : "";
+appendFileSync(join(dir, "argv.jsonl"), JSON.stringify({ argv, stdin }) + "\n");
+const replies = JSON.parse(readFileSync(join(dir, "replies.json"), "utf8")) as Record<string, Reply | Reply[]>;
+const key = argv[0] === "status" && replies[`status ${argv[2]}`] !== undefined ? `status ${argv[2]}` : argv[0] ?? "";
+const entry = replies[key];
+if (entry === undefined) {
+  console.error(`fake-openbot: no reply for "${key}"`);
+  process.exit(2);
+}
+let reply: Reply;
+if (Array.isArray(entry)) {
+  const counts = join(dir, "counts.json");
+  const seen: Record<string, number> = existsSync(counts) ? JSON.parse(readFileSync(counts, "utf8")) : {};
+  const n = seen[key] ?? 0;
+  seen[key] = n + 1;
+  writeFileSync(counts, JSON.stringify(seen));
+  reply = entry[Math.min(n, entry.length - 1)]!;
+} else reply = entry;
+const r = typeof reply === "string" ? { file: reply } : reply;
+if (r.file !== undefined) {
+  const own = join(dir, r.file);
+  const path = existsSync(own) ? own : join(import.meta.dir, "fixtures", "openbot", r.file);
+  process.stdout.write(readFileSync(path, "utf8"));
+} else process.stdout.write(r.stdout ?? "");
+process.exit(r.rc ?? 0);
