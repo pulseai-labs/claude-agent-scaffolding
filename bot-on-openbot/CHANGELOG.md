@@ -2,6 +2,22 @@
 
 All notable changes to the `bot-on-openbot` plugin.
 
+## 0.1.2 - 2026-10-28
+
+- Fixes #941: OpenBot's question tool takes at most 5 options; with more, the agent asks with none,
+  and a blocked park offered 7. No offer now shows more than 5 labels (`MAX_SHOWN`). An offer option
+  carries `shown` (default true): the agent is told only the shown labels, and the prompt-shape check
+  compares only those, in order. A tap or a typed answer still matches every recorded label exactly,
+  shown or not.
+- A blocked park with 1-4 worker options shows them (the recommended one first, marked) and `More…`,
+  which asks Show question, Unpark and Disarm as a follow-up; Show question there asks the worker's
+  options again. Those three stay accepted, not shown, on the first question. With 5 or more worker
+  options it shows only Show question, Unpark and Disarm; every worker option is accepted, not shown,
+  and the text's last line asks the operator to type one option's exact label, listing them.
+- `Unpark to stage…` pages the recipe's stages 4 at a time, with `More stages…` while more remain
+  and `Cancel` on the last page. Every stage, and Cancel, is accepted on every page.
+- An offer with labels not shown tells the agent to let the operator type an answer.
+
 ## 0.1.1 - 2026-10-28
 
 - Fixes #939: the agent could ask a question without its options (`options: null` on `/pending`, the

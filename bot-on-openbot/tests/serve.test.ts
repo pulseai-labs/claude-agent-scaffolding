@@ -55,7 +55,7 @@ test("a blocked park drafts first, then asks with the worker's options", async (
   expect(draft).toContain("1. red\n2. green\n3. blue\n4. amber\nScreen:\n");
   expect(env.calls()[0]!.argv).toEqual(["run", "Autopilot", "-", "--id", `${BLOCKED}#draft`, "--json"]);
   expect(ask).toContain("Show this text: It asks for a colour.\nRecommended: green is the house colour.");
-  expect(ask).toContain("- green (recommended)\n- red\n- blue\n- amber\n- Show question\n- Unpark\n- Disarm\nAlso let the operator type their own answer.");
+  expect(ask).toContain("- green (recommended)\n- red\n- blue\n- amber\n- More…\nAlso let the operator type their own answer.");
   expect(find(BLOCKED)).toMatchObject({ phase: "asked", ask_id: "ask", draft_id: "draft", park_at: P5 });
 });
 
@@ -87,7 +87,7 @@ test("a draft that fails is asked with no recommendation", async () => {
   await run();
   const ask = env.runStdins()[1]!;
   expect(ask).toContain("Show this text: baton r1/u5 blocked on a question.");
-  expect(ask).toContain("- red\n- green\n- blue\n- amber\n- Show question");
+  expect(ask).toContain("- red\n- green\n- blue\n- amber\n- More…\n");
   expect(ask).not.toContain("recommended");
 });
 

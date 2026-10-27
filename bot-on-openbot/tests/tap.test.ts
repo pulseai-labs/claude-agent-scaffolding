@@ -252,3 +252,96 @@ test("Yes on a merge whose URL is of another shape never reaches gh", async () =
   expect(env.runs).toEqual([]);
   expect(next(MOVE).say).toBe("r1/u2 at review: Merge — failed: not a PR URL");
 });
+
+// ---- issue #941: More…, typed labels not shown, stage pages -----------------------------------
+
+const six: Picker = {
+  kind: "omp-ask", question: "which?", other: 7,
+  options: ["a1", "b2", "c3", "d4", "e5", "f6"].map((label, i) => ({ n: i + 1, label })),
+};
+
+test("More… asks Show question, Unpark, Disarm with the park; Unpark there runs baton unpark", async () => {
+  const r = blocked();
+  await handleTap(r, "More…", ctx());
+  expect(env.runs).toEqual([]);
+  const f = next(BLOCKED);
+  expect(labels(f.offer)).toEqual(["Show question", "Unpark", "Disarm"]);
+  expect(f).toMatchObject({ run: "r1", unit: "u5", park_at: P5, title: r.title });
+  expect(f.picker).toEqual(COLOURS as Picker);
+  expect(taps()[0]).toMatchObject({ label: "More…", act: "more" });
+  await handleTap(f, "Unpark", ctx());
+  expect(env.runs).toEqual([["baton", "unpark", "r1", "u5"]]);
+});
+
+test("Show question on the More… question asks the worker's options again", async () => {
+  env.reply.fn = (argv) => (argv[1] === "screen" ? { rc: 0, stdout: screenJson(), stderr: "" } : { rc: 0, stdout: "", stderr: "" });
+  const r = blocked();
+  await handleTap(r, "More…", ctx());
+  await handleTap(next(BLOCKED), "Show question", ctx());
+  const f = next(BLOCKED, 2);
+  expect(labels(f.offer)).toEqual(labels(r.offer));
+  expect(f.offer!.allowOther).toBe(true);
+  expect(f.offer!.text).toContain("screen:\n╭─ Ask");
+  // and Disarm on the More… question asks Yes/No as before
+  close(f, "sent", T0);
+  await handleTap(blocked(), "More…", ctx());
+  await handleTap(next(BLOCKED, 3), "Disarm", ctx());
+  expect(labels(next(BLOCKED, 4).offer)).toEqual(["Yes", "No"]);
+});
+
+test("5 or more worker options: a typed exact label picks that option with its screen n", async () => {
+  const r = blocked(six, { summary: "S", recommended: 2, why: "W" });
+  expect(r.offer!.options.filter((o) => o.shown !== false).map((o) => o.label)).toEqual(["Show question", "Unpark", "Disarm"]);
+  await handleTap(r, "e5", ctx());
+  expect(env.runs).toEqual([["baton", "answer", "r1", "u5", "--park", P5, "--screen", "5", "e5"]]);
+  expect(next(BLOCKED).say).toBe('r1/u5 waits on a question: sent "e5" to the worker');
+  expect(taps()[0]).toMatchObject({ label: "e5", other: false, act: "pick" });
+});
+
+test("5 or more worker options: typed text that is no label goes as text; without Other it runs nothing", async () => {
+  await handleTap(blocked(six), "e 5", ctx());
+  expect(env.runs).toEqual([["baton", "answer", "r1", "u5", "--park", P5, "--screen-text", "e 5", "--question", "which?"]]);
+  close(next(BLOCKED), "sent", T0);
+  await handleTap(blocked({ ...six, other: null }), "e 5", ctx());
+  expect(env.runs.length).toBe(1);
+  expect(next(BLOCKED, 2).say).toBe("Typed answers only go to a blocked worker; nothing ran.");
+});
+
+test("the stage list pages with More stages…; a typed exact stage from another page unparks to it", async () => {
+  writeFileSync(join(env.dir, "baton", "runs", "r1", "recipe.json"),
+    JSON.stringify({ stages: Object.fromEntries(["a", "b", "c", "d", "e", "f"].map((s) => [s, {}])) }));
+  await handleTap(park(), "Unpark to stage…", ctx());
+  const p1 = next(PARK);
+  expect(p1.offer!.options.filter((o) => o.shown !== false).map((o) => o.label)).toEqual(["a", "b", "c", "d", "More stages…"]);
+  await handleTap(p1, "More stages…", ctx());
+  expect(env.runs).toEqual([]);
+  const p2 = next(PARK, 2);
+  expect(p2.offer!.options.filter((o) => o.shown !== false).map((o) => o.label)).toEqual(["e", "f", "Cancel"]);
+  expect(p2).toMatchObject({ unit: "u1", park_at: P1 });
+  await handleTap(p2, "b", ctx());
+  expect(env.runs).toEqual([["baton", "unpark", "r1", "u1", "--to", "b"]]);
+  // a typed stage on page 1 that page 1 does not show
+  close(next(PARK, 3), "sent", T0);
+  await handleTap(park(), "Unpark to stage…", ctx());
+  await handleTap(next(PARK, 4), "f", ctx());
+  expect(env.runs[1]).toEqual(["baton", "unpark", "r1", "u1", "--to", "f"]);
+});
+
+test("More stages… on a question whose park was replaced runs nothing and asks nothing", async () => {
+  writeFileSync(join(env.dir, "baton", "runs", "r1", "recipe.json"),
+    JSON.stringify({ stages: Object.fromEntries(["a", "b", "c", "d", "e"].map((s) => [s, {}])) }));
+  await handleTap(park(), "Unpark to stage…", ctx());
+  const run = defaultRun();
+  (run.units as Record<string, any>).u1.parked = { reason: "stalled", at: "2026-10-27T16:00:00.000Z" };
+  env.writeRun(run);
+  writeFileSync(join(env.dir, "baton", "runs", "r1", "recipe.json"),
+    JSON.stringify({ stages: Object.fromEntries(["a", "b", "c", "d", "e"].map((s) => [s, {}])) }));
+  await handleTap(next(PARK), "More stages…", ctx());
+  expect(next(PARK, 2).say).toBe("r1/u1 parked: the park this question was for is gone; nothing ran.");
+});
+
+test("on a blocked park with 1-4 options, a typed escape label is that escape, not text for the worker", async () => {
+  await handleTap(blocked(), "Disarm", ctx());
+  expect(env.runs).toEqual([]);
+  expect(labels(next(BLOCKED).offer)).toEqual(["Yes", "No"]);
+});

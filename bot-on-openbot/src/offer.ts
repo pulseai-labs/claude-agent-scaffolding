@@ -1,6 +1,10 @@
 // The options a notice is asked with, and the one act each label stands for. A tapped label is
 // matched back exactly against the offer recorded for its question, so labels within one offer are
 // unique; that is what makes the mapping safe.
+//
+// OpenBot's question tool takes at most MAX_SHOWN options (issue #941: with more, the agent asks with
+// none). So an option is shown (a button) or only accepted: an accepted label not shown still matches
+// a typed answer exactly, and runs the act recorded with it, the same as a tap.
 
 import { readUnit, reviewedHead, runReadable, stageNames } from "./baton-state.ts";
 import type { Notice } from "./notice.ts";
@@ -20,13 +24,26 @@ export type Act =
   | { do: "show" } | { do: "disarm" } | { do: "disarm-yes" } | { do: "no" }
   | { do: "merge"; pr_url: string; head_sha: string } | { do: "merge-yes"; pr_url: string; head_sha: string }
   | { do: "open-pr"; pr_url: string }
-  | { do: "pick"; n: number; label: string } | { do: "other" };
+  | { do: "pick"; n: number; label: string } | { do: "other" }
+  | { do: "more" } | { do: "stages"; from: number };
 
-export type Offer = { title: string; text: string; options: { label: string; act: Act }[]; allowOther: boolean };
+/** `shown` absent means true. */
+export type Option = { label: string; act: Act; shown?: boolean };
+
+/** `back`: the offer Show question asks again, when not this one (the More… question's). */
+export type Offer = { title: string; text: string; options: Option[]; allowOther: boolean; back?: Offer };
+
+/** The most options one OpenBot question takes (measured, issue #941). */
+export const MAX_SHOWN = 5;
+const STAGE_PAGE = MAX_SHOWN - 1;
+
+/** The labels the question shows, in order: what the agent is told to offer and the shape check compares. */
+export const shownLabels = (o: Offer): string[] => o.options.filter((x) => x.shown !== false).map((x) => x.label);
 
 export const LABELS = {
   unpark: "Unpark", unparkTo: "Unpark to stage…", show: "Show question", disarm: "Disarm",
   merge: "Merge", openPr: "Open PR", yes: "Yes", no: "No", cancel: "Cancel",
+  more: "More…", moreStages: "More stages…",
 } as const;
 
 const RECOMMENDED = " (recommended)";
@@ -64,8 +81,10 @@ export function offerFor(n: Notice, message: string, run: string): Offer | null 
   }
 }
 
-// A blocked park: the worker's own options (the recommended one first, marked), then the escapes.
-// A worker label wins over an escape with the same label; a mark that would repeat a label is dropped.
+// A blocked park. Up to 4 worker options: they are shown in screen order (the recommended one first,
+// marked), then More…, which asks the escapes as a follow-up (the escapes are accepted here too). 5 or more (or a worker label More…):
+// the escapes are shown, every worker option is accepted but not shown, and the text's last line asks
+// for one label typed exactly. A mark that would repeat a label is dropped.
 export function blockedOffer(message: string, run: string, unit: string, picker: Picker | null, draft: Draft | null): Offer {
   const title = `${run}/${unit} waits on a question`;
   const worker = picker?.options ?? [];
@@ -74,12 +93,21 @@ export function blockedOffer(message: string, run: string, unit: string, picker:
     return {
       title,
       text: `${message}\nNo options could be read from the worker's screen: answer it in the Orca terminal`,
-      options: escapes([]),
+      options: escapes(),
       allowOther: false,
     };
   }
-  const plain = worker.map((o) => ({ label: o.label, act: { do: "pick", n: o.n, label: o.label } as Act }));
+  const plain: Option[] = worker.map((o) => ({ label: o.label, act: { do: "pick", n: o.n, label: o.label } }));
   const rec = draft?.recommended != null ? worker.find((o) => o.n === draft.recommended) : undefined;
+  const allowOther = picker.other !== null;
+  if (worker.length >= MAX_SHOWN || worker.some((o) => o.label === LABELS.more)) {
+    const shown = escapes();
+    const typed = plain.filter((o) => !shown.some((e) => e.label === o.label)).map((o) => ({ ...o, shown: false }));
+    const lines = [draft ? draft.summary : message];
+    if (rec) lines.push(`Recommended: ${rec.label}${draft!.why ? ` (${draft!.why})` : ""}`);
+    lines.push(`Type one option's exact label to answer: ${typed.map((o) => JSON.stringify(o.label)).join(", ")}`);
+    return { title, text: lines.join("\n"), options: [...shown, ...typed], allowOther };
+  }
   let options = plain;
   let text = draft ? draft.summary : message;
   if (rec && !worker.some((o) => o.label === rec.label + RECOMMENDED)) {
@@ -89,15 +117,28 @@ export function blockedOffer(message: string, run: string, unit: string, picker:
     ];
     text = `${draft!.summary}\nRecommended: ${draft!.why || rec.label}`;
   }
-  return { title, text, options: [...options, ...escapes(options.map((o) => o.label))], allowOther: picker.other !== null };
+  // The escapes stay accepted, not shown, so a typed "Disarm" is still Disarm; a worker label wins.
+  const taken = options.map((o) => o.label);
+  const typed = escapes().filter((e) => !taken.includes(e.label)).map((e) => ({ ...e, shown: false }));
+  return { title, text, options: [...options, { label: LABELS.more, act: { do: "more" } }, ...typed], allowOther };
 }
 
-function escapes(taken: string[]): Offer["options"] {
+function escapes(): Option[] {
   return [
-    { label: LABELS.show, act: { do: "show" } as Act },
-    { label: LABELS.unpark, act: { do: "unpark" } as Act },
-    { label: LABELS.disarm, act: { do: "disarm" } as Act },
-  ].filter((o) => !taken.includes(o.label));
+    { label: LABELS.show, act: { do: "show" } },
+    { label: LABELS.unpark, act: { do: "unpark" } },
+    { label: LABELS.disarm, act: { do: "disarm" } },
+  ];
+}
+
+// More… on a blocked park: the escapes. Show question there asks the blocked park's own offer again.
+export function moreOffer(parent: Offer): Offer {
+  return { title: parent.title, text: parent.text, options: escapes(), allowOther: false, back: parent.back ?? parent };
+}
+
+// A refused screen answer: asked again with baton's reason, offering only Show question and Disarm.
+export function refusedOffer(title: string, text: string): Offer {
+  return { title, text, options: [{ label: LABELS.show, act: { do: "show" } }, { label: LABELS.disarm, act: { do: "disarm" } }], allowOther: false };
 }
 
 // Yes carries the act the first tap chose; `_what` names it for the reader of a call site.
@@ -110,14 +151,23 @@ export function confirmOffer(_what: "merge" | "disarm", carry: Act, title: strin
   };
 }
 
-// The recipe's stages (sorted; baton stage names are [a-z0-9_-], so none reads as Cancel).
-export function stageOffer(run: string, title: string): Offer {
+// The recipe's stages (sorted; baton stage names are [a-z0-9_-], so none reads as Cancel or More
+// stages…), 4 from `from` shown, then More stages… while more remain, else Cancel. Every stage, and
+// Cancel, is accepted on every page, so a stage typed exactly works from any page.
+export function stageOffer(run: string, title: string, from = 0): Offer {
+  const stages = stageNames(run);
+  const page = stages.slice(from, from + STAGE_PAGE);
+  const more = from + STAGE_PAGE < stages.length;
+  const stage = (s: string, shown: boolean): Option => ({ label: s, act: { do: "unpark-stage", stage: s }, ...(shown ? {} : { shown: false }) });
+  const cancel: Option = { label: LABELS.cancel, act: { do: "no" } };
   return {
     title,
     text: "Unpark to which stage?",
     options: [
-      ...stageNames(run).map((stage) => ({ label: stage, act: { do: "unpark-stage", stage } as Act })),
-      { label: LABELS.cancel, act: { do: "no" } },
+      ...page.map((s) => stage(s, true)),
+      more ? { label: LABELS.moreStages, act: { do: "stages", from: from + STAGE_PAGE } } : cancel,
+      ...stages.filter((s) => !page.includes(s)).map((s) => stage(s, false)),
+      ...(more ? [{ ...cancel, shown: false }] : []),
     ],
     allowOther: false,
   };

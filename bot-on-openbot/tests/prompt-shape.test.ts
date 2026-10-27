@@ -96,7 +96,7 @@ test("a malformed prompt (options null) is dismissed with settled and asked agai
   expect(stdins[1]).not.toContain(FIRM);
   expect(stdins[2]).toContain(FIRM);
   expect(stdins[2]).toContain("Use your question tool");
-  expect(stdins[2]).toContain("- green (recommended)\n- red\n- blue\n- amber\n- Show question\n- Unpark\n- Disarm\n");
+  expect(stdins[2]).toContain("- green (recommended)\n- red\n- blue\n- amber\n- More…\n");
   expect(env.calls().filter((c) => c.argv[0] === "run").map((c) => c.argv[4])).toEqual([`${BLOCKED}#draft`, BLOCKED, `${BLOCKED}#reask`]);
   expect(find(BLOCKED)).toMatchObject({ phase: "asked", ask_id: "reask", reasks: 1 });
   expect(env.runs).toEqual([["baton", "screen", "r1", "u5"]]); // nothing ran
@@ -234,4 +234,25 @@ test("a resolved settled that was never offered runs nothing, even where typed t
   expect(find(BLOCKED)).toMatchObject({ phase: "closed", closed_by: "gone" });
   expect(env.runStdins().at(-1)).toBe(messageTask(GIVE_UP));
   expect(posts).toEqual([]);
+});
+
+test("the shape check compares the shown labels only, in order (#941)", async () => {
+  const six = { kind: "omp-ask", question: "which?", other: 7, options: ["a1", "b2", "c3", "d4", "e5", "f6"].map((label, i) => ({ n: i + 1, label })) };
+  env.reply.fn = (argv) => (argv[1] === "screen" ? { rc: 0, stdout: screenJson(six), stderr: "" } : { rc: 0, stdout: "", stderr: "" });
+  env.setReplies({ run: [env.delivery("draft"), env.delivery("ask"), env.delivery("reask")] });
+  env.status("draft", "completed", "turn-d", JSON.stringify({ summary: "S", recommended: null, why: "" }));
+  env.status("ask", "running", "turn-a");
+  spoolNotice(BLOCKED, "baton r1/u5 blocked on a question");
+  await run();
+  const r = find(BLOCKED)!;
+  expect(r.offer!.options.length).toBe(9);
+  prompts = [wellFormed(r, "req-ok", ["Show question", "Unpark", "Disarm"])];
+  await run(2);
+  expect(posts).toEqual([]);
+  expect(find(BLOCKED)!.reasks).toBeUndefined();
+  // control: every accepted label as buttons is not the shape asked for
+  prompts = [wellFormed(r, "req-all")];
+  await run();
+  expect(posts).toEqual([{ path: answerPath("req-all"), body: SETTLED }]);
+  expect(find(BLOCKED)).toMatchObject({ reasks: 1 });
 });
