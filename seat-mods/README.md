@@ -239,6 +239,10 @@ error (#929):
   failed reply's waiting-on-operator notice, show as toasts instead. In another session (a
   `/clear` or a molt) it is dropped quietly. molt's handoff requests are not status turns; its
   seed is.
+- **Known limits** (0.11.0): under `claude -p` the printed result is the redo's reply, not the
+  first one; an Agent SDK host was not probed. While molt is paused, or after a child or an SDK
+  root handed off, molt's stage file still reads `command` or later, so every redo in that session
+  is dropped and only the toasts show.
 
 On the same block, an **idle check** (#876) reads three fields. When both wait fields — Waiting
 on (seats live) and Waiting on operator — read `none` while Next steps names work, the

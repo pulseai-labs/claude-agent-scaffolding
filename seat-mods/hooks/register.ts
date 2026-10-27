@@ -263,7 +263,7 @@ export const register: Register = on => {
     const ended = turn
     turn = undefined
     // An interrupted turn, and one that ended in an API error or a refusal, never answered:
-    // classic.Stop did not run on them either (#929 review).
+    // classic.Stop did not run on them either, so a redo would ask for a reply that never came.
     if (ended?.status !== true || e.isAborted || e.reason === 'error' || e.reason === 'refusal') return r
     const reply = e.answer ?? ''
     if (hasMoltHandoff(reply)) return r
