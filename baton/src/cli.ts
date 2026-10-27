@@ -7,6 +7,7 @@ import { GhForge } from "./forge.ts";
 import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.ts";
 import { hostKind, makeHost } from "./hosts/select.ts";
 import { notifyOnce } from "./notify.ts";
+import { parsePicker } from "./picker.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
 import { openStore, replaceFileSync, type KeptThread, type RunState, type UnitState } from "./state.ts";
 import { installTimer, removeTimer } from "./timer.ts";
@@ -18,6 +19,7 @@ const USAGE = [
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
   "       baton answer <run> <unit> <label>",
+  "       baton screen <run> <unit>",
   "       baton report <run>",
   "       baton tick [--run <id>]",
   "       baton timer install|remove",
@@ -42,6 +44,7 @@ export async function main(argv: string[]): Promise<number> {
     case "disarm": return disarmCmd(rest);
     case "unpark": return unparkCmd(rest);
     case "answer": return answerCmd(rest);
+    case "screen": return screenCmd(rest);
     case "report": return reportCmd(rest);
     case "tick": return tickCmd(rest);
     case "timer": return timerCmd(rest);
@@ -370,6 +373,53 @@ async function answerCmd(args: string[]): Promise<number> {
       return 2;
     }
   });
+}
+
+// ---- screen ---------------------------------------------------------------------------
+// A blocked park's fresh screen and the picker parsed from it, so a caller offers the options the
+// answer check will compare against (one parser for both). Reads only: no lock, nothing sent.
+
+/** A blocked park's thread, or the refusal: unit missing, not in a blocked park, or a move in flight. */
+function blockedThread(run: RunState, unitId: string): { thread: string; at: string } | string {
+  const unit = own(run.units, unitId);
+  if (!unit) return `no such unit: ${unitId}`;
+  const parked = unit.parked;
+  if (parked?.reason !== "blocked" || !parked.blocked) return `unit ${unitId} is not in a blocked park`;
+  // `unpark --to` ends the session at the next tick; the worker is no longer the operator's to answer.
+  if (parked.blocked.to !== undefined) return `unit ${unitId} has an unpark --to in flight`;
+  return { thread: parked.blocked.thread, at: parked.at };
+}
+
+/** rc for a host error, with one stderr line `<who>: <message>`. */
+function hostFail(who: string, e: unknown): number {
+  process.stderr.write(`${who}: ${(e as Error).message}\n`);
+  if (e instanceof AnswerRefused) return 2;
+  if (e instanceof HostAuthError) return 3;
+  if (e instanceof HostDownError) return 4;
+  return 2;
+}
+
+async function screenCmd(args: string[]): Promise<number> {
+  if (args.length !== 2) return usage();
+  const [runId, unitId] = args;
+  const refuse = (msg: string) => fail(`baton screen: ${msg}`);
+  let run: RunState;
+  try {
+    run = openStore().readRun(runId);
+  } catch {
+    return refuse(`no such run: ${runId}`);
+  }
+  const b = blockedThread(run, unitId);
+  if (typeof b === "string") return refuse(b);
+  try {
+    const host = makeHost();
+    if (!host.screen) return refuse("host cannot read a screen");
+    const screen = await host.screen(b.thread);
+    process.stdout.write(JSON.stringify({ park_at: b.at, thread: b.thread, screen, picker: parsePicker(screen) }) + "\n");
+    return 0;
+  } catch (e) {
+    return hostFail("baton screen", e);
+  }
 }
 
 function reportCmd(args: string[]): number {

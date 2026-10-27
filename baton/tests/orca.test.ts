@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { HostDownError, LaunchError } from "../src/host.ts";
+import { AnswerRefused, HostDownError, LaunchError } from "../src/host.ts";
 import { runOrca } from "../src/hosts/orca-cli.ts";
 import { loadOrcaConfig, OrcaHost, shellQuote } from "../src/hosts/orca.ts";
 
@@ -304,6 +304,24 @@ describe("interrupt, close, screen", () => {
     expect(s.split("\n")).toEqual(tail);
     expect(s).toContain("Review against a base branch");
     expect(callsTo("terminal read")[0]).toEqual(["terminal", "read", "--terminal", HANDLE, "--screen", "--json"]);
+  });
+
+  test("keys sends one terminal send with the text, unchanged", async () => {
+    replies({ "terminal send": "terminal-send-escape.json" });
+    const text = "\x1b[A\x1b[A\x1b[B\r";
+    await host().keys!(HANDLE, text);
+    expect(callsTo("terminal send")).toEqual([["terminal", "send", "--terminal", HANDLE, "--text", text, "--json"]]);
+    await host().keys!(HANDLE, "use main, not 'dev' $HOME");
+    expect(callsTo("terminal send")[1][5]).toBe("use main, not 'dev' $HOME");
+  });
+
+  test("keys on a gone terminal throws AnswerRefused; any other refusal is host down", async () => {
+    replies({ "terminal send": "terminal-read-stale.json" });
+    const e = await thrown(host().keys!(HANDLE, "\r"));
+    expect(e).toBeInstanceOf(AnswerRefused);
+    expect(e.message).toBe("terminal gone");
+    replies({ "terminal send": fixture("other.json", { ok: false, error: { code: "runtime_unavailable", message: "x" } }) });
+    expect(await thrown(host().keys!(HANDLE, "\r"))).toBeInstanceOf(HostDownError);
   });
 
   test("stale handle: interrupt and close are quiet, screen is empty", async () => {

@@ -4,7 +4,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { HostDownError, LaunchError, type Host, type LaunchRequest, type ThreadStatus } from "../host.ts";
+import { AnswerRefused, HostDownError, LaunchError, type Host, type LaunchRequest, type ThreadStatus } from "../host.ts";
 import { configPath } from "../notify.ts";
 import { stateDir } from "../state.ts";
 import { bindLaunchDir, releaseLaunchDir } from "./launch-dir.ts";
@@ -216,6 +216,13 @@ export class OrcaHost implements Host {
   async close(threadId: string): Promise<void> {
     this.lists = undefined;
     this.onTerminal(["terminal", "close", "--terminal", threadId]);
+  }
+
+  async keys(threadId: string, text: string): Promise<void> {
+    this.lists = undefined;
+    // `--text` sends the bytes as given: `\r` is Enter, `\x1b[A` is Up (OpenBot-bridge spike).
+    const res = this.onTerminal(["terminal", "send", "--terminal", threadId, "--text", text]);
+    if (res === undefined) throw new AnswerRefused("terminal gone");
   }
 
   async screen(threadId: string): Promise<string> {

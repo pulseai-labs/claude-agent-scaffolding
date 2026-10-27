@@ -83,4 +83,10 @@ export interface Host {
   screen?(threadId: string): Promise<string>;
   /** Answer the thread's pending request `requestId`: `answers` maps question id to the chosen label. */
   respond?(threadId: string, requestId: string, answers: Record<string, string>): Promise<void>;
+  /**
+   * Send `text` to the thread's terminal as typed, bytes unchanged. A terminal that is gone throws
+   * `AnswerRefused("terminal gone")`. Only `baton answer --screen` / `--screen-text` call it, after
+   * their screen check.
+   */
+  keys?(threadId: string, text: string): Promise<void>;
 }
