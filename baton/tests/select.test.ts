@@ -6,7 +6,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { OrcaHost } from "../src/hosts/orca.ts";
 import { hostKind, makeHost } from "../src/hosts/select.ts";
-import { T3Host } from "../src/hosts/t3.ts";
 
 const BIN = join(import.meta.dir, "..", "bin", "baton");
 const FAKE = join(import.meta.dir, "fake-orca");
@@ -44,57 +43,36 @@ async function tickCli() {
   const [err, rc] = await Promise.all([new Response(p.stderr).text(), p.exited]);
   return { err, rc };
 }
-const noticeLog = () => (existsSync(join(state, "notify.log")) ? readFileSync(join(state, "notify.log"), "utf8") : "");
-/** A mode-600 token file that expires in a day, and a config pointing the T3 host at it. */
-function expiringToken(extra: Record<string, unknown>): void {
-  const file = join(base, "token.json");
-  writeFileSync(file, JSON.stringify({ access_token: "x", expires_at: Math.floor(Date.now() / 1000) + 86_400 }), { mode: 0o600 });
-  config({ t3: { tokenFile: file }, ...extra });
-}
 
-test("no host key selects t3", () => {
-  expect(hostKind()).toBe("t3"); // no config file at all
-  expect(makeHost()).toBeInstanceOf(T3Host);
+test("no host key selects orca", () => {
+  expect(hostKind()).toBe("orca"); // no config file at all
+  expect(makeHost()).toBeInstanceOf(OrcaHost);
   config({ slots: { session: 3 } });
-  expect(hostKind()).toBe("t3");
-  expect(makeHost()).toBeInstanceOf(T3Host);
-  config({ host: "t3" });
-  expect(makeHost()).toBeInstanceOf(T3Host);
+  expect(hostKind()).toBe("orca");
+  expect(makeHost()).toBeInstanceOf(OrcaHost);
 });
 
 test("host orca selects OrcaHost", () => {
   config({ host: "orca" });
   expect(hostKind()).toBe("orca");
-  const h = makeHost();
-  expect(h).toBeInstanceOf(OrcaHost);
-  expect(h).not.toBeInstanceOf(T3Host);
+  expect(makeHost()).toBeInstanceOf(OrcaHost);
 });
 
 test("bad host value fails the tick with a config error", async () => {
-  for (const bad of ["T3", "herdr", "", 3, null, ["orca"]]) {
+  // "t3" was a host before 0.6.0; it is now refused like any other value.
+  for (const bad of ["t3", "T3", "Orca", "herdr", "", 3, null, ["orca"]]) {
     config({ host: bad });
-    expect(() => hostKind()).toThrow('config: host must be "t3" or "orca"');
+    expect(() => hostKind()).toThrow('config: host must be "orca"');
+    expect(() => makeHost()).toThrow('config: host must be "orca"');
     const r = await tickCli();
     expect(r.rc).toBe(1);
-    expect(r.err).toContain('config: host must be "t3" or "orca"');
+    expect(r.err).toContain('config: host must be "orca"');
   }
-  // The control: a valid value ticks cleanly (no runs armed).
+  // The controls: a valid value, and no host key at all, tick cleanly (no runs armed).
   config({ host: "orca", orca: { cli: FAKE } });
   expect((await tickCli()).rc).toBe(0);
-});
-
-test("t3 token warning is skipped on orca", async () => {
-  // Control first: on t3 the same expiring token raises the notice.
-  expiringToken({});
+  config({ orca: { cli: FAKE } });
   expect((await tickCli()).rc).toBe(0);
-  expect(noticeLog()).toMatch(/token\/\d{4}-\d{2}-\d{2} t3 token expires .* run baton t3 login/);
-  // On orca, a fresh state dir and the same token file: no notice.
-  state = join(base, "state2");
-  mkdirSync(state);
-  process.env.BATON_STATE_DIR = state;
-  expiringToken({ host: "orca", orca: { cli: FAKE } });
-  expect((await tickCli()).rc).toBe(0);
-  expect(noticeLog()).not.toContain("token/");
 });
 
 test("orca block overrides cli and launcher", async () => {

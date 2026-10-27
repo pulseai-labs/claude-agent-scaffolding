@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -144,7 +144,7 @@ test("adopts a launched thread whose response was lost", async () => {
   expect(liveClaim(claimKey(join(root, "w", "a")))).toBe("r1/a/work/1");
 });
 
-test("a nonce T3 never saw is relaunched after 2 minutes", async () => {
+test("a nonce the host never saw is relaunched after 2 minutes", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 5, end: "completed" } });
   failNextLaunch(new HostDownError(), false);
@@ -165,8 +165,8 @@ test("a nonce T3 never saw is relaunched after 2 minutes", async () => {
 test("three unknown launch outcomes in a row park cap with one notice", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 5, end: "completed" } });
-  // Every launch is an unknown outcome and T3 never lists a thread for the nonce.
-  host.launch = async () => { throw new HostDownError("t3_thread_launch outcome unknown: JSON-RPC error -32602: bad model"); };
+  // Every launch is an unknown outcome and the host never lists a thread for the nonce.
+  host.launch = async () => { throw new HostDownError("launch outcome unknown: bad model"); };
   for (let i = 0; i < 12 && !runState().units.a.parked; i++) {
     at(i * 1.5);
     await doTick();
@@ -204,7 +204,7 @@ test("an orphan dropped at 2 minutes relaunches with a new nonce and a new direc
   mkdirSync(projRoot);
   await arm(recipe({ work: sess({ cwd: "{param.root}/proj" }) }, ["a"]));
   host = new FakeHost({ work: { ticks: 5, end: "completed" } });
-  t3LikeBind(projRoot);
+  launchDirBind(projRoot);
   failNextLaunch(new HostDownError(), false);
   await doTick();
   const first = runState().units.a.session!;
@@ -395,8 +395,8 @@ test("slots cap concurrent sessions", async () => {
   expect(host.launches[2].request.nonce).toBe("r1/c/work/1");
 });
 
-/** A FakeHost bind that, like T3's, gives a root-`cwd` worktree stage its own launch directory. */
-function t3LikeBind(projRoot: string) {
+/** A FakeHost bind that, like OrcaHost's, gives a root-`cwd` worktree stage its own launch directory. */
+function launchDirBind(projRoot: string) {
   host.bindDir = (_p, cwd, nonceText, mode) => {
     if (cwd !== projRoot || mode === "root") return cwd;
     const dir = join(state, "launch", encodeURIComponent(nonceText));
@@ -410,7 +410,7 @@ test("default root cwd still binds a per-launch worktree", async () => {
   mkdirSync(projRoot);
   await arm(recipe({ work: sess({ cwd: "{param.root}/proj" }) }, ["a"]));
   host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
-  t3LikeBind(projRoot);
+  launchDirBind(projRoot);
   await doTick();
   const dir = join(state, "launch", "r1%2Fa%2Fwork%2F1");
   expect(host.launches[0].request.cwd).toBe(dir);
@@ -431,7 +431,7 @@ test("launch_dir root binds the root and holds it busy", async () => {
   mkdirSync(projRoot);
   await arm(recipe({ work: sess({ cwd: "{param.root}/proj", launch_dir: "root" }) }, ["a", "b"]));
   host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
-  t3LikeBind(projRoot);
+  launchDirBind(projRoot);
   await doTick();
   expect(host.launches.length).toBe(1);
   expect(host.launches[0].request.cwd).toBe(projRoot);
@@ -844,7 +844,7 @@ test("auth error notifies once per day", async () => {
   at(60);
   expect(exitCode(await doTick())).toBe(3);
   expect(notifyLines().length).toBe(1);
-  expect(notifyLines()[0]).toContain("t3 token rejected — run baton t3 login");
+  expect(notifyLines()[0]).toContain("host auth rejected: host authentication failed");
   expect(runBytes()).toBe(before);
   at(24 * 60);
   await doTick();
@@ -1359,20 +1359,9 @@ async function cli(...args: string[]) {
   return { out, err, rc };
 }
 
-test("baton tick: busy is rc 0, and a token near expiry notifies once per day", async () => {
-  const token = join(root, "token.json");
-  writeFileSync(token, JSON.stringify({ access_token: "secret-value", expires_at: Math.floor(Date.now() / 1000) + 86_400, scope: "s" }));
-  chmodSync(token, 0o600);
-  writeFileSync(join(root, "config.json"), JSON.stringify({ t3: { tokenFile: token } }));
+test("baton tick: busy is rc 0, and a bad argument is usage", async () => {
   mkdirSync(state, { recursive: true });
-  let r = await cli("tick");
-  expect(r.rc).toBe(0);
-  r = await cli("tick");
-  expect(r.rc).toBe(0);
-  expect(notifyLines().length).toBe(1);
-  expect(notifyLines()[0]).toContain("expires");
-  expect(readFileSync(join(state, "notify.log"), "utf8")).not.toContain("secret-value");
-  expect(r.out + r.err).not.toContain("secret-value");
+  expect((await cli("tick")).rc).toBe(0);
   writeFileSync(join(state, "lock"), "1");
   expect((await cli("tick")).rc).toBe(0);
   expect((await cli("tick", "--run")).rc).toBe(64);
@@ -1385,7 +1374,7 @@ test("notify argv renders {key} and {message}", async () => {
   writeFileSync(join(root, "config.json"), JSON.stringify({ notify: [script, "{key}", "{message}"] }));
   await arm(recipe({ work: sess() }, ["u1"]));
   host = new FakeHost({ work: { ticks: 5, end: "completed" } });
-  host.launch = async () => { throw new HostDownError("t3_thread_launch outcome unknown: JSON-RPC error -32602: bad model"); };
+  host.launch = async () => { throw new HostDownError("launch outcome unknown: bad model"); };
   for (let i = 0; i < 12 && !runState().units.u1.parked; i++) {
     at(i * 1.5);
     await doTick();

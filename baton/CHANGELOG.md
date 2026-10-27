@@ -2,6 +2,31 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.6.0 - 2026-10-27
+
+Orca is the only host (operator ruling 2026-10-27: no move back to T3).
+
+- **Removed: the T3 host.** `src/hosts/t3.ts`, its login (`t3-login.ts`) and its MCP client
+  (`mcp.ts`) are gone, with the `baton t3 login | token-status | call` subcommands, the tick's T3
+  token-expiry notice, and `bin/omp-t3-claim` (the T3 claim launcher). `bin/baton-seat` reads the
+  same claim files and stays.
+- **Changed: the default host is Orca.** No `host` key, or `"host": "orca"`, selects it. Any other
+  value, `"t3"` included, now fails `arm` and the tick with `config: host must be "orca"`; a config
+  that still names `"t3"` must drop the key or set it to `"orca"`. The `t3` config block is no
+  longer read.
+- **Changed: the host-auth notice is host-neutral.** A host that refuses its credentials notifies
+  `host auth rejected: <error>` once a day (was the T3 text `t3 token rejected — run baton t3
+  login`). Orca raises no auth error, so this path is kept for a future host.
+- **Example recipe.** Every stage drops `OMP_T3_DROP_T3_MCP` (it only told `omp-t3-claim` to
+  remove T3's MCP extension). The README's T3 sections (login, the `omp-t3-claim` symlink, the loss
+  against T3) are gone; Install links only `bin/baton`.
+- **Kept, unused on Orca:** the host interface's optional `respond` and `pending`, triage, and
+  `baton answer`. Orca reports no structured question, so a triage stage never launches there and
+  `baton answer` refuses with rc 2; they stay for a host that can answer.
+- Known limits: the claim keys keep their T3-era names (`OMP_T3_SEAT`, `OMP_T3_VIA`), because
+  renaming them would break recipes already staged. A staged recipe that still sets
+  `OMP_T3_DROP_T3_MCP` passes it to the seat as a plain variable that nothing reads.
+
 ## 0.5.0 - 2026-10-27
 
 - **Orca host.** `"host": "orca"` in the config (`"t3"` is the default and stays so; any other

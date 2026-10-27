@@ -729,7 +729,7 @@ test("a session stage whose outcome moves to park records the session's thread",
 test("a park with no session records neither", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 5, end: "completed" } });
-  host.launch = async () => { throw new HostDownError("t3_thread_launch outcome unknown: JSON-RPC error -32602: bad model"); };
+  host.launch = async () => { throw new HostDownError("launch outcome unknown: bad model"); };
   for (let i = 0; i < 12 && !runState().units.a.parked; i++) {
     at(i * 1.5);
     await doTick();

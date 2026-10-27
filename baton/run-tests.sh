@@ -18,14 +18,7 @@ done
 
 claude plugin validate "$SCRIPT_DIR" || exit 1
 
-# bin/omp-t3-claim arrives with the launcher; check its syntax once it exists.
-if [ -f "$SCRIPT_DIR/bin/omp-t3-claim" ]; then
-  bash -n "$SCRIPT_DIR/bin/omp-t3-claim" || exit 1
-fi
-
-# bin/baton-seat is the Orca terminal launcher; same check.
-if [ -f "$SCRIPT_DIR/bin/baton-seat" ]; then
-  bash -n "$SCRIPT_DIR/bin/baton-seat" || exit 1
-fi
+# bin/baton-seat is the Orca terminal launcher; check its syntax.
+bash -n "$SCRIPT_DIR/bin/baton-seat" || exit 1
 
 bun test "$SCRIPT_DIR/tests"

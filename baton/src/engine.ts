@@ -205,7 +205,7 @@ async function tickLocked(opts: TickOpts, report: TickReport): Promise<void> {
     if (e instanceof HostAuthError) {
       report.host = "auth";
       report.errors.push(`host auth: ${e.message}`);
-      await opts.notify(`auth/${day(now)}`, "t3 token rejected — run baton t3 login");
+      await opts.notify(`auth/${day(now)}`, `host auth rejected: ${e.message}`);
     } else if (e instanceof HostDownError) {
       report.host = "down";
       report.errors.push(`host down: ${e.message}`);
