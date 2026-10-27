@@ -72,11 +72,14 @@ export class FakeHost implements Host {
   /** What `screen` returns per thread; a thread with no entry reads `""`. */
   screens: Record<string, string> = {};
   answers: { threadId: string; requestId: string; answers: Record<string, string> }[] = [];
-  /** With it, the instance has `close`, `screen` and `respond`; without, it has none of them, as a 0.4.0 host. */
+  /** What `keys` sent, in order. */
+  sent: { thread: string; text: string }[] = [];
+  /** With it, the instance has `close`, `screen`, `respond` and `keys`; without, none of them, as a 0.4.0 host. */
   withOptional: boolean;
   declare close?: (threadId: string) => Promise<void>;
   declare screen?: (threadId: string) => Promise<string>;
   declare respond?: (threadId: string, requestId: string, answers: Record<string, string>) => Promise<void>;
+  declare keys?: (threadId: string, text: string) => Promise<void>;
   private threads: Thread[] = [];
 
   constructor(public script: Record<string, Behaviour>, opts: { withOptional?: boolean } = {}) {
@@ -95,6 +98,10 @@ export class FakeHost implements Host {
     this.respond = async (threadId, requestId, answers) => {
       this.check();
       this.answers.push({ threadId, requestId, answers });
+    };
+    this.keys = async (threadId, text) => {
+      this.check();
+      this.sent.push({ thread: threadId, text });
     };
   }
 

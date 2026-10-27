@@ -1,0 +1,144 @@
+{
+  "id": "ba9d11da-fc6f-42b3-a5c0-782838c2d1b5",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_d63433a6-f407-4721-ad81-b8bf5b361b27",
+      "status": "running",
+      "tail": [
+        "                                            ████████████",
+        "                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄",
+        "                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀",
+        "                                               ▒▒  ██                  █",
+        "                                                   ██       v18.11.3",
+        "                        Tip: Say `orchestrate` in your message to drive a multi-phase task with",
+        "                                     parallel subagents — watch it glow as you type",
+        " This is a test of an orchestration engine; follow it exactly. Call your ask tool once with the question spike: which",
+        " colour? and the options red, green, blue and amber. Then reply with the answer you got and end the turn. Do not run",
+        " any other tool.",
+        "╭─── ? Ask ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮",
+        "│  spike: which colour?                                                                                                │",
+        "│  ○ red                                                                                                               │",
+        "│  ○ green                                                                                                             │",
+        "│  ◉ blue                                                                                                              │",
+        "│  ○ amber                                                                                                             │",
+        "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+        " Answer received: blue.",
+        "                                                                                  🎛️ SPIKE: Test orchestration ask spike",
+        " π > ◉ GLM-5.3-Flash > 📁 ~/projects/pilot-fourseat-ai > ⑂ main ?10 > $0.00 ▶─1%─────────────────────────────────────1M─",
+        "╰─",
+        "manual",
+        "molt 1%/65%",
+        "seat: coordinator"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "44",
+      "latestCursor": "44",
+      "returnedLineCount": 24,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 4
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 3
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 4
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 104
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 97
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 118
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "26a412c9-87ac-4172-9872-b1eca867b633"
+  }
+}

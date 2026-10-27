@@ -8,3 +8,4 @@ The `--json` replies the Orca host is tested against (`tests/fake-orca` serves t
 - `*.edited.json` are hand edits of recorded replies; the tests make further edits of the same kind
   at run time, next to the replies they write.
 - `repo-list.json` is hand-built in the live reply's shape.
+- `terminal-read-omp-ask*.json` and `terminal-read-numbered-row3.json` were recorded on draco-desk on 2026-10-27 (omp v18.11.3) by the OpenBot-bridge spike; its record is the AI repo's `docs/superpowers/evidence/2026-10-27-openbot-bridge-spike/README.md`.

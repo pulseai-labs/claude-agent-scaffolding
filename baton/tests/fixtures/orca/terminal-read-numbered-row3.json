@@ -1,0 +1,174 @@
+{
+  "id": "231e1e43-d374-499d-ac98-5f045951c63e",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_d63433a6-f407-4721-ad81-b8bf5b361b27",
+      "status": "running",
+      "tail": [
+        "                        Tip: Say `orchestrate` in your message to drive a multi-phase task with",
+        "                                     parallel subagents — watch it glow as you type",
+        " This is a test of an orchestration engine; follow it exactly. Call your ask tool once with the question spike: which",
+        " colour? and the options red, green, blue and amber. Then reply with the answer you got and end the turn. Do not run",
+        " any other tool.",
+        "╭─── ? Ask ────────────────────────────────────────────────────────────────────────────────────────────────────────────╮",
+        "│  spike: which colour?                                                                                                │",
+        "│  ○ red                                                                                                               │",
+        "│  ○ green                                                                                                             │",
+        "│  ◉ blue                                                                                                              │",
+        "│  ○ amber                                                                                                             │",
+        "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+        " Answer received: blue.",
+        " /review",
+        "  ⎋ Working…                                                                      🎛️ SPIKE: Test orchestration ask spike",
+        "╭─ Review Mode ────────────────────────────────────────────────────────────────────────────────────────────────────────╮",
+        "│                                                                                                                      │",
+        "│                                                                                                                      │",
+        "│    1. Review against a base branch (PR Style)                                                                        │",
+        "│    2. Review uncommitted changes                                                                                     │",
+        "│  ❯ 3. Review a specific commit                                                                                       │",
+        "│    4. Review a specific PR                                                                                           │",
+        "│    5. Custom review instructions                                                                                     │",
+        "│                                                                                                                      │",
+        "│ ↑/↓ navigate  ⏎ select  ⎋ cancel                                                                                     │",
+        "│                                                                                                                      │",
+        "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+        "manual",
+        "molt 1%/65%",
+        "seat: coordinator"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "79",
+      "latestCursor": "79",
+      "returnedLineCount": 30,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 3
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 4
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 104
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 97
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 112
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "26a412c9-87ac-4172-9872-b1eca867b633"
+  }
+}

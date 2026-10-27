@@ -1,0 +1,194 @@
+{
+  "id": "db9495e9-5d61-493b-9f43-7300d16de067",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_1ba2e0d2-5767-476b-917d-e0e1e20356c8",
+      "status": "running",
+      "tail": [
+        "                                            ████████████",
+        "                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄",
+        "                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀",
+        "                                               ▒▒  ██                  █",
+        "                                                   ██       v18.11.3",
+        "                         Tip: Press Alt+P (or /switch) to switch provider, and Ctrl+P to cycle",
+        "                                            role models smol -> slow -> etc",
+        " This is a test of an orchestration engine; follow it exactly. Call your ask tool once with the question spike: which",
+        " colour? and the options red, green, blue and amber. Then reply with the answer you got and end the turn. Do not run",
+        " any other tool.",
+        "╭─── Ask 1 questions ──────────────────────────────────────────────────────────────────────────────────────────────────╮",
+        "├─── [colour] · options:4 ─────────────────────────────────────────────────────────────────────────────────────────────┤",
+        "│  spike: which colour?                                                                                                │",
+        "│  ○ red                                                                                                               │",
+        "│  ○ green                                                                                                             │",
+        "│  ○ blue                                                                                                              │",
+        "│  ○ amber                                                                                                             │",
+        "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+        "  ⎋ Testing ask tool with colour spike question                                      🗳️ ASK: Test orchestration ask flow",
+        "╭─ Ask ────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮",
+        "│ spike: which colour?                                                                                                 │",
+        "├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤",
+        "│   ○ red                                                                                                              │",
+        "│ ❯ ○ green                                                                                                            │",
+        "│   ○ blue                                                                                                             │",
+        "│   ○ amber                                                                                                            │",
+        "│   ○ Other (type your own)                                                                                            │",
+        "│                                                                                                                      │",
+        "├──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤",
+        "│ ⏎ select · n note · ↑/↓ move · ⎋ cancel · Alt+H hide                                                                 │",
+        "╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯",
+        "manual",
+        "molt 1%/65%",
+        "seat: coordinator"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "44",
+      "latestCursor": "44",
+      "returnedLineCount": 34,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 4
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 3
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 4
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 104
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "26a412c9-87ac-4172-9872-b1eca867b633"
+  }
+}
