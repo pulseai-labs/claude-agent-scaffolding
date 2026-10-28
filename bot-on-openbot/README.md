@@ -91,8 +91,9 @@ token.
 **The default agent.** A notice that cannot reach a project agent goes to the default agent, with a
 first line saying why: `[pulse360: no OpenBot agent pulse360_autopilot — sent to Autopilot]` (the
 prefix is the GitHub repo name), `[run r9: no project — sent to Autopilot]` (no `params.repo`), or
-`[run r9: no GitHub origin for <repo> — sent to Autopilot]`. Plain notices (run done, and anything
-else) carry no run, so they always go to the default agent, with no note. A found route is kept per
+`[run r9: no GitHub origin for <repo> — sent to Autopilot]`. A run-done notice is routed like any
+other run notice, and can fall back with a note. Only a notice whose key names no run goes straight
+to the default agent, with no note. A found route is kept per
 run for the life of `serve`; a fallback is not, so an agent created mid-run is used from the run's
 next notice.
 
@@ -116,7 +117,7 @@ bot-on-telegram is this one edit.
 | Unit blocked on a question in its terminal | a drafted question: the worker's options, one marked recommended, then More… (Show question, Unpark, Disarm); with 5 or more worker options, Show question, Unpark, Disarm and a line asking for an option's exact label |
 | Unit moved to a stage | a question: Merge (when the unit has a PR and a reviewed head), Open PR (when it has a PR), Disarm |
 | Run parked | a question: Disarm |
-| Run done, and anything else | a plain message, verbatim |
+| Run done, and anything else | a plain message, verbatim (a run-done notice still goes to its project's agent) |
 
 One delivery is open per agent: an unanswered OpenBot question blocks that agent's queue, so the next
 notice for it waits in the spool until the open one is answered, settled or ends. Other agents are
@@ -185,7 +186,9 @@ Only one `serve` runs at a time; a second exits with code 3.
   has a question open on each until the first is answered.
 - `status` does not route spooled notices: it shows the spool count, not which agent each spooled
   notice will reach. That is known only when the notice is delivered.
-- A fallback notice that waits in the spool costs one `git` and one `/v1/agents` call per loop.
+- A fallback notice that waits in the spool is routed again every loop. A no-project fallback costs
+  no call, a no-GitHub-origin fallback one `git` call, and a missing-agent fallback one `git` and
+  one `/v1/agents` call.
 - If OpenBot cannot be reached while routing, the whole drain stops for that loop; the spool keeps
   its order.
 - OpenBot allows 30 runs per agent per hour. A refused or failed run keeps the notice in the spool, in

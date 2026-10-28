@@ -17,7 +17,8 @@ All notable changes to the `bot-on-openbot` plugin.
 - `deliveries.jsonl` records carry `agent`; a 0.1.x record without it counts as the default agent.
 - `status` prints one `agent:` line per agent (found or NOT FOUND, `, open: <keys>`).
 - Known limits added: the two-open-in-one-project case, `origin`-only GitHub remotes,
-  `params.repo`-only routing, and the per-loop `git` and `/v1/agents` cost of a waiting fallback.
+  `params.repo`-only routing, and the per-loop cost of a waiting fallback (none for no project, one `git` call for no GitHub
+  origin, one `git` and one `/v1/agents` call for a missing agent).
 - Setup: one agent per project named `<repo>_autopilot`, Local scripts on for each.
 
 ## 0.1.3 - 2026-10-28
