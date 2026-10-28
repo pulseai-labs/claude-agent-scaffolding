@@ -5,16 +5,16 @@ import { DEFAULTS, parseConfig } from '../hooks/config'
 import type { MoltConfig } from '../hooks/config'
 import { atLeast, stageOf, thresholdsFor } from '../hooks/measure'
 import type { Stage, Thresholds } from '../hooks/measure'
-import { MAX_STOP_BLOCKS, gateAllows, isProgress } from '../hooks/gate'
+import { MAX_STOP_BLOCKS, gateAllows } from '../hooks/gate'
 import { briefPrompt, extractFacts, factsBrief, isUsableSummary, markerPath, pickHandoff, resolvePath } from '../hooks/handoff'
 import type { Handoff, Message } from '../hooks/handoff'
-import { activePath, autonomicPath, fallbackPath, lineagePath, logPath, parseAutonomic, parseLineage, safeSessionId, stagePath } from '../hooks/records'
+import { activePath, fallbackPath, lineagePath, logPath, parseLineage, safeSessionId, stagePath } from '../hooks/records'
 import type { Lineage } from '../hooks/records'
 import {
   SESSION_OFF, SESSION_ON, COMMAND_USAGE, STATUS_OFF, STATUS_PAUSED,
   HANDOFF_REQUIRED, HANDED_OFF, PARENT_HANDOFF, HANDING_OFF, RESUMED,
   SEED_REJECTED, CONFIG_PROBLEMS, SETTINGS_PROBLEMS, SESSION_STATUS, FILL_STATUS,
-  MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, MISSING_HANDOFF,
+  WARNED, PAUSED_UNATTENDED, MISSING_HANDOFF,
   STATUS_METER, BLOCK_NOTE, CHILD_NOTE, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
   DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
   OPERATOR_LEAD, PAST_LEAD, fill,
@@ -24,7 +24,7 @@ export type Shape = { tool: string; args: Record<string, unknown> }
 
 // omp 18.8.9's built-in tools (the binary's BUILTIN_TOOLS registry plus think, yield, goal, the edit tool's
 // `apply_patch` wire name, and the tools registered outside it), each decided once:
-//   write, edit, apply_patch, ast_edit   -> Write / Edit: the handoff's own file tools; progress and lastMd count them
+//   write, edit, apply_patch, ast_edit   -> Write / Edit: the handoff's own file tools; lastMd counts them
 //                                           (ast_edit once its preview is resolved: see `credited`)
 //   bash                                 -> Bash {command}: only git add / git commit segments pass the gate
 //   read of skill://<name>[/file]        -> Skill: the handoff instruction names a handoff skill
@@ -191,7 +191,6 @@ export type MoltIO = {
   warnNext(text: string): void                         // pi.sendMessage(text, { deliverAs: 'nextTurn' })
   status(text: string): void
   notify(text: string, tone: 'info' | 'warn'): void
-  bell(command: string, message: string): Promise<void>
   ephemeral(prompt: string): Promise<string | undefined>
   route(): boolean                                     // a command ctx is saved, so newSession() is reachable
   printMode(): boolean
@@ -259,7 +258,6 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   let seeded: { session: string; startPercent?: number } | undefined
   let inFlight = false                      // a molt between newSession() and its seed
   let claiming = false                      // an agent_end between its first await and molt(): two overlapping calls clear once
-  let progress = 0                          // Write, Edit or commit since the last molt
   const nudged = new Set<string>()
   const stopBlocks = new Map<string, number>()
   const lastMd = new Map<string, string>()
@@ -309,7 +307,7 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     try { await io.remove(activePath(home(), id)) } catch {}
   }
 
-  // The stage file: molt's stage and effective thresholds, for autonomic's /autopilot status (same body as the Claude glue).
+  // The stage file: molt's stage and effective thresholds, for seat-mods, which reads it (#929; same body as the Claude glue).
   async function publishStage(id: string) {
     if (!safeSessionId(id)) return
     const t = thresholds(id)
@@ -406,12 +404,11 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
 
   const warnedAt = (id: string, which: 1 | 2) => Math.round(which === 1 ? thresholds(id).warn : thresholds(id).warnAgain)
 
-  async function pause(id: string, text: string, bell: string | undefined) {
+  async function pause(id: string, text: string) {
     paused = id
     await dropActive(id)
     notify(text, 'warn')
     showStatus(id)
-    if (bell !== undefined) void io.bell(bell, text).catch(err => log(`bell failed ${String(err)}`))
     await log(`pause session=${id} ${text}`)
   }
 
@@ -443,14 +440,10 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
   }
 
   async function molt(id: string, handoff: Handoff, signal?: AbortSignal) {
-    const record = parseAutonomic(await io.readText(autonomicPath(home(), id)))
     const own = parseLineage(await io.readText(lineagePath(home(), id)))
     if (signal?.aborted) return
-    if (record.mode === 'manual' && unattended >= cfg.manualMaxMolts)
-      return pause(id, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }), undefined)
-    // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
-    if (record.mode === 'autopilot' && own !== undefined && progress === 0 && !forced.has(id))
-      return pause(id, fill(PAUSED_NO_PROGRESS, { path: handoff.path }), record.bell)
+    if (unattended >= cfg.manualMaxMolts)
+      return pause(id, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }))
     if (!io.route()) {
       unroutable.add(id)
       await log(io.printMode() ? 'no clear route in print mode' : 'no clear route: no command context is armed yet')
@@ -514,7 +507,6 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     } else {
       // The seed is already on its way (newSessionAndSeed); this is the rest of a seeded start.
       unattended += 1
-      progress = 0
       forced.delete(p.oldSession)
       seeded = { session: id }
       notify(fill(RESUMED, { path: p.handoff }), 'info')
@@ -612,13 +604,10 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
     if (calls?.size === 0) gateStages.delete(id)
     try {
       if (off.has(id) || inFlight || handedOff.has(id)) return
-      // Counted against the stage the call was gated at: past the first warning the session may write and
-      // commit its handoff, which would make every molt look like progress to the autopilot loop guard.
       if (e.isError !== true) {
         const stack = staged.get(id) ?? []
         staged.set(id, stack)
         const shapes = credited(stack, e.toolName, e.input, e.details, true)
-        if (!atLeast(gateStage, 'warn') && shapes.some(s => isProgress(s.tool, s.args))) progress += 1
         if (atLeast(gateStage, 'command')) for (const s of shapes) {
           if ((s.tool !== 'Write' && s.tool !== 'Edit') || typeof s.args.file_path !== 'string') continue
           const path = handoffPath(s.args.file_path, io.cwd, home())
@@ -736,12 +725,10 @@ export function createMolt(io: MoltIO, briefMs: number = FALLBACK_BRIEF_MS) {
 
   async function status(id: string): Promise<string> {
     const t = thresholds(id)
-    const record = parseAutonomic(await io.readText(autonomicPath(home(), id)))
     const lines = [
       fill(SESSION_STATUS, { state: off.has(id) ? 'off' : paused === id ? 'paused' : 'on' }),
       fill(FILL_STATUS, { percent: lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`,
         warn: Math.round(t.warn), warnAgain: Math.round(t.warnAgain), command: Math.round(t.command), block: Math.round(t.block), fallback: Math.round(t.fallback) }),
-      fill(MODE_STATUS, { mode: record.mode }),
       io.route() ? 'clear route: armed.' : io.printMode() ? 'clear route: none (print mode).' : 'clear route: not armed yet (the next prompt you send arms it).',
     ]
     if (cfg.problems.length) lines.push(fill(SETTINGS_PROBLEMS, { problems: cfg.problems.join('; ') }))

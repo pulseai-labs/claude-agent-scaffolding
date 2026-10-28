@@ -1,12 +1,11 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { activePath, autonomicPath, lineagePath, parseAutonomic, parseLineage, recordBell, safeSessionId } from '../hooks/records'
+import { activePath, lineagePath, parseLineage, safeSessionId } from '../hooks/records'
 import { DEFAULT_INSTRUCTIONS, DEFAULT_SEED, expandHome, fill } from '../hooks/templates'
 
 describe('paths', () => {
   test('under ~/.claude/state', () => {
     expect(lineagePath('/h', 's1')).toBe('/h/.claude/state/molt/lineage/s1.json')
     expect(activePath('/h', 's1')).toBe('/h/.claude/state/molt/active/s1')
-    expect(autonomicPath('/h', 's1')).toBe('/h/.claude/state/autonomic/sessions/s1.json')
   })
   test('a session id is a file name only when it is plain', () => {
     expect(safeSessionId('0b9e-4f_x')).toBe(true)
@@ -24,25 +23,6 @@ describe('parseLineage', () => {
     expect(parseLineage('{"from":"a"}')).toBeUndefined()
     expect(parseLineage('{')).toBeUndefined()
     expect(parseLineage(undefined)).toBeUndefined()
-  })
-})
-
-describe('recordBell: the bell in any mode', () => {
-  test('a manual record keeps its bell; a blank or unreadable one has none', () => {
-    expect(recordBell('{"mode":"manual","bell":"ntfy x"}')).toBe('ntfy x')
-    expect(recordBell('{"bell":"  "}')).toBeUndefined()
-    expect(recordBell('not json')).toBeUndefined()
-  })
-})
-
-describe('parseAutonomic: anything unreadable is manual', () => {
-  test('autopilot with a bell', () => {
-    expect(parseAutonomic('{"mode":"autopilot","bell":"ntfy x"}')).toEqual({ mode: 'autopilot', bell: 'ntfy x' })
-  })
-  test('other modes, bad JSON, nothing: manual', () => {
-    expect(parseAutonomic('{"mode":"Autopilot"}')).toEqual({ mode: 'manual' })
-    expect(parseAutonomic('not json')).toEqual({ mode: 'manual' })
-    expect(parseAutonomic(undefined)).toEqual({ mode: 'manual' })
   })
 })
 

@@ -1,8 +1,8 @@
 import type { EngineInterface, Register } from 'claude-code'
 import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
 import type { RoleState } from './rules'
-import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, waitingOnOperator, rewriteReason, redoDrop, REDO_ORPHAN, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING, WAITING_NOTICE } from './status'
-import { autonomicPath, moltStagePath, parseAutonomic, seatLogPath } from './records'
+import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, rewriteReason, redoDrop, REDO_ORPHAN, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING } from './status'
+import { moltStagePath, seatLogPath } from './records'
 
 type Engine = EngineInterface
 
@@ -16,75 +16,29 @@ let turn: { status: boolean; redone: boolean; sessionId: string } | undefined
 // The redos seat-mods submitted at failed status turns' ends, oldest first, until each
 // arrives at prompt.submit (#929: classic.Stop, which held the turn open, never runs for a
 // plugin on an org account). The host runs queued prompts in order, so each seat-mods
-// prompt that arrives answers the oldest entry. `warning` is the failure's flag and `reply`
-// the failed reply, shown and rung if the redo never runs; `superseded` marks another turn
+// prompt that arrives answers the oldest entry. `warning` is the failure's flag, shown if the
+// redo never runs; `superseded` marks another turn
 // that started first.
-type Redo = { sessionId: string; warning: string; reply: string; superseded: boolean }
+type Redo = { sessionId: string; warning: string; superseded: boolean }
 const pending: Redo[] = []
 
-// A redo that never runs leaves the failed reply as the turn that stands: its flag, and its
-// waiting-on-operator notice and bell (#873), are shown as toasts.
+// A redo that never runs leaves the failed reply as the turn that stands: its flag is shown
+// as a toast.
 async function standAlone($: Engine, redo: Redo): Promise<void> {
   $.ui.toast(redo.warning)
-  const notice = await noticeFor($, redo.reply)
-  if (notice !== undefined) $.ui.toast(notice)
 }
 
 async function roleOf($: any): Promise<RoleState> {
   return parseRole(await $.env.get('SEAT_MODS_ROLE'))
 }
 
-// seat-mods' own log: the bell's failures only. It is created on the first failure;
+// seat-mods' own log: a failed redo only. It is created on the first failure;
 // nothing else writes it, and nothing waits on it.
 async function log($: Engine, line: string): Promise<void> {
   try {
     await $.process.run(['sh', '-c', 'mkdir -p "$(dirname "$2")" && printf "%s\\n" "$1" >> "$2"',
       'sh', `${new Date().toISOString()} ${line}`, seatLogPath((await $.env.get('HOME')) ?? '')])
   } catch {}
-}
-
-// seat-mods' copy of molt's bell (#873): BELL_TIMEOUT_MS and ring are byte-identical to
-// molt's, pinned by tests/test-mod-shell-parity.sh. The comment below is molt's own,
-// kept verbatim so the pin compares it.
-
-// One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
-// The engine kills a `process.run` child at 30 s when no bound is given — the same bound
-// molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
-// a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a
-// hung one stays bounded. Nothing waits on it (see `pause`), so this is only a backstop.
-const BELL_TIMEOUT_MS = 30_000
-
-// Rung once and left to finish: the bell never gates the hook that paused the session. A bell
-// that cannot start, throws, or is killed at BELL_TIMEOUT_MS rejects; one that runs and exits
-// non-zero resolves. Both are failures and both are logged once — `log` never throws, so this
-// promise always resolves and nothing is left unhandled (#665 item 4).
-async function ring($: Engine, bell: string, message: string): Promise<void> {
-  try {
-    const r = await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
-    if (r.exitCode !== 0) await log($, `bell failed exit=${r.exitCode}`)
-  } catch (err) {
-    await log($, `bell failed ${String(err)}`)
-  }
-}
-
-// The waiting-on-operator signal (#873): when a stop that ends a status turn hands the
-// operator a decision or an action, and autonomic's record says autopilot, ring its bell
-// (when set) and return the notice to show at turn.complete. It adds a notification only:
-// a missing record, a manual session, a quiet field or a failing read returns undefined.
-async function noticeFor($: Engine, reply: string): Promise<string | undefined> {
-  const text = waitingOnOperator(reply)
-  if (text === undefined) return undefined
-  try {
-    const [homeDir, id] = await Promise.all([$.env.get('HOME'), $.session.id()])
-    const saved = await $.fs.read(autonomicPath(homeDir ?? '', id)).catch(() => undefined)
-    const record = parseAutonomic(typeof saved === 'string' ? saved : undefined)
-    if (record.mode !== 'autopilot') return undefined
-    const notice = `${WAITING_NOTICE}${text}`
-    if (record.bell !== undefined) void ring($, record.bell, notice)
-    return notice
-  } catch {
-    return undefined
-  }
 }
 
 // Where a path lands: the path itself if it stats, else its nearest existing
@@ -275,8 +229,8 @@ export const register: Register = on => {
       : isIdleStop(reply) ? { reason: IDLE_REASON, warning: IDLE_WARNING } : undefined
     if (failure !== undefined && !ended.redone) {
       // One redo turn (#929), not awaited: it starts once this turn is over. The reply
-      // stands as it is meanwhile — no flag and no bell while its redo is pending.
-      const mine: Redo = { sessionId: ended.sessionId, warning: failure.warning, reply, superseded: false }
+      // stands as it is meanwhile — no flag while its redo is pending.
+      const mine: Redo = { sessionId: ended.sessionId, warning: failure.warning, superseded: false }
       pending.push(mine)
       $.prompt.submit({ text: failure.reason }).catch(async (err: unknown) => {
         const at = pending.indexOf(mine)
@@ -287,19 +241,12 @@ export const register: Register = on => {
       return r
     }
     const warning = failure?.warning
-    // The turn that stands: a status block that hands the operator a decision or an
-    // action rings in autopilot (#873, design §5.2 — a malformed block that still waits
-    // on the operator rings too).
-    const notice = await noticeFor($, reply)
     // Core's result text repeats `e.answer`; only a text a mod beneath set is
     // output of its own. The warning replaces core's text (the reply would
     // otherwise show twice) and appends after any other, its own last line
     // (review round 2, PR #874; the idle warning takes the same place, #876).
-    // The waiting-on-operator notice follows the warning, as its own line (#873); a
-    // notice on a block that passed appends to the reply, which is still the turn's own text.
-    const added = [warning, notice].filter((line): line is string => line !== undefined)
-    if (added.length === 0) return r
-    const base = warning !== undefined && (r.text === '' || r.text === e.answer) ? '' : r.text
-    return { ...r, text: base === '' ? added.join('\n') : `${base}\n${added.join('\n')}` }
+    if (warning === undefined) return r
+    const base = r.text === '' || r.text === e.answer ? '' : r.text
+    return { ...r, text: base === '' ? warning : `${base}\n${warning}` }
   })
 }

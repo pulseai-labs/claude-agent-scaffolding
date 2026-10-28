@@ -19,16 +19,6 @@ typed completion states, the teardown commands, and the machines — and each wi
 differs from its guide. What a finished seat means is layer-neutral and lives in
 `references/completion.md`.
 
-### Trusted OMP assignment enrollment (unreleased)
-
-For the new enrolled OMP path only, Autonomic's real issuer/reader and omp-seat's preflight require a separately recorded operator approval/delegation and a startup-pinned bounded assignment. The dispatcher selects trusted input/event/source paths outside **all** worker roots, including coordinator `.worktrees`, report, scratch and handoff allowances. Mode, role, model/seat selection, report hashes and plan approval alone confer no operation grant. No live grants, thresholds, activation or changed seat profiles ship here.
-
-A retained pane may host a new assignment only after the old agent process ends and a fresh trusted launch binds the new snapshot. Same-assignment corrections can retain the process only within unchanged approvals/grants/lifetime. Revocation/completion invalidates, never rebinds. Public Molt evidence cannot distinguish genuine ownership from generic `/new` plus lineage, so enrolled in-place clears stay suspended and require a fresh trusted launch; parent-handback children end their unit. Finish/handoff existing tops/workers before enrolling them.
-
-For enrolled OMP, operator merge acknowledgment and spec/design/plan/release gates outrank `run.merge_word=standing`, inherited policy prose, role and confidence. Claude Code and legacy/manual retention/backend rules remain unchanged. Herdr 0.2.22's phase/locator.seen, one-generation consumption, resume/rotation ownership and no-auto-relaunch rules still apply: fresh-binding requirements never authorize duplicate workers on a live attempt. This is not a same-UID sandbox or atomic revocation lock. Native decision integration/release remains separately gated; #832 and #831's cross-host criterion are not closed.
-
-**Gated cutover of the reviewed integrated candidate (unreleased).** The reviewed integrated OMP routing candidate changes no roster, no launch flag and no per-seat profile. Activation is staged, not hot: observe with the non-acting replay first, then enable only the reviewed classes/assignments. Do not edit a running top's env or reports to enroll it; start a fresh approved OMP top with a trusted bounded assignment, use new processes for retained assignments, and keep a same-assignment in-place Molt suspended unless the full revalidation transaction runs. Existing CC tops/backend/permissions continue unchanged under #832 and no new sandbox claim is made. Rollback is explicit deployment to the prior supported release/backend with truthful source attribution, never a per-request chat fallback claiming Jev. Autonomic's `docs/omp-jev-rollout.md` holds the complete input/validation/gate list; no version is selected here.
-
 ## What ships
 
 | Surface | What it carries |
@@ -133,6 +123,8 @@ Since 0.2.18, an OMP launcher reads autonomic 0.7.0's live mode file via `AUTONO
 Claude Code keeps reading `AUTONOMIC_EFFECTIVE_MODE`. Only an exact `autopilot` marks a child; unset, missing or older autonomic is manual.
 
 Since 0.2.17, OMP coordinator and worker seats launch through `omp-seat` (see `references/config.md`); OMP seats fill the lane driver (default-lane spine session), close, doctor or worker seats, and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4); since 0.2.23, also the activated spine session (`omp-seat crew-spine`) and the work-PR session (`omp-seat crew-work-pr`; omp-roles 0.6.0), which run 788 lifted (#788).
+
+Since 0.6.0, crew sets no ledger, pain-path or mode variable in the launch export, which ends at the molt marking, and no longer reads the launcher's mode; the enrolled OMP authority text is gone from the skill and its briefs.
 
 **Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
 invalid role and denies every tool call, so 0.2.7 and later —
@@ -239,9 +231,6 @@ has one fixed path.
 - The **`herdr-dagr`** plugin's `dagr` binary on PATH, to create and lint the run's
   `run.json`: dagr's producer contract resolves that validator *before* anything is
   written, and with none available the run starts no run file — not an unvalidated one.
-- autonomic 0.4.0 for autopilot children: an older autonomic sets no `AUTONOMIC_EFFECTIVE_MODE`, so
-  every child starts manual. An OMP launcher needs autonomic 0.7.0 for autopilot children: an older
-  autonomic writes no mode file, so the launcher reads manual.
 - `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as
   unavailable.
 - The agents named in `~/.claude/crew/agents.md` resolvable where their pane

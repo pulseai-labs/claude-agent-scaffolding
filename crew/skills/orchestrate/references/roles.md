@@ -49,9 +49,9 @@ command, in one export; every layer sets the same names and meanings, because th
 them and never ask which layer set them. A guarded seat — implementer, verifier or reviewer —
 is marked by its launcher, before its command, with
 
-    SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain
+    SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<REPORT_PATH's directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status
 
-plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. The names mean:
+The names mean:
 
 - `SEAT_MODS_ROLE` — the seat's role: `implementer`, `verifier` or `reviewer` for a guarded
   seat, `coordinator` for a coordinator seat, `orchestrator` for the top's rotation successor.
@@ -67,10 +67,6 @@ plus `AUTONOMIC_MODE=autopilot` where the autonomic marking below says. The name
   that sets `orchestrator`. A coordinator takes none, except an OMP coordinator (`config.md`),
   which adds each hosting repo's `.worktrees` root.
 - `MOLT_HANDOFF=parent` and `MOLT_STATUS_PATH=<REPORT_PATH>.molt-status` — every guarded seat, every coordinator seat and every operator-declared role. The operator's first top and the top's rotation successor are roots and take neither. What the marking does is `completion.md`'s ("A child past molt's warnings").
-- `AUTONOMIC_LEDGER` and `AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` — the run's one
-  ledger, an **absolute** path outside every worktree, and the seat's pain file; the top's
-  successor takes `AUTONOMIC_LEDGER` and no pain path, since it has no parent.
-- `AUTONOMIC_MODE=autopilot` — only when the launcher is itself in autopilot.
 
 Never in `settings.json`'s `env`, a shell profile or a `command:` line. The scratch directory,
 created first, is `<run dir>/scratch/<role>-<n>` — `<run dir>` the directory holding the run's
@@ -83,34 +79,6 @@ for `seat: <role>`; its absence there means no guards — a coordinator records 
 file (to the top), the top records one from its own launches to the operator, and a missing
 status line halts no seat, re-launches none and is never silently dropped. The layer's step says
 which read carries it.
-
-**autonomic marking.** The same export adds `AUTONOMIC_LEDGER=<ledger>
-AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain` for every child the molt marking reaches, and
-`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot. `<ledger>` is the
-launcher's own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`: one ledger
-per run, outside every worktree. A relative launcher value is first
-resolved against the launcher's own repo root, as autonomic resolves it, never passed on as
-written: a relative path resolves inside each seat's worktree and dies with it, and with none
-the ledger lands in the worktree and rides the seat's commits. The export quotes nothing, so an
-inherited path is passed on only when every character is a letter, a digit, `.`, `_`, `/` or
-`-`; any other is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead.
-`<run dir>` and `REPORT_PATH` are crew's own choice and keep to the same characters. The
-launcher's mode is autonomic's live mode, read at each launch — on Claude Code, `printf %s
-"$AUTONOMIC_EFFECTIVE_MODE"`, set by autonomic 0.4.0 on every mode change. An OMP launcher (an
-`omp-seat` coordinator) reads `cat "$AUTONOMIC_MODE_FILE"` (autonomic 0.7.0), because omp's bash
-children keep the environment from session start. Exactly `autopilot` marks the child; anything
-else (unset, missing file, older autonomic) does not. It is never `$AUTONOMIC_MODE`, the spawn's
-input: the top may be in autopilot by `/autopilot on` or a molt's lineage, which that never
-shows, or may have been refused it. It is never the record file either: one that failed to
-write can still read `autopilot` after a fall to manual. `autopilot` marks the child; anything
-else, unset included, leaves `AUTONOMIC_MODE` unset. A manual seat writes neither file, so the
-two paths cost nothing. An autopilot seat's scope is its brief; it gets no `/autopilot on`. Its
-first permission ask, and the first after a clear, has nothing to judge and waits for a human,
-so a seat meant to run unattended needs a `command:` whose permission mode does not ask
-first — the operator's file, never a launch-time edit. `AUTONOMIC_BELL` is never set: the pain
-file reaches the parent. The top's rotation successor takes `AUTONOMIC_MODE` and
-`AUTONOMIC_LEDGER` by the same rule and no pain path, since it has no parent; the operator's
-first top takes none. A respawn reads the launcher's mode again.
 
 **A molt is not a launch.** The top's in-place molt (`lifecycle.md`, "Where molt runs") keeps
 the pane's process and its exports, so its `orchestrator` marking stands across the clear, and
@@ -129,8 +97,6 @@ check, and the worker's own: one that finds its model is not `SEAT_EXPECTED_MODE
 a failed launch in its report file and stops, rather than working around it.
 
 ## Retention follows artifacts
-
-**Enrolled OMP override:** retention preserves a pane/artifact lineage, not permission to hot-enroll its running agent. A materially new task ends the process and takes fresh trusted issuance/launch. A correction or re-check may reuse only the same assignment and unchanged approval/grants/lifetime. All role profiles remain ceilings, never grants; operator-owned merge/design/plan gates and seat-mods denials win. Completion/revocation invalidates old authority. Generic switch or an in-place Molt without independently distinguishable public ownership evidence remains suspended and needs fresh trusted launch; parent-handback children end their unit. The legacy/Claude Code retention paragraphs below are unchanged.
 
 The session that built the PR fixes the PR, and an implementer is retained across
 consecutive work items. No ownership transfer exists: retain a seat by keeping its

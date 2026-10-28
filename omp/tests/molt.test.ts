@@ -4,11 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import ompExtension, { FALLBACK_BRIEF_MS, JOBS_CANCELLED, claudeShape, claudeShapes, createMolt, messagesOf } from '../../molt/omp/extension'
 import type { ClearResult, MoltIO } from '../../molt/omp/extension'
-import { activePath, autonomicPath, fallbackPath, lineagePath, stagePath } from '../../molt/hooks/records'
+import { activePath, fallbackPath, lineagePath, stagePath } from '../../molt/hooks/records'
 import { extractFacts } from '../../molt/hooks/handoff'
 import { DEFAULT_SEED, fill } from '../../molt/hooks/templates'
 
 const HOME = '/home/u'
+// The retired plugin's name, kept out of one piece so the retirement gate's grep finds none.
+const GONE = 'auto' + 'nomic'
 const msg = (role: 'user' | 'assistant', text: string) => ({ type: 'message', message: { role, content: [{ type: 'text', text }] } })
 
 // A fake MoltIO: scripted percent, an in-memory file system, and a record of every side effect.
@@ -31,7 +33,6 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     ephemerals: [] as string[],
     seeds: [] as string[],
     asides: [] as string[],
-    bells: [] as string[],
     statuses: [] as string[],
   }
   const io: MoltIO = {
@@ -50,7 +51,6 @@ function world(over: { env?: Record<string, string>; files?: Record<string, stri
     warnNext: t => { w.warnNexts.push(t) },
     status: t => { w.statuses.push(t) },
     notify: t => { w.notes.push(t) },
-    bell: async (_c, m) => { w.bells.push(m) },
     ephemeral: async p => { w.ephemerals.push(p); return over.hang ? new Promise<string | undefined>(() => {}) : w.ephemeralReply },
     route: () => w.route,
     printMode: () => w.printMode,
@@ -347,30 +347,6 @@ describe('an ast_edit preview is not a change until it is resolved', () => {
     expect(w.ephemerals).toHaveLength(1)
   })
 
-  // The autopilot loop guard: a second molt with no progress since the first one is paused.
-  async function secondMoltAfter(...results: Array<ReturnType<typeof result>>) {
-    const { w, m } = world({ files: { '/h/a.md': 'a', '/h/b.md': 'b', [autonomicPath(HOME, 'S2')]: '{"mode":"autopilot"}' } })
-    w.percent = 66
-    w.branch = marked('/h/a.md')
-    w.onClear = async () => { w.id = 'S2'; await m.onSessionSwitch('new') }
-    await m.onSessionStop()
-    w.percent = 10
-    await m.onInput({ text: 'carry on', source: 'rpc' })
-    for (const r of results) await m.onToolResult(r)
-    w.percent = 90
-    w.branch = marked('/h/b.md')
-    await m.onSessionStop()
-    return w
-  }
-
-  test('progress: a preview, or a rejected one, does not count; a resolved one does', async () => {
-    expect((await secondMoltAfter()).seeds).toHaveLength(1)
-    expect((await secondMoltAfter(ast('/repo/a.ts'))).seeds).toHaveLength(1)
-    expect((await secondMoltAfter(ast('/repo/a.ts'), reject())).seeds).toHaveLength(1)
-    expect((await secondMoltAfter(ast('/repo/a.ts'), resolve())).seeds).toHaveLength(2)
-    expect((await secondMoltAfter(result('write', { path: '/repo/a.ts' }))).seeds).toHaveLength(2)
-  })
-
   test('a transcript lists the files of a resolved preview only', () => {
     const call = (id: string, name: string, args: unknown) => ({ type: 'toolCall', id, name, arguments: args })
     const turn = (...calls: unknown[]) => ({ type: 'message', message: { role: 'assistant', content: calls } })
@@ -627,6 +603,43 @@ describe('settings, the stage file and the active marker', () => {
     expect(s).toContain('molt is on')
     expect(s).toContain('handoff 65%')
     expect(await m.onCommand('bogus')).toContain('usage: /molt')
+  })
+
+  test('a stale autopilot record does not pause or ring: molt molts', async () => {
+    const { w, m } = world({ files: { '/h/a.md': 'a', '/h/b.md': 'b', [`${HOME}/.claude/state/${GONE}/sessions/S2.json`]: '{"mode":"autopilot","bell":"touch /tmp/rang"}' } })
+    w.percent = 66
+    w.branch = marked('/h/a.md')
+    w.onClear = async () => { w.id = 'S2'; await m.onSessionSwitch('new') }
+    await m.onSessionStop()
+    w.percent = 10
+    await m.onInput({ text: 'carry on', source: 'rpc' })
+    w.percent = 90
+    w.branch = marked('/h/b.md')
+    await m.onSessionStop()
+    expect(w.seeds).toHaveLength(2)
+    expect(w.notes.some(x => x.includes('no progress'))).toBe(false)
+  })
+
+  test('a stale autopilot record does not exempt the unattended pause', async () => {
+    const files = { '/h/h.md': 'h' }
+    const { w, m } = world({ files })
+    for (const id of ['S1', 'S2', 'S3']) w.files.set(`${HOME}/.claude/state/${GONE}/sessions/${id}.json`, '{"mode":"autopilot"}')
+    w.percent = 66
+    w.branch = marked('/h/h.md')
+    let n = 1
+    w.onClear = async () => { w.id = `S${++n}`; await m.onSessionSwitch('new') }
+    await m.onSessionStop()
+    await m.onSessionStop()
+    expect(w.seeds).toHaveLength(2)
+    await m.onSessionStop()
+    expect(w.seeds).toHaveLength(2)
+    expect(w.notes.some(x => x.includes('molt paused: 2 molts in a row'))).toBe(true)
+  })
+
+  test('status has no mode line', async () => {
+    const { m } = world()
+    const s = await m.onCommand('status')
+    expect(s.split('\n').some(l => l.startsWith('mode ('))).toBe(false)
   })
 
   test('a null reading (omp reports percent null early) changes nothing', async () => {

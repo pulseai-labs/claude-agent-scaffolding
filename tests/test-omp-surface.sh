@@ -10,8 +10,8 @@ set -u
 export LC_ALL=C
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OMP_SIX="ossify merge-bar workspace-init architect-critic code-judo ai-mentor"
-# The three mods (spec C): catalog entries equal their Claude entries; their text is not gated here.
-OMP_MODS="seat-mods molt autonomic"
+# The two mods (spec C): catalog entries equal their Claude entries; their text is not gated here.
+OMP_MODS="seat-mods molt"
 # Claude plugins also listed on OMP for an OMP top (spec D): catalog entries equal their Claude entries; text not gated.
 OMP_SHARED="crew"
 # Plugins that exist on OMP only: no Claude-catalog entry, no .claude-plugin/, versioned by package.json.
@@ -35,7 +35,7 @@ check_catalog() { # $1=root
   local r=$1 o="$1/.omp-plugin/marketplace.json" c="$1/.claude-plugin/marketplace.json" p v
   [ -f "$o" ] || { echo "catalog: .omp-plugin/marketplace.json missing"; return; }
   [ "$(jq -r '[.plugins[].name] | sort | join(" ")' "$o")" = "$(printf '%s\n' $OMP_SIX $OMP_MODS $OMP_SHARED $OMP_ONLY | sort | paste -sd' ' -)" ] \
-    || echo "catalog: lists $(jq -c '[.plugins[].name]' "$o"), want exactly the six, the three mods, the shared and the OMP-only plugins"
+    || echo "catalog: lists $(jq -c '[.plugins[].name]' "$o"), want exactly the six, the two mods, the shared and the OMP-only plugins"
   jq -e --slurpfile c "$c" '.name == $c[0].name and .owner == $c[0].owner' "$o" >/dev/null \
     || echo "catalog: name/owner differ from the Claude catalog"
   for p in $OMP_SIX $OMP_MODS $OMP_SHARED; do

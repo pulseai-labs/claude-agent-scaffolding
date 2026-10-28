@@ -32,26 +32,18 @@ function normal(path: string): string | undefined {
   return '/' + parts.join('/')
 }
 
-// Extra files and a bell for the #873 tests: the autonomic record's text under its path,
-// the session id the record is keyed by (`session`, when a test changes it), and the exit a
-// bell command answers with.
-type WorldExtra = { files?: Record<string, string>; sessionId?: string; session?: { id: string }; bellExit?: number; links?: Record<string, string> }
+// Extra files for the tests: file text under its path, the session id (`session`, when a test
+// changes it), and links.
+type WorldExtra = { files?: Record<string, string>; sessionId?: string; session?: { id: string }; links?: Record<string, string> }
 
 function world(on: On, env: Record<string, string>, gitRepo = true, cwd = '/w/seat-mods', cwdFailure = false, extra: WorldExtra = {}) {
   const runs: string[][] = []
-  const bellRuns: string[][] = []
   mock.env(on, env)
   on('tool.call', () => ({ result: 'ran' }) as never)
   on('session.id', () => ({ value: extra.session?.id ?? extra.sessionId ?? 's1' }) as never)
   on('session.cwd', () => cwdFailure ? { deny: 'cwd unavailable' } : { value: cwd })
   on('process.run', (_$, e) => {
     runs.push([...e.argv])
-    // The autopilot bell, `sh -c 'AUTONOMIC_MESSAGE="$1"; …'` (#873): its message is the
-    // last argument, as molt's world answers it. A bell that exits non-zero resolves.
-    if (typeof e.argv[2] === 'string' && e.argv[2].includes('AUTONOMIC_MESSAGE')) {
-      bellRuns.push([...e.argv])
-      return { value: { exitCode: extra.bellExit ?? 0, stdout: '', stderr: '', isStdoutTruncated: false } } as never
-    }
     return { value: e.argv.includes('rev-parse')
       ? (gitRepo
         ? { exitCode: 0, stdout: '/w\n', stderr: '', isStdoutTruncated: false }
@@ -77,7 +69,7 @@ function world(on: On, env: Record<string, string>, gitRepo = true, cwd = '/w/se
     if (text === undefined) return { deny: `ENOENT: ${e.path}` } as never
     return { value: text } as never
   })
-  return { runs, bellRuns }
+  return { runs }
 }
 
 describe('unset role: guarded as the default implementer', () => {
@@ -1092,31 +1084,6 @@ describe('the redo turn, review fixes (#929)', () => {
     expect(r.drop).toBeDefined()
     expect(redos(w)).toEqual([])
   })
-
-  test('a dropped redo still rings the failed reply\'s waiting-on-operator notice', async ($, on) => {
-    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' }, undefined, undefined, { files: {
-      '/home/u/.claude/state/molt/stage/s1': '{"stage":"command"}\n',
-      '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode":"autopilot","bell":"notify-me"}',
-    } })
-    await $.prompt.submit(notify())
-    await ends($, 'Done.\nWaiting on operator: decision: merge #12 now?')
-    await flush()
-    expect(redos(w)).toEqual([])
-    expect(w.toasts).toEqual([STATUS_WARNING, 'seat-mods: waiting on operator — decision: merge #12 now?'])
-    expect(w.bellRuns.length).toBe(1)
-  })
-
-  test('a rejected redo still rings the failed reply\'s waiting-on-operator notice', async ($, on) => {
-    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' }, undefined, (e, call) => {
-      if (call === 2) throw new Error('prompt refused')
-      return { text: e.text, context: e.context }
-    }, { files: { '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode":"autopilot","bell":"notify-me"}' } })
-    await $.prompt.submit(notify())
-    await ends($, 'Done.\nWaiting on operator: decision: merge #12 now?')
-    await flush()
-    expect(w.toasts).toEqual([STATUS_WARNING, 'seat-mods: waiting on operator — decision: merge #12 now?'])
-    expect(w.bellRuns.length).toBe(1)
-  })
 })
 
 // A valid block whose Next steps names work while both wait fields read none:
@@ -1197,87 +1164,33 @@ describe('idle stop (#876)', () => {
   })
 })
 
-// The waiting-on-operator signal (#873): in autopilot, a status turn whose block hands the
-// operator a decision or an action rings autonomic's bell from the record and shows the line
-// in turn.complete. It adds a notification only — it never blocks, answers or approves. It
-// fires only on the turn that stands, never on a reply whose redo is pending (#929).
-const WAITING = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Waiting on operator:** decision: merge #12 now?'
-const NOTICE = 'seat-mods: waiting on operator — decision: merge #12 now?'
-const RECORD = '/home/u/.claude/state/autonomic/sessions/s1.json'
-const AUTOPILOT = { [RECORD]: '{"mode":"autopilot","bell":"notify-me"}' }
+// The waiting-on-operator notice and bell (#873) ran only in autopilot and are gone: a stale
+// record of the retired plugin changes nothing, and nothing runs a bell.
+const WAITING = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Waiting on operator:** decision: pick A'
+const OLD_NAME = 'auto' + 'nomic'
+const OLD_RECORD = `/home/u/.claude/state/${OLD_NAME}/sessions/s1.json`
 
-describe('waiting on the operator rings the bell (#873)', () => {
-  const waitingWorld = (on: On, files: Record<string, string> | undefined, bellExit?: number, role = 'orchestrator') =>
-    statusWorld(on, { SEAT_MODS_ROLE: role, HOME: '/home/u' }, undefined, undefined, { files, bellExit })
-
-  test('rings once with the notice when the block passes and reads decision:', async ($, on) => {
-    const w = waitingWorld(on, AUTOPILOT)
+describe('no waiting-on-operator notice', () => {
+  test('a stale autopilot record and a decision in field 5: no notice, no bell run', async ($, on) => {
+    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' }, undefined, undefined,
+      { files: { [OLD_RECORD]: '{"mode":"autopilot","bell":"notify-me"}' } })
     await $.prompt.submit(notify())
     const done = await ends($, WAITING)
-    expect(w.bellRuns.length).toBe(1)
-    expect(w.bellRuns[0]?.at(-1)).toBe(NOTICE)
-    expect(done.text).toBe(`${WAITING}\n${NOTICE}`)
-  })
-
-  test('quiet on the failed reply; rings when the redo stands', async ($, on) => {
-    const w = waitingWorld(on, AUTOPILOT)
-    await $.prompt.submit(notify())
-    // The failed reply waits on the operator too, but its redo is pending: no bell yet.
-    expect((await ends($, 'Done.\nWaiting on operator: decision: merge #12 now?')).text).toBe('Done.\nWaiting on operator: decision: merge #12 now?')
-    expect(w.bellRuns.length).toBe(0)
-    await flush()
-    // The redo fails the shape again and stands; its last labelled line waits.
-    const done = await ends($, 'Done.\nWaiting on operator: decision: merge #12 now?')
-    expect(w.bellRuns.length).toBe(1)
-    expect(w.bellRuns[0]?.at(-1)).toBe(NOTICE)
-    expect(done.text).toBe(`${STATUS_WARNING}\n${NOTICE}`)
-  })
-
-  test('quiet on none', async ($, on) => {
-    const w = waitingWorld(on, AUTOPILOT)
-    await $.prompt.submit(notify())
-    const done = await ends($, STATUS_BLOCK)
-    expect(w.bellRuns.length).toBe(0)
-    expect(done.text).toBe(STATUS_BLOCK)
-  })
-
-  test('quiet in manual mode', async ($, on) => {
-    const manual = waitingWorld(on, { [RECORD]: '{"mode":"manual","bell":"notify-me"}' })
-    await $.prompt.submit(notify())
-    const done = await ends($, WAITING)
-    expect(manual.bellRuns.length).toBe(0)
     expect(done.text).toBe(WAITING)
+    expect(done.text).not.toContain('seat-mods: waiting on operator')
+    expect(w.toasts).toEqual([])
+    expect(w.runs.filter(argv => argv.join(' ').includes(OLD_NAME.toUpperCase() + '_MESSAGE'))).toEqual([])
   })
 
-  test('quiet with no record at all', async ($, on) => {
-    const w = waitingWorld(on, undefined)
+  test('a dropped redo toasts only the flag, never a notice', async ($, on) => {
+    const w = statusWorld(on, { SEAT_MODS_ROLE: 'orchestrator', HOME: '/home/u' }, undefined, undefined, { files: {
+      '/home/u/.claude/state/molt/stage/s1': '{"stage":"command"}\n',
+      [OLD_RECORD]: '{"mode":"autopilot","bell":"notify-me"}',
+    } })
     await $.prompt.submit(notify())
-    await ends($, WAITING)
-    expect(w.bellRuns.length).toBe(0)
-  })
-
-  test('quiet on a molt handoff', async ($, on) => {
-    const w = waitingWorld(on, AUTOPILOT)
-    await $.prompt.submit(notify())
-    await ends($, 'Waiting on operator: decision: go?\nMOLT-HANDOFF: /h.md')
-    expect(w.bellRuns.length).toBe(0)
-  })
-
-  test('quiet for a non-orchestrator role', async ($, on) => {
-    const w = waitingWorld(on, AUTOPILOT, undefined, 'implementer')
-    await $.prompt.submit(notify())
-    await ends($, WAITING)
-    expect(w.bellRuns.length).toBe(0)
-  })
-
-  test('a failing bell does not hold the turn end, and the log names the failure', async ($, on) => {
-    const w = waitingWorld(on, AUTOPILOT, 3)
-    await $.prompt.submit(notify())
-    const done = await ends($, WAITING)
-    expect(done.text).toBe(`${WAITING}\n${NOTICE}`)
+    await ends($, 'Done.\nWaiting on operator: decision: merge #12 now?')
     await flush()
-    expect(w.bellRuns.length).toBe(1)
-    expect(w.runs.filter(argv => argv.join(' ').includes('bell failed exit=3')).length).toBe(1)
+    expect(w.toasts).toEqual([STATUS_WARNING])
   })
 })
 

@@ -55,7 +55,7 @@ case "$input" in    # fast path: most Bash calls are not herdr new-work commands
   *) new_work "$input" || exit 0 ;;
 esac
 
-# molt wins the context boundary (autonomic + molt spec, D9). In a session where the
+# molt wins the context boundary (molt spec, D9). In a session where the
 # molt mod is active, molt hands the session off in place at its own threshold, and
 # this notice would order a second, conflicting rotation: two tops on one run. molt
 # keeps one marker per session fresh on every prompt and turn. A marker older than a

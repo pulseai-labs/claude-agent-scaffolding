@@ -6,7 +6,7 @@ const RUN = (args: string) => ({ command: 'molt', args, origin: { kind: 'compose
 const STAGE = (id = 's1') => `/home/u/.claude/state/molt/stage/${id}`
 const stage = (w: ReturnType<typeof world>, id = 's1') => JSON.parse(w.files.get(STAGE(id)) ?? 'null')
 
-describe('the stage file (molt 0.2.1, autonomic #677 F12)', () => {
+describe('the stage file (molt 0.2.1)', () => {
   test('a measurement writes the stage and the effective thresholds', async ($, on) => {
     const w = world(on); at(w, 42)
     await $.tool.call(READ)

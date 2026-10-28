@@ -8,7 +8,7 @@ import { checkExtensions, expandRole, pinWarning, planLaunch, versionWarning } f
 
 let root: string, ompRecord: string, claudeRecord: string
 
-function install(name: string, withExt = true, version = ({ 'seat-mods': '0.4.1', molt: '0.3.0', autonomic: '0.6.0' } as Record<string, string>)[name] ?? '0.2.0'): string {
+function install(name: string, withExt = true, version = ({ 'seat-mods': '0.4.1', molt: '0.3.0' } as Record<string, string>)[name] ?? '0.2.0'): string {
   const p = join(root, 'cache', name)
   mkdirSync(join(p, 'omp'), { recursive: true })
   mkdirSync(join(p, '.claude-plugin'), { recursive: true })
@@ -37,13 +37,36 @@ beforeEach(() => {
 })
 
 describe('planLaunch', () => {
-  test('worker pins the three extensions in order, then the caller args, with no system prompt', () => {
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a, 'omp-roles': install('omp-roles', false) })
+  test('worker pins the two extensions in order, then the caller args, with no system prompt', () => {
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m, 'omp-roles': install('omp-roles', false) })
     expect(launch()).toMatchObject({
-      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'), '--x'],
+      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '--x'],
       warnings: [],
     })
+  })
+  test('a worker launches with seat-mods and molt only', () => {
+    const [s, m] = [install('seat-mods'), install('molt')]
+    record(ompRecord, { 'seat-mods': s, molt: m })
+    const r = launch() as { argv: string[]; extensions: string[] }
+    expect(r.argv).toEqual(['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '--x'])
+    expect(r.argv.filter(a => a === '-e')).toHaveLength(2)
+    expect(r.extensions).toHaveLength(2)
+  })
+  test('the orchestrator launches with seat-mods, molt and crew only; the status entry is the last -e', () => {
+    const [s, m] = [statusEntry(install('seat-mods', true, '0.8.0')), install('molt')]
+    record(ompRecord, { 'seat-mods': s, molt: m, crew: install('crew', false, '0.3.0') })
+    const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
+    const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir }) as { argv: string[] }
+    expect(r).not.toHaveProperty('error')
+    expect(r.argv.filter(a => a === '-e')).toHaveLength(3)
+    expect(r.argv[r.argv.lastIndexOf('-e') + 1]).toBe(join(s, 'omp/status-extension.ts'))
+  })
+  test('leftover authority variables are ignored: no preflight export, and bin/omp-seat names none', async () => {
+    const seatModule = await import('../../omp-roles/omp/seat')
+    expect('authorityPreflight' in seatModule).toBe(false)
+    const bin = readFileSync(join(import.meta.dir, '..', '..', 'omp-roles', 'bin', 'omp-seat'), 'utf8')
+    expect(bin).not.toContain('AUTO' + 'NOMIC_')
   })
   test('a name from the prototype chain is not a role', () => {
     expect(launch('toString')).toEqual({ error: expect.stringContaining('unknown role "toString"') })
@@ -52,34 +75,28 @@ describe('planLaunch', () => {
   test('an unknown role is an error', () => {
     expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator, crew-spine, crew-work-pr)' })
   })
-  test("orchestrator appends its role file and loads seat-mods' status entry last (seat-mods 0.8.0, autonomic 0.7.0, crew 0.3.0)", () => {
-    const [s, m, a] = [statusEntry(install('seat-mods', true, '0.8.0')), install('molt'), install('autonomic', true, '0.7.0')]
-    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a, 'crew': install('crew', false, '0.3.0') })
+  test("orchestrator appends its role file and loads seat-mods' status entry last (seat-mods 0.8.0, crew 0.3.0)", () => {
+    const [s, m] = [statusEntry(install('seat-mods', true, '0.8.0')), install('molt')]
+    record(ompRecord, { 'seat-mods': s, molt: m, 'crew': install('crew', false, '0.3.0') })
     const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
     expect(planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir })).toMatchObject({
-      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
+      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'),
         '-e', join(s, 'omp/status-extension.ts'), '--append-system-prompt', join(rolesDir, 'orchestrator.md')],
     })
   })
   test('orchestrator refuses seat-mods 0.7.0, naming the 0.8.0 minimum (no top without the status check)', () => {
-    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.7.0')), molt: install('molt'), autonomic: install('autonomic', true, '0.7.0'), 'crew': install('crew', false, '0.3.0') })
+    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.7.0')), molt: install('molt'), 'crew': install('crew', false, '0.3.0') })
     const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
     expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.7.0') })
     expect((r as { error: string }).error).toContain('0.8.0')
   })
   test('orchestrator refuses a seat-mods install with no omp/status-extension.ts', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.8.0'), molt: install('molt'), autonomic: install('autonomic', true, '0.7.0'), 'crew': install('crew', false, '0.3.0') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.8.0'), molt: install('molt'), 'crew': install('crew', false, '0.3.0') })
     const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
     expect((r as { error: string }).error).toContain('status-extension.ts')
   })
   const orch = () => planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
-  const orchMods = (autonomic = '0.7.0') => ({ 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt'), autonomic: install('autonomic', true, autonomic) })
-  test('orchestrator refuses autonomic 0.6.0, naming the 0.7.0 minimum (children inherit autopilot through the mode file)', () => {
-    record(ompRecord, { ...orchMods('0.6.0'), 'crew': install('crew', false, '0.3.0') })
-    const r = orch() as { error: string }
-    expect(r.error).toContain('autonomic 0.6.0')
-    expect(r.error).toContain('0.7.0')
-  })
+  const orchMods = () => ({ 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt') })
   test('orchestrator refuses a host with no crew, naming the plugin, the install command and the omp record', () => {
     record(ompRecord, orchMods())
     const r = orch() as { error: string }
@@ -106,36 +123,36 @@ describe('planLaunch', () => {
     })
   }
   test('control: worker launches with SEAT_MODS_ROLE unset', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt') })
     expect(launch('worker')).toHaveProperty('argv')
   })
   test('control: a worker does not load the status entry, even when seat-mods ships it', () => {
-    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt') })
     const r = launch('worker') as { argv: string[] }
-    expect(r.argv.filter(a => a === '-e')).toHaveLength(3)
+    expect(r.argv.filter(a => a === '-e')).toHaveLength(2)
     expect(r.argv.some(a => a.endsWith('status-extension.ts'))).toBe(false)
   })
-  test('control: worker needs neither crew nor autonomic 0.7.0', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
+  test('control: worker needs no crew', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt') })
     expect(launch('worker')).toHaveProperty('argv')
   })
   test('control: worker still accepts seat-mods 0.4.1', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt') })
     expect(launch('worker')).toHaveProperty('argv')
   })
   for (const role of ['spine-driver', 'close', 'work-pr', 'crew-spine', 'crew-work-pr']) {
     test(`${role} appends its shipped role file after the extensions and before passthrough args`, () => {
-      const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-      record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+      const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+      record(ompRecord, { 'seat-mods': s, molt: m })
       const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
       expect(planLaunch({ role, via: 'omp-glm', args: ['--model', 'test model', 'Begin.'], ompRecord, claudeRecord, rolesDir })).toMatchObject({
-        argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
+        argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'),
           '--append-system-prompt', join(rolesDir, `${role}.md`), '--model', 'test model', 'Begin.'],
         warnings: [],
       })
     })
     test(`${role} refuses a missing role file instead of launching without its procedure`, () => {
-      record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
+      record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt') })
       const rolesDir = join(root, 'missing roles')
       expect(planLaunch({ role, via: 'omp-glm', args: [], ompRecord, claudeRecord, rolesDir })).toEqual({
         error: `omp-seat: role file ${join(rolesDir, `${role}.md`)} is missing`,
@@ -143,11 +160,11 @@ describe('planLaunch', () => {
     })
   }
   test('a mod missing from both records names the mod and both records', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt') })
+    record(ompRecord, { 'seat-mods': install('seat-mods') })
     const r = launch()
     expect(r).toHaveProperty('error')
     const e = (r as { error: string }).error
-    expect(e).toContain('autonomic')
+    expect(e).toContain('molt')
     expect(e).toContain(ompRecord)
     expect(e).toContain(claudeRecord)
   })
@@ -155,38 +172,38 @@ describe('planLaunch', () => {
     expect(launch()).toHaveProperty('error')
   })
   test("a mod present only in Claude Code's record uses that install path", () => {
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-    record(ompRecord, { 'seat-mods': s, molt: m })
-    record(claudeRecord, { autonomic: a })
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s })
+    record(claudeRecord, { molt: m })
     expect(launch()).toMatchObject({
-      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'), '--x'],
+      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '--x'],
       warnings: [],
     })
   })
   test('an install without omp/extension.ts is an error naming the file', () => {
     const old = install('seat-mods', false)
-    record(ompRecord, { 'seat-mods': old, molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': old, molt: install('molt') })
     const r = launch() as { error: string }
     expect(r.error).toContain(join(old, 'omp', 'extension.ts'))
     expect(r.error).toContain('0.4.1')
   })
   test('seat-mods 0.4.0 with an OMP extension is refused, naming the 0.4.1 minimum', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.0'), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.0'), molt: install('molt') })
     expect(launch()).toEqual({ error: expect.stringContaining('seat-mods 0.4.0') })
     expect((launch() as { error: string }).error).toContain('0.4.1')
   })
   test('seat-mods 0.4.1 with an OMP extension is accepted', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt') })
     expect(launch()).toHaveProperty('argv')
     expect(launch()).not.toHaveProperty('error')
   })
   test('newer seat-mods is accepted without a lexicographic version comparison', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.10.0'), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.10.0'), molt: install('molt') })
     expect(launch()).toHaveProperty('argv')
   })
   test('a mod with an unreadable or invalid version refuses instead of launching unguarded', () => {
     const s = install('seat-mods')
-    record(ompRecord, { 'seat-mods': s, molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': s, molt: install('molt') })
     for (const content of ['{not json', JSON.stringify({ version: 'bad' }), JSON.stringify({})]) {
       writeFileSync(join(s, '.claude-plugin', 'plugin.json'), content)
       expect(launch()).toEqual({ error: expect.stringContaining('0.4.1') })
@@ -200,7 +217,7 @@ describe('planLaunch', () => {
     expect(r.error).toContain('unreadable')
   })
   test('an unreadable Claude record fails loud too', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt'), autonomic: install('autonomic') })
+    record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt') })
     mkdirSync(join(claudeRecord, '..'), { recursive: true })
     writeFileSync(claudeRecord, '{not json')
     expect((launch() as { error: string }).error).toContain(claudeRecord)
@@ -235,17 +252,17 @@ describe('seat config overlay (#843)', () => {
     expect(Bun.YAML.parse(readFileSync(shipped, 'utf8'))).toEqual({ todo: { reminders: false } })
   })
   test('planLaunch passes the overlay right after the extensions, before the role file', () => {
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m })
     const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
     expect(planLaunch({ role: 'close', via: 'omp-glm', args: ['Begin.'], ompRecord, claudeRecord, rolesDir, seatConfig: shipped })).toMatchObject({
-      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'), '-e', join(a, 'omp/extension.ts'),
+      argv: ['omp-glm', '-e', join(s, 'omp/extension.ts'), '-e', join(m, 'omp/extension.ts'),
         `--config=${shipped}`, '--append-system-prompt', join(rolesDir, 'close.md'), 'Begin.'],
     })
   })
   test('a missing overlay stops the launch instead of starting a seat whose todo reminders block molt', () => {
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m })
     const gone = join(root, 'missing', 'seat-config.yml')
     expect(planLaunch({ role: 'worker', via: 'omp-glm', args: [], ompRecord, claudeRecord, seatConfig: gone })).toEqual({
       error: `omp-seat: seat config ${gone} is missing`,
@@ -254,8 +271,8 @@ describe('seat config overlay (#843)', () => {
   test('bin/omp-seat passes the shipped overlay to every launch', () => {
     const seat = join(import.meta.dir, '..', '..', 'omp-roles', 'bin', 'omp-seat')
     const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m })
     const out = join(home, 'argv.txt')
     const via = join(home, 'via.sh')
     writeFileSync(via, `#!/bin/sh\n[ "$1" = --version ] && exit 0\nprintf '%s\\n' "$@" > '${out}'\n`)
@@ -270,15 +287,29 @@ describe('bin/omp-seat with a via that cannot run', () => {
   const seat = join(import.meta.dir, '..', '..', 'omp-roles', 'bin', 'omp-seat')
   function run(via: string) {
     const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m })
     return spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
+  }
+  for (const set of [['PATH'], ['PATH', 'SHA256', 'ASSIGNMENT_ID', 'ASSIGNMENT_GENERATION', 'LAUNCH_ID']]) {
+    test(`leftover authority variables (${set.length} of 5) neither refuse nor are read: the via runs and exits 0`, () => {
+      const home = join(root, 'home')
+      const receipt = join(root, 'executed')
+      const via = join(root, 'harmless-via')
+      writeFileSync(via, `#!/bin/sh\n[ "$1" = --version ] && exit 0\nprintf executed >> '${receipt}'\n`)
+      chmodSync(via, 0o700)
+      const [s, m] = ['seat-mods', 'molt'].map(n => install(n))
+      record(join(home, '.omp/plugins/installed_plugins.json'), { 'seat-mods': s, molt: m })
+      const leftover = Object.fromEntries(set.map(n => ['AUTO' + 'NOMIC_' + (n === 'PATH' ? 'AUTHORITY_PATH' : n === 'SHA256' ? 'AUTHORITY_SHA256' : n), join(root, 'missing-snapshot')]))
+      const r = spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home, ...leftover }, encoding: 'utf8', timeout: 30_000 })
+      expect({ status: r.status, executed: existsSync(receipt) }).toEqual({ status: 0, executed: true })
+    })
   }
   test('an extension that fails to load stops the launch before any omp starts', () => {
     const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
     writeFileSync(join(m, 'omp', 'extension.ts'), 'throw new Error("boom")')
-    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
+    record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m })
     const r = spawnSync('bun', [seat, 'worker', '--via', 'true'], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
     expect(r.status).toBe(2)
     expect(r.stderr).toContain(`omp-seat: ${join(m, 'omp', 'extension.ts')} did not load: boom`)
@@ -293,20 +324,6 @@ describe('bin/omp-seat with a via that cannot run', () => {
     const r = run('false')
     expect(r.status).toBe(1)
     expect(r.stderr).not.toContain('not the tested')
-  })
-  test('partial authority refuses before the via version probe or worker executes', () => {
-    const home = join(root, 'home')
-    const receipt = join(root, 'executed')
-    const via = join(root, 'harmless-via')
-    writeFileSync(via, `#!/bin/sh\nprintf executed >> '${receipt}'\n`)
-    chmodSync(via, 0o700)
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map(n => install(n))
-    record(join(home, '.omp/plugins/installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
-    const r = spawnSync('bun', [seat, 'worker', '--via', via], {
-      env: { ...process.env, HOME: home, AUTONOMIC_AUTHORITY_PATH: join(root, 'missing-snapshot') },
-      encoding: 'utf8', timeout: 30_000,
-    })
-    expect({ status: r.status, executed: existsSync(receipt) }).toEqual({ status: 2, executed: false })
   })
 })
 
@@ -325,10 +342,10 @@ describe('checkExtensions (fix wave 4)', () => {
       expect(e).toContain(`omp-seat: ${f} did not load:`)
     }
   })
-  test('planLaunch lists the three extension paths it pinned', () => {
-    const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
-    record(ompRecord, { 'seat-mods': s, molt: m, autonomic: a })
-    expect((launch() as { extensions: string[] }).extensions).toEqual([s, m, a].map((p) => join(p, 'omp/extension.ts')))
+  test('planLaunch lists the two extension paths it pinned', () => {
+    const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))
+    record(ompRecord, { 'seat-mods': s, molt: m })
+    expect((launch() as { extensions: string[] }).extensions).toEqual([s, m].map((p) => join(p, 'omp/extension.ts')))
   })
 })
 

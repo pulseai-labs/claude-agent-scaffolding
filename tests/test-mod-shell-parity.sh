@@ -4,17 +4,16 @@
 # renamed copy, whose definition line alone is compared (see renamed below). A copy
 # that lacks a declaration fails: an empty extraction is never a match.
 #
-# Four pairs, and one renamed copy (molt's stage path in seat-mods). seat-mods' shell reader in molt's shell.ts. autonomic's bell to molt's,
-# plus seat-mods' own copy of that bell (#873). seat-mods' redactor to autonomic's (#873).
-# seat-mods' autonomic-record reader to molt's (#873). Same rule, same extractor: a copy
-# that drifts fails CI.
+# One pair, and one renamed copy. The pair is seat-mods' shell reader and its copy in molt's
+# shell.ts; the renamed copy is molt's stage path in seat-mods. Same rule, same extractor: a
+# copy that drifts fails CI.
 
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 # decl <file> <name>: the declaration's comment block, its first line, and for a
 # function every line through its closing "}" at column 0. A const may carry a type
-# annotation before its `=` (SECRETS does), so the annotation is allowed.
+# annotation before its `=`, so the annotation is allowed.
 decl() {
   awk -v name="$2" '
     function starts(line) {
@@ -49,9 +48,6 @@ pair() {
 }
 
 pair "seat-mods/hooks/rules.ts" "molt/hooks/shell.ts" "COMMANDS HEREDOC QUOTED WRAPPERS blankHeredocs substitutionSpans blank commandOf tokensOf gitOf substitutionsOf SUBSTITUTION_TOO_DEEP"
-pair "molt/hooks/register.tsx" "autonomic/hooks/register.tsx seat-mods/hooks/register.ts" "BELL_TIMEOUT_MS ring"
-pair "autonomic/hooks/ledger.ts" "seat-mods/hooks/redact.ts" "SECRETS redact"
-pair "molt/hooks/records.ts" "seat-mods/hooks/records.ts" "autonomicPath parseAutonomic"
 
 # renamed <source> <name> <copy> <copy name>: a one-line const copied under another name. Only
 # the definition line is compared, with the copy's name put back; the comments may differ.

@@ -1,8 +1,9 @@
-import { describe, expect, test } from 'bun:test'
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
+import { afterEach, describe, expect, test } from 'bun:test'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { childRole, roleFor, writeTargets, guard, realOf, spawnDecision } from '../../seat-mods/omp/extension'
+import seatModsExtension, { childRole, roleFor, writeTargets, guard, realOf, spawnDecision } from '../../seat-mods/omp/extension'
 
 const deps = (over: Partial<Parameters<typeof guard>[0]> = {}) => ({
   env: { SEAT_MODS_ROLE: 'coordinator', SEAT_MODS_ALLOW: '/tmp/allow', HOME: '/home/u' } as Record<string, string | undefined>,
@@ -807,5 +808,85 @@ describe('scratch directories: /tmp and $TMPDIR (batch 5)', () => {
     expect(await guard(reviewer, 'bash', { command: 'rm -rf /tmp/x' }, child('reviewer'))).toBeUndefined()
     // an implementer may remove in its worktree and in /tmp, so both spellings pass
     expect(await guard(deps({ env: { SEAT_MODS_ROLE: 'implementer', HOME: '/home/u' }, ...tree }), 'bash', { command: 'rm -rf @/tmp/x' }, main)).toBeUndefined()
+  })
+})
+
+// The default export, driven the way the host drives it: a fake `pi`, a real temp git tree, the
+// real `git rev-parse --show-toplevel` and real paths in `depsFor`. One denial per guarded role,
+// the reviewer edit, a write outside the worktree, the filesystem root, the verifier push and the
+// implementer force-push. Nothing else is loaded into the host.
+describe('the default export through a fake host', () => {
+  const saved = { role: process.env.SEAT_MODS_ROLE, allow: process.env.SEAT_MODS_ALLOW }
+  const dirs: string[] = []
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
+    for (const [k, v] of [['SEAT_MODS_ROLE', saved.role], ['SEAT_MODS_ALLOW', saved.allow]] as const) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v
+    }
+  })
+
+  function host(role: string) {
+    const tree = realpathSync(mkdtempSync(join(tmpdir(), 'seat-mods-host-')))
+    dirs.push(tree)
+    expect(spawnSync('git', ['init', '-q', tree]).status).toBe(0)
+    process.env.SEAT_MODS_ROLE = role
+    delete process.env.SEAT_MODS_ALLOW
+    const handlers = new Map<string, (e: any, c: any) => any>()
+    seatModsExtension({ on: (n: string, h: (e: any, c: any) => any) => { handlers.set(n, h) } })
+    const ctx = { cwd: tree, agent: { kind: 'main' } }
+    const call = (toolName: string, input: Record<string, unknown>) => handlers.get('tool_call')!({ toolName, input }, ctx)
+    return { tree, call }
+  }
+  const MAIN = 'refs/heads/main'
+
+  const DENIALS: Array<[string, string, string]> = [
+    ['implementer', 'git merge topic', 'no merges'],
+    ['implementer', `git push --force origin ${MAIN}:${MAIN}`, 'no force-push'],
+    ['implementer', 'git branch -D topic', 'no branch deletion'],
+    ['implementer', 'git commit --no-verify -m x', 'no --no-verify'],
+    ['implementer', 'git commit -m "x\n\nCo-Authored-By: someone"', 'no AI trailers'],
+    ['verifier', 'git commit -m x', 'no git commit'],
+    ['verifier', `git push origin ${MAIN}:${MAIN}`, 'no git push'],
+    ['verifier', 'gh pr create --title t', 'no gh pr create'],
+    ['reviewer', 'git commit -m x', 'no git commit'],
+    ['reviewer', `git push origin ${MAIN}:${MAIN}`, 'no git push'],
+    ['reviewer', 'gh pr create --title t', 'no gh pr create'],
+  ]
+  for (const [role, command, expected] of DENIALS) {
+    test(`${role} is denied: ${expected}`, async () => {
+      const h = host(role)
+      const r = await h.call('bash', { command, cwd: h.tree })
+      expect(r?.block).toBe(true)
+      expect(String(r.reason)).toContain(expected)
+      expect(String(r.reason)).toContain(`seat-mods (${role})`)
+    })
+  }
+
+  test('a reviewer may not edit the worktree', async () => {
+    const h = host('reviewer')
+    const r = await h.call('write', { path: join(h.tree, 'x.txt'), content: 'x' })
+    expect(r?.block).toBe(true)
+    expect(String(r.reason)).toContain('no edits in the worktree')
+  })
+
+  test('a write outside the worktree and the allowance is denied for every guarded role', async () => {
+    for (const role of ['implementer', 'verifier', 'reviewer']) {
+      const h = host(role)
+      const r = await h.call('write', { path: '/etc/seat-mods-fixture', content: 'x' })
+      expect(r?.block).toBe(true)
+      expect(String(r.reason)).toContain('no writes outside the worktree')
+    }
+  })
+
+  test('removing the filesystem root is denied', async () => {
+    const h = host('implementer')
+    const r = await h.call('bash', { command: 'rm -rf /', cwd: h.tree })
+    expect(r?.block).toBe(true)
+  })
+
+  test('controls: an implementer write inside the worktree and a plain command pass', async () => {
+    const h = host('implementer')
+    expect(await h.call('write', { path: join(h.tree, 'x.txt'), content: 'x' })).toBeUndefined()
+    expect(await h.call('bash', { command: 'ls', cwd: h.tree })).toBeUndefined()
   })
 })
