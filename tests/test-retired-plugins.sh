@@ -71,6 +71,10 @@ fi
 check_catalog() {
   local f="$1"
   if [ ! -f "$f" ]; then fail "$f exists"; return; fi
+  if ! jq -e '(.plugins | type) == "array" and (.plugins | length) > 0' "$f" >/dev/null 2>&1; then
+    fail "$f: has no non-empty .plugins array (empty, null or unreadable catalog)"
+    return
+  fi
   if jq -e --arg n "$OLD" '[.. | objects | select((.name? | type) == "string" and (.name | ascii_downcase) == $n)] | length == 0' "$f" >/dev/null 2>&1; then
     pass "$f: no $OLD entry"
   else
@@ -81,22 +85,39 @@ check_catalog ".claude-plugin/marketplace.json"
 check_catalog ".omp-plugin/marketplace.json"
 check_catalog ".agents/plugins/marketplace.json"
 
-# 3. The tree-wide sweep. Every hit is printed — a truncated list reads as a shorter job
-#    than the one actually left.
+# 3. The tree-wide sweep, by content and by file name. Every hit is printed — a truncated
+#    list reads as a shorter job than the one actually left.
 hits=""
-while IFS= read -r hit; do
-  [ -n "$hit" ] || continue
-  file="${hit%%:*}"
-  is_survivor "$file" && continue
-  hits="$hits$hit
-"
-done < <(git grep -n -i -I -- "$OLD" -- . || true)
-
-if [ -z "$hits" ]; then
-  pass "no $OLD in the tree outside the sanctioned survivors"
+# git grep exits 1 for "no matches" (fine) and >1 for a real error: that must FAIL, not read as clean.
+grep_out="$(git grep -n -i -I -- "$OLD" -- . 2>&1)"
+grep_rc=$?
+if [ "$grep_rc" -gt 1 ]; then
+  fail "git grep errored (exit $grep_rc), so the content sweep did not run:"
+  printf '%s\n' "$grep_out" | sed 's/^/        /'
 else
-  fail "$OLD still appears ($(printf '%s' "$hits" | grep -c .) hit(s)):"
-  printf '%s' "$hits" | sed 's/^/        /'
+  while IFS= read -r hit; do
+    [ -n "$hit" ] || continue
+    file="${hit%%:*}"
+    is_survivor "$file" && continue
+    hits="$hits$hit
+"
+  done <<EOT
+$grep_out
+EOT
+  # File names: tracked paths that carry the name, minus the same survivors.
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    is_survivor "$path" && continue
+    hits="$hits$path (file name)
+"
+  done < <(git ls-files | awk -v o="$OLD" 'index(tolower($0), o) > 0')
+
+  if [ -z "$hits" ]; then
+    pass "no $OLD in the tree (content or file names) outside the sanctioned survivors"
+  else
+    fail "$OLD still appears ($(printf '%s' "$hits" | grep -c .) hit(s)):"
+    printf '%s' "$hits" | sed 's/^/        /'
+  fi
 fi
 
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
