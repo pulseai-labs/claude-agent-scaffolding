@@ -2,17 +2,17 @@
 
 A **plugin marketplace** published to three surfaces: Claude Code (`/plugin install`, from
 `.claude-plugin/marketplace.json`), Codex (`.agents/plugins/marketplace.json`, the v0
-dual-publish contract), and OMP (`.omp-plugin/marketplace.json`, six plugins;
+dual-publish contract), and OMP (`.omp-plugin/marketplace.json`, ten plugins;
 `tests/test-omp-surface.sh` keeps it in step). There is no application — the plugins *are* the product.
 
 **A change to a plugin manifest or to packaging has to be carried to every surface that
 plugin ships on**, and CI enforces it rather than advising it: `tests/test-codex-dual-publish.sh`
-checks version and frontmatter parity across the two marketplaces. `seat-mods`, `molt`, `autonomic`,
+checks version and frontmatter parity across the two marketplaces. `seat-mods`, `molt`,
 `baton` and `bot-on-openbot` are deliberately absent from the Codex set — check the deferred list in
 `tests/test-codex-dual-publish.sh` before assuming a plugin ships everywhere.
 
 Shipped: `workspace-init`, `ai-mentor`, `architect-critic`, `claude-security-audit`, `ossify`,
-`code-judo`, `crew`, `merge-bar`, `seat-mods`, `molt`, `autonomic`, `baton`, `bot-on-openbot`.
+`code-judo`, `crew`, `merge-bar`, `seat-mods`, `molt`, `baton`, `bot-on-openbot`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
 handoffs, review records and process exhaust live in a private sibling workspace and must

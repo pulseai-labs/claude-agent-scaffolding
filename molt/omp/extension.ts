@@ -2,7 +2,6 @@
 // modules. Loaded only by omp-seat with -e (never ambient). Imports molt's own modules and node: builtins only;
 // omp's host types are `any`, so this file imports in plain bun.
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { spawn } from 'node:child_process'
 import { dirname } from 'node:path'
 import { FALLBACK_BRIEF_MS, createMolt } from './core'
 import type { MoltIO } from './core'
@@ -31,12 +30,6 @@ function ioFor(pi: any, cur: () => any, route: () => any): MoltIO {
     warnNext: text => { pi.sendMessage(text, { deliverAs: 'nextTurn' }) },
     status: text => { cur().ui?.setStatus?.('molt', text) },
     notify: (text, tone) => { cur().ui?.notify?.(text, tone === 'warn' ? 'warning' : 'info') },
-    // Nothing waits on the bell; it is bounded at 30 s like the Claude glue's.
-    bell: (command, message) => new Promise<void>(resolve => {
-      const child = spawn('sh', ['-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${command}`, 'sh', message], { stdio: 'ignore', timeout: 30_000 })
-      child.on('error', () => resolve())
-      child.on('exit', () => resolve())
-    }),
     ephemeral: async prompt => {
       const run = cur().runEphemeralTurn
       if (typeof run !== 'function') return undefined

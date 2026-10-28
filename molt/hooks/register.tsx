@@ -4,7 +4,7 @@ import type { Notice } from '../types'
 import { DEFAULTS, parseConfig } from './config'
 import type { MoltConfig } from './config'
 import { CHARS_PER_TOKEN, atLeast, projectedPercent, stageOf, thresholdsFor } from './measure'
-import { MAX_STOP_BLOCKS, gateAllows, isProgress, takeRequest, waitsIn } from './gate'
+import { MAX_STOP_BLOCKS, gateAllows, takeRequest, waitsIn } from './gate'
 import type { Request } from './gate'
 import { markerPath } from './handoff'
 import { briefPrompt, extractFacts, factsBrief, isUsableSummary, pickHandoff, resolvePath } from './handoff'
@@ -12,12 +12,12 @@ import type { Handoff, Message } from './handoff'
 import { fallbackPath, lineagePath, parseLineage } from './records'
 import type { Lineage, Successor } from './records'
 import type { Stage, Thresholds } from './measure'
-import { activePath, autonomicPath, logPath, parseSuccessor, sdkHandoffPath, successorPath, parseAutonomic, progressPath, recordBell, safeSessionId, stagePath } from './records'
+import { activePath, logPath, parseSuccessor, sdkHandoffPath, successorPath, safeSessionId, stagePath } from './records'
 import {
   SESSION_OFF, SESSION_ON, COMMAND_USAGE, STATUS_OFF, STATUS_PAUSED,
   HANDOFF_REQUIRED, HANDED_OFF, PARENT_HANDOFF, HANDING_OFF, RESUMED,
   SEED_REJECTED, CONFIG_PROBLEMS, SETTINGS_PROBLEMS, SESSION_STATUS, FILL_STATUS,
-  MODE_STATUS, WARNED, PAUSED_UNATTENDED, PAUSED_NO_PROGRESS, PAUSED_AGENT, MISSING_HANDOFF,
+  WARNED, PAUSED_UNATTENDED, PAUSED_AGENT, MISSING_HANDOFF,
   STATUS_METER, BLOCK_NOTE, CHILD_NOTE, SDK_NOTE, SDK_HANDED_OFF, STALE_SESSION, CHILD_WARNING, DEFAULT_INSTRUCTIONS,
   DEFAULT_SEED, DEFAULT_WARNING, OLD_DEFAULT_INSTRUCTIONS, ROOT_NOTE, expandHome,
   OPERATOR_LEAD, PAST_LEAD, fill,
@@ -38,15 +38,8 @@ let paused: string | undefined
 let pausedText = ''                       // the pause's reason, told to the agent at each prompt it gets
 let seeded: { session: string; startPercent?: number } | undefined
 
-// One copy in two files: molt's register.tsx and autonomic's; tests/test-mod-shell-parity.sh holds the two identical.
-// The engine kills a `process.run` child at 30 s when no bound is given — the same bound
-// molt-v0.2.2's awaited bell therefore ran under. Stated explicitly, and never tightened:
-// a slow bell (a remote notify curl) that completed on 0.2.2 must still complete, while a
-// hung one stays bounded. Nothing waits on it (see `pause`), so this is only a backstop.
-const BELL_TIMEOUT_MS = 30_000
 let unmeasured = 0                        // tool and response output no response has measured yet
 let inFlight = false                      // a molt between /clear and its seed
-let progress = 0                          // Write, Edit or commit since the last molt
 const nudged = new Set<string>()          // sessions told once at a tool result
 const stopBlocks = new Map<string, number>()
 const lastMd = new Map<string, string>()  // the last .md a session wrote past the command
@@ -100,39 +93,7 @@ async function dropActive($: Engine, sessionId: string): Promise<void> {
   try { await $.process.run(['rm', '-f', activePath(await home($), sessionId)]) } catch {}
 }
 
-// The session's progress, kept beside the module count: /reload-plugins reloads this
-// module and the count falls to 0, while the file the session wrote survives it — which
-// is what the next autopilot molt reads (#713). Best-effort, logged once per process.
-let progressFailed = false
-async function markProgress($: Engine, sessionId: string): Promise<void> {
-  if (!safeSessionId(sessionId)) return
-  try {
-    await $.fs.write(progressPath(await home($), sessionId), `${new Date().toISOString()}\n`)
-  } catch (err) {
-    if (progressFailed) return
-    progressFailed = true
-    await log($, `progress write failed session=${sessionId} ${String(err)}`)
-  }
-}
-
-async function dropProgress($: Engine, sessionId: string): Promise<void> {
-  if (!safeSessionId(sessionId)) return
-  try { await $.process.run(['rm', '-f', progressPath(await home($), sessionId)]) } catch {}
-}
-
-// Above 0 the module count has it; at 0 — after a reload — the session's own file still
-// does. A file that cannot be read counts as no file: the guard keeps its older behaviour.
-async function hasProgress($: Engine, h: string, sessionId: string): Promise<boolean> {
-  if (progress > 0) return true
-  try {
-    return await $.fs.exists(progressPath(h, sessionId))
-  } catch {
-    return false
-  }
-}
-
-// The stage file (0.2.1): molt's stage and effective thresholds, for autonomic's /autopilot status and its
-// handling of molt's block deny. Rewritten only when the stage or a threshold changes; best-effort, logged once.
+// The stage file (0.2.1): molt's stage and effective thresholds, for seat-mods, which reads it (#929). Rewritten only when the stage or a threshold changes; best-effort, logged once.
 const published = new Map<string, string>()
 let stageFailed = false
 async function publishStage($: Engine, sessionId: string): Promise<void> {
@@ -156,7 +117,7 @@ async function publishStage($: Engine, sessionId: string): Promise<void> {
 }
 
 // Best effort: a notice that cannot be written never aborts the step that wanted it. A
-// pause writes its toast, status, bell and log whether or not the band took the text (#665).
+// pause writes its toast, status and log whether or not the band took the text (#665).
 let noticeFailed = false
 async function setNotice($: Engine, value: Notice): Promise<void> {
   try {
@@ -307,30 +268,13 @@ async function sdkHandOff($: Engine, sessionId: string, handoff: Handoff): Promi
   await log($, `handed off to operator session=${sessionId} handoff=${handoff.path} source=${handoff.source} percent=${lastPercent} host=sdk`)
 }
 
-// Rung once and left to finish: the bell never gates the hook that paused the session. A bell
-// that cannot start, throws, or is killed at BELL_TIMEOUT_MS rejects; one that runs and exits
-// non-zero resolves. Both are failures and both are logged once — `log` never throws, so this
-// promise always resolves and nothing is left unhandled (#665 item 4).
-async function ring($: Engine, bell: string, message: string): Promise<void> {
-  try {
-    const r = await $.process.run(['sh', '-c', `AUTONOMIC_MESSAGE="$1"; export AUTONOMIC_MESSAGE; ${bell}`, 'sh', message], { timeoutMs: BELL_TIMEOUT_MS })
-    if (r.exitCode !== 0) await log($, `bell failed exit=${r.exitCode}`)
-  } catch (err) {
-    await log($, `bell failed ${String(err)}`)
-  }
-}
-
-async function pause($: Engine, sessionId: string, text: string, bell: string | undefined): Promise<void> {
+async function pause($: Engine, sessionId: string, text: string): Promise<void> {
   paused = sessionId
   pausedText = text
   await dropActive($, sessionId)
   await setNotice($, { text, tone: 'warn' })
   $.ui.toast(text)
   showStatus($, sessionId)
-  // Not awaited: every caller of pause (both loop guards, both from turn.complete) returns
-  // without waiting on the bell. That is not silence — it still rings, with this same text,
-  // and still logs a failure once.
-  if (bell !== undefined) void ring($, bell, text)
   await log($, `pause session=${sessionId} ${text}`)
 }
 
@@ -359,15 +303,9 @@ async function fallbackBrief($: Engine, sessionId: string): Promise<string> {
 
 async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<void> {
   const h = await home($)
-  const recordText = await readText($, autonomicPath(h, sessionId))
-  const record = parseAutonomic(recordText)
   const own = parseLineage(await readText($, lineagePath(h, sessionId)))
-  if (record.mode === 'manual' && unattended >= cfg.manualMaxMolts) {
-    return pause($, sessionId, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }), recordBell(recordText))
-  }
-  // /molt now is the operator asking for this molt: it is not a loop, whatever the progress.
-  if (record.mode === 'autopilot' && own !== undefined && !forced.has(sessionId) && !(await hasProgress($, h, sessionId))) {
-    return pause($, sessionId, fill(PAUSED_NO_PROGRESS, { path: handoff.path }), record.bell)
+  if (unattended >= cfg.manualMaxMolts) {
+    return pause($, sessionId, fill(PAUSED_UNATTENDED, { count: unattended, path: handoff.path }))
   }
   inFlight = true
   pending = { oldSession: sessionId, handoff: handoff.path, chain: own?.chain ?? sessionId, depth: (own?.depth ?? 0) + 1 }
@@ -406,12 +344,8 @@ async function molt($: Engine, sessionId: string, handoff: Handoff): Promise<voi
 // can fail; every step after it is best-effort, and a rejection's warning always wins.
 async function seed($: Engine, sessionId: string, p: NonNullable<typeof pending>): Promise<void> {
   // Counted here, once the clear happened: a /clear that is rejected or never clears is not
-  // a molt for the loop guards.
+  // a molt for the loop guard.
   unattended += 1
-  progress = 0
-  // The file belonged to the session that made the progress; a molt starts a new session
-  // id, whose count starts at 0 like today's (#713).
-  await dropProgress($, p.oldSession)
   forced.delete(p.oldSession)
   seeded = { session: sessionId }
   let text = fill(DEFAULT_SEED, { path: p.handoff })
@@ -483,12 +417,10 @@ async function status($: Engine, sessionId: string): Promise<string> {
   if (!off.has(sessionId) && !inFlight) try { await measure($, sessionId) } catch {}
   const usage = await $.session.usage({ breakdown: 'summary' })
   const t = currentThresholds(sessionId)
-  const record = parseAutonomic(await readText($, autonomicPath(await home($), sessionId)))
   const lines = [
     fill(SESSION_STATUS, { state: off.has(sessionId) ? 'off' : paused === sessionId ? 'paused' : 'on' }),
     fill(FILL_STATUS, { percent: lastPercent === undefined ? 'not measured yet' : `${Math.round(lastPercent)}%`,
       warn: Math.round(t.warn), warnAgain: Math.round(t.warnAgain), command: Math.round(t.command), block: Math.round(t.block), fallback: Math.round(t.fallback) }),
-    fill(MODE_STATUS, { mode: record.mode }),
   ]
   const b = usage.context.breakdown
   if (b === undefined || b.rawMaxTokens <= 0) lines.push('auto-compact threshold not readable on this build.')
@@ -568,7 +500,6 @@ export const register: Register = (on, options) => {
 
   on('session.end', async ($, e, next) => {
     await dropActive($, e.sessionId)
-    await dropProgress($, e.sessionId)
     // A /clear or a resume: the process goes on under another id, in a new window. A molt's
     // own clear comes here too; its seed follows in molt()'s clear.
     if (e.reason === 'clear' || e.reason === 'resume') newWindow(e.sessionId, e.reason)
@@ -688,13 +619,6 @@ export const register: Register = (on, options) => {
     // A staged Write or Edit is held for review and leaves the file unchanged.
     const staged = (r.result as { staged?: unknown } | undefined)?.staged === true
     if (r.deny === undefined && r.isError === undefined && !staged) {
-      // Below the first warning only: past it the session may write and commit its handoff, which
-      // would make every molt look like progress to the autopilot loop guard.
-      if (isProgress(e.tool, args) && !atLeast(stage, 'warn')) {
-        progress += 1
-        // On disk too, so a module reloaded mid-session does not lose the count (#713).
-        if (sessionId !== '') await markProgress($, sessionId)
-      }
       const path = args.file_path
       // A file written while molt is off is not this session's handoff: /molt on does not
       // turn it into one (#665).

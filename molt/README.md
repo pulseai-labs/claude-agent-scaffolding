@@ -146,7 +146,7 @@ Set them in `/config` → molt (the plugin's `userConfig`).
 | `blockPercent` | 75 | Past this fill only the handoff's tools run. |
 | `fallbackMargin` | 5 | At block + this margin, molt stops waiting for a handoff: with none, it writes a fallback brief. |
 | `minRoomPercent` | 15 | A seeded session's first warning is this many points above its starting fill, as far as the fallback stays at 99% or below. |
-| `manualMaxMolts` | 2 | In manual mode, molt pauses after this many molts in a row with no prompt from you. |
+| `manualMaxMolts` | 2 | molt pauses after this many molts in a row with no prompt from you. |
 | `instructionsTemplate` | `~/.claude/molt/instructions.md` | What the session is told at the handoff command. `{{percent}}`, `{{command}}` and `{{block}}` are filled in (and 0.1.0's `{{soft}}` and `{{hard}}`, as the same two). |
 | `warningTemplate` | `~/.claude/molt/warning.md` | What the session is told at the two warnings. `{{percent}}`, `{{stage}}` (`first` or `second`) and `{{command}}` are filled in. |
 | `seedTemplate` | `~/.claude/molt/seed.md` | The one prompt the fresh session receives. `{{path}}` is the handoff. |
@@ -179,7 +179,7 @@ All under `~/.claude/state/molt/`, keyed by session id:
 | Path | What it holds |
 |---|---|
 | `active/<id>` | The active marker: written at start, after a clear, on every prompt, every turn end, and by `/molt now` and `/molt on`; removed at session end, by `/molt off`, and while the session is paused. The crew hooks read it. |
-| `lineage/<id>.json` | Written for each seeded session: `{ from, chain, depth, handoff }` — the session it came from, the first session of the chain, how many molts deep it is, and the handoff it resumed from. `autonomic` reads it to carry its mode across a molt. |
+| `lineage/<id>.json` | Written for each seeded session: `{ from, chain, depth, handoff }` — the session it came from, the first session of the chain, how many molts deep it is, and the handoff it resumed from.  |
 | `briefs/<id>.md` | A fallback brief, when molt wrote one. |
 | `sdk-handoff/<id>` | Written when a root under an Agent SDK host hands off: the handoff path. A restarted process that resumes the same session reads it, so the session stays handed off. |
 | `successor/<id>.json` | Written at each seed for the session that molted: `{ successor, handoff, at }`. The stale-resume guard reads it; `/molt on` in that session removes it. |
@@ -193,8 +193,7 @@ session's file carries none until its first response measures where it started. 
 rewrites the file whenever the stage or a threshold changes, at `/molt off`, `/molt on` and
 `/molt now`, and when a clear, compact or resume resets the stage. A child writes it too. The
 write is best-effort: a failure is logged once and never stops a warning, a handoff or a molt.
-`autonomic` reads it for `/autopilot status` and, on Claude Code, to tell molt's own block deny from a
-seat guard's. It leaves no turn end to molt: autonomic 0.11.0 judges none (#887).
+`seat-mods` reads it, on Claude Code, to tell molt's own block deny from a seat guard's (#929).
 
 The three templates are written with their defaults on first start, only where no file exists
 (and the one 0.1.0 default above). Edit them freely; an empty or unreadable template falls back
@@ -207,32 +206,25 @@ to the default text.
 | `/molt now` | Treats the session as past the handoff command whatever the fill, and puts the handoff instruction in the prompt box: press Enter to send it. Where the session has no prompt box, the next prompt you send carries it. Below the handoff threshold the instruction's first line says you asked for the handoff, not that the fill is past the threshold (#903); an `instructions.md` you edited with another first line is sent as written. It also lifts a pause and `/molt off`, and brings the active marker back in the same command. |
 | `/molt off` | molt stops measuring, warning, blocking, gating and molting in this session, and removes the active marker, so the crew context-ceiling hooks speak again here. |
 | `/molt on` | Turns it back on. In a stale session it also lifts the stale-resume guard and removes the successor record. |
-| `/molt status` | The fill and the ladder, the mode `autonomic` records, any settings problem, and whether auto-compact runs above the block threshold. |
+| `/molt status` | The fill and the ladder, any settings problem, and whether auto-compact runs above the block threshold. |
 
 `/molt now` cannot submit the prompt itself: Claude Code refuses a prompt submitted from a
 command's own hook, because it would wait on the turn that hook holds.
 
-## With autonomic
+## The unattended-molt guard
 
-molt reads the session's mode and bell from `autonomic`'s record,
-`~/.claude/state/autonomic/sessions/<id>.json`. With no record, or one it cannot read, the
-session is in manual mode. The loop guards apply to roots only — a child is never cleared, so it
-cannot loop — and differ by mode:
+The guard applies to roots only — a child is never cleared, so it cannot loop. After
+`manualMaxMolts` molts in a row with no prompt from you, molt pauses, shows a band, names the
+handoff, and drops the active marker, so a crew's context-ceiling hook speaks again. Your next
+message resumes it and brings the marker back. A message an Agent SDK host sends (T3 Code)
+counts as yours; the seed prompt and other plugin prompts do not. While paused, every prompt
+the agent gets carries a line saying the handoff did not happen and you must send a message to
+resume.
 
-- **Manual.** After `manualMaxMolts` molts in a row with no prompt from you, molt pauses, shows
-  a band, names the handoff, and drops the active marker, so a crew's context-ceiling hook
-  speaks again. Your next message resumes it and brings the marker back. A message an Agent SDK
-  host sends (T3 Code) counts as yours; the seed prompt and other plugin prompts do not. A manual
-  pause also rings the record's bell, and while paused, every prompt the agent gets carries a line
-  saying the handoff did not happen and you must send a message to resume.
-- **Autopilot.** There is no count limit. A molt with no progress since the previous one — no
-  Write, Edit or NotebookEdit, and no `git commit` the line runs, made below the first warning —
-  pauses the session and rings the record's bell, a shell command run with `AUTONOMIC_MESSAGE` set
-  to the reason. The bell never delays the turn end: it is rung and left to finish, killed at the
-  engine's 30-second process default if it has not answered, and a failure — a non-zero exit or
-  a rejection, the kill included — is logged once. Work past the first warning does not count:
-  there the session may write and commit its handoff, which would make every molt look like
-  progress.
+History: before 0.5.0 this was the manual branch of two loop guards. The other branch read a
+per-session mode record written by a sibling plugin, now retired, and in autopilot mode paused a
+molt with no progress since the previous one and rang the record's bell. molt no longer reads
+that record; the unattended-molt pause is unchanged and now applies in every session, with no bell.
 
 ## With the crews
 
@@ -290,15 +282,6 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
 - **`date` with a `$'…'` or `$"…"` flag passes inside a substitution.**
   `git commit -m "$(date $'-f' huge.log)"` and `$(date $"-f" huge.log)` are not refused, though
   `date` reads the file; `-f`, `'-f'`, `"-f"` and `--file` are.
-- **A Bash write is not progress unless it commits.** The autopilot loop guard counts Write,
-  Edit, NotebookEdit and `git commit`; `sed -i` or `cat >` alone reads as no progress. A
-  `git commit` counts only bare, or behind `time`: a `{ … }` segment cannot be told from a
-  function definition's body (`f() { git commit -m m; }`, which runs no commit), and one behind
-  `if`, `then`, `elif`, `else` or `!` may not run, so neither counts.
-- **C7, the progress count reads text, not control flow.** A bare `git commit` counts even when
-  the line does not run it or it commits nothing: `false && git commit -m m` (the commit never
-  runs), `time false && git commit -m m`, and `git commit -m m || git add f` (the commit may
-  fail while the add makes the line succeed). A second command inside a `{ … }` group counts too.
 - **Any Agent SDK prompt is a message from you, to molt.** A headless SDK driver that loops a
   root session therefore resets the manual pause count at each prompt, as a worker's ping does
   below; such a loop is bounded only by minimum room. The OMP extension keeps its own count and
@@ -331,7 +314,7 @@ as before. molt never reads crew state; the crews read molt's marker and mark th
   once. `newSession()` cancels every background job the old session owned, and the seed's last line tells the resumed session to
   re-arm what its handoff lists. `/molt now` sends the instruction as an `aside`, which starts a turn on an idle session.
 - There is no manifest UI on OMP: `~/.omp/agent/molt.json` holds the same keys as the settings table below, and a file that is not valid
-  JSON falls back to the defaults with a notice. The state files (`~/.claude/state/molt/`) are the ones `autonomic` reads.
+  JSON falls back to the defaults with a notice. The state files live under `~/.claude/state/molt/`.
 - Past the block threshold only `write`, `edit`, `apply_patch`, `ast_edit`, a `skill://` read and `git add` / `git commit` run, with the gate and the substitution rule above.
 - Main limit: there is no handoff in `-p` mode (no command context to arm, so the session keeps going, gated). The clear is measured
   in rpc mode only (two cycles); the TUI is unmeasured.

@@ -2,6 +2,19 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.5.0
+
+Standing orders come from the project's memory bank or `AGENTS.md`, and bind only the role they name; the autopilot policy is gone.
+
+- `working-a-pr` — one **Standing orders** paragraph defines where an order is read (the memory
+  bank's `08-governance.md` `## Standing orders`, then `AGENTS.md`; a canonical checkout reads
+  its paired AI workspace), that the files are read as the base branch has them — an order a
+  PR's own diff adds binds nothing in that PR — and that it binds only the role it names. Every other site points
+  to it. With no order in effect, every ask stays exactly as it is.
+- Eval fixture `W11` now keeps its three orders in the workspace `AGENTS.md`, naming the
+  orchestrator; new fixture `W12` has an order naming the orchestrator read by a worker seat,
+  which must still ask.
+
 ## 0.4.0
 
 Standing orders in the autopilot policy for the merge, the round stop and the reviewers.

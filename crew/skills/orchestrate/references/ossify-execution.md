@@ -42,7 +42,9 @@ layer, in its report file.** And every dispatched session returns a checkable
 artifact — a PR list, a ledger comment id, a merge SHA — never narrative.
 
 **Depth is confirmed with the operator, twice over.** Before the spine session
-launches, under a standing order in the autopilot policy for seats and profiles, take
+launches, under a standing order in the project's memory bank or AGENTS.md for seats and profiles
+(merge-bar's working-a-pr, "Standing orders" paragraph, says where it is read and whom it
+binds; the orders that bind here are those naming the orchestrator role; with no standing order, ask), take
 the depth as `2` and continue; otherwise ask the operator to confirm nested worker depth
 is `2`: the spine session launches item sessions of its own. The layer has no depth setting
 to read, so a brief asserting the depth is not confirmation, and no CLI read substitutes.
@@ -60,8 +62,7 @@ this plugin's own.
 
 **Recommending.** After `/plan-spine`, recommend one implementer and one verifier seat per item
 from the project file's seats and conditions — scope, risk and cost,
-item by item — and the three coordinator seats beside them: under a standing order in the
-autopilot policy for seats and profiles, write the recommended set and continue; otherwise
+item by item — and the three coordinator seats beside them: under a standing order in the project's memory bank or AGENTS.md for seats and profiles, write the recommended set and continue; otherwise
 present every seat to the operator in one approval phase and write nothing until all of it is
 decided — a half-approved set looks binding and is not. Record the recommendation and any
 override. Prefer an agent the layer detects for an item row where the choice is open: the
@@ -94,7 +95,7 @@ seat by its carried name in its machine file (`config.md`) rather than launching
 default, because a carried name that file does not define halts and is asked. It marks each
 seat it launches as the layer's `Seat marking` states — a guarded role with its allow paths,
 `coordinator` for a coordinator seat. A resumed top whose handoff lacks them asks the operator before any launch that spends an approved seat
-— under a standing order in the autopilot policy for seats and profiles, it picks the set from the project file, records the pick and why, and continues instead.
+— under a standing order in the project's memory bank or AGENTS.md for seats and profiles, it picks the set from the project file, records the pick and why, and continues instead.
 
 ## Fixed procedures
 
@@ -113,8 +114,6 @@ Fresh-per-item pairs are scoped to **activated ossify spines**. Outside them
 `roles.md`'s class routing and retention remain authoritative — a retained implementer
 across ordinary consecutive work items is still correct.
 
-For new enrolled OMP assignments the authority contract is stricter: materially new work always needs a fresh agent process/issuance, even outside an activated spine; retained panes alone do not carry grants. Same-item corrections/rechecks may reuse only unchanged approvals/grants/lifetime. A replace/respawn is a fresh trusted launch, with its original role and seat marking before its command as the layer's `Seat marking` states; revoke the predecessor rather than rebinding it. Keep operator plan/merge/design gates, profile ceilings and every seat denial; CC and legacy/manual retention are unchanged.
-
 The single exception inside a spine is a *replace* decision at the first-failure ask
 (`ossify-nested-run.md` §3): the old pair is released before its replacement exists, so
 one-pair-per-item is preserved by that ordering rather than broken by the exception. The
@@ -125,7 +124,7 @@ ordinary first run of the item, not an inheritance of the rejected work.
 
 Reviewer profile is absent from spine planning and from the SEATS block on purpose: the PR
 does not exist yet, and a profile chosen before there is a diff to read is a guess
-recorded as a decision. At the PR transition, a standing order in the autopilot policy
+recorded as a decision. At the PR transition, a standing order in the project's memory bank or AGENTS.md
 for seats and profiles decides the pick: under that standing order, pick the reviewer
 and PR-fix profiles from the project file and record why; otherwise ask for the
 reviewer's resolved profile and review level (it fills that agent's review command, `config.md`), and put **both** into the **work-PR
@@ -143,7 +142,7 @@ brief** rather than the planned-implementer brief, whose DONE opens a new PR: it
 the PR that already exists. One seat per PR, released at merge.
 
 **A close-review writer is not this seat.** When a close halts on its own review
-(`ossify-nested-run.md` §4), under a standing order in the autopilot policy for seats
+(`ossify-nested-run.md` §4), under a standing order in the project's memory bank or AGENTS.md for seats
 and profiles, pick that writer's profile from the project file and record why;
 otherwise ask the operator for it at the halt — then dispatch one writer per affected
 hosting repo, each from `references/ossify-close-writer.md`, bounded to its own repo's

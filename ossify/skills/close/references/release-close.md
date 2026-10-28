@@ -265,7 +265,7 @@ anchor blocks as `no-release-anchor`.
 **Each due line gets one of three unblocks, and all three are real work:**
 
 - **Walk it now.** `oss ledger_activate <line-id>`, then walk it with the operator,
-  or yourself under a standing order in the autopilot policy that gives you the demo walk (`cumulative-demo.md` §3), like any §3 line. A failed walk halts. Under that order the release close ends by asking the operator for one nod over the walk read-out; that nod is the release close's only operator ask on the walk.
+  or yourself under a standing order in the project's memory bank or `AGENTS.md` that gives you the demo walk (`cumulative-demo.md` §3), like any §3 line. A failed walk halts. Under that order the release close ends by asking the operator for one nod over the walk read-out; that nod is the release close's only operator ask on the walk.
 - **Defer it again.** New operator words and a later release — the call
   `cumulative-demo.md` §4a names, with the operator present.
 - **Retire it.** `oss ledger_retire <line-id> <by-spine> "<why>"` needs a spine that has

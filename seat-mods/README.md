@@ -235,8 +235,7 @@ error (#929):
 - No redo follows a turn that never answered: an interrupted turn, an API error, a refusal.
 - The redo is dropped when it arrives if another prompt started a turn first (the operator's, a
   notification), or if molt's stage file (`~/.claude/state/molt/stage/<id>`) reads `command`,
-  `block` or `fallback`: molt acts on that turn end, and its handoff wins. The line, and the
-  failed reply's waiting-on-operator notice, show as toasts instead. In another session (a
+  `block` or `fallback`: molt acts on that turn end, and its handoff wins. The line shows as a toast instead. In another session (a
   `/clear` or a molt) it is dropped quietly. molt's handoff requests are not status turns; its
   seed is.
 - **Known limits** (0.11.0): under `claude -p` the printed result is the redo's reply, not the
@@ -258,16 +257,6 @@ shape, and a redo asked for the shape takes the idle warning only, not a second 
 
 The check calls no model and never calls herdr, Orca or Paseo. Only `SEAT_MODS_ROLE=orchestrator`
 sessions are affected; every other role and an unset role are untouched.
-
-When a status turn that stands hands the operator a `decision:` or an `action:` — whether the block
-passed or its redo missed too; never a reply whose redo is pending — and autonomic's session record
-(`~/.claude/state/autonomic/sessions/<id>.json`) says `mode: autopilot`, seat-mods rings the
-record's `bell` (when set) and shows `seat-mods: waiting on operator — <field 5 text>`: on Claude
-Code as a line under the reply in `turn.complete`; on OMP in the notification its status entry
-already uses. The text is redacted for credential shapes, cut to one line and 200 characters. The
-signal only adds a notification: it never approves, answers or blocks, a failing or slow bell is
-logged and never holds the turn, and `none`, a manual session, no record, a molt handoff and a
-non-orchestrator role are quiet. The bell runs detached under molt's 30 s bound.
 
 A typed prompt that starts with a crew tag — `[crew report|molt|message <role>]`, crew 0.3.x — is a
 status turn. So are the two legacy ping forms, `REPORT READY: ` and `MOLT WARNING `, and the two
@@ -365,7 +354,7 @@ That is the accepted cost of covering briefs already dispatched from crew 0.3.0.
 
 Under `SEAT_MODS_ROLE=orchestrator`, the OMP guard blocks the `task` tool and every `before_subagent_spawn` (eval `agent()`, workpool) with a #798 denial directing the top to dispatch a herdr seat; other tools stay free, coordinator and every guarded role are unchanged, and the Claude Code hook is unchanged.
 
-`omp/status-extension.ts` (0.8.0) is the status-block check and idle stop for an OMP orchestrator, over the same `hooks/status.ts`: one block per turn, then the warning as an OMP notification. `omp-seat` loads it last, after molt and autonomic, for the orchestrator only, so their `session_stop` blocks win as they do beneath seat-mods on Claude Code; the guard stays first. OMP's `input` cannot tell typing from a herdr send, so a turn is status by its crew tag, or when no input started it (a job completion, an idle wake). **Known limit:** a turn that no prompt starts gets the check but not the status-turn context line.
+`omp/status-extension.ts` (0.8.0) is the status-block check and idle stop for an OMP orchestrator, over the same `hooks/status.ts`: one block per turn, then the warning as an OMP notification. `omp-seat` loads it last, after molt, for the orchestrator only, so its `session_stop` blocks win as they do beneath seat-mods on Claude Code; the guard stays first. OMP's `input` cannot tell typing from a herdr send, so a turn is status by its crew tag, or when no input started it (a job completion, an idle wake). **Known limit:** a turn that no prompt starts gets the check but not the status-turn context line.
 
 `omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`, so the Bash reading, the scratch places (`$TMPDIR` from the seat's environment) and the `cd` walk above apply to a `bash` call there as they do on Claude Code. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
 

@@ -21,7 +21,7 @@ molt's `MOLT-HANDOFF: <path>` line ends with that line instead of the block.
 On OMP, seat-mods 0.8.0 checks the status block too (one block per turn, then a warning).
 
 Must not: spawn subagents (task, eval agent(), workpool) — seat-mods blocks them; dispatch herdr seats instead — or
-ask the operator what the run, its briefs or autonomic's mode already decide.
+ask the operator what the run or its briefs already decide.
 
 When the operator says "hand back to Claude", rotate (lifecycle.md) with the Claude launch command and Claude profile your handoff recorded, and send the successor its resume in the Claude form — `/ossify:handoff-resume <path>` with ossify, the path as its first
 instruction without — never `skill://`.

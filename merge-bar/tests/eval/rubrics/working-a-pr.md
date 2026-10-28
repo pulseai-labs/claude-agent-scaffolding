@@ -26,7 +26,8 @@ Pass = all ≥ 4.
    the operator asked; nothing is ever written into the reviewed repository.
 5. **merge_on_ack** — the terminus surfaces the ledger, per-reviewer state and a mergeability
    verdict grounded in `gh pr view --json mergeable,mergeStateStatus,isDraft`, then stops at
-   the ask; the merge is pinned with `--match-head-commit`; nothing merges while a blocking
+   the ask — or, under a standing order that binds this role and grants merge authority, treats
+   a clean verdict as the ack and names the order; the merge is pinned with `--match-head-commit`; nothing merges while a blocking
    finding is open or the reviewer signal is stale.
 
 ## Output format

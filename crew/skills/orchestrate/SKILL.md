@@ -98,7 +98,7 @@ verifier, the operator, the coordinator seats an activated spine adds, and a
 operator's two files (`references/config.md`), never from this plugin's prose. A seat
 name neither file defines halts the run rather than guessing.
 
-### Enrolled OMP authority
+### OMP host substitutions
 
 The OMP substitutions every layer shares live here; a layer file's `## Host: OMP` states
 only its own mechanics. A send's slash command is text on omp: `/<plugin>:<skill>` becomes
@@ -106,48 +106,6 @@ only its own mechanics. A send's slash command is text on omp: `/<plugin>:<skill
 omp: the context-ceiling notice comes from molt's omp extension. For the top, no `Agent`
 tool means no `task`, `eval` `agent()` or workpool: seat-mods 0.4.4 blocks them for `SEAT_MODS_ROLE=orchestrator` (#798).
 On OMP, seat-mods 0.8.0 checks the status block too (one block per turn, then a warning).
-
-Only a separately approved operator issuance or bounded recorded delegation may enroll a
-new OMP autonomous assignment. Use Autonomic's real file/CLI contract and omp-seat
-preflight; mode, role, model/seat selection, plan approval and reports are not grants. Copy
-each dispatched template's complete authority identity/prohibitions envelope, filled with
-trusted startup facts or `none`, not a reference-only fragment. No live grants/thresholds
-or activation follow from this skill.
-
-**New enrolled OMP path only:** before the seat command, the operator/trusted delegated
-dispatcher independently selects outside-allowance input/event/source paths and invokes
-`bun <autonomic-root>/bin/authority.ts issue --input <trusted-input> --authority-root
-<trusted-root> --worker-root <assignment-worktree> --worker-root <each-extra-root>` (repeat
-roots). Its JSON binding maps path/sha256/assignmentId/generation/launchId to
-`AUTONOMIC_AUTHORITY_PATH`, `AUTONOMIC_AUTHORITY_SHA256`, `AUTONOMIC_ASSIGNMENT_ID`,
-`AUTONOMIC_ASSIGNMENT_GENERATION`, `AUTONOMIC_LAUNCH_ID` in the trusted startup export;
-never take them from a worker/report/model.
-
-Check the whole allowance, including every `SEAT_MODS_ALLOW` entry, coordinator `.worktrees`,
-report/scratch/handoff and output roots: authority, parent, input and evidence/policy
-sources must not overlap in either ancestry direction. omp-seat resolves the installed
-Autonomic CLI and validates before the via version probe/worker; partial/invalid bindings
-refuse. Preserve all existing role/path/molt/autonomic markings and extension order
-seat-mods → Molt → Autonomic. A role or autopilot marks a seat, not a grant; empty grants
-authorize nothing. No live issuance is supplied by these instructions.
-
-Every materially new enrolled assignment ends the old agent process and needs fresh
-issuance/launch, retained pane included. Same-assignment corrections/rechecks use unchanged
-approvals/grants/lifetime; revocation/completion/replacement invalidates, never rebinds. A
-parent-handback child ends its unit. Public host evidence cannot distinguish private Molt
-ownership from generic `/new` plus lineage, so enrolled in-place clears remain suspended and
-require fresh trusted launch; finish/handoff existing tops/workers before rollout, never
-hot-enroll via env/report edits. Retain phase/locator.seen/generation/resume ownership and
-never auto-relaunch a live attempt.
-
-Enrolled OMP operator merge acknowledgment and design/spec/plan/release gates override
-standing routing, shared policy prose, role and confidence; all seat-mods denials remain
-absolute. Read/revalidate the original pinned authority before decisions and immediately
-before action, with no following model await; failures stay operator handling, never a new
-digest. Same-UID/shared-process and last-check race limits remain; this is not a
-sandbox/atomic revocation lock. Unbound OMP and Claude Code keep their legacy behavior;
-#832 and #831's full parity criterion remain open. Native decision consumers and
-release/activation remain separately gated.
 
 ## 4. The run
 

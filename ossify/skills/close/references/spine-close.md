@@ -519,7 +519,7 @@ loop — is REPLACED here by unclaiming in a follow-up commit, because the recor
 lineage guard binds to the pushed tip and a rewritten head cannot be recorded;
 if a rewrite has already happened, re-land the PR from the pushed tip or
 record an operator decision. The merge is the operator's explicit call inside work-pr —
-this ceremony does not ack on anyone's behalf; a standing order in the autopilot policy that grants merge authority is the operator's ack, given in advance. **If the operator leaves any PR
+this ceremony does not ack on anyone's behalf; a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority is the operator's ack, given in advance. **If the operator leaves any PR
 open, the close halts here, recording nothing**: surface the PR URLs, say which
 steps remain, and stop. That is the named halt state; re-invoke `/close
 <spine-id>` once the PR has merged.
@@ -769,7 +769,7 @@ An unknown spine id is rc 7 with a message, not a silent no-op.
 
 `oss demo_run` for every active `auto:` line, then walk
 `oss demo_user_lines "$spine_id"` — **this spine's own `user:` lines only** — with
-the human, or yourself under a standing order in the autopilot policy that gives
+the human, or yourself under a standing order in the project's memory bank or `AGENTS.md` that gives
 you the demo walk (`cumulative-demo.md` §3). Full detail, the §6.1-vs-§6.2
 scoping, quarantine handling and the ledger's wall-clock budget in
 **`references/cumulative-demo.md`**.

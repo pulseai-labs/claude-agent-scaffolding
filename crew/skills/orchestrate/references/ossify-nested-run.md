@@ -65,7 +65,6 @@ releases every item pair and closes the workspace it created, as
    step 5 — and deliver its brief as its row's `brief_delivery` says. Guard it
    before its command as the layer's `Seat marking` says — role `implementer`,
    its scratch directory created first under your own run directory.
-   On the new enrolled OMP path only, issue from separately approved external operator/delegation records, bind the five exact authority startup fields before omp-seat, and include the complete filled authority envelope in the item brief. Compare the trusted authority/input/evidence/policy roots against the entire worker allowance, coordinator `.worktrees` included. A profile/SEATS row or plan approval is not a grant; operator-owned plan/design/merge gates and seat-mods denials remain absolute. Corrections/rechecks stay same-assignment only while approvals/grants/lifetime are unchanged; replacement/completion/revocation invalidates. New work/respawn requires fresh process, never a new digest from env/report/lineage. Public Molt ownership evidence is insufficient, so an enrolled clear stays suspended pending fresh trusted launch. Preserve nested run phase/generation/resume ownership and no-auto-relaunch rules; CC/legacy behavior is unchanged.
 4. Each implementer confirms its model, reads, and writes a detailed plan to its
    report file, then waits. Gather the round's plans into **one** ordered ask to you;
    return an independent approve-or-amend per item; the spine session sends each
@@ -176,7 +175,7 @@ Seat launch) — as many times as that takes.
 **A close that halts on its own review returns `halted: close-review` with the
 ledger.** The ceremony's accumulated-diff review is the close seat's to run, never to
 fix: a `fix now` disposition ends that dispatch. The top asks the operator for a
-writer profile — or, under a standing order in the autopilot policy for seats and
+writer profile — or, under a standing order in the project's memory bank or AGENTS.md for seats and
 profiles, picks that profile from the project file and records why — and dispatches
 one writer per affected hosting repo — each in
 that repo's own spine worktree with a bounded edit scope, per

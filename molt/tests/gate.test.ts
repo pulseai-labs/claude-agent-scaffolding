@@ -1,16 +1,15 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { gateAllows, isProgress, takeRequest, waitsIn } from '../hooks/gate'
+import { gateAllows, takeRequest, waitsIn } from '../hooks/gate'
 import type { Request } from '../hooks/gate'
 import { gitSubcommands } from '../hooks/shell'
 import * as shell from '../hooks/shell'
 
-// The 0.2.3 tag and the round-1 head predate the round-2 exports (the walk sets and
-// the run-only reader); reading them through a lookup keeps this file loadable there,
+// The 0.2.3 tag and the round-1 head predate the round-2 exports (the walk sets);
+// reading them through a lookup keeps this file loadable there,
 // so the rows fail as tests rather than as one file error.
 const walked = shell as unknown as {
   HEAD_WORDS?: Set<string>
   CLOSERS?: Set<string>
-  gitSubcommandsThatRun?: (command: string) => Array<string | undefined>
 }
 
 const bash = (command: string) => gateAllows('Bash', { command })
@@ -48,19 +47,6 @@ describe('gateAllows past the hard threshold', () => {
   test('an empty or missing command is refused', () => {
     expect(bash('')).toBe(false)
     expect(gateAllows('Bash', {})).toBe(false)
-  })
-})
-
-describe('isProgress', () => {
-  test('a file written or a commit made', () => {
-    expect(isProgress('Write', { file_path: '/r/a' })).toBe(true)
-    expect(isProgress('Edit', { file_path: '/r/a' })).toBe(true)
-    expect(isProgress('Bash', { command: 'git add a && git commit -F m' })).toBe(true)
-  })
-  test('reads and other commands are not progress', () => {
-    expect(isProgress('Read', { file_path: '/r/a' })).toBe(false)
-    expect(isProgress('Bash', { command: 'git status' })).toBe(false)
-    expect(isProgress('Bash', { command: 'echo git commit' })).toBe(false)
   })
 })
 
@@ -147,49 +133,6 @@ describe('reserved head words past the hard threshold (#711)', () => {
   })
 })
 
-// #711 review R2/RR1: a commit counts as progress only where the line runs it for
-// sure — bare, or behind `time`. A commit behind a conditional or negating head may
-// not run; a `{ … }` body cannot be told from a function definition's, which runs
-// no commit.
-describe('isProgress with reserved head words (#711 review R2/RR1)', () => {
-  test('a bare commit or one behind time counts', () => {
-    expect(isProgress('Bash', { command: 'git commit -m m' })).toBe(true)
-    expect(isProgress('Bash', { command: 'time git commit -m m' })).toBe(true)
-  })
-  test('a commit behind a conditional or negating head does not count', () => {
-    expect(isProgress('Bash', { command: 'if git add missing.lock; then git commit -m m; fi' })).toBe(false)
-    expect(isProgress('Bash', { command: 'then git commit -m m' })).toBe(false)
-    expect(isProgress('Bash', { command: '! git commit -m m' })).toBe(false)
-  })
-  test('a commit behind { or a function definition does not count (RR1)', () => {
-    expect(isProgress('Bash', { command: '{ git commit -m m; }' })).toBe(false)
-    expect(isProgress('Bash', { command: '{ time git commit -m m; }' })).toBe(false)
-    expect(isProgress('Bash', { command: 'f() { git commit -m m; }' })).toBe(false)
-    expect(isProgress('Bash', { command: 'function f { git commit -m m; }' })).toBe(false)
-  })
-  // Progress at 4d4a20b5 and now alike (724-A7, 724-A7b): the commit of the first stands in its
-  // own segment; the second sits behind `then`.
-  test('a redirected closer leaves the progress reading as it was', () => {
-    expect(isProgress('Bash', { command: '{ git add f; git commit -m m; } >/tmp/log' })).toBe(true)
-    expect(isProgress('Bash', { command: 'if git add f; then git commit -m m; fi 2>/tmp/e' })).toBe(false)
-  })
-  test('the run-only reader sees only a bare commit or one behind time', () => {
-    expect(walked.gitSubcommandsThatRun?.('git commit -m m')).toEqual(['commit'])
-    expect(walked.gitSubcommandsThatRun?.('time git commit -m m')).toEqual(['commit'])
-    expect(walked.gitSubcommandsThatRun?.('{ git commit -m m; }')).toEqual([])
-    expect(walked.gitSubcommandsThatRun?.('if git commit -m m')).toEqual([])
-    expect(walked.gitSubcommandsThatRun?.('! git commit -m m')).toEqual([])
-  })
-  test('a path-qualified or builtin-wrapped commit is not progress (control)', () => {
-    expect(isProgress('Bash', { command: '/x/if git commit -m m' })).toBe(false)
-    expect(isProgress('Bash', { command: 'builtin git commit -m m' })).toBe(false)
-  })
-  test('a command of only head words or closers is not progress (control)', () => {
-    expect(isProgress('Bash', { command: 'fi' })).toBe(false)
-    expect(isProgress('Bash', { command: '!' })).toBe(false)
-  })
-})
-
 // #711 review R1: a lone `&` is Bash's third list separator. Without the split the
 // head walk lets `! git commit -m m & evil` and its siblings run `evil` past the
 // block; `&&` and the redirections that carry `&` are not boundaries.
@@ -248,8 +191,6 @@ describe('batch 5: command word', () => {
     expect(bash('bin/env git add f')).toBe(false)
     expect(gitSubcommands('bin/env git add f')).toEqual([undefined])
     expect(gitSubcommands('FOO=1 ./sudo git commit -m m')).toEqual([undefined])
-    expect(walked.gitSubcommandsThatRun?.('./env git commit -m m')).toEqual([undefined])
-    expect(isProgress('Bash', { command: './env git commit -m m' })).toBe(false)
     // the path counts wherever it stands among the wrappers
     expect(gitSubcommands('./env env git add f')).toEqual([undefined])
     expect(gitSubcommands('env ./env git add f')).toEqual([undefined])
@@ -258,10 +199,7 @@ describe('batch 5: command word', () => {
     expect(gitSubcommands('FOO=./x env git add f')).toEqual(['add'])
     expect(bash('env git add f')).toBe(true)
     expect(gitSubcommands('/usr/bin/env git add f')).toEqual(['add'])
-    expect(walked.gitSubcommandsThatRun?.('/usr/bin/env git commit -m m')).toEqual(['commit'])
     expect(gitSubcommands('/usr/bin/git add f')).toEqual(['add'])
-    expect(walked.gitSubcommandsThatRun?.('env git commit -m m')).toEqual(['commit'])
-    expect(isProgress('Bash', { command: 'env git commit -m m' })).toBe(true)
   })
   test('a redirection before the command does not hide it', () => {
     expect(bash('{log}>/tmp/f git add f')).toBe(true)
