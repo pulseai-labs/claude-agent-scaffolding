@@ -1,7 +1,8 @@
 // An answered OpenBot question → at most one fixed command. The label is matched exactly against the
 // offer recorded for that question (never against model text); the command and its arguments come
 // from that offer and the record's own run, unit and park. Follow-up questions and result messages
-// are opened as follow-up records, which the next serve loop sends.
+// are opened as follow-up records, which the next serve loop sends on the record's own agent: `bot`
+// is the client of the agent the question went to, and a follow-up keeps that agent.
 
 import { appendFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";

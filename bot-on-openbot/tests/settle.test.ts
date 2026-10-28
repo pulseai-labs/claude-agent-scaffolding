@@ -6,7 +6,7 @@ import { blockedOffer, offerFor } from "../src/offer.ts";
 import { serve } from "../src/serve.ts";
 import { SETTLE_MODE, sweepSettled, wellFormed } from "../src/settle.ts";
 import { handleTap } from "../src/tap.ts";
-import { captureErr, COLOURS, defaultRun, FIX, makeEnv, P1, P5, type Env } from "./helpers.ts";
+import { captureErr, COLOURS, defaultRun, FIX, makeEnv, P1, P5, serveOpts, type Env } from "./helpers.ts";
 
 const TOKEN = "FIXTURE-OPENBOT-TOKEN-do-not-leak";
 const AGENT_ID = "agent-7a6bdc91-f17f-4c79-9dae-4a7d3b1a0eb6";
@@ -16,6 +16,8 @@ let env: Env;
 let server: ReturnType<typeof Bun.serve>;
 let prompts: unknown[];
 let posts: { path: string; body: unknown }[];
+let gets: string[];
+const B_ID = "agent-b";
 
 beforeEach(() => {
   env = makeEnv();
@@ -24,13 +26,15 @@ beforeEach(() => {
   env.status("d2", "running", "turn-2");
   prompts = [];
   posts = [];
+  gets = [];
   server = Bun.serve({
     port: 0,
     async fetch(req) {
       const path = new URL(req.url).pathname;
       if (req.headers.get("authorization") !== `Bearer ${TOKEN}`) return new Response("", { status: 401 });
-      if (path === "/v1/agents") return Response.json([{ id: AGENT_ID, name: "Autopilot" }]);
-      if (path === `/v1/agents/${AGENT_ID}/pending`) return Response.json({ prompts, approvals: [], browserTakeovers: [] });
+      gets.push(path);
+      if (path === "/v1/agents") return Response.json([{ id: AGENT_ID, name: "Autopilot" }, { id: B_ID, name: "B" }]);
+      if (path === `/v1/agents/${AGENT_ID}/pending` || path === `/v1/agents/${B_ID}/pending`) return Response.json({ prompts, approvals: [], browserTakeovers: [] });
       if (req.method === "POST" && path.endsWith("/answer")) {
         posts.push({ path, body: await req.json() });
         return Response.json({ ok: true });
@@ -68,6 +72,16 @@ const promptOf = (r: DeliveryRec, requestId = "req-1", labels?: string[]) => ({
 });
 const clearPark = () => env.writeRun(defaultRun({ units: { u1: { id: "u1", stage: "build", parked: null, vars: {} } } }));
 
+test("settling answers on the record's agent", async () => {
+  const r = parkRec({ agent: "B" });
+  prompts = [promptOf(r)];
+  clearPark();
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
+  expect(env.calls().map((c) => c.argv)).toEqual([["status", "B", "d1", "--json"]]);
+  expect(gets.filter((p) => p.endsWith("/pending"))).toEqual([`/v1/agents/${B_ID}/pending`]);
+  expect(posts).toEqual([{ path: `/v1/agents/${B_ID}/prompts/req-1/answer`, body: { answers: { reply: ["settled"] } } }]);
+});
+
 test("SETTLE_MODE is answer (spike: an unoffered label is accepted)", () => {
   expect(SETTLE_MODE).toBe("answer");
 });
@@ -76,17 +90,17 @@ test("a cleared park settles once, answering its prompt with settled", async () 
   const r = parkRec();
   prompts = [promptOf(r)];
   clearPark();
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(posts).toEqual([{ path: `/v1/agents/${AGENT_ID}/prompts/req-1/answer`, body: { answers: { reply: ["settled"] } } }]);
   expect(find(PARK)).toMatchObject({ phase: "closed", closed_by: "settled", closed_at: T0.toISOString() });
-  expect(await sweepSettled(env.bot, T0)).toBe(0);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
   expect(posts.length).toBe(1);
 });
 
 test("a park that moved on (a newer park) settles", async () => {
   const r = parkRec({ park_at: "2026-10-27T09:00:00.000Z" });
   prompts = [promptOf(r)];
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(posts.length).toBe(1);
 });
 
@@ -96,7 +110,7 @@ test("a disarmed run settles its questions; so does a done run", async () => {
     const r = parkRec();
     prompts = [promptOf(r)];
     posts = [];
-    expect(await sweepSettled(env.bot, T0)).toBe(1);
+    expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
     expect(posts.length).toBe(1);
     record({ ...r, phase: "asked" }); // reopen for the next status
   }
@@ -106,7 +120,7 @@ test("an unreadable run settles nothing", async () => {
   const r = parkRec();
   prompts = [promptOf(r)];
   writeFileSync(join(env.dir, "baton", "runs", "r1", "run.json"), "{garbage");
-  expect(await sweepSettled(env.bot, T0)).toBe(0);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
   expect(posts).toEqual([]);
   expect(open().map((x) => x.key)).toEqual([PARK]);
 });
@@ -114,7 +128,7 @@ test("an unreadable run settles nothing", async () => {
 test("a still-parked unit stays open and calls nothing", async () => {
   const r = parkRec();
   prompts = [promptOf(r)];
-  expect(await sweepSettled(env.bot, T0)).toBe(0);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
   expect(posts).toEqual([]);
   expect(env.calls()).toEqual([]);
   expect(find(PARK)!.phase).toBe("asked");
@@ -127,7 +141,7 @@ test("follow-up questions of a settled notice settle too", async () => {
   record(f);
   prompts = [promptOf(f, "req-2")];
   clearPark();
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(find(`${PARK}#1`)).toMatchObject({ phase: "closed", closed_by: "settled" });
   expect(posts.map((p) => p.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-2/answer`]);
 });
@@ -137,7 +151,7 @@ test("answers the matching prompt with settled, and only that one", async () => 
   const other = { ...promptOf(r, "req-other"), questions: [{ ...promptOf(r).questions[0], question: "someone else's question" }] };
   prompts = [other, promptOf(r, "req-mine")];
   clearPark();
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(posts.map((p) => p.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-mine/answer`]);
 });
 
@@ -147,7 +161,7 @@ test("a prompt of its title with other labels is its own prompt, malformed: sett
   // same question; one label differs (the agent asked it its own way)
   prompts = [promptOf(r, "req-1", ["Unpark", "Unpark to stage…", "Show question", "Merge"])];
   clearPark();
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(posts).toEqual([{ path: `/v1/agents/${AGENT_ID}/prompts/req-1/answer`, body: { answers: { reply: ["settled"] } } }]);
   expect(find(PARK)).toMatchObject({ phase: "closed", closed_by: "settled" });
   expect(find(PARK)!.unanswered).toBeUndefined();
@@ -157,7 +171,7 @@ test("the exact prompt wins over a malformed one of the same title", async () =>
   const r = parkRec();
   prompts = [promptOf(r, "req-bad", ["Unpark"]), promptOf(r, "req-exact")];
   clearPark();
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(posts.map((p) => p.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-exact/answer`]);
 });
 
@@ -176,7 +190,7 @@ test("settle dismisses the malformed prompt (options null) of a settled park, fo
   env.status("d1", "running", "turn-1");
   prompts = [NO_OPTIONS()];
   clearBlocked();
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(posts).toEqual([{ path: `/v1/agents/${AGENT_ID}/prompts/5b0e9c4a-8d31-4f6e-b2a7-c94e1f03d6b8/answer`, body: { answers: { reply: ["settled"] } } }]);
   expect(find(r.key)).toMatchObject({ phase: "closed", closed_by: "settled" });
   expect(find(r.key)!.unanswered).toBeUndefined();
@@ -189,7 +203,7 @@ test("a prompt is found by its header alone, or by its question's first line alo
     env.status("d1", "running", "turn-1");
     prompts = [{ ...NO_OPTIONS(), questions: [{ id: "reply", header, question, options: null }] }];
     clearBlocked();
-    expect(await sweepSettled(env.bot, T0)).toBe(1);
+    expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
     expect(posts.length).toBe(1);
     expect(find(r.key)).toMatchObject({ phase: "closed", closed_by: "settled" });
   }
@@ -207,7 +221,7 @@ test("a prompt with another title is never answered, whatever its labels", async
     other("", "", null),
   ];
   clearBlocked();
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(posts).toEqual([]);
   expect(find(r.key)).toMatchObject({ phase: "closed", closed_by: "settled", unanswered: true });
 });
@@ -216,17 +230,17 @@ test("a question not yet shown is closed now and answered once it shows", async 
   const r = parkRec();
   env.status("d1", "running", "turn-1");
   clearPark();
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(posts).toEqual([]);
   expect(find(PARK)).toMatchObject({ phase: "closed", closed_by: "settled", unanswered: true });
   // a tap meanwhile runs nothing
   await captureErr(() => handleTap(r, "Unpark", { bot: env.bot, runner: env.runner, now: () => T0 }));
   expect(env.runs).toEqual([]);
   prompts = [promptOf(r)];
-  expect(await sweepSettled(env.bot, T0)).toBe(0);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
   expect(posts.length).toBe(1);
   expect(find(PARK)!.unanswered).toBeUndefined();
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(posts.length).toBe(1);
 });
 
@@ -234,7 +248,7 @@ test("a question whose delivery ended is not waited for", async () => {
   parkRec();
   env.status("d1", "completed", "turn-1", "x");
   clearPark();
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(find(PARK)!.unanswered).toBeUndefined();
 });
 
@@ -242,26 +256,26 @@ test("a settled question whose delivery ended never answers a newer prompt of th
   const r = parkRec();
   env.status("d1", "running", "turn-1");
   clearPark();
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(find(PARK)).toMatchObject({ phase: "closed", unanswered: true });
   // Its turn ends without a prompt; a later park of the same unit asks under the same title.
   env.status("d1", "completed", "turn-1", "x");
   prompts = [promptOf(r, "req-new")];
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(posts).toEqual([]);
   expect(find(PARK)!.unanswered).toBeUndefined();
   // and an asked record whose own delivery ended settles without touching a same-title prompt
   const r2 = parkRec({ key: `${PARK}#2`, ask_id: "d2" });
   env.status("d2", "completed", "turn-2", "x");
   prompts = [promptOf(r2, "req-new")];
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(posts).toEqual([]);
 });
 
 test("a drafting record of a settled park closes with no question asked", async () => {
   record({ key: `r1/u5/park/${P5}`, phase: "drafting", run: "r1", unit: "u5", park_at: P5, title: "t", picker: COLOURS as never, draft_id: "dr", message: "m" });
   env.writeRun(defaultRun({ units: { u5: { id: "u5", stage: "build", parked: null, vars: {} } } }));
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(find(`r1/u5/park/${P5}`)).toMatchObject({ phase: "closed", closed_by: "settled" });
   expect(find(`r1/u5/park/${P5}`)!.unanswered).toBeUndefined();
   expect(posts).toEqual([]);
@@ -271,7 +285,7 @@ test("a drafting record of a settled park closes with no question asked", async 
 test("a message is never settled", async () => {
   record({ key: "r1/done", phase: "asked", run: "r1", title: "t", say: "done", ask_id: "d9" });
   env.writeRun(defaultRun({ status: "done" }));
-  expect(await sweepSettled(env.bot, T0)).toBe(0);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
   expect(find("r1/done")!.phase).toBe("asked");
 });
 
@@ -279,7 +293,7 @@ test("OpenBot down while settling keeps the record open for the next loop", asyn
   parkRec();
   clearPark();
   server.stop(true);
-  const { value } = await captureErr(() => sweepSettled(env.bot, T0));
+  const { value } = await captureErr(() => sweepSettled(env.botFor, env.defaultAgent, T0));
   expect(value).toBe(0);
   expect(find(PARK)!.phase).toBe("asked");
 });
@@ -290,7 +304,7 @@ test("a blocked park's question settles when its park clears", async () => {
   record(r);
   prompts = [promptOf(r)];
   env.writeRun(defaultRun({ units: { u5: { id: "u5", stage: "build", parked: null, vars: {} } } }));
-  expect(await sweepSettled(env.bot, T0)).toBe(1);
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
   expect(posts.length).toBe(1);
 });
 
@@ -299,7 +313,7 @@ test("serve settles each loop", async () => {
   env.status("d1", "running", "turn-1");
   prompts = [promptOf(r)];
   clearPark();
-  await captureErr(() => serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter: 1, pollMs: 0 }));
+  await captureErr(() => serve(serveOpts(env, T0)));
   expect(posts.length).toBe(1);
   expect(find(PARK)!.closed_by).toBe("settled");
 });
@@ -311,10 +325,10 @@ test("token sweep: after serve settles, taps and fails, no state file and no std
   clearPark();
   const { readdirSync, readFileSync } = await import("node:fs");
   const { err } = await captureErr(async () => {
-    await serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter: 1, pollMs: 0 });
+    await serve(serveOpts(env, T0));
     server.stop(true); // OpenBot gone: the next sweeps fail and log
     record({ ...r, phase: "asked" });
-    await serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter: 1, pollMs: 0 });
+    await serve(serveOpts(env, T0));
   });
   expect(err.join("")).toContain("settle");
   expect(err.join("")).not.toContain(TOKEN);
@@ -346,6 +360,6 @@ test("settle finds the exact prompt of an offer with labels not shown", async ()
   env.status("d1", "running", "turn-1");
   prompts = [promptOf(r, "req-bad", ["Show question"]), promptOf(r, "req-exact", ["Show question", "Unpark", "Disarm"])];
   env.writeRun(defaultRun({ units: { u5: { id: "u5", stage: "build", parked: null, vars: {} } } }));
-  await sweepSettled(env.bot, T0);
+  await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(posts.map((x) => x.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-exact/answer`]);
 });

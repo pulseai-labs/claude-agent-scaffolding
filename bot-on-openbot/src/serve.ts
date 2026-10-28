@@ -2,12 +2,13 @@ import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } f
 import { join } from "node:path";
 import { parseScreen, screen, type Runner } from "./actions.ts";
 import { readUnit } from "./baton-state.ts";
-import { close, find, followUp, open, record, type DeliveryRec } from "./deliveries.ts";
-import { parseKey } from "./notice.ts";
+import { agentKey, agentOf, close, find, followUp, open, record, type DeliveryRec } from "./deliveries.ts";
+import { parseKey, type Notice } from "./notice.ts";
 import { log } from "./log.ts";
-import { blockedOffer, offerFor } from "./offer.ts";
+import { blockedOffer, offerFor, type Offer } from "./offer.ts";
 import { OpenBotDown, OpenBotRefused, type Delivery, type OpenBot, type Prompt } from "./openbot.ts";
 import { stateDir } from "./paths.ts";
+import type { Route } from "./route.ts";
 import { ours, SETTLED_LABEL, stillOpen, sweepSettled, wellFormed } from "./settle.ts";
 import { listSpool, removeSpool } from "./spool.ts";
 import { handleTap } from "./tap.ts";
@@ -21,7 +22,14 @@ export class LockHeldError extends Error {
 }
 
 export type ServeOptions = {
-  bot: OpenBot;
+  /** The client of one OpenBot agent. */
+  botFor: (agent: string) => OpenBot;
+  /** The agent a notice goes to; rejects with OpenBotDown when that cannot be told yet. */
+  route: (n: Notice) => Promise<Route>;
+  /** Drops a run's cached route after its run was refused: the agent may be deleted or renamed. */
+  forget?: (run: string) => void;
+  /** The agent of a record that names none (written by 0.1.x). */
+  defaultAgent: string;
   runner: Runner;
   now: () => Date;
   /** Bounds the number of loops; unset means run until killed. */
@@ -94,7 +102,7 @@ export async function serve(opts: ServeOptions): Promise<void> {
         logError("poll", e);
       }
       try {
-        await sweepSettled(opts.bot, opts.now());
+        await sweepSettled(opts.botFor, opts.defaultAgent, opts.now());
       } catch (e) {
         logError("settle", e);
       }
@@ -106,44 +114,66 @@ export async function serve(opts: ServeOptions): Promise<void> {
 }
 
 // ---- drain -----------------------------------------------------------------------------------
-// The spool in order, but only while no delivery is open: an unanswered OpenBot question blocks the
-// agent's queue (spike ruling), so the bridge keeps one in flight. A refused or failed run stops the
-// drain and keeps the file, so the notice goes later, in order.
+// The spool in order, each notice to its agent, but only while that agent has no delivery open: an
+// unanswered OpenBot question blocks the agent's queue (spike ruling), so the bridge keeps one in
+// flight per agent (names compared as OpenBot resolves them: case and outer spaces ignored). A notice whose agent is busy stays spooled and the drain goes on to later ones,
+// so the order holds within each agent. A refused or failed run holds its agent for this loop and
+// keeps the file, so the notice goes later, in order; a refused run also drops its run's cached
+// route, so an agent deleted or renamed since is resolved again (and falls back) next loop. A notice whose agent cannot be told (route:
+// OpenBot down) stops the drain and keeps the file: no later notice may overtake it.
 
 async function drain(opts: ServeOptions): Promise<void> {
+  const held = new Set<string>(); // agentKey of each agent whose run was refused or failed this loop
   for (const { path, item } of listSpool()) {
-    if (open().length > 0) return;
     if (find(item.key)) {
       removeSpool(path); // asked once already: --id would return the same delivery anyway
       continue;
     }
+    const n = parseKey(item.key);
+    let route: Route;
     try {
-      await deliver(item.key, item.message, opts);
+      route = await opts.route(n);
     } catch (e) {
       if (!stopsDrain(e)) throw e;
       log(`drain stopped: ${(e as Error).message}`);
       return;
     }
+    const { agent } = route;
+    const id = agentKey(agent);
+    if (held.has(id) || open().some((r) => agentKey(agentOf(r, opts.defaultAgent)) === id)) continue;
+    try {
+      await deliver(item.key, item.message, route.note, agent, opts);
+    } catch (e) {
+      if (!stopsDrain(e)) throw e;
+      if (e instanceof OpenBotRefused && n.kind !== "plain") opts.forget?.(n.run);
+      log(`drain stopped: ${agent}: ${(e as Error).message}`);
+      held.add(id);
+      continue;
+    }
+    if (route.note !== undefined) log(`${item.key}: ${route.note}`); // once, when it goes
     removeSpool(path);
   }
 }
 
-async function deliver(key: string, message: string, opts: ServeOptions): Promise<void> {
-  const { bot } = opts;
+// A fallback's note is the first line of the text, so the operator sees why it came here. A blocked
+// park keeps it on its record: its offer's text is built later, from the draft.
+async function deliver(key: string, raw: string, note: string | undefined, agent: string, opts: ServeOptions): Promise<void> {
+  const bot = opts.botFor(agent);
   const n = parseKey(key);
   if (n.kind === "unit-park" && readUnit(n.run, n.unit)?.parked?.blocked) {
-    return deliverBlocked(key, message, n.run, n.unit, n.at, opts);
+    return deliverBlocked(key, raw, note, agent, n.run, n.unit, n.at, opts);
   }
+  const message = withNote(note, raw);
   const run = n.kind === "plain" ? "" : n.run;
   const offer = offerFor(n, message, run);
   if (!offer) {
     const { deliveryId } = await bot.run(messageTask(message), key);
-    record({ key, phase: "asked", run, title: message.split("\n")[0]!.slice(0, 200), say: message, ask_id: deliveryId });
+    record({ key, phase: "asked", agent, run, title: message.split("\n")[0]!.slice(0, 200), say: message, ask_id: deliveryId });
     return;
   }
   const { deliveryId } = await bot.run(askTask(offer), key);
   record({
-    key, phase: "asked", run, title: offer.title, offer, ask_id: deliveryId,
+    key, phase: "asked", agent, run, title: offer.title, offer, ask_id: deliveryId,
     ...(n.kind === "unit-park" || n.kind === "unit-move" ? { unit: n.unit } : {}),
     ...(n.kind === "unit-park" ? { park_at: n.at } : {}),
   });
@@ -152,8 +182,12 @@ async function deliver(key: string, message: string, opts: ServeOptions): Promis
 // A blocked park: `baton screen` gives the fresh screen and its picker (baton's parser, the same one
 // its answer check uses). Park gone, or a newer park on screen: closed, nothing sent. A picker: the
 // agent drafts first. No picker, or the screen cannot be read: asked at once with the escapes only.
-async function deliverBlocked(key: string, message: string, run: string, unit: string, at: string, opts: ServeOptions): Promise<void> {
-  const base = { key, run, unit, park_at: at, title: blockedOffer(message, run, unit, null, null).title };
+async function deliverBlocked(key: string, message: string, note: string | undefined, agent: string, run: string, unit: string, at: string, opts: ServeOptions): Promise<void> {
+  const bot = opts.botFor(agent);
+  const base = {
+    key, agent, run, unit, park_at: at, title: blockedOffer(message, run, unit, null, null).title,
+    ...(note !== undefined ? { note } : {}),
+  };
   const res = await screen(run, unit, opts.runner);
   const shown = res.rc === 0 ? parseScreen(res.stdout) : null;
   if (res.rc === 2 || (shown && shown.park_at !== at)) {
@@ -161,16 +195,23 @@ async function deliverBlocked(key: string, message: string, run: string, unit: s
     return;
   }
   if (shown?.picker) {
-    const { deliveryId } = await opts.bot.run(draftTask(shown.screen, shown.picker), `${key}#draft`);
+    const { deliveryId } = await bot.run(draftTask(shown.screen, shown.picker), `${key}#draft`);
     record({ ...base, phase: "drafting", message, picker: shown.picker, draft_id: deliveryId });
     return;
   }
-  const offer = blockedOffer(message, run, unit, null, null);
-  const { deliveryId } = await opts.bot.run(askTask(offer), key);
+  const offer = noted(note, blockedOffer(message, run, unit, null, null));
+  const { deliveryId } = await bot.run(askTask(offer), key);
   record({ ...base, phase: "asked", offer, ask_id: deliveryId });
 }
 
+const withNote = (note: string | undefined, text: string): string => (note === undefined ? text : `${note}\n${text}`);
+const noted = (note: string | undefined, o: Offer): Offer => ({ ...o, text: withNote(note, o.text) });
+
 // ---- poll ------------------------------------------------------------------------------------
+// Every open record is read, sent and answered on its own agent; a tap is read from the agent the
+// question went to, so it can only answer that question.
+
+const botOf = (rec: DeliveryRec, opts: ServeOptions): OpenBot => opts.botFor(agentOf(rec, opts.defaultAgent));
 
 async function statusOf(bot: OpenBot, id: string): Promise<Delivery> {
   try {
@@ -197,18 +238,18 @@ async function poll(opts: ServeOptions): Promise<void> {
 // malformed prompt is firmer; an expired question was asked well the first time.
 async function send(rec: DeliveryRec, opts: ServeOptions): Promise<DeliveryRec> {
   const task = rec.offer ? askTask(rec.offer, rec.reasks === 1 && !rec.expired) : messageTask(rec.say ?? rec.title);
-  const { deliveryId } = await opts.bot.run(task, rec.reasks === 1 ? `${rec.key}#reask` : rec.key);
+  const { deliveryId } = await botOf(rec, opts).run(task, rec.reasks === 1 ? `${rec.key}#reask` : rec.key);
   const sent: DeliveryRec = { ...rec, ask_id: deliveryId };
   record(sent);
   return sent;
 }
 
 async function afterDraft(rec: DeliveryRec, opts: ServeOptions): Promise<DeliveryRec> {
-  const d = await statusOf(opts.bot, rec.draft_id ?? "");
+  const d = await statusOf(botOf(rec, opts), rec.draft_id ?? "");
   if (d.state === "queued" || d.state === "running") return rec;
   const picker = rec.picker ?? null;
   const draft = d.state === "completed" && d.text !== null && picker ? parseDraft(d.text, picker) : null;
-  const offer = blockedOffer(rec.message ?? rec.title, rec.run, rec.unit ?? "", picker, draft);
+  const offer = noted(rec.note, blockedOffer(rec.message ?? rec.title, rec.run, rec.unit ?? "", picker, draft));
   const asked: DeliveryRec = { ...rec, phase: "asked", offer };
   delete asked.ask_id;
   record(asked);
@@ -216,14 +257,15 @@ async function afterDraft(rec: DeliveryRec, opts: ServeOptions): Promise<Deliver
 }
 
 async function afterAsk(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
-  const d = await statusOf(opts.bot, rec.ask_id ?? "");
+  const bot = botOf(rec, opts);
+  const d = await statusOf(bot, rec.ask_id ?? "");
   const ended = d.state === "completed" || d.state === "failed";
   if (!rec.offer) {
     if (ended) close(rec, "sent", opts.now());
     return;
   }
   if (d.turnId) {
-    const r = await opts.bot.resolved(d.turnId);
+    const r = await bot.resolved(d.turnId);
     if (r === "unreadable") {
       log(`${rec.key}: the answer in openbot.db is unreadable; nothing ran`);
       const closed = close(rec, "gone", opts.now());
@@ -242,7 +284,7 @@ async function afterAsk(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
       return;
     }
     if (r !== "none") {
-      await handleTap(rec, r.answer, { bot: opts.bot, runner: opts.runner, now: opts.now });
+      await handleTap(rec, r.answer, { bot, runner: opts.runner, now: opts.now });
       return;
     }
   }
@@ -279,9 +321,10 @@ async function expired(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
 // offered labels, in order. No prompt yet: wait (a turn that ends with none closes as gone above).
 
 async function checkShape(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
+  const bot = botOf(rec, opts);
   let prompts: Prompt[];
   try {
-    prompts = await opts.bot.pending();
+    prompts = await bot.pending();
   } catch (e) {
     if (!(e instanceof OpenBotDown)) throw e;
     log(`${rec.key}: prompt check: ${e.message}`); // checked again next loop
@@ -291,7 +334,7 @@ async function checkShape(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
   if (mine.length === 0 || mine.some((p) => wellFormed(rec, p))) return;
   // Dismissed with `settled`, which unblocks the agent. 409: someone answered first; the next poll
   // reads that answer as any other.
-  if ((await opts.bot.answer(mine[0]!, SETTLED_LABEL)) === "closed") return;
+  if ((await bot.answer(mine[0]!, SETTLED_LABEL)) === "closed") return;
   log(`${rec.key}: the agent asked the question without its options; dismissed`);
   await malformed(rec, opts);
 }

@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { configDir } from "./paths.ts";
 
-export type BotConfig = { agent: string; cli: string[]; db: string; automationDir: string };
+export type BotConfig = { agent: string; agents: Record<string, string>; cli: string[]; db: string; automationDir: string };
 
 /** openbot-cli as OpenBot v0.50.x installs it on Linux, run with bun. */
 export const DEFAULT_CLI = ["bun", "/opt/OpenBot/app/resources/cli/openbot-cli.mjs"];
@@ -27,6 +27,18 @@ export function readBotConfig(): BotConfig {
   if (typeof c.agent !== "string" || c.agent.trim() === "") {
     throw new Error("config agent must be a non-empty string");
   }
+  // `agents` maps a repo name to its own OpenBot agent (one agent per project); absent means {}.
+  let agents: Record<string, string> = {};
+  if (c.agents !== undefined) {
+    const a = c.agents;
+    if (
+      typeof a !== "object" || a === null || Array.isArray(a) ||
+      !Object.entries(a).every(([k, v]) => k.trim() !== "" && typeof v === "string" && v.trim() !== "")
+    ) {
+      throw new Error("config agents must map repo names to non-empty agent names");
+    }
+    agents = { ...(a as Record<string, string>) };
+  }
   let cli = DEFAULT_CLI;
   if (c.cli !== undefined) {
     if (!Array.isArray(c.cli) || c.cli.length === 0 || !c.cli.every((a) => typeof a === "string" && a !== "")) {
@@ -42,6 +54,7 @@ export function readBotConfig(): BotConfig {
   };
   return {
     agent: c.agent,
+    agents,
     cli: [...cli],
     db: path("db", join(openbotDir(), "openbot.db")),
     automationDir: path("automationDir", join(openbotDir(), "automation")),

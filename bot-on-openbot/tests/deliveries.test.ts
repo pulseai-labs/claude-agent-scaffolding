@@ -2,7 +2,9 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { all, close, find, followUp, followUpKey, open, record, type DeliveryRec } from "../src/deliveries.ts";
+import { agentOf, all, close, find, followUp, followUpKey, open, record, type DeliveryRec } from "../src/deliveries.ts";
+import { serve } from "../src/serve.ts";
+import { captureErr, makeEnv, serveOpts } from "./helpers.ts";
 
 let dir: string;
 beforeEach(() => {
@@ -57,4 +59,23 @@ test("a follow-up carries the parent's run, unit and park and opens unsent", () 
   const f = followUp(parent, { say: "done" });
   expect(f).toEqual({ key: "k#1", phase: "asked", run: "r1", unit: "u1", park_at: "p", title: "t", say: "done" });
   expect(f.ask_id).toBeUndefined();
+});
+
+test("a follow-up carries the parent's agent", () => {
+  expect(followUp(rec("k", { agent: "p_bot" }), { say: "done" }).agent).toBe("p_bot");
+  expect("agent" in followUp(rec("j"), { say: "done" })).toBe(false);
+});
+
+test("a 0.1.x record without agent reads as the default", async () => {
+  expect(agentOf(rec("a"), "Autopilot")).toBe("Autopilot");
+  expect(agentOf(rec("a", { agent: "p_bot" }), "Autopilot")).toBe("p_bot");
+  const env = makeEnv();
+  try {
+    record({ key: "r1/done", phase: "asked", run: "r1", title: "t", say: "t", ask_id: "d1" }); // as 0.1.x wrote it
+    env.status("d1", "running", "turn-1");
+    await captureErr(() => serve(serveOpts(env, T)));
+    expect(env.calls().map((c) => c.argv)).toEqual([["status", "Autopilot", "d1", "--json"]]);
+  } finally {
+    env.cleanup();
+  }
 });

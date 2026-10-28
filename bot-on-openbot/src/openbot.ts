@@ -35,6 +35,7 @@ export interface OpenBot {
   resolved(turnId: string): Promise<Resolved>;
   pending(): Promise<Prompt[]>;
   answer(prompt: Prompt, label: string): Promise<"ok" | "closed">;
+  exists(): Promise<boolean>;
 }
 
 export type OpenBotConfig = { agent: string; cli: string[]; db: string; automationDir: string };
@@ -143,20 +144,29 @@ export function makeOpenBot(cfg: OpenBotConfig): OpenBot {
     }
     return { status: res.status, json };
   };
-  // The agent's id, found as openbot-cli finds it: by id, or the one agent with that name (case ignored).
-  const agentId = async (): Promise<string> => {
+  // The agents that match the configured agent: by id, else every agent with that name (case ignored).
+  const matches = async (): Promise<{ id: string; name: string }[]> => {
     const r = await http("agents", "GET", "/v1/agents");
     if (r.status !== 200 || !Array.isArray(r.json)) throw new OpenBotDown(`OpenBot agents: HTTP ${r.status}`);
     const agents = r.json.filter((a): a is { id: string; name: string } => isObj(a) && typeof a.id === "string" && typeof a.name === "string");
     const byId = agents.find((a) => a.id === cfg.agent);
-    if (byId) return byId.id;
+    if (byId) return [byId];
     const want = cfg.agent.trim().toLocaleLowerCase();
-    const named = agents.filter((a) => a.name.trim().toLocaleLowerCase() === want);
-    if (named.length !== 1) throw new OpenBotDown(`OpenBot agents: ${named.length} agents match the configured name`);
-    return named[0]!.id;
+    return agents.filter((a) => a.name.trim().toLocaleLowerCase() === want);
+  };
+  // The agent's id, found as openbot-cli finds it: by id, or the one agent with that name.
+  const agentId = async (): Promise<string> => {
+    const found = await matches();
+    if (found.length !== 1) throw new OpenBotDown(`OpenBot agents: ${found.length} agents match the configured name`);
+    return found[0]!.id;
   };
 
   return {
+    // True when exactly one agent matches; zero or several is false, an OpenBot that does not answer throws.
+    async exists() {
+      return (await matches()).length === 1;
+    },
+
     // `run <agent> - --id <id> --json`, no --wait (run-queued.json: {deliveryId, status: "queued"}).
     async run(task, id) {
       const { rc, json } = await cli(cfg, ["run", cfg.agent, "-", "--id", id, "--json"], task);
@@ -245,5 +255,18 @@ export function makeOpenBot(cfg: OpenBotConfig): OpenBot {
       if (r.status >= 200 && r.status < 300) return "ok";
       throw new OpenBotDown(`OpenBot answer: HTTP ${r.status}`);
     },
+  };
+}
+
+// One client per agent name, made on first use and kept: each project's agent is its own client.
+export function makeOpenBots(cfg: Omit<OpenBotConfig, "agent">): (agent: string) => OpenBot {
+  const clients = new Map<string, OpenBot>();
+  return (agent) => {
+    let c = clients.get(agent);
+    if (!c) {
+      c = makeOpenBot({ ...cfg, agent });
+      clients.set(agent, c);
+    }
+    return c;
   };
 }

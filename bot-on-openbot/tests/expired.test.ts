@@ -8,7 +8,7 @@ import { find, record } from "../src/deliveries.ts";
 import { serve } from "../src/serve.ts";
 import { spoolNotice } from "../src/spool.ts";
 import { messageTask } from "../src/task.ts";
-import { captureErr, defaultRun, FIX, makeEnv, P1, type Env } from "./helpers.ts";
+import { captureErr, defaultRun, FIX, makeEnv, P1, serveOpts, type Env } from "./helpers.ts";
 
 const T0 = new Date("2026-10-28T02:00:00Z");
 const PARK = `r1/u1/park/${P1}`;
@@ -21,7 +21,7 @@ beforeEach(() => {
 });
 afterEach(() => env.cleanup());
 
-const run = (stopAfter = 1) => captureErr(() => serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter, pollMs: 0 }));
+const run = (stopAfter = 1) => captureErr(() => serve(serveOpts(env, T0, stopAfter)));
 const runIds = () => env.calls().filter((c) => c.argv[0] === "run").map((c) => c.argv[4]);
 
 // The recorded expired row, moved to `turnId`.

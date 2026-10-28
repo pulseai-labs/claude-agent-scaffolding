@@ -20,15 +20,33 @@ test("cli default is the bun path", () => {
   expect(DEFAULT_CLI).toEqual(["bun", "/opt/OpenBot/app/resources/cli/openbot-cli.mjs"]);
   expect(readBotConfig()).toEqual({
     agent: "Autopilot",
+    agents: {},
     cli: ["bun", "/opt/OpenBot/app/resources/cli/openbot-cli.mjs"],
     db: join(homedir(), ".config", "OpenBot", "openbot.db"),
     automationDir: join(homedir(), ".config", "OpenBot", "automation"),
   });
 });
 
+test("agents defaults to empty", () => {
+  write({ agent: "Autopilot" });
+  expect(readBotConfig().agents).toEqual({});
+});
+
+test("agents maps repo names to agents", () => {
+  write({ agent: "A", agents: { pulse360: "p_bot" } });
+  expect(readBotConfig().agents).toEqual({ pulse360: "p_bot" });
+});
+
+test("agents must be an object of non-empty strings", () => {
+  for (const agents of [[], "x", { p: "" }, { p: 3 }, { "": "a" }]) {
+    write({ agent: "A", agents });
+    expect(() => readBotConfig()).toThrow("config agents must map repo names to non-empty agent names");
+  }
+});
+
 test("cli, db and automationDir can be set", () => {
   write({ agent: "A", cli: ["node", "/x/cli.mjs"], db: "/d/openbot.db", automationDir: "/d/automation" });
-  expect(readBotConfig()).toEqual({ agent: "A", cli: ["node", "/x/cli.mjs"], db: "/d/openbot.db", automationDir: "/d/automation" });
+  expect(readBotConfig()).toEqual({ agent: "A", agents: {}, cli: ["node", "/x/cli.mjs"], db: "/d/openbot.db", automationDir: "/d/automation" });
 });
 
 test("config needs an agent", () => {

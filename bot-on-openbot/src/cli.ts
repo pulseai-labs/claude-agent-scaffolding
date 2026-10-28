@@ -1,6 +1,7 @@
 import { defaultRunner } from "./actions.ts";
 import { readBotConfig } from "./config.ts";
-import { makeOpenBot } from "./openbot.ts";
+import { makeOpenBots } from "./openbot.ts";
+import { makeRouter } from "./route.ts";
 import { LockHeldError, serve } from "./serve.ts";
 import { installService, removeService } from "./service.ts";
 import { spoolNotice } from "./spool.ts";
@@ -46,9 +47,9 @@ function notifyCmd(args: string[]): number {
 }
 
 async function serveCmd(): Promise<number> {
-  let bot;
+  let cfg;
   try {
-    bot = makeOpenBot(readBotConfig());
+    cfg = readBotConfig();
   } catch (e) {
     process.stderr.write(`bot-on-openbot: ${(e as Error).message}\n`);
     return 1;
@@ -58,7 +59,12 @@ async function serveCmd(): Promise<number> {
   process.on("SIGTERM", quit);
   process.on("SIGINT", quit);
   try {
-    await serve({ bot, runner: defaultRunner, now: () => new Date(), ...(stop > 0 ? { stopAfter: stop } : {}) });
+    const botFor = makeOpenBots(cfg);
+    const route = makeRouter(cfg, botFor, defaultRunner);
+    await serve({
+      botFor, route, forget: route.forget, defaultAgent: cfg.agent,
+      runner: defaultRunner, now: () => new Date(), ...(stop > 0 ? { stopAfter: stop } : {}),
+    });
     return 0;
   } catch (e) {
     process.stderr.write(`bot-on-openbot: ${(e as Error).message}\n`);
