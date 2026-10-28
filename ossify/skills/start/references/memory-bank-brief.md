@@ -52,8 +52,9 @@ Two files earn special attention at bootstrap:
   section (the heading present, no rules). Rules are authored later via the
   rule-authoring flow routed from `doctor`.
 - **`08-governance.md`** ships with an empty `## Standing orders` section
-  (the heading present, no orders). An absent section reads as "no standing order": the
-  operator is asked, and the human walks the demo.
+  (the heading present, no orders). An absent or empty section settles no kind of order, so the
+  lookup goes on to `AGENTS.md` (`close/references/cumulative-demo.md` §3); with no order there
+  either, the operator is asked and the human walks the demo.
 - **Never emit a fill-in marker** (`TODO`, `<placeholder>`, `TBD`) into a memory
   bank file. Thin-and-true beats a marker that nobody will come back to.
 

@@ -164,7 +164,8 @@ at 1.24.0. No `lib/` code, no state change.
 Since 1.27.0, that standing order is read from the project's own files, not a
 host policy: `08-governance.md`'s `## Standing orders` section, then `AGENTS.md` for any
 kind that section does not settle (a canonical checkout reads its paired AI workspace
-through `.workspace/pairing.json`). An order binds only the role it names, and one naming
+through `.workspace/pairing.json`), as the base branch has them: an order a PR's own diff
+adds binds nothing in that PR. An order binds only the role it names, and one naming
 no role binds no one. `/ossify:start` seeds the section empty; with no order the human
 walks, as before. No `lib/` code, no state change.
 
