@@ -94,7 +94,7 @@ are not found and the skills that need them say so. A session started
 with `--no-extensions` needs `-e <that file>`.
 
 Guarded seats: install `omp-roles` and the two mods, then launch with `omp-seat` (the extensions load only
-through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, molt 0.3.0 (the first release whose OMP extension `omp-seat` loads; with an older install it refuses with an "is missing" message).
+through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, seat-mods 0.4.1 and molt 0.3.0 (the first releases whose OMP extensions `omp-seat` loads; with an older install it refuses with an "is missing" message).
 
     omp plugin install omp-roles@claude-agent-scaffolding   # and seat-mods, molt
     omp-seat worker --via omp -p "..."
