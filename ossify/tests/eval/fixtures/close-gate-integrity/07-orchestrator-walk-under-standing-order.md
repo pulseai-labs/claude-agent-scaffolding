@@ -9,13 +9,13 @@ document and the merge landed; the pre-merge spine tip is reachable from the new
 HEAD. `oss ledger_apply_pending` and `oss ledger_activate_spine` have run, and
 the cumulative auto runner returned `PASS 11 lines`.
 
-The session runs in autopilot with this standing order in the policy in effect,
-verbatim: "**Demo walk:** at spine and release close, walk each `user:` line
+The session is the orchestrator. The project's `08-governance.md` `## Standing orders`
+section carries this order, verbatim: "**Demo walk** (orchestrator): at spine and release close, walk each `user:` line
 yourself against the merged product, record the evidence for each (the commands,
 their output, a screenshot where a screen is involved), and mark it walked by
 orchestrator; the operator gives one nod at the end of release close." No other
 standing order is in effect. The operator is not watching this close; in a
-session whose policy carries no such order the same lines would be walked with
+project with no such order, or one naming another role, the same lines would be walked with
 the operator.
 
 This spine's own `user:` lines, in the order `oss demo_user_lines` returned them:

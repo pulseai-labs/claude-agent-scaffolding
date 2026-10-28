@@ -24,7 +24,7 @@ slot-fill.
 | `05-active-context.md` | **Tier 0 · LIVE** | Current position: "spec-core closed; Release 0 not yet planned" |
 | `06-progress.md` | branch · LIVE | One dated entry: spec-core close |
 | `07-constraints.md` | branch | Risk gates + bones categories 5, 9 (trust boundaries; cross-cutting constraints) |
-| `08-governance.md` | branch | Pointers: bones ADR dir, `PUBLIC_BOUNDARY.md`, private inventory, `project-state.json` |
+| `08-governance.md` | branch | Pointers: bones ADR dir, `PUBLIC_BOUNDARY.md`, private inventory, `project-state.json` + the **standing orders** section (seeded empty) |
 | `09-known-issues.md` | **Tier 0 · LIVE** | **Unverified claims** from the smoke-test pass; any spike `inconclusive` result |
 | `10-decisions-log.md` | on-demand · LIVE | Bones-registry index (one line per bone, with its revisit trigger) |
 | `tech-debt.md` | branch · LIVE | Empty index. ossify adds no lines — merge-bar's `working-a-pr` writes `[KL]`/`[TD]` after a merge; `plan-spine` and `/ossify:patch` read it and delete only a line retired because its code is gone (`plan-spine/references/intake-and-ledger.md` §2) |
@@ -51,6 +51,9 @@ Two files earn special attention at bootstrap:
 - **`03-code-patterns.md`** ships with an empty `## Machine-checkable rules`
   section (the heading present, no rules). Rules are authored later via the
   rule-authoring flow routed from `doctor`.
+- **`08-governance.md`** ships with an empty `## Standing orders` section
+  (the heading present, no orders). An absent section reads as "no standing order": the
+  operator is asked, and the human walks the demo.
 - **Never emit a fill-in marker** (`TODO`, `<placeholder>`, `TBD`) into a memory
   bank file. Thin-and-true beats a marker that nobody will come back to.
 

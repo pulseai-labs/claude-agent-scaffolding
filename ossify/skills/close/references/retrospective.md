@@ -65,7 +65,7 @@ fact, the same way §3 names a quarantined line.
 
 The `auto:` result (`PASS <n> lines`, or the line that failed and what was done
 about it) and the `user:` walk — which journeys the human drove, or you walked
-under a standing order in the autopilot policy that gives you the demo walk
+under a standing order in the project's memory bank or `AGENTS.md` that gives you the demo walk
 (`cumulative-demo.md` §3), and whether each outcome matched. Name any line that
 was **quarantined during this close**, with its expiry release.
 

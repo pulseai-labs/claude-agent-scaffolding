@@ -253,7 +253,7 @@ steps in **binding order**, plus **4b** (the bones registration, `spine-close.md
    must pass at this close.
 4. **The cumulative demo**: `oss demo_run` for every active `auto:` line, then
    walk **this spine's own** `user:` lines (`oss demo_user_lines <spine>`) with
-   the human, or yourself under a standing order in the autopilot policy that gives you the demo walk (`cumulative-demo.md` §3). **Halt on the first failure** — no later step runs.
+   the human, or yourself under a standing order in the project's memory bank or `AGENTS.md` that gives you the demo walk (`cumulative-demo.md` §3). **Halt on the first failure** — no later step runs.
 4b. **Register the bones this spine's plan declares** (`spine-close.md` §5b):
    `SPINE.md`'s `## Bones this spine registers` rows enter the bones registry via
    `oss bone_add`. A missing ADR file halts naming the ref; `None.` or no section is a no-op.
@@ -300,7 +300,7 @@ enforceable at a release boundary). Eight steps, in **binding order**:
    hard-halts, it is surfaced by name for the user to confirm.
 2. **The full cumulative walkthrough**: `oss demo_run` for every accumulated
    `auto:` line, then walk **every** active `user:` line with the human, or
-   yourself under a standing order in the autopilot policy that gives you the demo walk (`cumulative-demo.md` §3) — `oss demo_user_lines` with **no argument**. The amendments are already
+   yourself under a standing order in the project's memory bank or `AGENTS.md` that gives you the demo walk (`cumulative-demo.md` §3) — `oss demo_user_lines` with **no argument**. The amendments are already
    applied; the spines applied them. Grouping by feature is **derived** from
    `source_spine` and `oss feature_list`, not read off a field.
 3. **Blocking finding — fake expiry.** `oss expired_fakes "$rel"`, plus the

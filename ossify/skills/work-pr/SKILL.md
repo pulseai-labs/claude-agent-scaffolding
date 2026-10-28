@@ -1,6 +1,6 @@
 ---
 name: work-pr
-description: Use when driving a pull request to merge — merge-bar's working-a-pr if installed, else the bundled loop; every finding dispositioned, merge only on the operator's explicit ack, or a standing order's in the autopilot policy
+description: Use when driving a pull request to merge — merge-bar's working-a-pr if installed, else the bundled loop; every finding dispositioned, merge only on the operator's explicit ack, or a standing order's in the project's memory bank or `AGENTS.md`
 ---
 
 **Pick the loop, and say in one line which one before round 1.**
@@ -25,13 +25,13 @@ Under the bundled loop, three rails survive any adaptation:
 - **A deferral is a tracked issue, never a silent pass.** Every finding ends
   as `fixed in <sha>`, `deferred → #N`, or `invalid — <why>` (an
   evidence-shaped refutation) in the ledger you surface.
-- **The merge is the operator's, or a standing order's in the autopilot policy.**
+- **The merge is the operator's, or a standing order's in the project's memory bank or `AGENTS.md`.**
   Surface the ledger, the reviewer state, and a mergeability verdict, then stop at
-  the ask — or, under a standing order in the autopilot policy that grants merge
-  authority, treat a clean verdict as the ack (as `references/loop.md` §4 says).
+  the ask — or, under a standing order in the project's memory bank or `AGENTS.md` that
+  binds this role and grants merge authority (lookup: `close/references/cumulative-demo.md` §3), treat a clean verdict as the ack (as `references/loop.md` §4 says).
   Never auto-merge.
 
-Whichever loop runs, the merge is the operator's, or a standing order's in the autopilot policy,
+Whichever loop runs, the merge is the operator's, or a standing order's in the project's memory bank or `AGENTS.md`,
 and requirements a caller states in the invocation bind it: spine close states its landing (a merge commit where the repo allows one,
 else a squash or rebase of exactly the reviewed head) and no history rewrite.
 

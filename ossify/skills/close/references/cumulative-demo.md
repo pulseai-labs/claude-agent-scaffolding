@@ -28,7 +28,7 @@ the spec's, not an optimization:
 |---|---|---|
 | `auto:` lines | all accumulated, every run | all accumulated |
 | `user:` lines | **this spine's own contribution only** | **every** accumulated line, grouped by feature |
-| Who drives the `user:` half | the human, here, now, or yourself under a standing order in the autopilot policy that gives you the demo walk (§3) | the human, at the release gate, or yourself under that order (§3) |
+| Who drives the `user:` half | the human, here, now, or yourself under a standing order that gives you the demo walk (§3) | the human, at the release gate, or yourself under that order (§3) |
 
 One verb serves both: `oss demo_user_lines` **with** a spine argument filters to
 `source_spine == <spine>`; **without** one it returns every active `user:` line.
@@ -91,13 +91,20 @@ outcome matched. A line the human reports as not matching is a **failure**, and
 it halts exactly like an `auto:` failure — there is no "note it and move on" tier
 here.
 
-Under a standing order in the autopilot policy that gives you the demo walk, walk each line yourself,
+Under a standing order that gives you the demo walk, walk each line yourself,
 one at a time and in the same order, against the merged product. Record for each
 line the evidence the order requires — the commands you ran and their output, and
 a screenshot path where a screen is involved — and mark it `walked by orchestrator`
 in the read-out, never "walked by operator". A line you find failing is a
 **failure** and halts exactly as above. The read-out, with each line's evidence
 and its mark, goes to the operator.
+
+**Where the order lives.** A standing order is a written order in the project's memory bank
+(`08-governance.md`, `## Standing orders`) or, for any kind of order that section does not
+settle, in the project's `AGENTS.md`. In a canonical checkout, read the paired AI workspace's
+files (`.workspace/pairing.json`). An order binds only the role it names (one naming no role
+binds no one), so one naming the orchestrator does not bind a worker or PR-lane seat that reads
+the same file. A session whose role the order names walks; with none, the walk is the human's.
 
 Absent that order, the walk is the human's. You may not perform a `user:` line on the human's behalf and mark it passed.
 The whole reason the ledger keeps a `user:` half is that some outcomes are only
@@ -304,7 +311,7 @@ deferral on the session's judgment is the same failure as walking the line on th
 operator's behalf. The line is not cleared — it is still owed, now against a release,
 and the release close collects it with the operator present (`release-close.md` §5b).
 
-Under a standing order in the autopilot policy that gives you the demo walk, a
+Under a standing order that gives you the demo walk, a
 line is walked by the orchestrator, so the operator's absence is not a reason to
 defer one; a line that needs a person's own device or account still defers, with
 the operator's words.
@@ -407,7 +414,7 @@ records nothing at all.
   product.
 - **Treating a `user:` line's mismatch as advisory** (§3).
 - **Marking a `user:` line passed without the human**, absent the standing order
-  in the autopilot policy that gives you the walk (§3).
+  that gives you the walk (§3).
 - **Editing a demo line, its command, or its expectation to get past a failure**
   (§2).
 - **Quarantining a line this spine broke** (§4).
