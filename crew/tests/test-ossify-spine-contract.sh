@@ -2603,7 +2603,7 @@ for pair in "$GENERIC_BRIEFS_MD:11" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:
 done
 # The two fixed needles. Both wrap in the file today, so the flat join is each
 # pin's mode, as this suite's header says for a wrapped clause.
-pin "$EXEC_MD" 'under a standing order in the autopilot policy for seats and profiles, write the recommended set and continue; otherwise present every seat' \
+pin "$EXEC_MD" 'under a standing order in the project'\''s memory bank or AGENTS.md for seats and profiles, write the recommended set and continue; otherwise present every seat' \
   "ossify-execution.md §3: the seat set is written under the order, else presented" flat
 pin "$EXEC_MD" 'under that standing order, pick the reviewer and PR-fix profiles from the project file and record why; otherwise ask' \
   "ossify-execution.md §5: the reviewer and PR-fix profiles follow the order, else are asked" flat

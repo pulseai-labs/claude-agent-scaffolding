@@ -176,7 +176,7 @@ Seat launch) — as many times as that takes.
 **A close that halts on its own review returns `halted: close-review` with the
 ledger.** The ceremony's accumulated-diff review is the close seat's to run, never to
 fix: a `fix now` disposition ends that dispatch. The top asks the operator for a
-writer profile — or, under a standing order in the autopilot policy for seats and
+writer profile — or, under a standing order in the project's memory bank or AGENTS.md for seats and
 profiles, picks that profile from the project file and records why — and dispatches
 one writer per affected hosting repo — each in
 that repo's own spine worktree with a bounded edit scope, per

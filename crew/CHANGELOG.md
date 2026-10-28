@@ -9,6 +9,15 @@ All notable changes to the `crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.5.0
+
+The seat and profile orders crew reads come from the project's own files. `orchestrate` takes
+a standing order "in the project's memory bank or AGENTS.md" for seats and profiles where it
+named the autopilot policy, and points at merge-bar's working-a-pr "Standing orders"
+paragraph for where it is read and whom it binds, without restating it; the orders bind the
+orchestrator role, and with no standing order, or without merge-bar installed, the ask stays.
+No agent gains authority; the enrolled-authority text is unchanged.
+
 ## 0.4.3
 
 **Text only.** autonomic 0.11.0 no longer judges a turn end, so `orchestrate`'s completion text
