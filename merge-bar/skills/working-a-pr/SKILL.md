@@ -8,14 +8,14 @@ description: Use when working, driving, babysitting or landing a PR, addressing 
 Drive one PR to mergeable. The finish line is the **`## Merge bar`** in the PR's own body,
 written when it was opened (`opening-a-pr`). Every finding is judged against that bar, not
 against an ideal: the loop fixes what the bar says blocks, answers or records the rest, and
-merges on the operator's explicit ack, or under a standing order that grants merge authority.
-The loop is judgment; the shell is only for
+merges on the operator's explicit ack, or under a standing order (see **Standing orders**) that binds this role and grants merge
+authority. The loop is judgment; the shell is only for
 mechanical `git`/`gh` facts. Nothing here needs a manifest, a worktree, or any plugin state.
 
 **Standing orders.** A standing order is a written order in the project's memory bank
 (`08-governance.md`, `## Standing orders`) or, for any kind of order that section does not
 settle, in the project's `AGENTS.md`. In a canonical checkout, read the paired AI workspace's
-files (`.workspace/pairing.json`). An order binds only the role it names, so one naming the
+files (`.workspace/pairing.json`). An order binds only the role it names (one naming no role binds no one), so one naming the
 orchestrator does not bind a worker or PR-lane seat that reads the same file. With none, every
 ask below stays.
 
@@ -155,7 +155,7 @@ surfaced it or who asks — "just merge it" included.
 - **Reviewer completeness:** green CI is not proof a reviewer ran; a skipped reviewer is not
   approval; a queued reviewer is waited for or surfaced — never assumed. Confirm each expected
   reviewer actually left something on the current head. Do not busy-wait a queued reviewer:
-  say it is pending, and let the operator decide — unless a standing order
+  say it is pending, and let the operator decide — unless a standing order (see **Standing orders**) that binds this role
   names the fallback reviewer: then replace it and say so in the ledger.
 
 Sort by failure direction before acting: a finding that the boundary **refuses a valid input**
@@ -181,7 +181,7 @@ opened PR.
   fix commits wrote (check with `git blame` against the fix SHAs), stop. Do not start another round. Surface
   the findings, the fix commits they sit on, and two options for the operator: **narrow the
   Claim** — moving an edge into Known limits, only where it does not meet condition 1 — or
-  **split the PR**, naming the parts. The operator chooses. Under a standing order
+  **split the PR**, naming the parts. The operator chooses. Under a standing order (see **Standing orders**) that binds this role
   that settles the round stop, follow that order instead and record the
   choice in the stop report. Findings in that same round which
   sit on the PR's original commits are dispositioned on their merits alongside the stop report.
@@ -221,7 +221,7 @@ Then, in one place, give the operator:
   that only after the operator acks is the loop soliciting an impossible
   merge.
 
-Then **ask**: merge, wait, or leave open — or, under a standing order
+Then **ask**: merge, wait, or leave open — or, under a standing order (see **Standing orders**) that binds this role
 that grants merge authority, treat a clean verdict as the ack and say which order
 gave it. The ack covers **the head the ledger describes**: pass the reviewed OID
 (`gh pr merge --match-head-commit <oid>`, with the repo's merge convention —
@@ -283,5 +283,5 @@ where they go.
   stop fires only when the reading says your fixes are generating the findings.
 - **Ack-to-merging a blocking finding**, or letting "just merge it" relabel one as a limit.
 - **Trusting a pre-fix verdict on a post-fix head.**
-- **Auto-merging.** The merge is the operator's explicit call, or a standing order's; never a
+- **Auto-merging.** The merge is the operator's explicit call, or a standing order's that binds this role; never a
   merge queue's auto-merge.

@@ -14,8 +14,8 @@ watching. The session is the orchestrator (`SEAT_MODS_ROLE=orchestrator`). The w
   each edge that does not meet condition 1 into Known limits — fixes the blocking findings that
   remain, and continues; it splits the PR only when no narrowing keeps the Claim true, and says
   which parts.
-- **Reviewers:** a reviewer that cannot run on this head (quota, outage, not installed) is
-  replaced by the fallback reviewer the project's roles file names; the orchestrator never
+- **Reviewers:** the orchestrator replaces a reviewer that cannot run on this head (quota,
+  outage, not installed) with the fallback reviewer the project's roles file names, and never
   waits on a reviewer the merge bar does not require.
 
 The project's roles file names OMP `/review` as the fallback reviewer. The body's Claim reads
