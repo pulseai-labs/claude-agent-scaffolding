@@ -2146,9 +2146,9 @@ _PRW_LOOP="$HERE/../skills/work-pr/references/loop.md"
 _PRW_WP="$HERE/../skills/work-pr/SKILL.md"
 _PRW_SC="$HERE/../skills/close/references/spine-close.md"
 _PRW_CD="$HERE/../skills/close/references/cumulative-demo.md"
-pin "$_PRW_LOOP" 'Then **ask**: merge, wait, or leave open — or, under a standing order in the project'"'"'s memory bank or `AGENTS.md` that grants merge authority, treat a clean verdict as the ack and say which order gave it.' \
+pin "$_PRW_LOOP" 'Then **ask**: merge, wait, or leave open — or, under a standing order in the project'"'"'s memory bank or `AGENTS.md` that binds this role and grants merge authority, treat a clean verdict as the ack and say which order gave it.' \
   "loop.md's terminus does not take a standing order's clean verdict as the merge ack (#831)"
-pin "$_PRW_SC" "this ceremony does not ack on anyone's behalf; a standing order in the project's memory bank or \`AGENTS.md\` that grants merge authority is the operator's ack, given in advance" \
+pin "$_PRW_SC" "this ceremony does not ack on anyone's behalf; a standing order in the project's memory bank or \`AGENTS.md\` that binds this role and grants merge authority is the operator's ack, given in advance" \
   "spine-close.md does not say a standing order is the operator's ack given in advance (#831)"
 pin "$_PRW_WP" "the merge is the operator's, or a standing order's in the project's memory bank or \`AGENTS.md\`" \
   "work-pr/SKILL.md's 'whichever loop runs' sentence does not carry the standing-order merge (#831)"
@@ -2160,7 +2160,7 @@ pin "$_PRW_CD" 'You may not perform a `user:` line on the human'"'"'s behalf and
 # 1.27.0 - the order's home is the project's files, and it binds only the role it names.
 pin "$_PRW_CD" '(`08-governance.md`, `## Standing orders`)' \
   "cumulative-demo.md does not name the memory bank's Standing orders section as the order's home (1.27.0)"
-pin "$_PRW_CD" '`AGENTS.md`' \
+pin "$_PRW_CD" 'for any kind of order that section does not' \
   "cumulative-demo.md does not fall back to AGENTS.md for kinds the section does not settle (1.27.0)"
 pin "$_PRW_CD" '(`.workspace/pairing.json`)' \
   "cumulative-demo.md does not send a canonical checkout to the paired AI workspace's files (1.27.0)"
@@ -2181,6 +2181,10 @@ pin "$_PRW_SC" "the human, or yourself under a standing order in the project's m
   "spine-close.md's step-4 reference still gives the demo walk to the human alone (#869 disposition 1)"
 pin "$_PRW_WP" "the ask — or, under a standing order in the project's memory bank or \`AGENTS.md\` that" \
   "work-pr/SKILL.md's merge rail still stops at the ask with no standing-order branch (#869 disposition 2)"
+pin "$_PRW_WP" "binds this role and grants merge authority (lookup:" \
+  "work-pr/SKILL.md's merge rail dropped 'binds this role and grants merge authority' - an order binds only the role it names (1.27.0)"
+pin "$_PRW_LOOP" "that binds this role names" \
+  "loop.md's fallback-reviewer order lost its role cue (1.27.0)"
 pin "$_PRW_WP" "Never auto-merge." \
   "work-pr/SKILL.md's merge rail lost 'Never auto-merge' - a merge queue's auto-merge stays forbidden (#869 disposition 2)"
 

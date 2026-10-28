@@ -150,8 +150,8 @@ lean one. doctor's and close's `fail: state` remedy names `/ossify:start` or
 `/ossify:adopt`, which each run `init`, instead of a bare `init`. No `lib/`
 code, no state change.
 
-Since 1.25.0 (#831, #832), the merge and the demo walk take a
-standing order when the session has one. work-pr's
+Since 1.25.0 (#831, #832; autopilot slice 1), the merge and the demo walk take a
+standing order in the autopilot policy when the session has one. work-pr's
 bundled loop, `/ossify:patch` and the spine close merge on the operator's
 explicit ack or on a standing order that grants merge authority — the terminus
 treats a clean verdict as that ack and the ledger names which order gave it —
