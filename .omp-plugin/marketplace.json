@@ -53,12 +53,6 @@
       "source": "./molt"
     },
     {
-      "name": "autonomic",
-      "description": "Autopilot as a Claude Code mod: standing orders in the system prompt; a cached fork judges each AskUserQuestion and permission ask against the policy and scope, never a turn end; a committed decision ledger; a closed pain list by toast, band and bell. Fails toward manual.",
-      "category": "workflow",
-      "source": "./autonomic"
-    },
-    {
       "name": "omp-roles",
       "description": "OMP role pack for default mode. 0.5.0 ships omp-seat, the launcher that pins its OMP extensions onto a seat, plus the implementer and seat-reviewer agents and the spine-driver, close, work-pr and orchestrator coordinator roles, launched with omp-seat <role>; since 0.6.0 also crew-spine and crew-work-pr; since 0.7.0 every seat runs with omp's todo reminders off, so molt's handoff can reach idle; since 0.7.2 its orchestrator role needs crew 0.3.0 (its procedure, the orchestrate skill); omp-seat orc opens the orchestrator on omp-glm; since 0.9.0 it pins two extensions and runs no authority preflight. OMP only.",
       "category": "workflow",

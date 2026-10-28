@@ -37,6 +37,7 @@ is_survivor() {
     */CHANGELOG.md) return 0 ;;                  # released history: a changelog records what shipped
     CHANGELOG.md) return 0 ;;                    # root-level changelog, same reason
     docs/conventions/skill-first.md) return 0 ;; # cites the retired plugin's 0.5.0 as evidence: history
+    crew/README.md) return 0 ;;                  # its released "Since 0.2.9 / 0.2.10 / 0.2.18" paragraphs name the retired plugin: release history, never edited
   esac
   return 1
 }

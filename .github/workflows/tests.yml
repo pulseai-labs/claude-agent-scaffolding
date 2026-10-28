@@ -82,9 +82,6 @@ jobs:
       - name: molt suite
         run: bash molt/run-tests.sh
 
-      - name: autonomic suite
-        run: bash autonomic/run-tests.sh
-
       - name: dual-publish parity (repo-root)
         run: bash tests/test-codex-dual-publish.sh
 
