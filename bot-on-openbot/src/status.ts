@@ -2,28 +2,37 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readBotConfig } from "./config.ts";
-import { open } from "./deliveries.ts";
+import { agentOf, open } from "./deliveries.ts";
 import { serviceState } from "./service.ts";
 import { listSpool } from "./spool.ts";
 
 const LIST_TIMEOUT_MS = 30_000;
 
-// The configured agent, and whether `openbot-cli list` finds it (by id, or the one agent with that
-// name, case ignored, as openbot-cli resolves it). openbot-cli never prints the token; nor does this.
-function agentLine(): string {
+// Every agent the bridge uses: the default, the per-repo agents, then agents of open records, each
+// once. Whether `openbot-cli list` (one call) finds it, by id or by the one agent with that name, case
+// ignored, as openbot-cli resolves it; `, open: <keys>` when it has open deliveries. openbot-cli never
+// prints the token; nor does this.
+function agentLines(): string[] {
   let cfg;
   try {
     cfg = readBotConfig();
   } catch (e) {
-    return `agent: MISSING (${(e as Error).message})`;
+    return [`agent: MISSING (${(e as Error).message})`];
   }
+  const openKeys = new Map<string, string[]>();
+  for (const r of open()) {
+    const n = agentOf(r, cfg.agent);
+    openKeys.set(n, [...(openKeys.get(n) ?? []), r.key]);
+  }
+  const names = [...new Set([cfg.agent, ...Object.values(cfg.agents), ...openKeys.keys()])];
+  const withOpen = (n: string, s: string): string => `agent: ${n} ${s}` + (openKeys.has(n) ? `, open: ${openKeys.get(n)!.join(", ")}` : "");
   let p: ReturnType<typeof Bun.spawnSync>;
   try {
     p = Bun.spawnSync([...cfg.cli, "list", "--json"], {
       stdout: "pipe", stderr: "ignore", timeout: LIST_TIMEOUT_MS, env: { ...process.env },
     });
   } catch {
-    return `agent: ${cfg.agent} (openbot-cli could not start)`;
+    return names.map((n) => withOpen(n, "(openbot-cli could not start)"));
   }
   let agents: unknown;
   try {
@@ -31,11 +40,15 @@ function agentLine(): string {
   } catch {
     agents = undefined;
   }
-  if (p.exitCode !== 0 || !Array.isArray(agents)) return `agent: ${cfg.agent} (openbot-cli list failed: exit ${p.exitCode ?? "killed"})`;
-  const want = cfg.agent.trim().toLocaleLowerCase();
-  const found = agents.filter((a: { id?: unknown; name?: unknown }) =>
-    a?.id === cfg.agent || (typeof a?.name === "string" && a.name.trim().toLocaleLowerCase() === want));
-  return found.length === 1 ? `agent: ${cfg.agent} (openbot-cli list finds it)` : `agent: ${cfg.agent} NOT FOUND by openbot-cli list`;
+  if (p.exitCode !== 0 || !Array.isArray(agents)) {
+    return names.map((n) => withOpen(n, `(openbot-cli list failed: exit ${p.exitCode ?? "killed"})`));
+  }
+  return names.map((n) => {
+    const want = n.trim().toLocaleLowerCase();
+    const found = agents.filter((a: { id?: unknown; name?: unknown }) =>
+      a?.id === n || (typeof a?.name === "string" && a.name.trim().toLocaleLowerCase() === want));
+    return withOpen(n, found.length === 1 ? "(openbot-cli list finds it)" : "NOT FOUND by openbot-cli list");
+  });
 }
 
 // What baton would run for a notice: argv[0] of its `notify`, found as a path or on PATH.
@@ -54,7 +67,7 @@ function batonNotifyLine(): string {
 
 export function statusText(): string {
   return [
-    agentLine(), `service: ${serviceState()}`, `spool: ${listSpool().length}`, `open deliveries: ${open().length}`,
+    ...agentLines(), `service: ${serviceState()}`, `spool: ${listSpool().length}`, `open deliveries: ${open().length}`,
     batonNotifyLine(), "",
   ].join("\n");
 }
