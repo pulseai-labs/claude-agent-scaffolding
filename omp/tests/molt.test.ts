@@ -620,6 +620,22 @@ describe('settings, the stage file and the active marker', () => {
     expect(w.notes.some(x => x.includes('no progress'))).toBe(false)
   })
 
+  test('a stale autopilot record does not exempt the unattended pause', async () => {
+    const files = { '/h/h.md': 'h' }
+    const { w, m } = world({ files })
+    for (const id of ['S1', 'S2', 'S3']) w.files.set(`${HOME}/.claude/state/${GONE}/sessions/${id}.json`, '{"mode":"autopilot"}')
+    w.percent = 66
+    w.branch = marked('/h/h.md')
+    let n = 1
+    w.onClear = async () => { w.id = `S${++n}`; await m.onSessionSwitch('new') }
+    await m.onSessionStop()
+    await m.onSessionStop()
+    expect(w.seeds).toHaveLength(2)
+    await m.onSessionStop()
+    expect(w.seeds).toHaveLength(2)
+    expect(w.notes.some(x => x.includes('molt paused: 2 molts in a row'))).toBe(true)
+  })
+
   test('status has no mode line', async () => {
     const { m } = world()
     const s = await m.onCommand('status')
