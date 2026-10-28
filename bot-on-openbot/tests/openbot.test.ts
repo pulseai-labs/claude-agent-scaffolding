@@ -83,6 +83,8 @@ const bot = (over: Partial<{ db: string; automationDir: string }> = {}) =>
 const TAP_TURN = "01a17e48-feb8-7281-b5be-ec01e0b24c9f";
 const TEXT_TURN = "01a17e46-fce5-7d40-bc28-a554f07cf4ea";
 const tapRow = () => JSON.parse(fixture("openbot-db-prompt-resolved-tap.json"));
+const EXPIRED_TURN = "01a17eea-e408-7cd1-8a8b-912f4655672f";
+const expiredRow = () => JSON.parse(fixture("openbot-db-prompt-resolved-expired.json"));
 
 test("run returns the delivery id", async () => {
   replies({ run: "run-queued.json" });
@@ -142,6 +144,36 @@ test("status: a failed, interrupted or cancelled delivery is failed; an unknown 
   await expect(bot().status("d")).rejects.toBeInstanceOf(OpenBotRefused);
   replies({ status: { stdout: JSON.stringify({ ok: true, exitCode: 0, status: "weird", turnId: null }), rc: 0 } });
   await expect(bot().status("d")).rejects.toBeInstanceOf(OpenBotDown);
+});
+
+test("status: starting is not ended (#943), and the recorded delivery a restart interrupted is failed", async () => {
+  replies({ status: { stdout: JSON.stringify({ ok: true, exitCode: 0, status: "starting", turnId: null, answer: null }), rc: 0 } });
+  expect((await bot().status("d")).state).toBe("queued");
+  replies({ status: { file: "status-interrupted-after-restart.json", rc: 1 } });
+  expect(await bot().status("ea1d1864-7ab1-49c1-b19b-64e183b8ee59")).toEqual({ state: "failed", turnId: EXPIRED_TURN, text: null });
+});
+
+test("resolved reads a question OpenBot expired on restart as expired (#943)", async () => {
+  const db = seedDb([{ type: "prompt.resolved", payload: expiredRow() }]);
+  expect(await bot({ db }).resolved(EXPIRED_TURN)).toBe("expired");
+});
+
+test("an expired row of another shape is unreadable, not expired", async () => {
+  const shapes: [string, (p: any) => void][] = [
+    ["two questions", (p) => p.changedMessages[0].questionPrompt.questions.push({ ...p.changedMessages[0].questionPrompt.questions[0], id: "two" })],
+    ["no question id", (p) => delete p.changedMessages[0].questionPrompt.questions[0].id],
+    ["the prompt message of another turn", (p) => (p.changedMessages[0].turnId = TAP_TURN)],
+    ["two prompt messages", (p) => p.changedMessages.push(p.changedMessages[0])],
+    ["another resolution status", (p) => (p.changedMessages[0].questionPrompt.resolution.status = "cancelled")],
+    ["expired, yet with responses", (p) => (p.changedMessages[0].questionPrompt.resolution.responses = { reply: { answers: ["red"] } })],
+  ];
+  for (const [what, mutate] of shapes) {
+    rmSync(join(dir, "openbot.db"), { force: true });
+    const p = expiredRow();
+    mutate(p);
+    const db = seedDb([{ type: "prompt.resolved", payload: p }]);
+    expect([what, await bot({ db }).resolved(EXPIRED_TURN)]).toEqual([what, "unreadable"]);
+  }
 });
 
 test("resolved reads a tap", async () => {

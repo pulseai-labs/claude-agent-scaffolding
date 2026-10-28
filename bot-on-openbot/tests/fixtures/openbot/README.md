@@ -18,5 +18,10 @@ with `<redacted>`; no token appears in any file.
   (`prompt.requested`; `prompt.resolved` after a phone tap, `green`, and after typed text, `teal`).
   `openbot-db-orchestration-events.schema.sql` is that table's schema; tests seed temp databases
   from it.
+- `openbot-db-prompt-resolved-expired.json`: the `prompt.resolved` `payload_json` an OpenBot restart wrote
+  for a question still open (dry run `dry-b`, 2026-10-28, issue #943): `resolution.status` is
+  `expired`, with no `responses`.
+- `status-interrupted-after-restart.json`: `status --json` on that question's delivery after the
+  restart: `interrupted` (exit 1), with OpenBot's restart error.
 - `draft-reply.json`: a completed draft run (`status --json`); its `answer` is the JSON the draft
   wording asks for.
