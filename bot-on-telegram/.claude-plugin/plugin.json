@@ -1,8 +1,0 @@
-{
-  "name": "bot-on-telegram",
-  "version": "0.2.0",
-  "description": "Sends baton notices to one Telegram chat, with buttons, and turns button presses into baton actions. A CLI and a service; no skill.",
-  "author": {
-    "name": "Pras"
-  }
-}
