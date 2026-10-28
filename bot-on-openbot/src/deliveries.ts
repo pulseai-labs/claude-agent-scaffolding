@@ -77,6 +77,10 @@ export function agentOf(r: DeliveryRec, dflt: string): string {
   return r.agent ?? dflt;
 }
 
+/** One agent's identity: OpenBot resolves a name with case and outer spaces ignored. The stored name
+ * stays as given; only comparisons use this. */
+export const agentKey = (name: string): string => name.trim().toLocaleLowerCase();
+
 export function open(): DeliveryRec[] {
   return all().filter((r) => r.phase !== "closed");
 }

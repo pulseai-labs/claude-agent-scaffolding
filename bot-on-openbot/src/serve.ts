@@ -2,7 +2,7 @@ import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } f
 import { join } from "node:path";
 import { parseScreen, screen, type Runner } from "./actions.ts";
 import { readUnit } from "./baton-state.ts";
-import { agentOf, close, find, followUp, open, record, type DeliveryRec } from "./deliveries.ts";
+import { agentKey, agentOf, close, find, followUp, open, record, type DeliveryRec } from "./deliveries.ts";
 import { parseKey, type Notice } from "./notice.ts";
 import { log } from "./log.ts";
 import { blockedOffer, offerFor, type Offer } from "./offer.ts";
@@ -116,14 +116,14 @@ export async function serve(opts: ServeOptions): Promise<void> {
 // ---- drain -----------------------------------------------------------------------------------
 // The spool in order, each notice to its agent, but only while that agent has no delivery open: an
 // unanswered OpenBot question blocks the agent's queue (spike ruling), so the bridge keeps one in
-// flight per agent. A notice whose agent is busy stays spooled and the drain goes on to later ones,
+// flight per agent (names compared as OpenBot resolves them: case and outer spaces ignored). A notice whose agent is busy stays spooled and the drain goes on to later ones,
 // so the order holds within each agent. A refused or failed run holds its agent for this loop and
 // keeps the file, so the notice goes later, in order; a refused run also drops its run's cached
 // route, so an agent deleted or renamed since is resolved again (and falls back) next loop. A notice whose agent cannot be told (route:
 // OpenBot down) stops the drain and keeps the file: no later notice may overtake it.
 
 async function drain(opts: ServeOptions): Promise<void> {
-  const held = new Set<string>(); // agents whose run was refused or failed this loop
+  const held = new Set<string>(); // agentKey of each agent whose run was refused or failed this loop
   for (const { path, item } of listSpool()) {
     if (find(item.key)) {
       removeSpool(path); // asked once already: --id would return the same delivery anyway
@@ -139,14 +139,15 @@ async function drain(opts: ServeOptions): Promise<void> {
       return;
     }
     const { agent } = route;
-    if (held.has(agent) || open().some((r) => agentOf(r, opts.defaultAgent) === agent)) continue;
+    const id = agentKey(agent);
+    if (held.has(id) || open().some((r) => agentKey(agentOf(r, opts.defaultAgent)) === id)) continue;
     try {
       await deliver(item.key, item.message, route.note, agent, opts);
     } catch (e) {
       if (!stopsDrain(e)) throw e;
       if (e instanceof OpenBotRefused && n.kind !== "plain") opts.forget?.(n.run);
       log(`drain stopped: ${agent}: ${(e as Error).message}`);
-      held.add(agent);
+      held.add(id);
       continue;
     }
     if (route.note !== undefined) log(`${item.key}: ${route.note}`); // once, when it goes

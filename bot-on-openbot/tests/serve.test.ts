@@ -330,6 +330,22 @@ test("a refused run drops its cached route, so a deleted agent falls back on the
   expect(r.err.join("")).toContain(`bot-on-openbot: ${PARK}: [pulse360: no OpenBot agent`);
 });
 
+test("agent names differing only in case or spaces are one queue", async () => {
+  record({ key: "k0", phase: "asked", run: "r9", title: "t", say: "x", ask_id: "d0", agent: "autopilot" });
+  env.setReplies({ run: [{ stdout: '{"ok":false,"exitCode":1,"error":"limit"}', rc: 1 }, env.delivery("d2")] });
+  env.status("d0", "running");
+  spoolNotice("a/1", "m"); // routed to Autopilot, which has k0 open as autopilot
+  await run(1, async () => ({ agent: "Autopilot" }));
+  expect(runAgents()).toEqual([]);
+  expect(listSpool().map((s) => s.item.key)).toEqual(["a/1"]);
+
+  record({ key: "k0", phase: "closed", run: "r9", title: "t", say: "x", ask_id: "d0", agent: "autopilot" });
+  spoolNotice("b/done", "m2");
+  await run(1, async (n) => ({ agent: n.kind === "plain" ? "Autopilot" : " AUTOPILOT" }));
+  expect(runAgents()).toEqual(["Autopilot"]); // refused: holds " AUTOPILOT" too, so b/done waits
+  expect(listSpool().map((s) => s.item.key)).toEqual(["a/1", "b/done"]);
+});
+
 test("route down keeps the notice and stops the drain", async () => {
   env.setReplies({ run: env.delivery("d1") });
   spoolNotice(PARK, "m");

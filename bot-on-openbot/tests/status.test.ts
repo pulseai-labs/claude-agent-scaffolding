@@ -107,3 +107,21 @@ test("status prints one agent line per agent, marks open deliveries, and lists o
   expect(out).toContain("agent: Autopilot (openbot-cli list finds it), open: k4\n");
   expect(out.split("\n").filter((l) => l.startsWith("agent: ")).length).toBe(3);
 });
+
+test("status counts agent names differing only in case or spaces as one agent", () => {
+  writeFileSync(join(cfg, "config.json"), JSON.stringify({
+    agent: "Autopilot", agents: { pulse360: "Pulse360_Autopilot" }, cli: [FAKE], automationDir: join(dir, "automation"),
+  }));
+  list({ ok: true, exitCode: 0, agents: [{ id: "agent-7a6bdc91", name: "Autopilot" }, { id: "x", name: "pulse360_autopilot" }] });
+  mkdirSync(join(dir, "state"), { recursive: true });
+  writeFileSync(join(dir, "state", "deliveries.jsonl"), [
+    { key: "k1", phase: "asked", agent: "autopilot", run: "r", title: "t" },
+    { key: "k2", phase: "asked", run: "r", title: "t" },
+    { key: "k3", phase: "asked", agent: "pulse360_autopilot ", run: "r", title: "t" },
+  ].map((r) => JSON.stringify(r)).join("\n") + "\n");
+  const lines = status().out.split("\n").filter((l) => l.startsWith("agent: "));
+  expect(lines).toEqual([
+    "agent: Autopilot (openbot-cli list finds it), open: k1, k2",
+    "agent: Pulse360_Autopilot (openbot-cli list finds it), open: k3",
+  ]);
+});

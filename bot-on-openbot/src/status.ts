@@ -2,14 +2,14 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { readBotConfig } from "./config.ts";
-import { agentOf, open } from "./deliveries.ts";
+import { agentKey, agentOf, open } from "./deliveries.ts";
 import { serviceState } from "./service.ts";
 import { listSpool } from "./spool.ts";
 
 const LIST_TIMEOUT_MS = 30_000;
 
 // Every agent the bridge uses: the default, the per-repo agents, then agents of open records, each
-// once. Whether `openbot-cli list` (one call) finds it, by id or by the one agent with that name, case
+// once (case and outer spaces ignored, as OpenBot resolves a name; the first spelling is shown). Whether `openbot-cli list` (one call) finds it, by id or by the one agent with that name, case
 // ignored, as openbot-cli resolves it; `, open: <keys>` when it has open deliveries. openbot-cli never
 // prints the token; nor does this.
 function agentLines(): string[] {
@@ -19,13 +19,20 @@ function agentLines(): string[] {
   } catch (e) {
     return [`agent: MISSING (${(e as Error).message})`];
   }
-  const openKeys = new Map<string, string[]>();
+  const shown = new Map<string, string>(); // agentKey -> the first spelling met
+  const openKeys = new Map<string, string[]>(); // agentKey -> open record keys
+  for (const n of [cfg.agent, ...Object.values(cfg.agents)]) if (!shown.has(agentKey(n))) shown.set(agentKey(n), n);
   for (const r of open()) {
     const n = agentOf(r, cfg.agent);
-    openKeys.set(n, [...(openKeys.get(n) ?? []), r.key]);
+    const k = agentKey(n);
+    if (!shown.has(k)) shown.set(k, n);
+    openKeys.set(k, [...(openKeys.get(k) ?? []), r.key]);
   }
-  const names = [...new Set([cfg.agent, ...Object.values(cfg.agents), ...openKeys.keys()])];
-  const withOpen = (n: string, s: string): string => `agent: ${n} ${s}` + (openKeys.has(n) ? `, open: ${openKeys.get(n)!.join(", ")}` : "");
+  const names = [...shown.values()];
+  const withOpen = (n: string, s: string): string => {
+    const keys = openKeys.get(agentKey(n));
+    return `agent: ${n} ${s}` + (keys ? `, open: ${keys.join(", ")}` : "");
+  };
   let p: ReturnType<typeof Bun.spawnSync>;
   try {
     p = Bun.spawnSync([...cfg.cli, "list", "--json"], {
@@ -44,9 +51,9 @@ function agentLines(): string[] {
     return names.map((n) => withOpen(n, `(openbot-cli list failed: exit ${p.exitCode ?? "killed"})`));
   }
   return names.map((n) => {
-    const want = n.trim().toLocaleLowerCase();
+    const want = agentKey(n);
     const found = agents.filter((a: { id?: unknown; name?: unknown }) =>
-      a?.id === n || (typeof a?.name === "string" && a.name.trim().toLocaleLowerCase() === want));
+      a?.id === n || (typeof a?.name === "string" && agentKey(a.name) === want));
     return withOpen(n, found.length === 1 ? "(openbot-cli list finds it)" : "NOT FOUND by openbot-cli list");
   });
 }
