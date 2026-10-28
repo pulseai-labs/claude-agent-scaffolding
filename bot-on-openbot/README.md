@@ -166,6 +166,8 @@ Only one `serve` runs at a time; a second exits with code 3.
   loop while a question waits. A typed answer `settled`, where `settled` is not an offered label, reads
   as the bridge's own dismissal: nothing runs and the question is asked again (or closed, the second
   time).
+- An OpenBot restart expires an open question. Nothing runs; the bridge asks it again once while its
+  park is open, else closes it and tells the operator (seen once, dry run 2026-10-28).
 - Delivery is at least once: a crash between a run and the spool delete runs it again with the same
   `--id`, which OpenBot answers with the same delivery.
 - The draft is the model's: its summary and recommendation can be wrong. A draft that is not the JSON

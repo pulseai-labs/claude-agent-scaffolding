@@ -46,6 +46,11 @@ function settled(r: DeliveryRec): boolean {
   return readUnit(r.run, r.unit)?.parked?.at !== r.park_at;
 }
 
+/** Still in its park, known: the run reads as armed or parked, and a park question's unit is at its park. */
+export function stillOpen(r: DeliveryRec): boolean {
+  return runReadable(r.run) && ["armed", "parked"].includes(runStatus(r.run) ?? "") && !settled(r);
+}
+
 // Answer the record's prompt with `settled` when it is on /pending. True when there is nothing left to
 // answer: answered, already closed (409), or the delivery ended without one. False: try next loop.
 // The delivery is read first: the agent runs one turn at a time, so a prompt is the record's only

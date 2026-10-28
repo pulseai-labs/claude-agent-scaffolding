@@ -20,6 +20,7 @@ export type DeliveryRec = {
   closed_at?: string; closed_by?: "tap" | "settled" | "gone" | "sent";
   unanswered?: true;           // settled, but its OpenBot prompt is still to be answered "settled"
   reasks?: 1;                  // asked again once, firmer, after the agent asked it without its options (#939)
+  expired?: true;              // that re-ask follows an OpenBot restart that expired the question (#943): not firmer
 };
 
 const logPath = (): string => join(stateDir(), "deliveries.jsonl");

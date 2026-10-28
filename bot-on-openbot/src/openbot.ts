@@ -11,7 +11,7 @@ import { join } from "node:path";
 
 export type Prompt = { requestId: string; questionId: string; header: string; question: string; options: string[] };
 export type Delivery = { state: "queued" | "running" | "completed" | "failed"; turnId: string | null; text: string | null };
-export type Resolved = { questionId: string; answer: string } | "none" | "unreadable";
+export type Resolved = { questionId: string; answer: string } | "none" | "expired" | "unreadable";
 
 /** OpenBot cannot be reached, gave no JSON, or its db cannot be opened: try again on a later loop. */
 export class OpenBotDown extends Error {
@@ -77,14 +77,17 @@ async function cli(cfg: OpenBotConfig, args: string[], stdin?: string): Promise<
   }
 }
 
+// OpenBot's delivery statuses, all of them (issue #943: `starting` is the first seconds of a run).
 const STATES: Record<string, Delivery["state"]> = {
-  queued: "queued", running: "running", completed: "completed",
+  queued: "queued", starting: "queued", running: "running", completed: "completed",
   failed: "failed", interrupted: "failed", cancelled: "failed",
 };
 
 // One `prompt.resolved` payload → the one answer it holds, or unreadable. The path is the recorded
 // one (openbot-db-prompt-resolved-tap.json, -free-text.json): changedMessages[] holds exactly one
 // questionPrompt of exactly one question; resolution.responses.<that question id>.answers is ["<label>"].
+// An OpenBot restart resolves the open question with resolution {status: "expired"} and no responses
+// (openbot-db-prompt-resolved-expired.json, issue #943): expired, never an answer.
 function answerOf(payload: unknown, turnId: string): Resolved {
   if (!isObj(payload) || !Array.isArray(payload.changedMessages)) return "unreadable";
   const prompts = payload.changedMessages.filter((m) => isObj(m) && m.questionPrompt !== undefined);
@@ -95,6 +98,9 @@ function answerOf(payload: unknown, turnId: string): Resolved {
   if (!Array.isArray(qp.questions) || qp.questions.length !== 1) return "unreadable";
   const q = qp.questions[0];
   if (!isObj(q) || typeof q.id !== "string" || q.id === "") return "unreadable";
+  if (isObj(qp.resolution) && qp.resolution.status === "expired") {
+    return qp.resolution.responses === undefined ? "expired" : "unreadable";
+  }
   if (!isObj(qp.resolution) || !isObj(qp.resolution.responses)) return "unreadable";
   const r = Object.hasOwn(qp.resolution.responses, q.id) ? qp.resolution.responses[q.id] : undefined;
   if (!isObj(r) || !Array.isArray(r.answers) || r.answers.length !== 1) return "unreadable";

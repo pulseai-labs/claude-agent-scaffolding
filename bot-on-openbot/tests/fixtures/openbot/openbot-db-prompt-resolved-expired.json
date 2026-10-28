@@ -1,0 +1,93 @@
+{
+  "detail": {
+    "turnId": "01a17eea-e408-7cd1-8a8b-912f4655672f",
+    "requestId": 0,
+    "status": "expired"
+  },
+  "changedMessages": [
+    {
+      "id": "question-prompt:01a17eea-e408-7cd1-8a8b-912f4655672f:0",
+      "turnId": "01a17eea-e408-7cd1-8a8b-912f4655672f",
+      "author": "assistant",
+      "source": "assistant",
+      "text": "Question: dry-b/probe waits on a question\nThe worker asks, “Which colour?” Option 1 is red, option 2 is green, option 3 is blue, and option 4 is amber.",
+      "createdAt": "2026-10-27T19:51:27.832Z",
+      "status": "completed",
+      "itemType": "question_prompt",
+      "questionPrompt": {
+        "requestId": 0,
+        "questions": [
+          {
+            "id": "reply",
+            "header": "dry-b/probe waits on a question\nThe worker asks, “Which colour?” Option 1 is red, option 2 is green, option 3 is blue, …",
+            "question": "dry-b/probe waits on a question\nThe worker asks, “Which colour?” Option 1 is red, option 2 is green, option 3 is blue, and option 4 is amber.",
+            "isSecret": false,
+            "options": [
+              {
+                "label": "red",
+                "description": ""
+              },
+              {
+                "label": "green",
+                "description": ""
+              },
+              {
+                "label": "blue",
+                "description": ""
+              },
+              {
+                "label": "amber",
+                "description": ""
+              },
+              {
+                "label": "More…",
+                "description": ""
+              }
+            ]
+          }
+        ],
+        "resolution": {
+          "status": "expired"
+        }
+      },
+      "uiBlock": {
+        "version": 1,
+        "blockId": "8cd36c65-cf29-4677-8efd-398e58b65a02",
+        "spec": {
+          "type": "quick_replies",
+          "options": [
+            {
+              "id": "red",
+              "label": "red"
+            },
+            {
+              "id": "green",
+              "label": "green"
+            },
+            {
+              "id": "blue",
+              "label": "blue"
+            },
+            {
+              "id": "amber",
+              "label": "amber"
+            },
+            {
+              "id": "more",
+              "label": "More…"
+            }
+          ],
+          "title": "dry-b/probe waits on a question\nThe worker asks, “Which colour?” Option 1 is red, option 2 is green, option 3 is blue, and option 4 is amber.",
+          "allowText": true
+        },
+        "state": {
+          "status": "expired"
+        }
+      },
+      "reactions": [],
+      "reaction": null
+    }
+  ],
+  "removedMessageIds": [],
+  "activeTurnId": "01a17eea-e408-7cd1-8a8b-912f4655672f"
+}

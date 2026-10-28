@@ -8,7 +8,7 @@ import { log } from "./log.ts";
 import { blockedOffer, offerFor } from "./offer.ts";
 import { OpenBotDown, OpenBotRefused, type Delivery, type OpenBot, type Prompt } from "./openbot.ts";
 import { stateDir } from "./paths.ts";
-import { ours, SETTLED_LABEL, sweepSettled, wellFormed } from "./settle.ts";
+import { ours, SETTLED_LABEL, stillOpen, sweepSettled, wellFormed } from "./settle.ts";
 import { listSpool, removeSpool } from "./spool.ts";
 import { handleTap } from "./tap.ts";
 import { askTask, draftTask, messageTask, parseDraft } from "./task.ts";
@@ -193,9 +193,10 @@ async function poll(opts: ServeOptions): Promise<void> {
 }
 
 // A follow-up opened unsent, or a question to ask again: it goes now. OpenBot refusing leaves it for
-// later. A re-ask needs its own --id: the same id would return the first delivery.
+// later. A re-ask needs its own --id: the same id would return the first delivery. Only a re-ask of a
+// malformed prompt is firmer; an expired question was asked well the first time.
 async function send(rec: DeliveryRec, opts: ServeOptions): Promise<DeliveryRec> {
-  const task = rec.offer ? askTask(rec.offer, rec.reasks === 1) : messageTask(rec.say ?? rec.title);
+  const task = rec.offer ? askTask(rec.offer, rec.reasks === 1 && !rec.expired) : messageTask(rec.say ?? rec.title);
   const { deliveryId } = await opts.bot.run(task, rec.reasks === 1 ? `${rec.key}#reask` : rec.key);
   const sent: DeliveryRec = { ...rec, ask_id: deliveryId };
   record(sent);
@@ -229,6 +230,10 @@ async function afterAsk(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
       followUp(closed, { say: `${rec.title}: your answer could not be read, so nothing ran. Act in the Orca terminal or with baton.` });
       return;
     }
+    if (r === "expired") {
+      await expired(rec, opts);
+      return;
+    }
     if (r !== "none" && r.answer === SETTLED_LABEL && !rec.offer.options.some((o) => o.label === SETTLED_LABEL)) {
       // Our own dismissal of a malformed prompt, read back after a crash before the re-ask was
       // recorded (or the operator typed it): never a tap, never text for the worker.
@@ -249,6 +254,23 @@ async function afterAsk(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
     log(`${rec.key}: the question ended with no answer; nothing ran`);
     close(rec, "gone", opts.now());
   }
+}
+
+// An OpenBot restart expired the question (issue #943); nothing runs. Asked again once while its park
+// is open, on the same one re-ask a malformed prompt spends; else closed with a message. The re-ask is
+// recorded unsent first, so a crash before it is sent sends it on the next loop with the same --id.
+async function expired(rec: DeliveryRec, opts: ServeOptions): Promise<void> {
+  if (rec.reasks === undefined && stillOpen(rec)) {
+    log(`${rec.key}: the question expired in OpenBot; asked again`);
+    const again: DeliveryRec = { ...rec, reasks: 1, expired: true };
+    delete again.ask_id; // the expired turn is never read again
+    record(again);
+    await send(again, opts);
+    return;
+  }
+  log(`${rec.key}: the question expired in OpenBot; closed, nothing ran`);
+  const closed = close(rec, "gone", opts.now());
+  followUp(closed, { say: `${rec.title}: the question expired in OpenBot (OpenBot restarted), so nothing ran. Act in the Orca terminal or with baton.` });
 }
 
 // ---- prompt shape (issue #939) -----------------------------------------------------------------

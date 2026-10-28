@@ -2,6 +2,19 @@
 
 All notable changes to the `bot-on-openbot` plugin.
 
+## 0.1.3 - 2026-10-28
+
+- Fixes #943: an OpenBot restart resolves the open question with `resolution.status: "expired"` and
+  no responses, and interrupts its delivery. The bridge read that row as unreadable and told the
+  operator their answer could not be read. `resolved()` now returns `expired` for that recorded shape
+  (any other odd shape stays unreadable). Nothing runs: the question is asked again once while its
+  park is open (the run armed or parked, the unit still at that park), on the same one re-ask a
+  malformed prompt spends (`reasks: 1`, run id `<key>#reask`) and with the normal wording (record field
+  `expired: true`); else, or the second time, it closes as `gone` and the operator gets a message that
+  the question expired because OpenBot restarted.
+- Fixes #943: the delivery status `starting` (the first seconds of a run) is read as not ended. It was
+  logged as "a delivery state this bot does not know", which aborted that poll loop.
+
 ## 0.1.2 - 2026-10-28
 
 - Fixes #941: OpenBot's question tool takes at most 5 options; with more, the agent asks with none,
