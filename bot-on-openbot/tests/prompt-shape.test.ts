@@ -8,7 +8,7 @@ import { find, type DeliveryRec } from "../src/deliveries.ts";
 import { serve } from "../src/serve.ts";
 import { spoolNotice } from "../src/spool.ts";
 import { messageTask } from "../src/task.ts";
-import { captureErr, FIX, makeEnv, P1, P5, screenJson, type Env } from "./helpers.ts";
+import { captureErr, FIX, makeEnv, P1, P5, screenJson, serveOpts, type Env } from "./helpers.ts";
 
 const TOKEN = "FIXTURE-OPENBOT-TOKEN-do-not-leak";
 const AGENT_ID = "agent-7a6bdc91-f17f-4c79-9dae-4a7d3b1a0eb6";
@@ -57,7 +57,7 @@ afterEach(() => {
   env.cleanup();
 });
 
-const run = (stopAfter = 1) => captureErr(() => serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter, pollMs: 0 }));
+const run = (stopAfter = 1) => captureErr(() => serve(serveOpts(env, T0, stopAfter)));
 const answerPath = (id: string) => `/v1/agents/${AGENT_ID}/prompts/${id}/answer`;
 const SETTLED = { answers: { reply: ["settled"] } };
 

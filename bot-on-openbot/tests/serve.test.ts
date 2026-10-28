@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { all, find, open } from "../src/deliveries.ts";
+import { all, find, open, record } from "../src/deliveries.ts";
+import { offerFor } from "../src/offer.ts";
 import { LockHeldError, serve } from "../src/serve.ts";
 import { listSpool, spoolNotice } from "../src/spool.ts";
-import { captureErr, makeEnv, P1, P5, screenJson, type Env } from "./helpers.ts";
+import type { Notice } from "../src/notice.ts";
+import { OpenBotDown } from "../src/openbot.ts";
+import type { Route } from "../src/route.ts";
+import { captureErr, defaultRun, makeEnv, P1, P5, screenJson, serveOpts, type Env } from "./helpers.ts";
 
 const BIN = join(import.meta.dir, "..", "bin", "bot-on-openbot");
 const T0 = new Date("2026-10-27T17:00:00Z");
@@ -14,8 +18,8 @@ beforeEach(() => {
 });
 afterEach(() => env.cleanup());
 
-const opts = (stopAfter = 1) => ({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter, pollMs: 0 });
-const run = (stopAfter = 1) => captureErr(() => serve(opts(stopAfter)));
+const opts = (stopAfter = 1, route?: (n: Notice) => Promise<Route>) => serveOpts(env, T0, stopAfter, route);
+const run = (stopAfter = 1, route?: (n: Notice) => Promise<Route>) => captureErr(() => serve(opts(stopAfter, route)));
 const PARK = `r1/u1/park/${P1}`;
 const BLOCKED = `r1/u5/park/${P5}`;
 const DRAFT = JSON.stringify({ summary: "It asks for a colour.", recommended: 2, why: "green is the house colour" });
@@ -223,4 +227,87 @@ test("a record written by serve is the full record each time", async () => {
   await run();
   const lines = readFileSync(join(env.dir, "state", "deliveries.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
   expect(lines.at(-1).offer.options.length).toBe(4);
+});
+
+// ---- one open delivery per agent (#945) --------------------------------------------------------
+
+const PARK2 = `r2/u1/park/${P1}`;
+// r1 is the pulse360 project, r2 another; anything else goes to the default agent.
+const AGENTS: Record<string, string> = { r1: "pulse360_autopilot", r2: "other_autopilot" };
+const byRun = async (n: Notice): Promise<Route> => ({ agent: n.kind === "plain" ? "Autopilot" : AGENTS[n.run]! });
+const runAgents = () => env.calls().filter((c) => c.argv[0] === "run").map((c) => c.argv[1]);
+
+test("two projects' parks are open at once, each on its own agent", async () => {
+  env.writeRun(defaultRun(), "r2");
+  env.setReplies({ run: [env.delivery("d1"), env.delivery("d2")] });
+  env.status("d1", "running", "turn-1");
+  env.status("d2", "running", "turn-2");
+  spoolNotice(PARK, "baton r1/u1 parked");
+  spoolNotice(PARK2, "baton r2/u1 parked");
+  await run(1, byRun);
+  expect(runAgents()).toEqual(["pulse360_autopilot", "other_autopilot"]);
+  expect(find(PARK)).toMatchObject({ phase: "asked", ask_id: "d1", agent: "pulse360_autopilot" });
+  expect(find(PARK2)).toMatchObject({ phase: "asked", ask_id: "d2", agent: "other_autopilot" });
+  expect(listSpool()).toEqual([]);
+});
+
+test("a second park in one project waits behind the first", async () => {
+  env.setReplies({ run: [env.delivery("d1"), env.delivery("d2")] });
+  env.status("d1", "running", "turn-1");
+  spoolNotice(PARK, "baton r1/u1 parked");
+  spoolNotice("r1/done", "baton r1 done");
+  await run(1, byRun);
+  expect(runAgents()).toEqual(["pulse360_autopilot"]);
+  expect(listSpool().map((s) => s.item.key)).toEqual(["r1/done"]);
+});
+
+test("a refused run holds only its own agent", async () => {
+  env.writeRun(defaultRun(), "r2");
+  env.setReplies({ run: [{ stdout: '{"ok":false,"exitCode":1,"error":"limit"}', rc: 1 }, env.delivery("d2")] });
+  env.status("d2", "running", "turn-2");
+  spoolNotice(PARK, "baton r1/u1 parked");
+  spoolNotice(PARK2, "baton r2/u1 parked");
+  spoolNotice("r1/done", "baton r1 done"); // behind the refused one, in its agent: not tried
+  const r = await run(1, byRun);
+  expect(runAgents()).toEqual(["pulse360_autopilot", "other_autopilot"]);
+  expect(listSpool().map((s) => s.item.key)).toEqual([PARK, "r1/done"]);
+  expect(find(PARK)).toBeUndefined();
+  expect(find(PARK2)).toMatchObject({ phase: "asked", agent: "other_autopilot" });
+  expect(r.err.join("")).toContain("bot-on-openbot: drain stopped: pulse360_autopilot:");
+});
+
+test("a fallback note heads the text", async () => {
+  env.setReplies({ run: env.delivery("d1") });
+  env.status("d1", "running", "turn-1");
+  spoolNotice(PARK, "baton r1/u1 parked in build: second prompt");
+  await run(1, async () => ({ agent: "Autopilot", note: "[run r1: no project — sent to Autopilot]" }));
+  const [task] = env.runStdins();
+  expect(task).toContain("Show this text: [run r1: no project — sent to Autopilot]\nbaton r1/u1 parked in build: second prompt.");
+  expect(runAgents()).toEqual(["Autopilot"]);
+  expect(find(PARK)).toMatchObject({ phase: "asked", agent: "Autopilot" });
+});
+
+test("route down keeps the notice", async () => {
+  env.setReplies({ run: env.delivery("d1") });
+  spoolNotice(PARK, "m");
+  const r = await run(1, async () => {
+    throw new OpenBotDown("OpenBot agents: no answer");
+  });
+  expect(env.calls()).toEqual([]);
+  expect(listSpool().map((s) => s.item.key)).toEqual([PARK]);
+  expect(all()).toEqual([]);
+  expect(r.err.join("")).toContain("OpenBot agents: no answer");
+});
+
+test("a follow-up stays on its parent's agent", async () => {
+  const offer = offerFor({ kind: "unit-park", run: "r1", unit: "u1", at: P1 }, "baton r1/u1 parked", "r1")!;
+  record({ key: PARK, phase: "asked", run: "r1", unit: "u1", park_at: P1, title: offer.title, offer, ask_id: "d1", agent: "p_bot" });
+  env.setReplies({ run: env.delivery("d2") });
+  env.status("d1", "running", "turn-1");
+  env.status("d2", "running", "turn-2");
+  env.resolve("turn-1", "Unpark to stage…");
+  await run(2, byRun); // the tap opens the follow-up; the next loop sends it
+  expect(env.calls()[0]!.argv).toEqual(["status", "p_bot", "d1", "--json"]);
+  expect(runAgents()).toEqual(["p_bot"]);
+  expect(find(`${PARK}#1`)).toMatchObject({ phase: "asked", ask_id: "d2", agent: "p_bot" });
 });

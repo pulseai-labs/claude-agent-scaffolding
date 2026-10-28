@@ -6,7 +6,7 @@ import { blockedOffer, offerFor, type Offer, type Picker } from "../src/offer.ts
 import { serve } from "../src/serve.ts";
 import { spoolNotice } from "../src/spool.ts";
 import { handleTap } from "../src/tap.ts";
-import { captureErr, COLOURS, defaultRun, HEAD, makeEnv, P1, P5, PR, screenJson, type Env } from "./helpers.ts";
+import { captureErr, COLOURS, defaultRun, HEAD, makeEnv, P1, P5, PR, screenJson, serveOpts, type Env } from "./helpers.ts";
 
 const T0 = new Date("2026-10-27T17:00:00Z");
 const PARK = `r1/u1/park/${P1}`;
@@ -239,7 +239,7 @@ test("serve hands a tapped label to handleTap", async () => {
   env.status("d2", "running", "turn-2");
   env.resolve("turn-1", "Unpark");
   spoolNotice(PARK, "baton r1/u1 parked");
-  await captureErr(() => serve({ bot: env.bot, runner: env.runner, now: () => T0, stopAfter: 2, pollMs: 0 }));
+  await captureErr(() => serve(serveOpts(env, T0, 2)));
   expect(env.runs).toEqual([["baton", "unpark", "r1", "u1"]]);
   expect(env.runStdins()[1]).toBe("Send the operator this message, verbatim, and nothing else: r1/u1 parked: Unpark — done");
 });

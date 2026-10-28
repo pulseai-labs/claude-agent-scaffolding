@@ -3,7 +3,7 @@
 // so the agent's queue moves on. A tap on a settled question finds it closed and runs nothing.
 
 import { readUnit, runReadable, runStatus } from "./baton-state.ts";
-import { all, record, type DeliveryRec } from "./deliveries.ts";
+import { agentOf, all, record, type DeliveryRec } from "./deliveries.ts";
 import { log } from "./log.ts";
 import { shownLabels } from "./offer.ts";
 import { OpenBotDown, OpenBotRefused, type OpenBot, type Prompt } from "./openbot.ts";
@@ -29,8 +29,9 @@ export function wellFormed(r: DeliveryRec, p: Prompt): boolean {
 // The record's prompt on /pending. /pending carries no turnId to match by. First the prompt as asked:
 // its question "<title>\n<text>" (pending-prompt.json) and exactly the offered labels, in order. Else a
 // prompt of its title asked some other way (issue #939: options null, pending-prompt-no-options.json),
-// so a malformed prompt is dismissed too. One delivery is open at a time, so the agent shows at most
-// one of the bridge's prompts; a prompt whose title is not the record's is never matched.
+// so a malformed prompt is dismissed too. One delivery is open at a time per agent, so the record's
+// agent shows at most one of the bridge's prompts; a prompt whose title is not the record's is never
+// matched.
 function promptOf(r: DeliveryRec, prompts: Prompt[]): Prompt | undefined {
   if (!r.offer) return undefined;
   const question = norm(`${r.title}\n${r.offer.text}`);
@@ -51,8 +52,9 @@ export function stillOpen(r: DeliveryRec): boolean {
   return runReadable(r.run) && ["armed", "parked"].includes(runStatus(r.run) ?? "") && !settled(r);
 }
 
-// Answer the record's prompt with `settled` when it is on /pending. True when there is nothing left to
-// answer: answered, already closed (409), or the delivery ended without one. False: try next loop.
+// Answer the record's prompt with `settled` when it is on its own agent's /pending. True when there is
+// nothing left to answer: answered, already closed (409), or the delivery ended without one. False:
+// try next loop.
 // The delivery is read first: the agent runs one turn at a time, so a prompt is the record's only
 // while its own delivery still runs. Once it has ended, a prompt of the same title belongs to a later
 // question (a new park of the same unit) and is never answered.
@@ -73,10 +75,11 @@ async function answerSettled(bot: OpenBot, r: DeliveryRec): Promise<boolean> {
 
 // Returns the number of records settled this sweep. A question whose prompt is not on /pending yet (it
 // shows about 6 s after the run) is closed now, so a tap runs nothing, and kept `unanswered` until its
-// prompt shows or its delivery ends.
-export async function sweepSettled(bot: OpenBot, now: Date): Promise<number> {
+// prompt shows or its delivery ends. Each record is read and answered on its own agent.
+export async function sweepSettled(botFor: (agent: string) => OpenBot, defaultAgent: string, now: Date): Promise<number> {
   let n = 0;
   for (const r of all()) {
+    const bot = botFor(agentOf(r, defaultAgent));
     try {
       if (r.phase === "closed") {
         if (r.unanswered && (await answerSettled(bot, r))) {

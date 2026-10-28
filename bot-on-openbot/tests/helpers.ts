@@ -5,7 +5,9 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Runner } from "../src/actions.ts";
-import { makeOpenBot, type OpenBot } from "../src/openbot.ts";
+import { makeOpenBots, type OpenBot } from "../src/openbot.ts";
+import type { Notice } from "../src/notice.ts";
+import type { Route } from "../src/route.ts";
 
 export const FAKE = join(import.meta.dir, "fake-openbot");
 export const FIX = join(import.meta.dir, "fixtures", "openbot");
@@ -22,7 +24,9 @@ export const COLOURS = {
 
 export type Env = {
   dir: string;
-  bot: OpenBot;
+  botFor: (agent: string) => OpenBot;
+  defaultAgent: string;
+  bot: OpenBot; // botFor(defaultAgent)
   runner: Runner;
   runs: string[][];
   reply: { fn: (argv: string[]) => { rc: number; stdout: string; stderr: string } };
@@ -51,9 +55,12 @@ export function makeEnv(): Env {
   let seq = 0;
   const runs: string[][] = [];
   const reply = { fn: (_: string[]) => ({ rc: 0, stdout: "", stderr: "" }) };
+  const botFor = makeOpenBots({ cli: [FAKE], db, automationDir: join(dir, "automation") });
   const env: Env = {
     dir,
-    bot: makeOpenBot({ agent: "Autopilot", cli: [FAKE], db, automationDir: join(dir, "automation") }),
+    botFor,
+    defaultAgent: "Autopilot",
+    bot: botFor("Autopilot"),
     runs,
     reply,
     runner: async (argv) => {
@@ -114,6 +121,13 @@ export function makeEnv(): Env {
   env.writeRun(defaultRun());
   env.setReplies({});
   return env;
+}
+
+/** serve options on env's clients; every notice routes to the default agent unless `route` is given. */
+export function serveOpts(
+  env: Env, now: Date, stopAfter = 1, route: (n: Notice) => Promise<Route> = async () => ({ agent: env.defaultAgent }),
+) {
+  return { botFor: env.botFor, route, defaultAgent: env.defaultAgent, runner: env.runner, now: () => now, stopAfter, pollMs: 0 };
 }
 
 export function defaultRun(over: Record<string, unknown> = {}) {

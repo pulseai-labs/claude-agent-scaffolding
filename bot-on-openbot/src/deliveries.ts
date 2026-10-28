@@ -10,6 +10,7 @@ import { stateDir } from "./paths.ts";
 export type DeliveryRec = {
   key: string;                 // notice key, or "<notice key>#<n>" for a follow-up question or message
   phase: "drafting" | "asked" | "closed";
+  agent?: string;              // the OpenBot agent it went to; a 0.1.x record has none: the default agent
   run: string; unit?: string; park_at?: string;
   title: string;
   message?: string;            // the notice's text, kept while a blocked park's draft runs
@@ -70,6 +71,11 @@ export function all(): DeliveryRec[] {
   return [...out.values()];
 }
 
+/** The OpenBot agent a record is read from and answered on: its own, else (0.1.x) the default agent. */
+export function agentOf(r: DeliveryRec, dflt: string): string {
+  return r.agent ?? dflt;
+}
+
 export function open(): DeliveryRec[] {
   return all().filter((r) => r.phase !== "closed");
 }
@@ -97,11 +103,13 @@ export function followUpKey(key: string): string {
 }
 
 // A follow-up question or message of `parent`, opened unsent: the next loop sends it. It carries the
-// parent's run, unit and park so that settling closes it with its notice.
+// parent's run, unit and park so that settling closes it with its notice, and the parent's agent:
+// a follow-up is never routed again.
 export function followUp(parent: DeliveryRec, what: { offer: Offer; picker?: Picker } | { say: string }): DeliveryRec {
   const rec: DeliveryRec = {
     key: followUpKey(parent.key),
     phase: "asked",
+    ...(parent.agent !== undefined ? { agent: parent.agent } : {}),
     run: parent.run,
     ...(parent.unit !== undefined ? { unit: parent.unit } : {}),
     ...(parent.park_at !== undefined ? { park_at: parent.park_at } : {}),
