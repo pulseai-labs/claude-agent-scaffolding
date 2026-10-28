@@ -291,6 +291,20 @@ describe('bin/omp-seat with a via that cannot run', () => {
     record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m })
     return spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
   }
+  for (const set of [['PATH'], ['PATH', 'SHA256', 'ASSIGNMENT_ID', 'ASSIGNMENT_GENERATION', 'LAUNCH_ID']]) {
+    test(`leftover authority variables (${set.length} of 5) neither refuse nor are read: the via runs and exits 0`, () => {
+      const home = join(root, 'home')
+      const receipt = join(root, 'executed')
+      const via = join(root, 'harmless-via')
+      writeFileSync(via, `#!/bin/sh\n[ "$1" = --version ] && exit 0\nprintf executed >> '${receipt}'\n`)
+      chmodSync(via, 0o700)
+      const [s, m] = ['seat-mods', 'molt'].map(n => install(n))
+      record(join(home, '.omp/plugins/installed_plugins.json'), { 'seat-mods': s, molt: m })
+      const leftover = Object.fromEntries(set.map(n => ['AUTO' + 'NOMIC_' + (n === 'PATH' ? 'AUTHORITY_PATH' : n === 'SHA256' ? 'AUTHORITY_SHA256' : n), join(root, 'missing-snapshot')]))
+      const r = spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home, ...leftover }, encoding: 'utf8', timeout: 30_000 })
+      expect({ status: r.status, executed: existsSync(receipt) }).toEqual({ status: 0, executed: true })
+    })
+  }
   test('an extension that fails to load stops the launch before any omp starts', () => {
     const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
     const [s, m] = ['seat-mods', 'molt'].map((n) => install(n))

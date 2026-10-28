@@ -79,7 +79,7 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
   }
   // MODS keeps seat-mods first: its guard must see a tool call before molt's tool_call handlers,
   // because omp stops at the first block and adds up input rewrites in order. The status check is a second entry,
-  // loaded last, so molt's session_stop block wins as they do beneath seat-mods on Claude Code.
+  // loaded last, so molt's session_stop block wins, as it does beneath seat-mods on Claude Code.
   if (o.role === 'orchestrator') {
     const root = (omp.get('seat-mods') ?? claude.get('seat-mods')) as string
     const status = join(root, 'omp', 'status-extension.ts')
