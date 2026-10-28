@@ -91,11 +91,15 @@ token.
 **The default agent.** A notice that cannot reach a project agent goes to the default agent, with a
 first line saying why: `[pulse360: no OpenBot agent pulse360_autopilot — sent to Autopilot]` (the
 prefix is the GitHub repo name), `[run r9: no project — sent to Autopilot]` (no `params.repo`), or
-`[run r9: no GitHub origin for <repo> — sent to Autopilot]`. A run-done notice is routed like any
-other run notice, and can fall back with a note. Only a notice whose key names no run goes straight
-to the default agent, with no note. A found route is kept per
-run for the life of `serve`; a fallback is not, so an agent created mid-run is used from the run's
-next notice.
+`[run r9: no GitHub origin for <repo> — sent to Autopilot]`. A blocked park's question carries the
+note too, above the draft's summary. Each fallback logs one line, `<notice key>: <note>`, when the
+notice goes. A run-done notice is routed like any other run notice, and can fall back with a note.
+Only a notice whose key names no run goes straight to the default agent, with no note. A found route
+is kept per run for the life of `serve`; a fallback is not, so an agent created mid-run is used from
+the run's next notice. When OpenBot refuses a run, its run's route is dropped, so an agent deleted or
+renamed since is resolved again on the next loop (and falls back with a note). Agent names are
+compared as OpenBot resolves them, case and outer spaces ignored: `Autopilot` and `autopilot` are one
+agent, one queue and one `status` line.
 
 ## The baton line
 
@@ -183,14 +187,18 @@ Only one `serve` runs at a time; a second exits with code 3.
   GitHub URLs of the three shapes above; any other remote falls back.
 - Two open in one project: a project's notice that fell back to the default agent stays open there
   when the project's own agent is created. The next notice opens on the new agent, so the project
-  has a question open on each until the first is answered.
+  has a question open on each until the first is answered. Likewise, order within a project can
+  break: a notice that fell back and waits behind the busy default agent can go after a later notice
+  of its project that resolved to the project's own agent.
 - `status` does not route spooled notices: it shows the spool count, not which agent each spooled
   notice will reach. That is known only when the notice is delivered.
 - A fallback notice that waits in the spool is routed again every loop. A no-project fallback costs
   no call, a no-GitHub-origin fallback one `git` call, and a missing-agent fallback one `git` and
   one `/v1/agents` call.
 - If OpenBot cannot be reached while routing, the whole drain stops for that loop; the spool keeps
-  its order.
+  its order. Routing reads `/v1/agents` over Local scripts' HTTP side, so a missing automation `url`
+  or `token` blocks it too, and the whole drain waits until they are back. 0.1.x delivered through
+  `openbot-cli` alone and did not need them to send.
 - OpenBot allows 30 runs per agent per hour. A refused or failed run keeps the notice in the spool, in
   order, and holds only that agent for the loop; a busy spine waits there. Follow-up questions and result messages each take a run.
 - A picker that is neither omp's ask picker nor omp's numbered `/review` picker reads as no picker: the
