@@ -89,7 +89,7 @@ Every command's syntax comes from the layer's guide.
    this pane or the seat is on another machine — so an eligible worker's ping comes to whichever pane
    `run.orchestrator` names when it renames; a coordinator fills its children's slots with its own
    nested `run.json` the same way, and an operator's `brief:` is sent as a copy carrying the slots and the ping step, never edited in place (`briefs.md`).
-   The full locator records `pane`, `machine` (a local seat's too), `report`, molt's `status` path
+   The full locator records `pane`, `machine` (a local seat's too), `report` and molt's `status` path,
    so an attempt whose brief never arrived never looks live.
    Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded`
    and its full locator before the brief goes, notes the generation the doorbell compares
@@ -237,7 +237,7 @@ Every command's syntax comes from the layer's guide.
     The run file holds those files’ paths, not the read cursors.
     Also carry what the run file cannot hold — why a choice was made, what the operator said.
     Every seat's pane, machine, report path, last consumed generation and molt
-    paths are in `run.json` (steps 1, 3 and 5), so the handoff does not copy them. On an
+    status path are in `run.json` (steps 1, 3 and 5), so the handoff does not copy them. On an
     activated ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With
     ossify installed, that is `/ossify:handoff`.

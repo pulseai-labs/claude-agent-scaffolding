@@ -124,6 +124,8 @@ Claude Code keeps reading `AUTONOMIC_EFFECTIVE_MODE`. Only an exact `autopilot` 
 
 Since 0.2.17, OMP coordinator and worker seats launch through `omp-seat` (see `references/config.md`); OMP seats fill the lane driver (default-lane spine session), close, doctor or worker seats, and, since 0.2.19, the orchestrator top and its rotation successor (`omp-seat orchestrator --via omp-glm`; omp-roles 0.4.0, seat-mods 0.4.4); since 0.2.23, also the activated spine session (`omp-seat crew-spine`) and the work-PR session (`omp-seat crew-work-pr`; omp-roles 0.6.0), which run 788 lifted (#788).
 
+Since 0.6.0, crew sets no ledger, pain-path or mode variable in the launch export, which ends at the molt marking, and no longer reads the launcher's mode; the enrolled OMP authority text is gone from the skill and its briefs.
+
 **Known limit.** `seat-mods` 0.1.0 does not know the two free roles: it reads either as an
 invalid role and denies every tool call, so 0.2.7 and later —
 the pre-rename line and every `crew` release — need `seat-mods` 0.2.0.
@@ -229,9 +231,6 @@ has one fixed path.
 - The **`herdr-dagr`** plugin's `dagr` binary on PATH, to create and lint the run's
   `run.json`: dagr's producer contract resolves that validator *before* anything is
   written, and with none available the run starts no run file — not an unvalidated one.
-- autonomic 0.4.0 for autopilot children: an older autonomic sets no `AUTONOMIC_EFFECTIVE_MODE`, so
-  every child starts manual. An OMP launcher needs autonomic 0.7.0 for autopilot children: an older
-  autonomic writes no mode file, so the launcher reads manual.
 - `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as
   unavailable.
 - The agents named in `~/.claude/crew/agents.md` resolvable where their pane

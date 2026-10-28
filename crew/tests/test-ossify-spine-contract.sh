@@ -68,13 +68,13 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=241          # 2026-10-28: -20 — the enrolled-authority envelope left the spine briefs (ossify-briefs.md now 241, the longest reference).
-                        # name and the host, and gain the sentence that says so; the demo-walk
-                        # paragraph in ossify-pr-briefs.md stayed below the longest reference.
-                        # A3: the budget equals the longest budgeted reference (261,
-                        # ossify-briefs.md); 0.2.9 raised it from 214 for the spine brief's 1.14.0
-                        # caller rules and re-entry seat rule; Task 4 raised it 257 -> 260 for the
-                        # three `PING_SEND=` fill lines its templates gained.
+REF_BUDGET=241          # 2026-10-28: the budget equals the longest budgeted reference (241,
+                        # ossify-briefs.md), 20 lines down from 261 now that the enrolled-authority
+                        # envelope has left the spine briefs. Earlier history: 2026-10-18 (Task 13)
+                        # raised it to 261 for the SEATS rows' agent name and host; 0.2.9 raised it
+                        # from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule;
+                        # Task 4 raised it 257 -> 260 for the three `PING_SEND=` fill lines its
+                        # templates gained.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking
                         # clause each launch site gained.
                         # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief
@@ -2592,7 +2592,7 @@ for pair in "$GENERIC_BRIEFS_MD:11" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:
 done
 # The enrolled-authority envelope is gone from every template: the five lines that
 # followed the opening line (and the opening line itself) carry no site now.
-for f in "$GENERIC_BRIEFS_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD"; do
+for f in "$GENERIC_BRIEFS_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$EXEC_MD" "$NESTED_MD"; do
   for gone in 'OMP AUTHORITY' 'BOUND FACTS: ' 'PROVENANCE: ' 'LIFECYCLE: ' 'FRESHNESS: ' 'enrolled OMP'; do
     n_eq "$f" "$gone" 0 "${f##*/} carries no '$gone' line"
   done

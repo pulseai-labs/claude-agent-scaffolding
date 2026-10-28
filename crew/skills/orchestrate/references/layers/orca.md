@@ -143,7 +143,7 @@ question to the operator, while the `REPORT:` line through `Read` still arrives.
 ## Host: OMP
 
 An OMP top runs this skill as written, with the substitutions stated once with the skill
-(`SKILL.md` §3): the send-as-text mapping, the hooks note, the `Agent` ban. This layer adds its own: omp's bash async job
-(`async.enabled`, on by default) — pass `timeout: 0` on every one and never `name:` — so
+(`SKILL.md` §3): the send-as-text mapping, the hooks note and the `Agent` ban. This layer
+adds its own: omp's bash async job (`async.enabled`, on by default) — pass `timeout: 0` on every one and never `name:` — so
 `--timeout-ms` bounds the wait; its result returns to the session as a turn, so every
 readiness and completion wait runs as one.

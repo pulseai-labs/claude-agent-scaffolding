@@ -55,6 +55,7 @@ section "seat launch (probes §2)"
 pin "$REF" 'MOLT_HANDOFF=parent' "the child marking is in the launch export exactly once (#666/#667)"
 present "$REF" 'SEAT_MODS_ROLE=' "the export's role variable is named"
 present "$REF" 'MOLT_STATUS_PATH=' "the export's status path is named"
+present "$REF" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status; <lane>' "the export ends at the molt marking, then the lane"
 present "$REF" 'exec <lane>' "the never-exec-a-lane trap is stated"
 present "$REF" 'expected_model:' "the model read checks the expected model"
 

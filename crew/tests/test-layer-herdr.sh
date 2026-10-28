@@ -281,6 +281,7 @@ RETIRED='AUTO''NOMIC'
 c="$(count_of "$ROLES" "$RETIRED" flat)"
 if [ "$c" -eq 0 ]; then pass "roles.md names no retired-plugin variable"
 else fail "roles.md names no retired-plugin variable" "$c left"; fi
+pin "$ROLES" 'MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status The names mean:' "the guarded export ends at the molt marking" flat
 c="$(count_of "$ROLES" "MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTO""NOMIC" flat)"
 if [ "$c" -eq 0 ]; then pass "the guarded export ends at the molt marking"
 else fail "the guarded export ends at the molt marking" "$c left"; fi
