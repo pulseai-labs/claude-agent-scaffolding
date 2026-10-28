@@ -16,10 +16,10 @@ let turn: { status: boolean; redone: boolean; sessionId: string } | undefined
 // The redos seat-mods submitted at failed status turns' ends, oldest first, until each
 // arrives at prompt.submit (#929: classic.Stop, which held the turn open, never runs for a
 // plugin on an org account). The host runs queued prompts in order, so each seat-mods
-// prompt that arrives answers the oldest entry. `warning` is the failure's flag and `reply`
-// the failed reply, shown and rung if the redo never runs; `superseded` marks another turn
+// prompt that arrives answers the oldest entry. `warning` is the failure's flag, shown if the
+// redo never runs; `superseded` marks another turn
 // that started first.
-type Redo = { sessionId: string; warning: string; reply: string; superseded: boolean }
+type Redo = { sessionId: string; warning: string; superseded: boolean }
 const pending: Redo[] = []
 
 // A redo that never runs leaves the failed reply as the turn that stands: its flag is shown
@@ -230,7 +230,7 @@ export const register: Register = on => {
     if (failure !== undefined && !ended.redone) {
       // One redo turn (#929), not awaited: it starts once this turn is over. The reply
       // stands as it is meanwhile — no flag while its redo is pending.
-      const mine: Redo = { sessionId: ended.sessionId, warning: failure.warning, reply, superseded: false }
+      const mine: Redo = { sessionId: ended.sessionId, warning: failure.warning, superseded: false }
       pending.push(mine)
       $.prompt.submit({ text: failure.reason }).catch(async (err: unknown) => {
         const at = pending.indexOf(mine)

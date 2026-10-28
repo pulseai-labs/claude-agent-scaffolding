@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from 'bun:test'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, realpathSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import seatModsExtension, { childRole, roleFor, writeTargets, guard, realOf, spawnDecision } from '../../seat-mods/omp/extension'
@@ -819,6 +819,7 @@ describe('the default export through a fake host', () => {
   const saved = { role: process.env.SEAT_MODS_ROLE, allow: process.env.SEAT_MODS_ALLOW }
   const dirs: string[] = []
   afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true })
     for (const [k, v] of [['SEAT_MODS_ROLE', saved.role], ['SEAT_MODS_ALLOW', saved.allow]] as const) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v
     }

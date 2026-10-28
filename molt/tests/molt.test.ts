@@ -364,7 +364,7 @@ describe('no autopilot branch (molt 0.5.0)', () => {
   })
   test('the unattended pause still fires and rings nothing, even with a manual record that names a bell', async ($, on) => {
     // 0.4.1's recordBell rang this record's bell on a manual pause; with no record it never rang.
-    const w = world(on, { files: { [H]: '#', [`/home/u/.claude/state/${GONE}/sessions/s3.json`]: '{"mode":"manual","bell":"x"}' } })
+    const w = world(on, { files: { [H]: '#', [`/home/u/.claude/state/${GONE}/sessions/s3.json`]: '{"mode":"manual","bell":"touch /tmp/molt-manual-rang"}' } })
     at(w, 67)
     for (const id of ['s1', 's2']) {
       w.clearTo.push(`${id}x`)
@@ -377,7 +377,8 @@ describe('no autopilot branch (molt 0.5.0)', () => {
     expect(w.clears).toBe(2)
     expect(w.toasts.at(-1) ?? '').toMatch(/^molt paused/)
     expect(w.toasts.at(-1) ?? '').toContain(H)
-    expect(w.runs.some(argv => argv.join(' ').includes(`${GONE.toUpperCase()}_MESSAGE`) || argv.includes('x'))).toBe(false)
+    expect(w.runs.some(argv => argv.join(' ').includes(`${GONE.toUpperCase()}_MESSAGE`))).toBe(false)
+    expect(w.runs.some(argv => argv.join(' ').includes('molt-manual-rang'))).toBe(false)
   })
   test('status has no mode line', async ($, on) => {
     const w = world(on)

@@ -12,6 +12,7 @@ The `autonomic` plugin is retired (#948).
   longer exempts it or turns it into a no-progress pause), and it rings nothing. `/molt status`
   has no `mode (...)` line. The progress count and its on-disk file are removed, as is
   `PAUSED_NO_PROGRESS`. The stage file stays: `seat-mods` reads it (#929).
+  The shell reader's `gitSubcommandsThatRun` and the gate's `isProgress`, which only that count used, are removed.
 - Tests: the bell and autopilot tests are removed; new tests pin that a stale autopilot record
   molts, that the unattended pause fires with no record and rings nothing, and that status has no
   mode line, on both the Claude Code and OMP glue.

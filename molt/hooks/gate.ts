@@ -1,4 +1,4 @@
-import { SUBSTITUTION_TOO_DEEP, gitSubcommands, gitSubcommandsThatRun, innerCommandsOf, substitutionsOf } from './shell'
+import { SUBSTITUTION_TOO_DEEP, gitSubcommands, innerCommandsOf, substitutionsOf } from './shell'
 
 // The Stop reflex asks for the handoff at most twice before falling back.
 export const MAX_STOP_BLOCKS = 2
@@ -52,14 +52,4 @@ export function gateAllows(tool: string, args: Readonly<Record<string, unknown>>
   const subs = gitSubcommands(args.command)
   return subs.length > 0 && subs.every(sub => sub !== undefined && GIT_ALLOWED.has(sub)) &&
     substitutionsOf(args.command).every(innerOk)
-}
-
-// Progress, for the autopilot loop guard (spec §2): a file written or a commit made.
-// A commit counts only where the line runs it — bare, or behind `time`; behind `{`
-// (a brace-group body reads the same as a function definition's), `if`, `then`,
-// `elif`, `else` or `!` it may not run, and counting it would hide a stalled loop
-// from the guard (review R2/RR1).
-export function isProgress(tool: string, args: Readonly<Record<string, unknown>>): boolean {
-  if (tool === 'Write' || tool === 'Edit' || tool === 'NotebookEdit') return true
-  return tool === 'Bash' && typeof args.command === 'string' && gitSubcommandsThatRun(args.command).includes('commit')
 }
