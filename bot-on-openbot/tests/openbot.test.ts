@@ -3,7 +3,7 @@ import { Database } from "bun:sqlite";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { makeOpenBot, OpenBotDown, OpenBotRefused } from "../src/openbot.ts";
+import { makeOpenBot, makeOpenBots, OpenBotDown, OpenBotRefused } from "../src/openbot.ts";
 
 const FAKE = join(import.meta.dir, "fake-openbot");
 const FIX = join(import.meta.dir, "fixtures", "openbot");
@@ -87,6 +87,19 @@ const TEXT_TURN = "01a17e46-fce5-7d40-bc28-a554f07cf4ea";
 const tapRow = () => JSON.parse(fixture("openbot-db-prompt-resolved-tap.json"));
 const EXPIRED_TURN = "01a17eea-e408-7cd1-8a8b-912f4655672f";
 const expiredRow = () => JSON.parse(fixture("openbot-db-prompt-resolved-expired.json"));
+
+test("each agent's client runs and polls on that agent", async () => {
+  replies({ run: "run-queued.json" });
+  const botFor = makeOpenBots({ cli: [FAKE], db: join(dir, "none.db"), automationDir: join(dir, "none") });
+  await botFor("A").run("t", "k1");
+  await botFor("B").run("t", "k2");
+  expect(calls().map((c) => c.argv)).toEqual([
+    ["run", "A", "-", "--id", "k1", "--json"],
+    ["run", "B", "-", "--id", "k2", "--json"],
+  ]);
+  expect(botFor("A")).toBe(botFor("A"));
+  expect(botFor("A")).not.toBe(botFor("B"));
+});
 
 test("run returns the delivery id", async () => {
   replies({ run: "run-queued.json" });

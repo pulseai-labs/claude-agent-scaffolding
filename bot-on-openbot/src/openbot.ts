@@ -257,3 +257,16 @@ export function makeOpenBot(cfg: OpenBotConfig): OpenBot {
     },
   };
 }
+
+// One client per agent name, made on first use and kept: each project's agent is its own client.
+export function makeOpenBots(cfg: Omit<OpenBotConfig, "agent">): (agent: string) => OpenBot {
+  const clients = new Map<string, OpenBot>();
+  return (agent) => {
+    let c = clients.get(agent);
+    if (!c) {
+      c = makeOpenBot({ ...cfg, agent });
+      clients.set(agent, c);
+    }
+    return c;
+  };
+}
