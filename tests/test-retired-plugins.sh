@@ -19,7 +19,7 @@
 # A checkout is the premise of all three facts, and the guard before them fails loudly on a
 # tree that is not one — see its own comment.
 #
-# Usage: bash "$0"   (from the repo root: bash tests/ plus this file's name)
+# Usage: bash tests/test-retired-plugins.sh
 # Deps:  bash 3.2+, git, jq, awk, sed.
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
