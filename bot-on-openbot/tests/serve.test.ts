@@ -287,16 +287,19 @@ test("a fallback note heads the text", async () => {
   expect(find(PARK)).toMatchObject({ phase: "asked", agent: "Autopilot" });
 });
 
-test("route down keeps the notice", async () => {
+test("route down keeps the notice and stops the drain", async () => {
   env.setReplies({ run: env.delivery("d1") });
   spoolNotice(PARK, "m");
-  const r = await run(1, async () => {
-    throw new OpenBotDown("OpenBot agents: no answer");
+  spoolNotice("r1/done", "m2"); // the same project: must never overtake it
+  spoolNotice("a/1", "m3"); // the default agent: not sent this loop either
+  const r = await run(1, async (n) => {
+    if (n.kind === "unit-park") throw new OpenBotDown("OpenBot agents: no answer");
+    return { agent: n.kind === "plain" ? "Autopilot" : "pulse360_autopilot" };
   });
   expect(env.calls()).toEqual([]);
-  expect(listSpool().map((s) => s.item.key)).toEqual([PARK]);
+  expect(listSpool().map((s) => s.item.key)).toEqual([PARK, "r1/done", "a/1"]);
   expect(all()).toEqual([]);
-  expect(r.err.join("")).toContain("OpenBot agents: no answer");
+  expect(r.err.join("")).toContain("bot-on-openbot: drain stopped: OpenBot agents: no answer");
 });
 
 test("a follow-up stays on its parent's agent", async () => {

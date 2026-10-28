@@ -116,8 +116,8 @@ export async function serve(opts: ServeOptions): Promise<void> {
 // unanswered OpenBot question blocks the agent's queue (spike ruling), so the bridge keeps one in
 // flight per agent. A notice whose agent is busy stays spooled and the drain goes on to later ones,
 // so the order holds within each agent. A refused or failed run holds its agent for this loop and
-// keeps the file, so the notice goes later, in order; a notice whose agent cannot be told yet
-// (route: OpenBot down) is kept and skipped.
+// keeps the file, so the notice goes later, in order. A notice whose agent cannot be told (route:
+// OpenBot down) stops the drain and keeps the file: no later notice may overtake it.
 
 async function drain(opts: ServeOptions): Promise<void> {
   const held = new Set<string>(); // agents whose run was refused or failed this loop
@@ -131,8 +131,8 @@ async function drain(opts: ServeOptions): Promise<void> {
       route = await opts.route(parseKey(item.key));
     } catch (e) {
       if (!stopsDrain(e)) throw e;
-      log(`drain kept ${item.key}: ${(e as Error).message}`);
-      continue;
+      log(`drain stopped: ${(e as Error).message}`);
+      return;
     }
     const { agent } = route;
     if (held.has(agent) || open().some((r) => agentOf(r, opts.defaultAgent) === agent)) continue;
