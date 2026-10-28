@@ -55,7 +55,7 @@ The sequence, not one call: `orca terminal create --worktree <sel> --title "seat
 (<agent>)" --command '<export …>; <lane>' --json`, then read the handle from the receipt
 (`Identity`). **Seat marking** is that export — the launch environment `roles.md`'s launch
 block states — typed before the lane:
-`export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain; <lane>`
+`export SEAT_MODS_ROLE=<role> SEAT_MODS_ALLOW=<report dir>:<scratch> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status; <lane>`
 The lane is a shell **function**, and Orca types `--command` into the terminal's interactive
 shell, so it resolves; `exec <lane>` fails and leaves a shell. The model read: the rendered
 screen where `model_shows: screen` must show `expected_model:`, and the same read carries
@@ -143,8 +143,7 @@ question to the operator, while the `REPORT:` line through `Read` still arrives.
 ## Host: OMP
 
 An OMP top runs this skill as written, with the substitutions stated once with the skill
-(`SKILL.md` §3): the send-as-text mapping, the hooks note, the `Agent` ban and the
-enrolled-authority envelope. This layer adds its own: omp's bash async job
+(`SKILL.md` §3): the send-as-text mapping, the hooks note, the `Agent` ban. This layer adds its own: omp's bash async job
 (`async.enabled`, on by default) — pass `timeout: 0` on every one and never `name:` — so
 `--timeout-ms` bounds the wait; its result returns to the session as a turn, so every
 readiness and completion wait runs as one.

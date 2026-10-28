@@ -90,7 +90,7 @@ Every command's syntax comes from the layer's guide.
    `run.orchestrator` names when it renames; a coordinator fills its children's slots with its own
    nested `run.json` the same way, and an operator's `brief:` is sent as a copy carrying the slots and the ping step, never edited in place (`briefs.md`).
    The full locator records `pane`, `machine` (a local seat's too), `report`, molt's `status` path
-   and autonomic's `pain` path, so an attempt whose brief never arrived never looks live.
+   so an attempt whose brief never arrived never looks live.
    Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded`
    and its full locator before the brief goes, notes the generation the doorbell compares
    (`completion.md`), and sets `phase: delivered` once the send is confirmed.
@@ -211,11 +211,10 @@ Every command's syntax comes from the layer's guide.
     as the blocker, and a new actionable finding returns to step 10.
     The run's `run.merge_word` decides where the merge word comes from. With `standing`, the operator's
     standing word is it: a clean gate set on that SHA is the agreed condition, so merge with no ask (#837).
-    With `operator`, the ask says that this run's brief or the operator set an operator merge gate, so
-    autonomic routes it to the operator: ask for the merge word naming that SHA. Under either word, a dispatch whose
+    With `operator`, the ask says that this run's brief or the operator set an operator merge gate:
+    ask for the merge word naming that SHA. Under either word, a dispatch whose
     merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator: tell them the word and the
     SHA, and they land it.
-    **Enrolled OMP precedence:** only actual operator acknowledgment of that head can satisfy this gate. `standing`, a missing legacy merge_word, a role, plan approval, shared standing-policy merge prose or confidence is not that acknowledgment. Spec/design/plan/release gates likewise stay operator-owned. This scoped rule does not rewrite Claude Code or legacy routing below.
     Merge only on that word, as a merge commit, never a squash, bound to that
     SHA: re-fetch the same full gate set for that SHA once more, then
     `gh pr merge <number> --repo <owner/repo> --merge --match-head-commit <sha>` —
@@ -234,10 +233,10 @@ Every command's syntax comes from the layer's guide.
     recorded in each hosting repo — and waits for no record pass.
 13. **Handoff.** If the run outlives the session, write a handoff naming the run's
     `run.json` path, the pane `run.orchestrator` names at writing, and the next step,
-    the head SHA, and, per live seat, the last molt status line noted and the last autonomic pain line noted.
+    the head SHA, and, per live seat, the last molt status line noted.
     The run file holds those files’ paths, not the read cursors.
     Also carry what the run file cannot hold — why a choice was made, what the operator said.
-    Every seat's pane, machine, report path, last consumed generation and molt and pain
+    Every seat's pane, machine, report path, last consumed generation and molt
     paths are in `run.json` (steps 1, 3 and 5), so the handoff does not copy them. On an
     activated ossify spine, also the spine's approved `SEATS` block, the resolved coordinator
     profiles and the accumulated close-review ledger (oldest first). With

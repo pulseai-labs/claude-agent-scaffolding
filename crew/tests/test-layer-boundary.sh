@@ -241,7 +241,6 @@ section "rules stay out of the layer file"
 # send-tag anchors below pin it there and out of every layer file.
 ANCHORS="$(printf '%s\n' \
   "the generation check governs all three	completion.md" \
-  "A child's pain	completion.md" \
   "One bounded background timer of about 15 minutes	completion.md" \
   "MOLT WARNING <pct> <task id>	completion.md" \
   "doorbell is the report file	completion.md" \

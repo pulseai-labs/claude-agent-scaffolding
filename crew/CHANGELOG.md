@@ -9,6 +9,20 @@ All notable changes to the `crew` plugin.
 - Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
 - Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
 
+## 0.6.0
+
+**Removal only.** The enrolled OMP authority text is gone from `orchestrate`: the section that
+issued and bound an assignment, the authority envelope every brief template carried (the opening
+line, its five startup variables, `BOUND FACTS`, `PROVENANCE`, `LIFECYCLE`, `FRESHNESS`), the
+enrolled-OMP paragraphs in the roles, lifecycle, spine and config references, and the "A child's
+pain" paragraph of `completion.md`. The guarded launch export, in `roles.md` and the Orca layer,
+ends at `MOLT_STATUS_PATH`; the ledger, pain-path and mode variables are no longer set, and the
+launcher's mode is no longer read. The `PROHIBITIONS` line keeps its operator-owned gate sentence
+and the merge rule, and loses only the clause about enrolled acknowledgment. Step 12 asks for the
+merge word on an `operator` run as before, and step 13's handoff notes the molt status line only.
+The context-ceiling hook's comment names molt alone as owner of the context boundary.
+Earlier entries are history and are not edited.
+
 ## 0.5.0
 
 The seat and profile orders crew reads come from the project's own files. `orchestrate` takes
