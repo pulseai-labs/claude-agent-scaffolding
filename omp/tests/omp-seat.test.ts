@@ -27,6 +27,15 @@ function record(path: string, paths: Record<string, string>) {
   for (const [n, p] of Object.entries(paths)) plugins[`${n}@${MARKETPLACE}`] = [{ scope: 'user', installPath: p }]
   writeFileSync(path, JSON.stringify({ version: 2, plugins }))
 }
+// The spawned seat's environment without any authority binding: judgment-world writes the five
+// variables into process.env, and one left behind sends every launch down the authority path (#949).
+const AUTHORITY_VARS = ['AUTONOMIC_AUTHORITY_PATH', 'AUTONOMIC_AUTHORITY_SHA256', 'AUTONOMIC_ASSIGNMENT_ID', 'AUTONOMIC_ASSIGNMENT_GENERATION', 'AUTONOMIC_LAUNCH_ID']
+const seatEnv = (extra: Record<string, string>): Record<string, string | undefined> => {
+  const env: Record<string, string | undefined> = { ...process.env }
+  for (const name of AUTHORITY_VARS) delete env[name]
+  return { ...env, ...extra }
+}
+
 const launch = (role = 'worker', args: string[] = ['--x']) =>
   planLaunch({ role, via: 'omp-glm', args, ompRecord, claudeRecord })
 
@@ -260,7 +269,7 @@ describe('seat config overlay (#843)', () => {
     const via = join(home, 'via.sh')
     writeFileSync(via, `#!/bin/sh\n[ "$1" = --version ] && exit 0\nprintf '%s\\n' "$@" > '${out}'\n`)
     chmodSync(via, 0o755)
-    const r = spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
+    const r = spawnSync('bun', [seat, 'worker', '--via', via], { env: seatEnv({ HOME: home }), encoding: 'utf8', timeout: 30_000 })
     expect(r.status).toBe(0)
     expect(readFileSync(out, 'utf8').split('\n')).toContain(`--config=${shipped}`)
   })
@@ -272,14 +281,14 @@ describe('bin/omp-seat with a via that cannot run', () => {
     const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
     const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
     record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
-    return spawnSync('bun', [seat, 'worker', '--via', via], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
+    return spawnSync('bun', [seat, 'worker', '--via', via], { env: seatEnv({ HOME: home }), encoding: 'utf8', timeout: 30_000 })
   }
   test('an extension that fails to load stops the launch before any omp starts', () => {
     const home = mkdtempSync(join(tmpdir(), 'seat-home-'))
     const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map((n) => install(n))
     writeFileSync(join(m, 'omp', 'extension.ts'), 'throw new Error("boom")')
     record(join(home, '.omp', 'plugins', 'installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
-    const r = spawnSync('bun', [seat, 'worker', '--via', 'true'], { env: { ...process.env, HOME: home }, encoding: 'utf8', timeout: 30_000 })
+    const r = spawnSync('bun', [seat, 'worker', '--via', 'true'], { env: seatEnv({ HOME: home }), encoding: 'utf8', timeout: 30_000 })
     expect(r.status).toBe(2)
     expect(r.stderr).toContain(`omp-seat: ${join(m, 'omp', 'extension.ts')} did not load: boom`)
   })
@@ -303,7 +312,7 @@ describe('bin/omp-seat with a via that cannot run', () => {
     const [s, m, a] = ['seat-mods', 'molt', 'autonomic'].map(n => install(n))
     record(join(home, '.omp/plugins/installed_plugins.json'), { 'seat-mods': s, molt: m, autonomic: a })
     const r = spawnSync('bun', [seat, 'worker', '--via', via], {
-      env: { ...process.env, HOME: home, AUTONOMIC_AUTHORITY_PATH: join(root, 'missing-snapshot') },
+      env: seatEnv({ HOME: home, AUTONOMIC_AUTHORITY_PATH: join(root, 'missing-snapshot') }),
       encoding: 'utf8', timeout: 30_000,
     })
     expect({ status: r.status, executed: existsSync(receipt) }).toEqual({ status: 2, executed: false })
