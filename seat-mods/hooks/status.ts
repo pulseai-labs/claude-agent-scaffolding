@@ -4,8 +4,6 @@
 // (AI workspace docs/superpowers/plans/2026-10-18-orchestrator-status-block.md
 // and 2026-10-18-idle-stop-status-block.md).
 
-import { redact } from './redact'
-
 export const STATUS_LABELS: readonly string[] = [
   'What I ruled:',
   'What the PR(s) will carry:',
@@ -49,10 +47,9 @@ export function isCrewTagged(text: string): boolean {
 // slack-ping and sdk are the operator's unless the text carries a crew tag (an
 // sdk turn is a `claude -p` host turn, which may be typed by the operator —
 // the anti-goal on typed turns outranks goal 1). A plugin prompt is status
-// unless it is autonomic's: its only `$.prompt.submit` is the pain-band press,
-// the operator's own chosen option. molt's handoff requests (#929) are not status
-// turns either: each asks for a MOLT-HANDOFF line, never the status block. molt's seed
-// (no MOLT-HANDOFF line) starts the next session's work and stays a status turn. `unclassified` and any unknown kind stay
+// unless it is molt's handoff request (#929), which is not a status turn: it asks for a
+// MOLT-HANDOFF line, never the status block. molt's seed (no MOLT-HANDOFF line) starts the
+// next session's work and stays a status turn. `unclassified` and any unknown kind stay
 // on the operator fallback; only they are untagged.
 export function classifyPrompt(origin: { kind: string; name?: string }, text: string): 'status' | 'operator' {
   switch (origin.kind) {
@@ -67,7 +64,7 @@ export function classifyPrompt(origin: { kind: string; name?: string }, text: st
     case 'auto-continuation':
       return 'status'
     case 'plugin':
-      return (origin.name === 'autonomic' || (origin.name === 'molt' && text.includes('MOLT-HANDOFF:'))) && !isCrewTagged(text) ? 'operator' : 'status'
+      return (origin.name === 'molt' && text.includes('MOLT-HANDOFF:')) && !isCrewTagged(text) ? 'operator' : 'status'
     case 'composer':
     case 'bridge':
     case 'channel':
@@ -140,46 +137,9 @@ export function isIdleStop(reply: string): boolean {
   return NONE_AT_START.test(content(3)) && NONE_AT_START.test(content(4)) && !NONE_AT_START.test(content(2))
 }
 
-// The waiting-on-operator line (#873): what field 5 hands the operator, for the signal that
-// rings the bell and shows it. It reads the last line labelled `Waiting on operator:` by
-// shape alone — asterisks and spaces around the label and between its words — so a block
-// let through after its rewrite still counts (design §5.2, anti-goal 3). Only the label
-// span is consumed: the value keeps every character, `*` included (#883 review). The text
-// is redacted like autonomic's pain texts before it leaves the session, cut to one line
-// and 200 characters. `none`, a missing line and any other value are quiet: the signal
-// only adds a notification.
-const WAITING_LABEL = STATUS_LABELS[STATUS_LABELS.length - 1] ?? ''
-const WAITING_LABEL_AT_START = new RegExp(
-  `^[\\s*]*${WAITING_LABEL.replace(/:$/, '').split(/\s+/)
-    .map(word => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('[\\s*]+')}[\\s*]*:[\\s*]*`,
-)
-const WAITING_PREFIX = /^(decision|action)\s*:\s*(.*)$/i
-
-// The line both hosts show and send to the bell (#873), one wording for both.
-export const WAITING_NOTICE = 'seat-mods: waiting on operator — '
-
-export function waitingOnOperator(reply: string): string | undefined {
-  const lines = reply.split('\n')
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const line = lines[i] ?? ''
-    const label = WAITING_LABEL_AT_START.exec(line)
-    if (label === null) continue
-    const content = line.slice(label[0].length).trim()
-    if (NONE_AT_START.test(content)) return undefined
-    const match = WAITING_PREFIX.exec(content)
-    if (match === null) return undefined
-    const text = redact(match[2] ?? '').replace(/\s+/g, ' ').trim()
-    if (text === '') return undefined
-    return `${(match[1] ?? '').toLowerCase()}: ${text}`.slice(0, 200)
-  }
-  return undefined
-}
-
-// True only when the reply's last non-empty line is the handoff line. Unlike
-// autonomic's hooks/floor.ts:4 (a multiline match anywhere in the reply), this
-// is anchored to the end: the design exempts only a turn that ends on the
-// handoff — `MOLT-HANDOFF: /h.md` followed by narration still fails the block.
+// True only when the reply's last non-empty line is the handoff line. It is
+// anchored to the end, not a multiline match anywhere in the reply: the design exempts only
+// a turn that ends on the handoff — `MOLT-HANDOFF: /h.md` followed by narration still fails the block.
 const HANDOFF_LINE = /^[ \t]*MOLT-HANDOFF:[ \t]*\S/
 
 export function hasMoltHandoff(reply: string): boolean {

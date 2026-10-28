@@ -1,28 +1,10 @@
-// seat-mods' files: the records of other plugins it reads, and its own log. Every path
-// is under ~/.claude/state, keyed by session id; the id must be a plain name to be a file
-// name. autonomicPath and parseAutonomic are molt's, copied byte for byte; tests/
-// test-mod-shell-parity.sh holds the pair identical.
+// seat-mods' files: molt's stage record it reads, and its own log. Every path is under
+// ~/.claude/state, keyed by session id; the id must be a plain name to be a file name.
 
 const STATE = '.claude/state'
-
-export const autonomicPath = (home: string, id: string) => `${home}/${STATE}/autonomic/sessions/${id}.json`
 
 // molt's stage file (#929): the same path molt's stagePath builds. tests/test-mod-shell-parity.sh
 // holds the definition line to molt's (#933).
 export const moltStagePath = (home: string, id: string) => `${home}/${STATE}/molt/stage/${id}`
 
 export const seatLogPath = (home: string) => `${home}/${STATE}/seat-mods/seat-mods.log`
-
-export type Autonomic = { mode: 'manual' | 'autopilot'; bell?: string }
-
-// The autonomic plugin's session record (spec §1). Anything unreadable is manual: the
-// fail direction gives the operator more asks, never fewer.
-export function parseAutonomic(text: string | undefined): Autonomic {
-  try {
-    const v = JSON.parse(text ?? '') as { mode?: unknown; bell?: unknown }
-    if (v.mode !== 'autopilot') return { mode: 'manual' }
-    return typeof v.bell === 'string' && v.bell.trim() !== '' ? { mode: 'autopilot', bell: v.bell } : { mode: 'autopilot' }
-  } catch {
-    return { mode: 'manual' }
-  }
-}

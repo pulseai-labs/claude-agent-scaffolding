@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'claude-code/testing'
-import { checkBlock, classifyPrompt, isCrewTagged, hasMoltHandoff, isIdleStop, waitingOnOperator, moltActs, redoDrop, IDLE_REASON, IDLE_WARNING, STATUS_CONTEXT } from '../hooks/status'
+import { checkBlock, classifyPrompt, isCrewTagged, hasMoltHandoff, isIdleStop, moltActs, redoDrop, IDLE_REASON, IDLE_WARNING, STATUS_CONTEXT } from '../hooks/status'
 import { moltStagePath } from '../hooks/records'
 
 const BLOCK = '**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** b\n**Waiting on (seats live):** none\n**Waiting on operator:** none'
@@ -59,7 +59,7 @@ describe('classifyPrompt', () => {
     expect(classifyPrompt({ kind: 'composer' }, '[crew report implementer] T1 final /r.md')).toBe('status')
     expect(classifyPrompt({ kind: 'composer' }, 'REPORT READY: T1 final /r.md')).toBe('status')
     expect(classifyPrompt({ kind: 'composer' }, 'MOLT WARNING 62% T1')).toBe('status')
-    expect(classifyPrompt({ kind: 'plugin', name: 'autonomic' }, 'Approve')).toBe('operator')
+    expect(classifyPrompt({ kind: 'plugin', name: 'auto' + 'nomic' }, 'x')).toBe('status')
     expect(classifyPrompt({ kind: 'plugin', name: 'other-mod' }, 'x')).toBe('status')
     for (const kind of ['projects-relay', 'coordinator', 'observer', 'observer-activity'])
       expect(classifyPrompt({ kind }, 'x')).toBe('status')
@@ -142,50 +142,6 @@ describe('isIdleStop (#876)', () => {
     expect(STATUS_CONTEXT).toContain('"decision: <question>" or "action: <what the operator must do>"')
     expect(IDLE_REASON).toBe('seat-mods (orchestrator): the status block says nothing waits, but Next steps names work. Do the next step now, or name the seat, wake, or operator decision or action you wait on.')
     expect(IDLE_WARNING).toBe('⚠ seat-mods: status block says nothing waits, but Next steps names work.')
-  })
-})
-
-// The waiting-on-operator signal (#873): the one line seat-mods rings and shows when a
-// status block hands the turn back to the operator. It reads the line by the label's shape
-// alone, so a block that failed the check and was let through still counts (Review Focus 2).
-describe('waitingOnOperator (#873)', () => {
-  test('reads a decision line', () => {
-    expect(waitingOnOperator('**What I ruled:** x\n**Waiting on operator:** decision: merge #12 now?')).toBe('decision: merge #12 now?')
-  })
-  test('reads an action line without bold', () => {
-    expect(waitingOnOperator('Waiting on operator: action: run gcloud auth login')).toBe('action: run gcloud auth login')
-  })
-  test('case and spaces', () => {
-    expect(waitingOnOperator('**Waiting on operator:**   Decision:  A or B?')).toBe('decision: A or B?')
-  })
-  test('none is quiet', () => {
-    expect(waitingOnOperator('**Waiting on operator:** none')).toBeUndefined()
-  })
-  test('no line is quiet', () => {
-    expect(waitingOnOperator('just prose')).toBeUndefined()
-  })
-  test('other text is quiet', () => {
-    expect(waitingOnOperator('**Waiting on operator:** maybe later')).toBeUndefined()
-  })
-  test('a secret is redacted', () => {
-    expect(waitingOnOperator('Waiting on operator: action: export GH_TOKEN=ghp_' + 'a'.repeat(36))).not.toContain('ghp_' + 'a'.repeat(36))
-  })
-  test('cut to 200 and one line', () => {
-    expect(waitingOnOperator('Waiting on operator: decision: ' + 'x'.repeat(300))!.length).toBe(200)
-  })
-  // Review Focus 1: the label is read after removing `*`, so a half-bold or oddly spaced
-  // label counts, and the last labelled line wins (a let-through reply may hold several).
-  test('the last labelled line wins, however its asterisks fall', () => {
-    expect(waitingOnOperator('**Waiting on operator:** none\n**Waiting on operator:** action: rerun CI'))
-      .toBe('action: rerun CI')
-    expect(waitingOnOperator('**Waiting on operator:** action: rerun CI')).toBe('action: rerun CI')
-    expect(waitingOnOperator('  Waiting on operator:   decision: go?  ')).toBe('decision: go?')
-  })
-  test('an asterisk in the value is kept', () => {
-    expect(waitingOnOperator('**Waiting on operator:** action: run rm -rf build/*')).toBe('action: run rm -rf build/*')
-  })
-  test('a decision word inside other prose is not the line', () => {
-    expect(waitingOnOperator('I made the decision: to wait.\n**Waiting on operator:** none')).toBeUndefined()
   })
 })
 

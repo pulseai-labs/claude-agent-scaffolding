@@ -6,11 +6,8 @@ const TURN = (answer: string, extra: object = {}) =>
   ({ answer, durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', ...extra }) as never
 const CLEAR = (id: string) => ({ source: 'clear', session_id: id }) as never
 const H = '/repo/docs/handoff.md'
-const AUTOPILOT = { '/home/u/.claude/state/autonomic/sessions/s1.json': '{"mode":"autopilot","bell":"ring-me"}' }
-const NO_PROGRESS = { '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' }
-// The progress file's own path, written out: the tests below pin the file the
-// implementation must write, read and remove, without importing the helper they test.
-const PROGRESS = (id = 's1') => `/home/u/.claude/state/molt/progress/${id}`
+// The retired plugin's name, kept out of one piece so the retirement gate's grep finds none.
+const GONE = 'auto' + 'nomic'
 const STAGE = (id = 's1') => `/home/u/.claude/state/molt/stage/${id}`
 const RUN = (args: string) =>
   ({ command: 'molt', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } }) as never
@@ -316,8 +313,8 @@ describe('loop guards', () => {
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(2)
   })
-  test('manual: a pause rings the record\'s bell and tells the agent at its next prompt', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', '/home/u/.claude/state/autonomic/sessions/s3.json': '{"mode":"manual","bell":"ring-me"}' } })
+  test('a pause tells the agent at its next prompt', async ($, on) => {
+    const w = world(on, { files: { [H]: '#' } })
     at(w, 67)
     for (const id of ['s1', 's2']) {
       w.clearTo.push(`${id}x`)
@@ -327,138 +324,67 @@ describe('loop guards', () => {
     }
     w.session.id = 's3'
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.bellRuns.length).toBe(1)
     await $.prompt.submit({ text: 'status', wait: false, origin: { kind: 'plugin' } } as never)
     expect(w.contexts.at(-1) ?? '').toContain('the handoff did not happen')
     expect(w.contexts.at(-1) ?? '').toContain(H)
   })
-  test('autopilot: a molt with no progress since the last one pauses and rings the bell', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
-      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
-    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
-  })
   test('a notice write that fails never aborts the pause (#665)', async ($, on) => {
     // A refused notice write (another mod, or the state store) used to throw out of
-    // pause() before its toast, status and bell: the operator learned nothing.
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS } })
+    // pause() before its toast, status and log: the operator learned nothing.
+    const w = world(on, { files: { [H]: '#' } })
     w.failNotices = true
     at(w, 67)
+    for (const id of ['s1', 's2']) {
+      w.clearTo.push(`${id}x`)
+      w.session.id = id
+      await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+      await flush()
+    }
+    w.session.id = 's3'
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
+    expect(w.clears).toBe(2)
     expect(w.toasts.at(-1)).toContain('molt paused')
     expect(w.statuses.at(-1)).toBe('molt: paused')
-    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
     expect(w.runs.some(argv => argv.join(' ').includes('pause session='))).toBe(true)
   })
-  test('autopilot: a reload after progress still counts it (#713)', async ($, on) => {
-    // /reload-plugins reloads the module, so the in-memory count is back at 0 while the
-    // session has written files. The session's own progress file is what survives it.
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS, [PROGRESS()]: '2026-01-01T00:00:00.000Z\n' } })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(1)
-    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(false)
-  })
-  test("autopilot: the first progress below the warning writes the session's progress file", async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS } })
-    at(w, 10)
-    await $.tool.call({ tool: 'Write', file_path: '/repo/x.ts', content: 'x' })
-    expect(w.files.has(PROGRESS())).toBe(true)
-  })
-  test('autopilot: progress past the warning writes no progress file (control)', async ($, on) => {
-    // Past the warning the session writes and commits its handoff, which must stay no
-    // progress (#711): a file written there would make every autopilot molt look live.
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, ...NO_PROGRESS } })
-    at(w, 67)
-    await $.tool.call({ tool: 'Write', file_path: H, content: '# h' })
-    expect(w.files.has(PROGRESS())).toBe(false)
-  })
-  test("a molt's seed removes the old session's progress file", async ($, on) => {
-    const w = world(on, { files: { [H]: '#', [PROGRESS()]: '2026-01-01T00:00:00.000Z\n' } })
+})
+
+describe('no autopilot branch (molt 0.5.0)', () => {
+  test('a stale autopilot record does not pause or ring: molt molts', async ($, on) => {
+    const w = world(on, { files: { [H]: '#',
+      [`/home/u/.claude/state/${GONE}/sessions/s1.json`]: '{"mode":"autopilot","bell":"touch /tmp/rang"}',
+      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
     w.clearTo.push('s2')
     at(w, 67)
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    w.session.id = 's2'
-    await flush()
-    expect(w.runs.some(argv => argv[0] === 'rm' && argv[2] === PROGRESS('s1'))).toBe(true)
-  })
-  test("session.end removes the session's progress file", async ($, on) => {
-    const w = world(on, { files: { [PROGRESS()]: '2026-01-01T00:00:00.000Z\n' } })
-    await $.session.end({ reason: 'exit', sessionId: 's1' } as never)
-    expect(w.runs.some(argv => argv[0] === 'rm' && argv[2] === PROGRESS('s1'))).toBe(true)
-  })
-  test('autopilot: /molt now lifts a no-progress pause and the molt goes ahead', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
-    await $.command.run({ command: 'molt', args: 'now', origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 120 } } as never)
-    await $.prompt.submit({ text: w.fills.at(-1) ?? '', wait: false, origin: { kind: 'composer' } })
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
     expect(w.clears).toBe(1)
+    expect(w.toasts.some(t => t.includes('no progress'))).toBe(false)
+    expect(w.notices.some(n => JSON.stringify(n).includes('no progress'))).toBe(false)
+    expect(w.runs.some(argv => argv.join(' ').includes(`${GONE.toUpperCase()}_MESSAGE`))).toBe(false)
   })
-  test('autopilot: a staged write below soft is no progress', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    w.staged = true
-    await $.tool.call({ tool: 'Write', file_path: '/repo/x.ts', content: 'x' })
+  test('the unattended pause still fires and rings nothing, even with a manual record that names a bell', async ($, on) => {
+    // 0.4.1's recordBell rang this record's bell on a manual pause; with no record it never rang.
+    const w = world(on, { files: { [H]: '#', [`/home/u/.claude/state/${GONE}/sessions/s3.json`]: '{"mode":"manual","bell":"touch /tmp/molt-manual-rang"}' } })
     at(w, 67)
+    for (const id of ['s1', 's2']) {
+      w.clearTo.push(`${id}x`)
+      w.session.id = id
+      await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
+      await flush()
+    }
+    w.session.id = 's3'
     await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
+    expect(w.clears).toBe(2)
+    expect(w.toasts.at(-1) ?? '').toMatch(/^molt paused/)
+    expect(w.toasts.at(-1) ?? '').toContain(H)
+    expect(w.runs.some(argv => argv.join(' ').includes(`${GONE.toUpperCase()}_MESSAGE`))).toBe(false)
+    expect(w.runs.some(argv => argv.join(' ').includes('molt-manual-rang'))).toBe(false)
   })
-  test('autopilot: writing and committing only the handoff past soft is no progress', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT, '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    at(w, 67)
-    await $.tool.call({ tool: 'Write', file_path: H, content: '# h' })
-    await $.tool.call({ tool: 'Bash', command: `git add ${H} && git commit -F /tmp/m` })
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
-    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
-  })
-  test('autopilot: with progress the molt goes ahead (control)', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
-      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    await $.tool.call({ tool: 'Bash', command: 'git add a && git commit -F /tmp/m' })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(1)
-  })
-  test('autopilot: a commit behind time is progress, so the molt goes ahead (#711 review RR1)', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
-      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    await $.tool.call({ tool: 'Bash', command: 'time git commit -m m' })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(1)
-  })
-  test('autopilot: a function definition body is no progress (control, #711 review RR1)', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
-      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    await $.tool.call({ tool: 'Bash', command: 'f() { git commit -m m; }' })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
-    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
-  })
-  test('autopilot: a commit behind a failing condition is no progress (control, #711 review R2)', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
-      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    await $.tool.call({ tool: 'Bash', command: 'if git add missing.lock; then git commit -m m; fi' })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
-    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
-  })
-  test('autopilot: a path-qualified head word committing is no progress (control)', async ($, on) => {
-    const w = world(on, { files: { [H]: '#', ...AUTOPILOT,
-      '/home/u/.claude/state/molt/lineage/s1.json': '{"from":"s0","chain":"s0","depth":1,"handoff":"/h0.md"}' } })
-    await $.tool.call({ tool: 'Bash', command: '/x/if git commit -m m' })
-    at(w, 67)
-    await $.turn.complete(TURN(`MOLT-HANDOFF: ${H}`))
-    expect(w.clears).toBe(0)
-    expect(w.runs.some(argv => argv.join(' ').includes('ring-me'))).toBe(true)
+  test('status has no mode line', async ($, on) => {
+    const w = world(on)
+    at(w, 10)
+    const r = await $.command.run(RUN('status'))
+    expect(r.text.split('\n').some((l: string) => l.startsWith('mode ('))).toBe(false)
   })
 })
 

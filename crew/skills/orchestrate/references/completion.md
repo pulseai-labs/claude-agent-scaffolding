@@ -165,16 +165,3 @@ hands off with no `open:`, cut inside a fix round; a close, work-item, lane-driv
 seat that hands off mid-ceremony; and a reviewer that hands off before its report validates,
 since a fresh one would run the PR's one review a second time. Without molt none of this
 fires, and the ceiling hook's rotation applies.
-
-## A child's pain
-
-Record each child's `AUTONOMIC_PAIN_PATH` at launch, beside its status file. The heartbeat,
-per tick, per live seat, reads it too, and so does the read before a retained seat's next
-unit. A non-empty file holding a line not yet noted is the seat asking upward: autonomic
-stopped it on its pain list, never resumes it and never pings through `NOTIFY_RUN`, so that
-line is the only signal that reaches you. Its state is `blocked` — an ask left at its dialog,
-which the dialog procedure above takes — or idle or done with no new report, a pain.
-Read the line and the seat's last report, then answer the seat or take it to the operator as
-any escalation; it is never a failed task. A seat-mods deny on a guarded seat rings nothing of
-its own: seat-mods refuses the call before autonomic sees it, so it reaches you only as a
-pain line.

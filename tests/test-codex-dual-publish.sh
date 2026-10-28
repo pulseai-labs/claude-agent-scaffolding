@@ -6,10 +6,10 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 MARKETPLACE="$ROOT/.agents/plugins/marketplace.json"
 CLAUDE_MARKETPLACE="$ROOT/.claude-plugin/marketplace.json"
-# seat-mods, molt and autonomic are Claude Code mods (hooks.json "modules"); Codex has no mod runtime.
+# seat-mods and molt are Claude Code mods (hooks.json "modules"); Codex has no mod runtime.
 # baton ships a CLI, a launcher and a systemd timer, no skill: Codex has nothing to load.
 # bot-on-openbot ships a CLI and a service, no skill: Codex has nothing to load.
-DEFERRED_PLUGINS="seat-mods molt autonomic baton bot-on-openbot"
+DEFERRED_PLUGINS="seat-mods molt baton bot-on-openbot"
 
 # THE INVENTORY IS THE FILESYSTEM, NOT A MARKETPLACE.
 #

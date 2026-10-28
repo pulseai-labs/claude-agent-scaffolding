@@ -1,4 +1,4 @@
-# ossify (v1.26.0)
+# ossify (v1.27.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -160,6 +160,14 @@ against the merged product, evidence recorded per line, marked `walked by
 orchestrator` in the read-out, the read-out to the operator, and a failing line
 still halts the close. Absent such an order, every site asks exactly as it did
 at 1.24.0. No `lib/` code, no state change.
+
+Since 1.27.0, that standing order is read from the project's own files, not a
+host policy: `08-governance.md`'s `## Standing orders` section, then `AGENTS.md` for any
+kind that section does not settle (a canonical checkout reads its paired AI workspace
+through `.workspace/pairing.json`), as the base branch has them: an order a PR's own diff
+adds binds nothing in that PR. An order binds only the role it names, and one naming
+no role binds no one. `/ossify:start` seeds the section empty; with no order the human
+walks, as before. No `lib/` code, no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and

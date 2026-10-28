@@ -2,6 +2,22 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.12.0 — 2026-10-28
+
+The autonomic plugin is retired (#948). seat-mods read its session record for one feature only,
+and that feature is gone.
+
+- **The waiting-on-operator notice and bell (#873) are gone; they ran only in autopilot.** A
+  manual session never showed them, so nothing a manual session sees changes. Removed:
+  `noticeFor`, `ring` and `BELL_TIMEOUT_MS` on Claude Code; `operatorWaiting` and the notice
+  field of the stop result on OMP; `waitingOnOperator`, `WAITING_NOTICE` and `hooks/redact.ts`;
+  and the record reader (`autonomicPath`, `parseAutonomic`) in `hooks/records.ts`.
+- **A plugin prompt is a status turn unless it is molt's `MOLT-HANDOFF:` request.** The one
+  prompt the retired plugin submitted was the operator's own choice; nothing else submits it.
+- **The OMP status entry still loads last, after molt.** Its `session_stop` blocks win as before.
+- `tests/test-mod-shell-parity.sh` drops the bell and redactor pairs; the shell reader pair and
+  the stage path copy stay.
+
 ## 0.11.1 — 2026-10-27
 
 #933, the test and wording follow-ups from PR #932's review. No change in behaviour.

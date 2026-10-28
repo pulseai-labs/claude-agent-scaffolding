@@ -68,13 +68,13 @@ CHANGELOG_MD="$PLUGIN_ROOT/CHANGELOG.md"
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
-REF_BUDGET=261          # 2026-10-18 (Task 13): +1 — ossify-briefs.md's SEATS rows take the agent
-                        # name and the host, and gain the sentence that says so; the demo-walk
-                        # paragraph in ossify-pr-briefs.md stayed below the longest reference.
-                        # A3: the budget equals the longest budgeted reference (261,
-                        # ossify-briefs.md); 0.2.9 raised it from 214 for the spine brief's 1.14.0
-                        # caller rules and re-entry seat rule; Task 4 raised it 257 -> 260 for the
-                        # three `PING_SEND=` fill lines its templates gained.
+REF_BUDGET=241          # 2026-10-28: the budget equals the longest budgeted reference (241,
+                        # ossify-briefs.md), 20 lines down from 261 now that the enrolled-authority
+                        # envelope has left the spine briefs. Earlier history: 2026-10-18 (Task 13)
+                        # raised it to 261 for the SEATS rows' agent name and host; 0.2.9 raised it
+                        # from 214 for the spine brief's 1.14.0 caller rules and re-entry seat rule;
+                        # Task 4 raised it 257 -> 260 for the three `PING_SEND=` fill lines its
+                        # templates gained.
                         # 0.2.7 (seat-mods 0.2.0): raised from 204 for the coordinator-marking
                         # clause each launch site gained.
                         # 0.2.8: raised for the molt clauses — nested-run §4 (211), the spine brief
@@ -1974,18 +1974,18 @@ pin "$LIFECYCLE_MD" 'A `done` task is never re-run' \
 pin "$LIFECYCLE_MD" 'It continues at the fresh handoff'"'"'s next step.' \
   "a rotation continues at its fresh handoff's next step" flat
 # Ruling 18 (split): the hard-stop resume moved out of 0.2.22 to #810; pin retired with its clause.
-pin "$LIFECYCLE_MD" 'and the next step, the head SHA, and, per live seat, the last molt status line noted and the last autonomic pain line noted.' \
-  "step 13 preserves the head SHA and each live seat's status and pain cursors" flat
+pin "$LIFECYCLE_MD" 'and the next step, the head SHA, and, per live seat, the last molt status line noted.' \
+  "step 13 preserves the head SHA and each live seat's status cursor" flat
 pin "$LIFECYCLE_MD" 'The run file holds those files’ paths, not the read cursors.' \
-  "handoff distinguishes durable status and pain paths from their last-noted lines" flat
+  "handoff distinguishes durable status paths from their last-noted lines" flat
 pin "$LIFECYCLE_MD" 'Write the handoff step 13 states, plus a resolved profile beside a launch command for each host' \
   "rotation inherits step 13's head SHA and live-seat cursors" flat
 pin "$LIFECYCLE_MD" 'The handoff restates no operator gate' \
   "the rotation handoff restates no operator gate (#819)" flat
 pin "$LIFECYCLE_MD" 'step 12 and `run.merge_word`' \
   "the handoff points at the merge rule instead of restating it" flat
-pin "$LIFECYCLE_MD" 'With `operator`, the ask says that this run'"'"'s brief or the operator set an operator merge gate, so autonomic routes it to the operator' \
-  "step 12 states an operator gate explicitly so autonomic routes it" flat
+pin "$LIFECYCLE_MD" 'With `operator`, the ask says that this run'"'"'s brief or the operator set an operator merge gate:' \
+  "step 12 states an operator gate explicitly" flat
 pin "$LIFECYCLE_MD" 'a clean gate set on that SHA is the agreed condition, so merge with no ask (#837)' \
   "under a standing merge word the top merges a clean gate with no ask (#837)" flat
 pin "$LIFECYCLE_MD" 'merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator' \
@@ -2584,11 +2584,18 @@ pin "$CHANGELOG_MD" '## 0.2.9' "CHANGELOG has 0.2.9"
 # line fails the control even though it would pass the absence pin.
 section "the standing orders reach the seats and the briefs"
 
-NEW_PROHIBITIONS='PROHIBITIONS: every seat-mods denial and narrower task limit wins. Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned; a worker'"'"'s implementation plan is the top'"'"'s to approve, and the merge follows run.merge_word. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted; standing merge routing never supplies enrolled OMP acknowledgment.'
+NEW_PROHIBITIONS='PROHIBITIONS: every seat-mods denial and narrower task limit wins. Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned; a worker'"'"'s implementation plan is the top'"'"'s to approve, and the merge follows run.merge_word. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted.'
 for pair in "$GENERIC_BRIEFS_MD:11" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:1"; do
   f="${pair%:*}"; want="${pair##*:}"
   n_eq "$f" 'PROHIBITIONS: ' "$want" "${f##*/} carries exactly $want PROHIBITIONS lines"
   n_eq "$f" "$NEW_PROHIBITIONS" "$want" "${f##*/} carries the new PROHIBITIONS line at all $want sites"
+done
+# The enrolled-authority envelope is gone from every template: the five lines that
+# followed the opening line (and the opening line itself) carry no site now.
+for f in "$GENERIC_BRIEFS_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$EXEC_MD" "$NESTED_MD"; do
+  for gone in 'OMP AUTHORITY' 'BOUND FACTS: ' 'PROVENANCE: ' 'LIFECYCLE: ' 'FRESHNESS: ' 'enrolled OMP'; do
+    n_eq "$f" "$gone" 0 "${f##*/} carries no '$gone' line"
+  done
 done
 for f in "$GENERIC_BRIEFS_MD" "$BRIEFS_MD" "$PRBRIEFS_MD" "$WRITER_MD" "$EXEC_MD" \
          "$NESTED_MD" "$LIFECYCLE_MD" "$ROLES_MD" "$SKILL_MD" \
@@ -2603,7 +2610,7 @@ for pair in "$GENERIC_BRIEFS_MD:11" "$BRIEFS_MD:3" "$PRBRIEFS_MD:2" "$WRITER_MD:
 done
 # The two fixed needles. Both wrap in the file today, so the flat join is each
 # pin's mode, as this suite's header says for a wrapped clause.
-pin "$EXEC_MD" 'under a standing order in the autopilot policy for seats and profiles, write the recommended set and continue; otherwise present every seat' \
+pin "$EXEC_MD" 'under a standing order in the project'\''s memory bank or AGENTS.md for seats and profiles, write the recommended set and continue; otherwise present every seat' \
   "ossify-execution.md §3: the seat set is written under the order, else presented" flat
 pin "$EXEC_MD" 'under that standing order, pick the reviewer and PR-fix profiles from the project file and record why; otherwise ask' \
   "ossify-execution.md §5: the reviewer and PR-fix profiles follow the order, else are asked" flat

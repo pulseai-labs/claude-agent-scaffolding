@@ -276,45 +276,18 @@ pin "$COMP" 'a work-PR session that hands off with no `open:`' "a work-PR cut mi
 pin "$ROLES" 'SEAT_MODS_ALLOW=<REPORT_PATH'"'"'s directory>:<its scratch directory> MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status' \
   "the launch block's quoted guarded export carries the molt marking" flat
 
-section "autonomic marking (0.2.9, #676)"
-pin "$ROLES" '**autonomic marking.**' "roles.md has the autonomic marking clause" flat
-pin "$ROLES" 'MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTONOMIC_LEDGER=<ledger> AUTONOMIC_PAIN_PATH=<REPORT_PATH>.autonomic-pain' \
-  "the launch block's quoted guarded export carries the autonomic variables" flat
-pin "$ROLES" '`AUTONOMIC_MODE=autopilot` only when the launcher is itself in autopilot' \
-  "autopilot is passed down, never set on a manual launcher's child" flat
-pin "$ROLES" 'printf %s "$AUTONOMIC_EFFECTIVE_MODE"' \
-  "Claude Code reads the live environment mode (0.2.10)" flat
-pin "$ROLES" 'cat "$AUTONOMIC_MODE_FILE"' \
-  "OMP reads the live mode file (autonomic 0.7.0)" flat
-pin "$ROLES" 'never `$AUTONOMIC_MODE`' "the mode is never read from the spawn's input" flat
-pin "$ROLES" 'never the record file' "the record file is never the signal (it can be stale)" flat
-pin "$ROLES" 'unset included' "an unset signal marks no child (D2)" flat
-c="$(count_of "$ROLES" 'jq -r .mode' flat)"
-if [ "$c" -eq 0 ]; then pass "the record read is gone (0.2.10)"
-else fail "the record read is gone (0.2.10)" "$c left"; fi
-pin "$ROLES" 'an **absolute** path outside every worktree' "the ledger is absolute and outside every worktree" flat
-pin "$ROLES" 'the launcher'"'"'s own `$AUTONOMIC_LEDGER` when set, else `<run dir>/autonomic-ledger.md`' \
-  "one ledger per run, inherited down the tree" flat
-pin "$ROLES" 'A relative launcher value is first resolved against the launcher'"'"'s own repo root' \
-  "an inherited relative ledger is made absolute before it is passed on (PR #679 r1)" flat
-pin "$ROLES" 'is not passed on: the child gets `<run dir>/autonomic-ledger.md` instead' \
-  "an unsafe inherited ledger path falls back to the run ledger, never into the export (PR #679 r3)" flat
-pin "$ROLES" 'passed on only when every character is a letter, a digit, `.`, `_`, `/` or `-`' \
-  "the inherited ledger is an allowlist, never a denylist (PR #679 r4)" flat
-pin "$ROLES" '`<run dir>` and `REPORT_PATH` are crew'"'"'s own choice and keep to the same characters' \
-  "the paths crew picks keep the same characters (PR #679 r4)" flat
-c="$(count_of "$ROLES" 'a backtick or a backslash is not passed on' flat)"
-if [ "$c" -eq 0 ]; then pass "the r3 denylist is gone (PR #679 r4)"
-else fail "the r3 denylist is gone (PR #679 r4)" "$c left"; fi
-c="$(count_of "$ROLES" 'single-quoted in the export' flat)"
-if [ "$c" -eq 0 ]; then pass "no quoting rule for the ledger remains (PR #679 r3)"
-else fail "no quoting rule for the ledger remains (PR #679 r3)" "$c left"; fi
-pin "$ROLES" '`AUTONOMIC_BELL` is never set' "no per-seat bell" flat
-pin "$ROLES" 'and `AUTONOMIC_LEDGER` by the same rule and no pain path' "the top's successor keeps autopilot, has no parent" flat
-pin "$COMP" '## A child'"'"'s pain' "completion.md has the child-pain paragraph" flat
-pin "$COMP" 'The heartbeat, per tick, per live seat, reads it too' "the heartbeat reads each child's pain file" flat
-pin "$COMP" 'it is never a failed task' "a pain line is an ask, not a failure" flat
-pin "$COMP" 'seat-mods refuses the call before autonomic sees it' "a seat-mods deny rings no pain of its own (F7)" flat
+section "the launch export carries no retired-plugin variable"
+RETIRED='AUTO''NOMIC'
+c="$(count_of "$ROLES" "$RETIRED" flat)"
+if [ "$c" -eq 0 ]; then pass "roles.md names no retired-plugin variable"
+else fail "roles.md names no retired-plugin variable" "$c left"; fi
+pin "$ROLES" 'MOLT_HANDOFF=parent MOLT_STATUS_PATH=<REPORT_PATH>.molt-status The names mean:' "the guarded export ends at the molt marking" flat
+c="$(count_of "$ROLES" "MOLT_STATUS_PATH=<REPORT_PATH>.molt-status AUTO""NOMIC" flat)"
+if [ "$c" -eq 0 ]; then pass "the guarded export ends at the molt marking"
+else fail "the guarded export ends at the molt marking" "$c left"; fi
+c="$(count_of "$COMP" "child's pain" flat)"
+if [ "$c" -eq 0 ]; then pass "completion.md has no child-pain paragraph"
+else fail "completion.md has no child-pain paragraph" "$c left"; fi
 
 section "OMP top (0.2.19)"
 pin "$REF" '## Host: OMP' "the layer file carries the OMP host mapping"
@@ -322,8 +295,10 @@ pin "$REF" '## Host: OMP' "the layer file carries the OMP host mapping"
 # Their pins read the shared file, and the layer file must not restate them.
 pin "$SKILL_MD" 'crew'"'"'s `hooks.json` does not run on omp' "the ceiling notice on omp comes from molt (SKILL.md)" flat
 present "$SKILL_MD" 'A send'"'"'s slash command is text on omp' "the send-as-text mapping lives with the skill" flat
-present "$SKILL_MD" 'New enrolled OMP path only' "the enrolled-OMP authority rules live with the skill" flat
-for moved in 'text on omp' 'New enrolled OMP path only' 'live issuance is supplied by these instructions'; do
+c="$(count_of "$SKILL_MD" 'New enrolled OMP path only' flat)"
+if [ "$c" -eq 0 ]; then pass "the enrolled-OMP authority rules are gone from the skill"
+else fail "the enrolled-OMP authority rules are gone from the skill" "$c left"; fi
+for moved in 'text on omp'; do
   c="$(count_of "$REF" "$moved" flat)" || c=failed
   if [ "$c" = "0" ]; then pass "the layer file does not restate: $moved"
   else fail "the layer file does not restate: $moved" "$c left"; fi

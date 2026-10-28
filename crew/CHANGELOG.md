@@ -2,12 +2,28 @@
 
 All notable changes to the `crew` plugin.
 
-**Unreleased (not published)**
+## 0.6.0
 
-- The reviewed integrated OMP routing release candidate ships with a gated-cutover runbook (autonomic `docs/omp-jev-rollout.md`): non-acting replay observation first, then reviewed class/assignment activation; a fresh approved OMP top with a trusted bounded assignment; retained assignments use new processes; same-assignment in-place Molt requires the full revalidation transaction or stays suspended. Existing Claude Code tops/backend/permissions are unchanged under #832; no new sandbox claim. Rollback is explicit deployment to the prior supported release/backend, never a per-request chat fallback claiming Jev.
-- Scope new OMP autonomous enrollment to externally approved, finite assignment snapshots and startup-pinned launch provenance; complete brief identity/prohibition blocks accompany each affected dispatch.
-- Require a fresh agent process for materially new enrolled assignments even in retained panes. Corrections within unchanged authority remain same-assignment; revocation/replacement invalidates. In-place Molt stays suspended when public ownership evidence is insufficient.
-- Preserve 0.2.22 phase/locator.seen/resume/generation/no-auto-relaunch ownership and all legacy/Claude Code behavior. Enrolled OMP operator merge/design/plan gates override standing routing without rewriting shared CC policy. No live grants, runtime activation, numeric acceptance policy, release or cross-host-parity claim.
+**Removal only.** The enrolled OMP authority text is gone from `orchestrate`: the section that
+issued and bound an assignment, the authority envelope every brief template carried (the opening
+line, its five startup variables, `BOUND FACTS`, `PROVENANCE`, `LIFECYCLE`, `FRESHNESS`), the
+enrolled-OMP paragraphs in the roles, lifecycle, spine and config references, and the "A child's
+pain" paragraph of `completion.md`. The guarded launch export, in `roles.md` and the Orca layer,
+ends at `MOLT_STATUS_PATH`; the ledger, pain-path and mode variables are no longer set, and the
+launcher's mode is no longer read. The `PROHIBITIONS` line keeps its operator-owned gate sentence
+and the merge rule, and loses only the clause about enrolled acknowledgment. Step 12 asks for the
+merge word on an `operator` run as before, and step 13's handoff notes the molt status line only.
+The context-ceiling hook's comment names molt alone as owner of the context boundary.
+Earlier entries are history and are not edited.
+
+## 0.5.0
+
+The seat and profile orders crew reads come from the project's own files. `orchestrate` takes
+a standing order "in the project's memory bank or AGENTS.md" for seats and profiles where it
+named the autopilot policy, and points at merge-bar's working-a-pr "Standing orders"
+paragraph for where it is read and whom it binds, without restating it; only orders naming the
+orchestrator role bind it, and with no standing order the ask stays.
+No agent gains authority; the enrolled-authority text is unchanged.
 
 ## 0.4.3
 

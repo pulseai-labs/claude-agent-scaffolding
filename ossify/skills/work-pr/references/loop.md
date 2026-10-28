@@ -3,7 +3,7 @@
 Drive one PR to mergeable: fetch every reviewer finding, give each a recorded
 disposition, drive the fixes yourself, re-review on the new head, defer the
 non-blocking leftovers as tracked issues, and merge on the operator's explicit
-ack, or under a standing order in the autopilot policy that grants merge
+ack, or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge
 authority. The loop is judgment; the shell is only for mechanical `git`/`gh`
 facts. Nothing here needs a manifest, a worktree, or any ossify state — the
 lane works on any repository `gh` can reach.
@@ -124,7 +124,7 @@ This section is authoritative for this lane.
   reviewer is not approval; a queued reviewer is waited for or surfaced —
   never assumed. Confirm each expected reviewer actually left something on the
   current head. Do not busy-wait a queued reviewer: say it is pending, and let
-  the operator decide — unless a standing order in the autopilot policy names
+  the operator decide — unless a standing order in the project's memory bank or `AGENTS.md` that binds this role names
   the fallback reviewer: then replace it and say so in the ledger.
 
 Loop §2→§2.5→§3 until every finding is dispositioned, every P1 is fixed or
@@ -190,7 +190,7 @@ In one place, give the operator:
   that only after the operator acks is the loop soliciting an impossible
   merge.
 
-Then **ask**: merge, wait, or leave open — or, under a standing order in the autopilot policy that grants merge authority, treat a clean verdict as the ack and say which order gave it.
+Then **ask**: merge, wait, or leave open — or, under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority, treat a clean verdict as the ack and say which order gave it.
 The ack covers **the head the ledger describes**: pass the reviewed OID
 (`gh pr merge --match-head-commit <oid>`, with the repo's merge convention —
 ask if the convention is not evident from the repo's history or settings), so
@@ -220,4 +220,4 @@ report the PR URL and stop — the loop does not poll.
   a correctness finding as style.
 - **Silent-passing a non-blocking finding** — untracked is undispositioned.
 - **Trusting a pre-fix verdict on a post-fix head.**
-- **Auto-merging.** The merge is the operator's explicit call, or a standing order's; never a merge queue's auto-merge.
+- **Auto-merging.** The merge is the operator's explicit call, or a standing order's that binds this role; never a merge queue's auto-merge.

@@ -2138,7 +2138,7 @@ _r=1; grep -Fq 'Re-read the inputs after the yes' "$_IC" \
 _pin "$_r" "the repair writes on a plan whose inputs changed between the yes and the write - a CLAUDE.md edited, or an AGENTS.md appeared, is never noticed (E2)"
 
 # 1.25.0 (autopilot slice 1, Tasks 3+4; #831 #832) - the merge and the demo walk
-# under a standing order in the autopilot policy. The first three pins and T4-1
+# under a standing order in the project's memory bank or AGENTS.md. The first three pins and T4-1
 # are red on 1.24.0's text and green after the edits; T4-2 is the loosening's
 # adjacent control (CLAUDE.md): §3's human walk stays the otherwise branch, and
 # the sentence it lives in is pinned so it cannot be deleted.
@@ -2146,26 +2146,45 @@ _PRW_LOOP="$HERE/../skills/work-pr/references/loop.md"
 _PRW_WP="$HERE/../skills/work-pr/SKILL.md"
 _PRW_SC="$HERE/../skills/close/references/spine-close.md"
 _PRW_CD="$HERE/../skills/close/references/cumulative-demo.md"
-pin "$_PRW_LOOP" 'Then **ask**: merge, wait, or leave open — or, under a standing order in the autopilot policy that grants merge authority, treat a clean verdict as the ack and say which order gave it.' \
+pin "$_PRW_LOOP" 'Then **ask**: merge, wait, or leave open — or, under a standing order in the project'"'"'s memory bank or `AGENTS.md` that binds this role and grants merge authority, treat a clean verdict as the ack and say which order gave it.' \
   "loop.md's terminus does not take a standing order's clean verdict as the merge ack (#831)"
-pin "$_PRW_SC" "this ceremony does not ack on anyone's behalf; a standing order in the autopilot policy that grants merge authority is the operator's ack, given in advance" \
+pin "$_PRW_SC" "this ceremony does not ack on anyone's behalf; a standing order in the project's memory bank or \`AGENTS.md\` that binds this role and grants merge authority is the operator's ack, given in advance" \
   "spine-close.md does not say a standing order is the operator's ack given in advance (#831)"
-pin "$_PRW_WP" "the merge is the operator's, or a standing order's in the autopilot policy" \
+pin "$_PRW_WP" "the merge is the operator's, or a standing order's in the project's memory bank or \`AGENTS.md\`" \
   "work-pr/SKILL.md's 'whichever loop runs' sentence does not carry the standing-order merge (#831)"
-pin "$_PRW_CD" 'Under a standing order in the autopilot policy that gives you the demo walk, walk each line yourself' \
+pin "$_PRW_CD" 'Under a standing order that gives you the demo walk, walk each line yourself' \
   "cumulative-demo.md does not hand the user: walk to the orchestrator under the Demo walk order (#832)"
 pin "$_PRW_CD" 'You may not perform a `user:` line on the human'"'"'s behalf and mark it passed.' \
   "cumulative-demo.md's otherwise branch - the human's walk - is gone, so the walk reads as the orchestrator's always (#832)"
+
+# 1.27.0 - the order's home is the project's files, and it binds only the role it names.
+pin "$_PRW_CD" '(`08-governance.md`, `## Standing orders`)' \
+  "cumulative-demo.md does not name the memory bank's Standing orders section as the order's home (1.27.0)"
+pin "$_PRW_CD" 'for any kind of order that section does not' \
+  "cumulative-demo.md does not fall back to AGENTS.md for kinds the section does not settle (1.27.0)"
+pin "$_PRW_CD" '(`.workspace/pairing.json`)' \
+  "cumulative-demo.md does not send a canonical checkout to the paired AI workspace's files (1.27.0)"
+pin "$_PRW_CD" 'An order binds only the role it names (one naming no role' \
+  "cumulative-demo.md lost the role rule - an order naming no role must bind no one (1.27.0)"
+pin "$_PRW_CD" 'with none, the walk is the human' \
+  "cumulative-demo.md lost the no-order branch - the human walks (1.27.0)"
+_MBB="$HERE/../skills/start/references/memory-bank-brief.md"
+pin "$_MBB" 'ships with an empty `## Standing orders`' \
+  "memory-bank-brief.md does not seed 08-governance.md with an empty Standing orders section (1.27.0)"
 
 # PR #869 round 1 (disposition items 1-3, one class): the two sites the first pass
 # left operator-only, conditioned in one commit. The first two pins are red on
 # dceda637's text and green after the fix; the third is the loosening's adjacent
 # control (CLAUDE.md): the rail gains a merge branch, so the prohibition the
 # disposition says to keep - "Never auto-merge" - is pinned against deletion.
-pin "$_PRW_SC" "the human, or yourself under a standing order in the autopilot policy that gives" \
+pin "$_PRW_SC" "the human, or yourself under a standing order in the project's memory bank or \`AGENTS.md\` that gives" \
   "spine-close.md's step-4 reference still gives the demo walk to the human alone (#869 disposition 1)"
-pin "$_PRW_WP" "the ask — or, under a standing order in the autopilot policy that grants merge" \
+pin "$_PRW_WP" "the ask — or, under a standing order in the project's memory bank or \`AGENTS.md\` that" \
   "work-pr/SKILL.md's merge rail still stops at the ask with no standing-order branch (#869 disposition 2)"
+pin "$_PRW_WP" "binds this role and grants merge authority (lookup:" \
+  "work-pr/SKILL.md's merge rail dropped 'binds this role and grants merge authority' - an order binds only the role it names (1.27.0)"
+pin "$_PRW_LOOP" "that binds this role names" \
+  "loop.md's fallback-reviewer order lost its role cue (1.27.0)"
 pin "$_PRW_WP" "Never auto-merge." \
   "work-pr/SKILL.md's merge rail lost 'Never auto-merge' - a merge queue's auto-merge stays forbidden (#869 disposition 2)"
 
