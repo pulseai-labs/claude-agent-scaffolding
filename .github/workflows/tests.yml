@@ -107,6 +107,12 @@ jobs:
         # which crew's own runner cannot see.
         run: bash tests/test-crew-rename.sh
 
+      - name: autonomic retirement gate (repo-root)
+        # The plugin's removal (#948): no tracked path, no catalog entry and no tree-wide
+        # reference outside CHANGELOG history and the sanctioned survivors listed in the
+        # script. Repo-root because it scans every plugin's tree.
+        run: bash tests/test-autonomic-retired.sh
+
       - name: merge-bar template parity (repo-root)
         # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).
         run: bash tests/test-merge-bar-template-parity.sh
