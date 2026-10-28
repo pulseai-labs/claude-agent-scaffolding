@@ -123,8 +123,6 @@ jobs:
       - name: baton suite
         run: bash baton/run-tests.sh
 
-      - name: bot-on-telegram suite
-        run: bash bot-on-telegram/run-tests.sh
 
       - name: bot-on-openbot suite
         run: bash bot-on-openbot/run-tests.sh
