@@ -13,9 +13,15 @@ are on, and `gh` (with its own auth) and `baton` on the service's PATH.
 - `bot-on-openbot notify <key> <message>` is what baton runs for each notice. It only writes a file
   into `<state>/spool/` and exits, so baton's tick never waits on the network.
 - `bot-on-openbot serve` (the service) sends the spool in order through `openbot-cli run <agent> -
-  --id <notice key> --json`, one delivery at a time. Each task is fixed wording plus data: ask the
+  --id <notice key> --json`, one delivery at a time per agent. Each task is fixed wording plus data: ask the
   operator one question with exactly these labels, send a message verbatim, or draft a summary of a
   screen as JSON. The agent asks; it never answers alone.
+- Each notice goes to its project's agent. `serve` reads the run's `run.json` `params.repo`, asks
+  `git -C <repo> remote get-url origin` for the repo name (GitHub `https://github.com/<owner>/<repo>`,
+  `git@github.com:<owner>/<repo>` and `ssh://git@github.com/<owner>/<repo>` only, `.git` optional),
+  and sends to `agents[<name>]` from the config, else the agent `<name>_autopilot`. That agent must
+  exist in OpenBot (found by id, or by exactly one name match, case ignored). A run whose agent
+  cannot be found goes to the default agent (see Agent).
 - The tapped label is read from OpenBot's own database (`openbot.db`, opened read-only: the
   `prompt.resolved` row of the delivery's turn), never from the agent's reply text. It is matched
   exactly against the options recorded for that question, and runs the one fixed command recorded
@@ -57,22 +63,38 @@ The unit carries `BATON_STATE_DIR`, `BATON_CONFIG`, `BOT_ON_OPENBOT_CONFIG_DIR` 
 
 ## Agent
 
-1. In OpenBot, pick or make the agent that talks to you (the one this was built with is `Autopilot`)
-   and turn its **Local scripts** on. OpenBot then writes `~/.config/OpenBot/automation/{url,token}`.
+One OpenBot agent per project, plus a default agent.
+
+1. In OpenBot, make one agent per project, named `<repo>_autopilot` after the GitHub repo name
+   (`pulse360_autopilot` for `pulse360`), and turn its **Local scripts** on. Do the same for the
+   default agent (the one this was built with is `Autopilot`). OpenBot then writes
+   `~/.config/OpenBot/automation/{url,token}`.
 2. Write `~/.config/bot-on-openbot/config.json`:
 
    ```json
-   { "agent": "Autopilot" }
+   { "agent": "Autopilot", "agents": { "some-repo": "Some Agent" } }
    ```
 
-   `agent` is the agent's name or id. Optional keys, each with its default:
+   `agent` is the default agent's name or id. `agents` is optional: it maps a repo name to the agent
+   that repo uses, where the name `<repo>_autopilot` does not fit. Other optional keys, each with its default:
    `"cli": ["bun", "/opt/OpenBot/app/resources/cli/openbot-cli.mjs"]`,
    `"db": "~/.config/OpenBot/openbot.db"`, `"automationDir": "~/.config/OpenBot/automation"`
    (spell paths out in full: they must be absolute).
 
 The bot reads OpenBot's token from the automation folder on each call and sends it only in a request
-header. It never writes it to a file, a log line or an error. `bot-on-openbot status` shows the agent
-and whether `openbot-cli list` finds it; it never prints the token.
+header. It never writes it to a file, a log line or an error. `bot-on-openbot status` prints one
+`agent:` line per agent: the default, then the `agents` values, then any agent with an open delivery.
+Each line says whether `openbot-cli list` finds it (`finds it` or `NOT FOUND`) and ends with
+`, open: <keys>` when it has open deliveries. It does not route spooled notices. It never prints the
+token.
+
+**The default agent.** A notice that cannot reach a project agent goes to the default agent, with a
+first line saying why: `[pulse360: no OpenBot agent pulse360_autopilot — sent to Autopilot]` (the
+prefix is the GitHub repo name), `[run r9: no project — sent to Autopilot]` (no `params.repo`), or
+`[run r9: no GitHub origin for <repo> — sent to Autopilot]`. Plain notices (run done, and anything
+else) carry no run, so they always go to the default agent, with no note. A found route is kept per
+run for the life of `serve`; a fallback is not, so an agent created mid-run is used from the run's
+next notice.
 
 ## The baton line
 
@@ -96,8 +118,10 @@ bot-on-telegram is this one edit.
 | Run parked | a question: Disarm |
 | Run done, and anything else | a plain message, verbatim |
 
-One delivery is open at a time: an unanswered OpenBot question blocks the agent's queue, so the next
-notice waits in the spool until the open one is answered, settled or ends.
+One delivery is open per agent: an unanswered OpenBot question blocks that agent's queue, so the next
+notice for it waits in the spool until the open one is answered, settled or ends. Other agents are
+not held, and the spool drains in order within each agent. A follow-up question stays on its parent's
+agent.
 
 ## Options
 
@@ -141,7 +165,8 @@ yet is closed at once and answered once it shows. Settling is checked on every `
 ## State
 
 `${BOT_ON_OPENBOT_STATE_DIR:-~/.local/state/bot-on-openbot}`: `spool/`, `spool-bad/`,
-`deliveries.jsonl` (every delivery, what it offered, and how it closed), `taps.jsonl` (every answer,
+`deliveries.jsonl` (every delivery, the `agent` it went to, what it offered, and how it closed; a
+0.1.x record has no `agent` and counts as the default agent), `taps.jsonl` (every answer,
 its act and the command's exit code; typed text is not logged), `serve.lock`.
 Only one `serve` runs at a time; a second exits with code 3.
 
@@ -150,11 +175,21 @@ Only one `serve` runs at a time; a second exits with code 3.
 - The answer is read from `openbot.db`, an internal OpenBot schema with no docs, and OpenBot's updater
   stays on. When an update changes its shape, nothing runs, one line is logged, and the operator gets
   a message to act in the Orca terminal or with baton.
-- One question at a time: an unanswered question holds every later notice, a merge included, until it
-  is answered, settled or ends.
-- One agent.
+- One question at a time per agent: an unanswered question holds that agent's later notices, a merge
+  included, until it is answered, settled or ends.
+- A notice with no project agent goes to the default agent. Routing reads only `params.repo` in the
+  run's `run.json`, so an ad hoc run without it goes there. Only the `origin` remote is read, and only
+  GitHub URLs of the three shapes above; any other remote falls back.
+- Two open in one project: a project's notice that fell back to the default agent stays open there
+  when the project's own agent is created. The next notice opens on the new agent, so the project
+  has a question open on each until the first is answered.
+- `status` does not route spooled notices: it shows the spool count, not which agent each spooled
+  notice will reach. That is known only when the notice is delivered.
+- A fallback notice that waits in the spool costs one `git` and one `/v1/agents` call per loop.
+- If OpenBot cannot be reached while routing, the whole drain stops for that loop; the spool keeps
+  its order.
 - OpenBot allows 30 runs per agent per hour. A refused or failed run keeps the notice in the spool, in
-  order; a busy spine waits there. Follow-up questions and result messages each take a run.
+  order, and holds only that agent for the loop; a busy spine waits there. Follow-up questions and result messages each take a run.
 - A picker that is neither omp's ask picker nor omp's numbered `/review` picker reads as no picker: the
   question then offers only Show question, Unpark and Disarm, and says to answer in the Orca terminal.
 - Free text reaches a worker only through a picker's Other row; elsewhere typed text runs nothing.

@@ -2,6 +2,24 @@
 
 All notable changes to the `bot-on-openbot` plugin.
 
+## 0.2.0 - 2026-10-28
+
+- Closes #945: one OpenBot agent per project. `serve` reads the run's `run.json` `params.repo`, takes
+  the repo name from `git -C <repo> remote get-url origin` (GitHub https, `git@github.com:` and
+  `ssh://git@github.com/` shapes only) and sends the notice to `agents[<name>]` from the config, else
+  `<name>_autopilot`, when OpenBot has that agent. Any other case goes to the default agent (`agent`),
+  with a first line saying why, e.g. `[pulse360: no OpenBot agent pulse360_autopilot — sent to
+  Autopilot]`. A found route is cached per run for the life of `serve`; a fallback is not.
+- New optional config key `agents`: repo name to agent name or id.
+- One delivery is open per agent, not one overall. The spool drains in order within each agent. A
+  refused or failed run holds only its agent for the loop; an OpenBot outage while routing stops the
+  drain. Follow-ups stay on their parent's agent. The 30-runs-per-hour limit is per agent.
+- `deliveries.jsonl` records carry `agent`; a 0.1.x record without it counts as the default agent.
+- `status` prints one `agent:` line per agent (found or NOT FOUND, `, open: <keys>`).
+- Known limits added: the two-open-in-one-project case, `origin`-only GitHub remotes,
+  `params.repo`-only routing, and the per-loop `git` and `/v1/agents` cost of a waiting fallback.
+- Setup: one agent per project named `<repo>_autopilot`, Local scripts on for each.
+
 ## 0.1.3 - 2026-10-28
 
 - Fixes #943: an OpenBot restart resolves the open question with `resolution.status: "expired"` and
