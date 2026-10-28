@@ -31,7 +31,7 @@ is stated, not just the conclusion).
    be current and not re-fetched ritually.
 4. **Merge only on explicit ack or a granting standing order** — the terminus
    surfaces the full ledger, per-reviewer state, and a mergeability verdict, then
-   stops at the ask; under a standing order in the project's memory bank or `AGENTS.md` that grants
+   stops at the ask; under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants
    merge authority it treats a clean verdict as the ack instead, and the ledger
    names which order gave it. Absent such an order, silence, green CI, or a clean
    verdict never substitute for the ack; and no merge is offered while a P1 is

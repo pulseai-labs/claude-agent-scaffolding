@@ -1,6 +1,6 @@
 ---
 name: working-a-pr
-description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges on the operator's explicit ack, or under a standing order in the project's memory bank or `AGENTS.md` that grants merge authority.
+description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges on the operator's explicit ack, or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority.
 ---
 
 # Working a pull request — against its merge bar

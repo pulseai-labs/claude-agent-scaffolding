@@ -22,7 +22,7 @@ Everything else is non-blocking.
 | Skill | Command | What it does |
 |---|---|---|
 | `opening-a-pr` | `/merge-bar:open-pr` | Writes the seven-field body (Claim, Scope, Known limits, Merge danger, Merge bar, Evidence, Closes) and opens the PR |
-| `working-a-pr` | `/merge-bar:work-pr <PR>` | Works the PR to mergeable against its own bar; merges on your ack, or under a standing order in the project's memory bank or `AGENTS.md` that grants merge authority |
+| `working-a-pr` | `/merge-bar:work-pr <PR>` | Works the PR to mergeable against its own bar; merges on your ack, or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority |
 | `setting-up-reviewers` | `/merge-bar:setup-reviewers` | Once per repository: `AGENTS.md` review rules, and `.coderabbit.yaml` if public |
 
 On Codex, invoke the skills by name.

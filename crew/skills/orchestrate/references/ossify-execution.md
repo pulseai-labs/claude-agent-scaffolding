@@ -44,7 +44,7 @@ artifact — a PR list, a ledger comment id, a merge SHA — never narrative.
 **Depth is confirmed with the operator, twice over.** Before the spine session
 launches, under a standing order in the project's memory bank or AGENTS.md for seats and profiles
 (merge-bar's working-a-pr, "Standing orders" paragraph, says where it is read and whom it
-binds; the orders here bind the orchestrator role; with no standing order, ask), take
+binds; the orders that bind here are those naming the orchestrator role; with no standing order, ask), take
 the depth as `2` and continue; otherwise ask the operator to confirm nested worker depth
 is `2`: the spine session launches item sessions of its own. The layer has no depth setting
 to read, so a brief asserting the depth is not confirmation, and no CLI read substitutes.

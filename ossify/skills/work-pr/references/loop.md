@@ -220,4 +220,4 @@ report the PR URL and stop — the loop does not poll.
   a correctness finding as style.
 - **Silent-passing a non-blocking finding** — untracked is undispositioned.
 - **Trusting a pre-fix verdict on a post-fix head.**
-- **Auto-merging.** The merge is the operator's explicit call, or a standing order's; never a merge queue's auto-merge.
+- **Auto-merging.** The merge is the operator's explicit call, or a standing order's that binds this role; never a merge queue's auto-merge.
