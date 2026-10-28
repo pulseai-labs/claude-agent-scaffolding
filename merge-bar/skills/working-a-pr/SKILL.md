@@ -182,7 +182,7 @@ opened PR.
   the findings, the fix commits they sit on, and two options for the operator: **narrow the
   Claim** — moving an edge into Known limits, only where it does not meet condition 1 — or
   **split the PR**, naming the parts. The operator chooses. Under a standing order (see **Standing orders**) that binds this role
-  that settles the round stop, follow that order instead and record the
+  and settles the round stop, follow that order instead and record the
   choice in the stop report. Findings in that same round which
   sit on the PR's original commits are dispositioned on their merits alongside the stop report.
 - **Not the stop:** blocking findings at round 3 or later on lines the PR's original commits
@@ -222,7 +222,7 @@ Then, in one place, give the operator:
   merge.
 
 Then **ask**: merge, wait, or leave open — or, under a standing order (see **Standing orders**) that binds this role
-that grants merge authority, treat a clean verdict as the ack and say which order
+and grants merge authority, treat a clean verdict as the ack and say which order
 gave it. The ack covers **the head the ledger describes**: pass the reviewed OID
 (`gh pr merge --match-head-commit <oid>`, with the repo's merge convention —
 ask if the convention is not evident from the repo's history or settings), so

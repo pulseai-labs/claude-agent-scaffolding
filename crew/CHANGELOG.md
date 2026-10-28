@@ -14,8 +14,8 @@ All notable changes to the `crew` plugin.
 The seat and profile orders crew reads come from the project's own files. `orchestrate` takes
 a standing order "in the project's memory bank or AGENTS.md" for seats and profiles where it
 named the autopilot policy, and points at merge-bar's working-a-pr "Standing orders"
-paragraph for where it is read and whom it binds, without restating it; the orders bind the
-orchestrator role, and with no standing order, or without merge-bar installed, the ask stays.
+paragraph for where it is read and whom it binds, without restating it; only orders naming the
+orchestrator role bind it, and with no standing order the ask stays.
 No agent gains authority; the enrolled-authority text is unchanged.
 
 ## 0.4.3

@@ -3,7 +3,7 @@
 Drive one PR to mergeable: fetch every reviewer finding, give each a recorded
 disposition, drive the fixes yourself, re-review on the new head, defer the
 non-blocking leftovers as tracked issues, and merge on the operator's explicit
-ack, or under a standing order in the project's memory bank or `AGENTS.md` that grants merge
+ack, or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge
 authority. The loop is judgment; the shell is only for mechanical `git`/`gh`
 facts. Nothing here needs a manifest, a worktree, or any ossify state — the
 lane works on any repository `gh` can reach.
