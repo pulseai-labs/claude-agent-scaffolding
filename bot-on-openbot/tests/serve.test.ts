@@ -288,6 +288,29 @@ test("a fallback note heads the text", async () => {
   expect(find(PARK)).toMatchObject({ phase: "asked", agent: "Autopilot" });
 });
 
+test("a fallback note heads a blocked park's question on every path", async () => {
+  const NOTE = "[run r1: no project — sent to Autopilot]";
+  const fallback = async (): Promise<Route> => ({ agent: "Autopilot", note: NOTE });
+  const cases: { screen: { rc: number; stdout: string }; draft?: [string, string | null]; text: string }[] = [
+    { screen: { rc: 0, stdout: screenJson() }, draft: ["completed", DRAFT], text: "It asks for a colour." },
+    { screen: { rc: 0, stdout: screenJson() }, draft: ["failed", null], text: "baton r1/u5 blocked on a question" },
+    { screen: { rc: 0, stdout: screenJson(null) }, text: "baton r1/u5 blocked on a question" },
+  ];
+  for (const c of cases) {
+    env.cleanup();
+    env = makeEnv();
+    env.reply.fn = () => ({ ...c.screen, stderr: "" });
+    env.setReplies({ run: c.draft ? [env.delivery("draft"), env.delivery("ask")] : env.delivery("ask") });
+    if (c.draft) env.status("draft", c.draft[0], c.draft[0] === "failed" ? null : "turn-d", c.draft[1]);
+    env.status("ask", "running", "turn-a");
+    spoolNotice(BLOCKED, "baton r1/u5 blocked on a question");
+    await run(1, fallback);
+    const ask = env.runStdins().at(-1)!;
+    expect(ask).toContain(`Show this text: ${NOTE}\n${c.text}`);
+    expect(find(BLOCKED)!.offer!.text.startsWith(`${NOTE}\n${c.text}`)).toBe(true);
+  }
+});
+
 test("route down keeps the notice and stops the drain", async () => {
   env.setReplies({ run: env.delivery("d1") });
   spoolNotice(PARK, "m");

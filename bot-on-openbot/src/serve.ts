@@ -5,7 +5,7 @@ import { readUnit } from "./baton-state.ts";
 import { agentOf, close, find, followUp, open, record, type DeliveryRec } from "./deliveries.ts";
 import { parseKey, type Notice } from "./notice.ts";
 import { log } from "./log.ts";
-import { blockedOffer, offerFor } from "./offer.ts";
+import { blockedOffer, offerFor, type Offer } from "./offer.ts";
 import { OpenBotDown, OpenBotRefused, type Delivery, type OpenBot, type Prompt } from "./openbot.ts";
 import { stateDir } from "./paths.ts";
 import type { Route } from "./route.ts";
@@ -136,10 +136,8 @@ async function drain(opts: ServeOptions): Promise<void> {
     }
     const { agent } = route;
     if (held.has(agent) || open().some((r) => agentOf(r, opts.defaultAgent) === agent)) continue;
-    // A fallback's note is the first line of the text, so the operator sees why it came here.
-    const message = route.note === undefined ? item.message : `${route.note}\n${item.message}`;
     try {
-      await deliver(item.key, message, agent, opts);
+      await deliver(item.key, item.message, route.note, agent, opts);
     } catch (e) {
       if (!stopsDrain(e)) throw e;
       log(`drain stopped: ${agent}: ${(e as Error).message}`);
@@ -151,12 +149,15 @@ async function drain(opts: ServeOptions): Promise<void> {
   }
 }
 
-async function deliver(key: string, message: string, agent: string, opts: ServeOptions): Promise<void> {
+// A fallback's note is the first line of the text, so the operator sees why it came here. A blocked
+// park keeps it on its record: its offer's text is built later, from the draft.
+async function deliver(key: string, raw: string, note: string | undefined, agent: string, opts: ServeOptions): Promise<void> {
   const bot = opts.botFor(agent);
   const n = parseKey(key);
   if (n.kind === "unit-park" && readUnit(n.run, n.unit)?.parked?.blocked) {
-    return deliverBlocked(key, message, agent, n.run, n.unit, n.at, opts);
+    return deliverBlocked(key, raw, note, agent, n.run, n.unit, n.at, opts);
   }
+  const message = withNote(note, raw);
   const run = n.kind === "plain" ? "" : n.run;
   const offer = offerFor(n, message, run);
   if (!offer) {
@@ -175,9 +176,12 @@ async function deliver(key: string, message: string, agent: string, opts: ServeO
 // A blocked park: `baton screen` gives the fresh screen and its picker (baton's parser, the same one
 // its answer check uses). Park gone, or a newer park on screen: closed, nothing sent. A picker: the
 // agent drafts first. No picker, or the screen cannot be read: asked at once with the escapes only.
-async function deliverBlocked(key: string, message: string, agent: string, run: string, unit: string, at: string, opts: ServeOptions): Promise<void> {
+async function deliverBlocked(key: string, message: string, note: string | undefined, agent: string, run: string, unit: string, at: string, opts: ServeOptions): Promise<void> {
   const bot = opts.botFor(agent);
-  const base = { key, agent, run, unit, park_at: at, title: blockedOffer(message, run, unit, null, null).title };
+  const base = {
+    key, agent, run, unit, park_at: at, title: blockedOffer(message, run, unit, null, null).title,
+    ...(note !== undefined ? { note } : {}),
+  };
   const res = await screen(run, unit, opts.runner);
   const shown = res.rc === 0 ? parseScreen(res.stdout) : null;
   if (res.rc === 2 || (shown && shown.park_at !== at)) {
@@ -189,10 +193,13 @@ async function deliverBlocked(key: string, message: string, agent: string, run: 
     record({ ...base, phase: "drafting", message, picker: shown.picker, draft_id: deliveryId });
     return;
   }
-  const offer = blockedOffer(message, run, unit, null, null);
+  const offer = noted(note, blockedOffer(message, run, unit, null, null));
   const { deliveryId } = await bot.run(askTask(offer), key);
   record({ ...base, phase: "asked", offer, ask_id: deliveryId });
 }
+
+const withNote = (note: string | undefined, text: string): string => (note === undefined ? text : `${note}\n${text}`);
+const noted = (note: string | undefined, o: Offer): Offer => ({ ...o, text: withNote(note, o.text) });
 
 // ---- poll ------------------------------------------------------------------------------------
 // Every open record is read, sent and answered on its own agent; a tap is read from the agent the
@@ -236,7 +243,7 @@ async function afterDraft(rec: DeliveryRec, opts: ServeOptions): Promise<Deliver
   if (d.state === "queued" || d.state === "running") return rec;
   const picker = rec.picker ?? null;
   const draft = d.state === "completed" && d.text !== null && picker ? parseDraft(d.text, picker) : null;
-  const offer = blockedOffer(rec.message ?? rec.title, rec.run, rec.unit ?? "", picker, draft);
+  const offer = noted(rec.note, blockedOffer(rec.message ?? rec.title, rec.run, rec.unit ?? "", picker, draft));
   const asked: DeliveryRec = { ...rec, phase: "asked", offer };
   delete asked.ask_id;
   record(asked);

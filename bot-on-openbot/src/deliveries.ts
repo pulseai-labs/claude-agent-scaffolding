@@ -14,6 +14,7 @@ export type DeliveryRec = {
   run: string; unit?: string; park_at?: string;
   title: string;
   message?: string;            // the notice's text, kept while a blocked park's draft runs
+  note?: string;               // a blocked park's fallback note: heads its offer's text, not its follow-ups
   draft_id?: string; ask_id?: string;   // an "asked" record with no ask_id is sent on the next loop
   picker?: Picker;             // blocked park only, from `baton screen`
   offer?: Offer;               // what was asked; the only source of a tap's command
