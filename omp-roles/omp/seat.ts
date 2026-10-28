@@ -1,22 +1,20 @@
-// omp-seat's logic: where the three extensions are installed, and the omp command line for a role.
+// omp-seat's logic: where the two extensions are installed, and the omp command line for a role.
 import { existsSync, readFileSync } from 'node:fs'
-import { spawnSync } from 'node:child_process'
 import { semver } from 'bun'
 import { join } from 'node:path'
 import { installPaths } from './bin-path'
 
-export const MODS = ['seat-mods', 'molt', 'autonomic'] as const
+export const MODS = ['seat-mods', 'molt'] as const
 // Minimum supported versions: seat-mods must map seat-reviewer to the reviewer profile;
-// molt and autonomic must ship their OMP extensions.
-const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0', autonomic: '0.6.0' }
+// molt must ship its OMP extension.
+const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0' }
 export const ROLES: Record<string, string | undefined> = {
   worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
   orchestrator: 'orchestrator.md', 'crew-spine': 'crew-spine.md', 'crew-work-pr': 'crew-work-pr.md',
 }   // role → roles/<file>.md; the crew-* roles follow a crew activated brief (#839)
-// A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798) and
-// autonomic's live mode file, so the herdr seats it launches inherit autopilot.
-// The orchestrator also needs seat-mods 0.8.0's status entry (omp/status-extension.ts), loaded after the three.
-const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.8.0', autonomic: '0.7.0' } }
+// A role that relies on a newer mod than the floor: the orchestrator needs seat-mods' no-subagent rail (#798).
+// The orchestrator also needs seat-mods 0.8.0's status entry (omp/status-extension.ts), loaded after the two.
+const ROLE_MIN: Record<string, Partial<Record<(typeof MODS)[number], string>>> = { orchestrator: { 'seat-mods': '0.8.0' } }
 // A role whose procedure is another plugin's skill: the orchestrator follows crew's orchestrate skill, whose
 // "Host: OMP" section ships in 0.3.0. Only omp's own record counts: omp does not discover a Claude Code user-scope
 // plugin unless its claude-plugins provider is enabled.
@@ -79,9 +77,9 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     argv.push('-e', ext)
     extensions.push(ext)
   }
-  // MODS keeps seat-mods first: its guard must see a tool call before molt's and autonomic's tool_call handlers,
+  // MODS keeps seat-mods first: its guard must see a tool call before molt's tool_call handlers,
   // because omp stops at the first block and adds up input rewrites in order. The status check is a second entry,
-  // loaded last, so molt's and autonomic's session_stop blocks win as they do beneath seat-mods on Claude Code.
+  // loaded last, so molt's session_stop block wins as they do beneath seat-mods on Claude Code.
   if (o.role === 'orchestrator') {
     const root = (omp.get('seat-mods') ?? claude.get('seat-mods')) as string
     const status = join(root, 'omp', 'status-extension.ts')
@@ -115,25 +113,6 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
     }
   }
   return { argv: [...argv, ...o.args], warnings: [], extensions }
-}
-
-// CLI/file boundary only: plugins never import each other's implementation.
-export function authorityPreflight(o: { env: Readonly<Record<string, string | undefined>>; workerRoots: readonly string[]; autonomicRoot: string }): { ok: true } | { error: string } {
-  const names = ['AUTONOMIC_AUTHORITY_PATH', 'AUTONOMIC_AUTHORITY_SHA256', 'AUTONOMIC_ASSIGNMENT_ID', 'AUTONOMIC_ASSIGNMENT_GENERATION', 'AUTONOMIC_LAUNCH_ID']
-  const present = names.filter(name => o.env[name] !== undefined).length
-  if (present === 0) return { ok: true } // Legacy/manual launch is not positive authority.
-  if (present !== names.length) return { error: 'omp-seat: partial authority binding; fresh trusted launch required' }
-  const cli = join(o.autonomicRoot, 'bin', 'authority.ts')
-  if (!existsSync(cli)) return { error: 'omp-seat: installed Autonomic has no authority validator' }
-  const r = spawnSync('bun', [cli, 'validate-launch', ...o.workerRoots.flatMap(root => ['--worker-root', root])], {
-    env: o.env, encoding: 'utf8', timeout: 10_000, maxBuffer: 64000,
-  })
-  if (r.error || r.status !== 0) return { error: 'omp-seat: invalid or unavailable trusted authority; fresh trusted launch required' }
-  try {
-    const value: unknown = JSON.parse(r.stdout)
-    if (value === null || typeof value !== 'object' || !('valid' in value) || value.valid !== true) throw new Error('invalid validator receipt')
-  } catch { return { error: 'omp-seat: invalid authority validation receipt' } }
-  return { ok: true }
 }
 
 export function testedVersion(pkgJson: string): string {
