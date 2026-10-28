@@ -146,6 +146,7 @@ async function drain(opts: ServeOptions): Promise<void> {
       held.add(agent);
       continue;
     }
+    if (route.note !== undefined) log(`${item.key}: ${route.note}`); // once, when it goes
     removeSpool(path);
   }
 }

@@ -280,7 +280,8 @@ test("a fallback note heads the text", async () => {
   env.setReplies({ run: env.delivery("d1") });
   env.status("d1", "running", "turn-1");
   spoolNotice(PARK, "baton r1/u1 parked in build: second prompt");
-  await run(1, async () => ({ agent: "Autopilot", note: "[run r1: no project — sent to Autopilot]" }));
+  const r = await run(1, async () => ({ agent: "Autopilot", note: "[run r1: no project — sent to Autopilot]" }));
+  expect(r.err.filter((l) => l.includes("no project"))).toEqual([`bot-on-openbot: ${PARK}: [run r1: no project — sent to Autopilot]\n`]);
   const [task] = env.runStdins();
   expect(task).toContain("Show this text: [run r1: no project — sent to Autopilot]\nbaton r1/u1 parked in build: second prompt.");
   expect(runAgents()).toEqual(["Autopilot"]);
