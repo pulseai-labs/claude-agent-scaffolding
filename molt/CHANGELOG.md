@@ -2,6 +2,20 @@
 
 All notable changes to the `molt` plugin.
 
+## 0.5.0 — 2026-10-28
+
+The `autonomic` plugin is retired (#948).
+
+- **The autopilot branch is gone: no no-progress guard, no bell, no mode line; the unattended
+  pause is unchanged.** molt no longer reads `autonomic`'s per-session record. The pause after
+  `manualMaxMolts` unattended molts now applies in every session (a stale autopilot record no
+  longer exempts it or turns it into a no-progress pause), and it rings nothing. `/molt status`
+  has no `mode (...)` line. The progress count and its on-disk file are removed, as is
+  `PAUSED_NO_PROGRESS`. The stage file stays: `seat-mods` reads it (#929).
+- Tests: the bell and autopilot tests are removed; new tests pin that a stale autopilot record
+  molts, that the unattended pause fires with no record and rings nothing, and that status has no
+  mode line, on both the Claude Code and OMP glue.
+
 ## 0.4.1 — 2026-10-27
 
 #933, the follow-ups from PR #932's review.
