@@ -79,12 +79,6 @@
       "source": "./baton"
     },
     {
-      "name": "bot-on-telegram",
-      "description": "Sends baton notices to one Telegram chat, with buttons, and turns button presses into baton actions. A CLI and a service; no skill.",
-      "category": "workflow",
-      "source": "./bot-on-telegram"
-    },
-    {
       "name": "bot-on-openbot",
       "description": "Sends baton notices to the operator as OpenBot questions and turns a tapped option into one fixed baton or gh command. A CLI and a service; no skill.",
       "category": "workflow",

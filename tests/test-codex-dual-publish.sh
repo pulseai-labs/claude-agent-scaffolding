@@ -8,8 +8,8 @@ MARKETPLACE="$ROOT/.agents/plugins/marketplace.json"
 CLAUDE_MARKETPLACE="$ROOT/.claude-plugin/marketplace.json"
 # seat-mods, molt and autonomic are Claude Code mods (hooks.json "modules"); Codex has no mod runtime.
 # baton ships a CLI, a launcher and a systemd timer, no skill: Codex has nothing to load.
-# bot-on-telegram and bot-on-openbot ship a CLI and a service, no skill: Codex has nothing to load.
-DEFERRED_PLUGINS="seat-mods molt autonomic baton bot-on-telegram bot-on-openbot"
+# bot-on-openbot ships a CLI and a service, no skill: Codex has nothing to load.
+DEFERRED_PLUGINS="seat-mods molt autonomic baton bot-on-openbot"
 
 # THE INVENTORY IS THE FILESYSTEM, NOT A MARKETPLACE.
 #
