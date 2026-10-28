@@ -26,6 +26,8 @@ export type ServeOptions = {
   botFor: (agent: string) => OpenBot;
   /** The agent a notice goes to; rejects with OpenBotDown when that cannot be told yet. */
   route: (n: Notice) => Promise<Route>;
+  /** Drops a run's cached route after its run was refused: the agent may be deleted or renamed. */
+  forget?: (run: string) => void;
   /** The agent of a record that names none (written by 0.1.x). */
   defaultAgent: string;
   runner: Runner;
@@ -116,7 +118,8 @@ export async function serve(opts: ServeOptions): Promise<void> {
 // unanswered OpenBot question blocks the agent's queue (spike ruling), so the bridge keeps one in
 // flight per agent. A notice whose agent is busy stays spooled and the drain goes on to later ones,
 // so the order holds within each agent. A refused or failed run holds its agent for this loop and
-// keeps the file, so the notice goes later, in order. A notice whose agent cannot be told (route:
+// keeps the file, so the notice goes later, in order; a refused run also drops its run's cached
+// route, so an agent deleted or renamed since is resolved again (and falls back) next loop. A notice whose agent cannot be told (route:
 // OpenBot down) stops the drain and keeps the file: no later notice may overtake it.
 
 async function drain(opts: ServeOptions): Promise<void> {
@@ -126,9 +129,10 @@ async function drain(opts: ServeOptions): Promise<void> {
       removeSpool(path); // asked once already: --id would return the same delivery anyway
       continue;
     }
+    const n = parseKey(item.key);
     let route: Route;
     try {
-      route = await opts.route(parseKey(item.key));
+      route = await opts.route(n);
     } catch (e) {
       if (!stopsDrain(e)) throw e;
       log(`drain stopped: ${(e as Error).message}`);
@@ -140,6 +144,7 @@ async function drain(opts: ServeOptions): Promise<void> {
       await deliver(item.key, item.message, route.note, agent, opts);
     } catch (e) {
       if (!stopsDrain(e)) throw e;
+      if (e instanceof OpenBotRefused && n.kind !== "plain") opts.forget?.(n.run);
       log(`drain stopped: ${agent}: ${(e as Error).message}`);
       held.add(agent);
       continue;

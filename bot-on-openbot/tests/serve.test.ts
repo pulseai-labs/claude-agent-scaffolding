@@ -6,8 +6,8 @@ import { offerFor } from "../src/offer.ts";
 import { LockHeldError, serve } from "../src/serve.ts";
 import { listSpool, spoolNotice } from "../src/spool.ts";
 import type { Notice } from "../src/notice.ts";
-import { OpenBotDown } from "../src/openbot.ts";
-import type { Route } from "../src/route.ts";
+import { OpenBotDown, type OpenBot } from "../src/openbot.ts";
+import { makeRouter, type Route } from "../src/route.ts";
 import { captureErr, defaultRun, makeEnv, P1, P5, screenJson, serveOpts, type Env } from "./helpers.ts";
 
 const BIN = join(import.meta.dir, "..", "bin", "bot-on-openbot");
@@ -309,6 +309,25 @@ test("a fallback note heads a blocked park's question on every path", async () =
     expect(ask).toContain(`Show this text: ${NOTE}\n${c.text}`);
     expect(find(BLOCKED)!.offer!.text.startsWith(`${NOTE}\n${c.text}`)).toBe(true);
   }
+});
+
+test("a refused run drops its cached route, so a deleted agent falls back on the next loop", async () => {
+  env.writeRun(defaultRun({ params: { repo: "/r" } }));
+  env.reply.fn = () => ({ rc: 0, stdout: "https://github.com/o/pulse360.git\n", stderr: "" });
+  const known = new Set(["pulse360_autopilot"]);
+  const probe = (agent: string) => ({ ...env.botFor(agent), exists: async () => known.has(agent) }) as OpenBot;
+  const router = makeRouter({ agent: "Autopilot", agents: {}, cli: [], db: "/x", automationDir: "/x" }, probe, env.runner);
+  const o = { ...serveOpts(env, T0, 1, router), forget: router.forget };
+  env.setReplies({ run: [{ stdout: '{"ok":false,"exitCode":1,"error":"no such agent"}', rc: 1 }, env.delivery("d1")] });
+  env.status("d1", "running", "turn-1");
+  spoolNotice(PARK, "baton r1/u1 parked");
+  await captureErr(() => serve(o)); // routed (and cached) to pulse360_autopilot; refused
+  known.delete("pulse360_autopilot"); // the agent was deleted or renamed
+  const r = await captureErr(() => serve(o));
+  expect(runAgents()).toEqual(["pulse360_autopilot", "Autopilot"]);
+  expect(env.runStdins()[1]).toContain("Show this text: [pulse360: no OpenBot agent pulse360_autopilot — sent to Autopilot]\n");
+  expect(find(PARK)).toMatchObject({ phase: "asked", agent: "Autopilot" });
+  expect(r.err.join("")).toContain(`bot-on-openbot: ${PARK}: [pulse360: no OpenBot agent`);
 });
 
 test("route down keeps the notice and stops the drain", async () => {

@@ -10,6 +10,9 @@ import type { OpenBot } from "./openbot.ts";
 
 export type Route = { agent: string; note?: string };
 
+/** Routes a notice; `forget` drops a run's cached agent, so its next notice is resolved again. */
+export type Router = ((n: Notice) => Promise<Route>) & { forget(run: string): void };
+
 const NAME = "[A-Za-z0-9._-]+";
 const SHAPES = [
   new RegExp(`^https://github\\.com/${NAME}/(${NAME}?)(?:\\.git)?$`),
@@ -30,9 +33,9 @@ export function makeRouter(
   cfg: BotConfig,
   botFor: (agent: string) => OpenBot,
   runner: Runner,
-): (n: Notice) => Promise<Route> {
+): Router {
   const found = new Map<string, string>(); // run -> its agent; fallbacks are never kept
-  return async (n) => {
+  const route = async (n: Notice): Promise<Route> => {
     if (n.kind === "plain") return { agent: cfg.agent };
     const cached = found.get(n.run);
     if (cached !== undefined) return { agent: cached };
@@ -48,4 +51,5 @@ export function makeRouter(
     found.set(n.run, agent);
     return { agent };
   };
+  return Object.assign(route, { forget: (run: string) => void found.delete(run) });
 }

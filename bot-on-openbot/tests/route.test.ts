@@ -123,6 +123,20 @@ test("a found route is cached per run", async () => {
   } finally { t.done(); }
 });
 
+test("a forgotten run is resolved again", async () => {
+  const t = setup({ repo: "/r" });
+  try {
+    expect(await t.router(parked)).toEqual({ agent: "pulse360_autopilot" });
+    t.known.delete("pulse360_autopilot");
+    expect(await t.router(parked)).toEqual({ agent: "pulse360_autopilot" }); // cached
+    t.router.forget("r1");
+    expect(await t.router(parked)).toEqual({
+      agent: "Autopilot", note: "[pulse360: no OpenBot agent pulse360_autopilot — sent to Autopilot]",
+    });
+    t.router.forget("r-unknown"); // nothing cached: a no-op
+  } finally { t.done(); }
+});
+
 test("OpenBot down rejects", async () => {
   const t = setup({ repo: "/r", down: true });
   try {

@@ -60,8 +60,9 @@ async function serveCmd(): Promise<number> {
   process.on("SIGINT", quit);
   try {
     const botFor = makeOpenBots(cfg);
+    const route = makeRouter(cfg, botFor, defaultRunner);
     await serve({
-      botFor, route: makeRouter(cfg, botFor, defaultRunner), defaultAgent: cfg.agent,
+      botFor, route, forget: route.forget, defaultAgent: cfg.agent,
       runner: defaultRunner, now: () => new Date(), ...(stop > 0 ? { stopAfter: stop } : {}),
     });
     return 0;
