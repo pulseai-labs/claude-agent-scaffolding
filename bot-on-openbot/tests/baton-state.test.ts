@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { newestPark, readUnit, reviewedHead, stageNames } from "../src/baton-state.ts";
+import { newestPark, readUnit, reviewedHead, runRepo, stageNames } from "../src/baton-state.ts";
 
 beforeEach(() => {
   process.env.BATON_STATE_DIR = join(import.meta.dir, "fixtures", "baton");
@@ -60,4 +62,26 @@ test("readUnit marks a blocked park only when parked.blocked is an object", () =
   expect(readUnit("r1", "u6")).toEqual({
     stage: "build", parked: { reason: "blocked", at: "2026-10-27T16:50:00.000Z" },
   });
+});
+
+test("runRepo is params.repo when it is an absolute path, else null", () => {
+  const root = mkdtempSync(join(tmpdir(), "bot-runrepo-"));
+  try {
+    process.env.BATON_STATE_DIR = root;
+    const put = (run: string, doc: unknown) => {
+      mkdirSync(join(root, "runs", run), { recursive: true });
+      writeFileSync(join(root, "runs", run, "run.json"), JSON.stringify(doc));
+    };
+    put("a", { params: { repo: "/home/dev/agent-ops" } });
+    put("b", { units: {} });
+    put("c", { params: { repo: 3 } });
+    put("d", { params: { repo: "rel/path" } });
+    expect(runRepo("a")).toBe("/home/dev/agent-ops");
+    expect(runRepo("b")).toBeNull();
+    expect(runRepo("c")).toBeNull();
+    expect(runRepo("d")).toBeNull();
+    expect(runRepo("missing")).toBeNull();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

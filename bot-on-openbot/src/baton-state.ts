@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { batonStateDir } from "./paths.ts";
 
 export type UnitView = { stage: string; parked?: { reason: string; at: string; blocked?: true }; pr_url?: string };
@@ -20,6 +20,14 @@ const isObj = (v: unknown): v is Record<string, unknown> =>
 // True when the run's run.json exists and parses as JSON.
 export function runReadable(run: string): boolean {
   return readJson(join(runDir(run), "run.json")) !== null;
+}
+
+// The repo a run works in: run.json's `params.repo` when it is an absolute path, else null.
+export function runRepo(run: string): string | null {
+  const doc = readJson(join(runDir(run), "run.json"));
+  if (!isObj(doc) || !isObj(doc.params)) return null;
+  const repo = doc.params.repo;
+  return typeof repo === "string" && isAbsolute(repo) ? repo : null;
 }
 
 // run.json keeps `units` as an object keyed by unit id; `parked` is null when not parked.

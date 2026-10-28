@@ -17,6 +17,7 @@ let requests: { method: string; path: string; auth: string | null; body: string 
 let answerReplies: { status: number; body: string }[];
 let pendingStatus: number;
 let pendingFile: string;
+let agentsReply: { status: number; body: unknown };
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "bot-openbot-"));
@@ -25,6 +26,7 @@ beforeEach(() => {
   answerReplies = [];
   pendingStatus = 200;
   pendingFile = "pending-prompt.json";
+  agentsReply = { status: 200, body: [{ id: AGENT_ID, name: "Autopilot" }, { id: "agent-x", name: "Other" }] };
 });
 afterEach(() => {
   server?.stop(true);
@@ -46,7 +48,7 @@ function startApi(): string {
       const body = await req.text();
       requests.push({ method: req.method, path, auth: req.headers.get("authorization"), body });
       if (req.headers.get("authorization") !== `Bearer ${TOKEN}`) return Response.json({ error: "no" }, { status: 401 });
-      if (req.method === "GET" && path === "/v1/agents") return Response.json([{ id: AGENT_ID, name: "Autopilot" }, { id: "agent-x", name: "Other" }]);
+      if (req.method === "GET" && path === "/v1/agents") return Response.json(agentsReply.body, { status: agentsReply.status });
       if (req.method === "GET" && path === `/v1/agents/${AGENT_ID}/pending`) {
         return new Response(pendingFile.startsWith("{") ? pendingFile : fixture(pendingFile), { status: pendingStatus });
       }
@@ -322,4 +324,27 @@ test("an agent name that matches no agent, or two, is OpenBotDown", async () => 
   // control: the agent id works as well as its name
   const byId = makeOpenBot({ agent: AGENT_ID, cli: [FAKE], db: join(dir, "x.db"), automationDir });
   expect((await byId.pending()).length).toBe(1);
+});
+
+test("exists is true for exactly one agent by name (case ignored) or id", async () => {
+  const auto = startApi();
+  expect(await bot({ automationDir: auto }).exists()).toBe(true);
+  const other = makeOpenBot({ agent: "agent-x", cli: [FAKE], db: join(dir, "none.db"), automationDir: auto });
+  expect(await other.exists()).toBe(true);
+  const lower = makeOpenBot({ agent: "autopilot", cli: [FAKE], db: join(dir, "none.db"), automationDir: auto });
+  expect(await lower.exists()).toBe(true);
+});
+
+test("exists is false for no agent, and for two with the same name", async () => {
+  const auto = startApi();
+  const missing = makeOpenBot({ agent: "Nobody", cli: [FAKE], db: join(dir, "none.db"), automationDir: auto });
+  expect(await missing.exists()).toBe(false);
+  agentsReply.body = [{ id: "a1", name: "Autopilot" }, { id: "a2", name: "autopilot" }];
+  expect(await bot({ automationDir: auto }).exists()).toBe(false);
+});
+
+test("exists rejects with OpenBotDown when OpenBot answers 500", async () => {
+  const auto = startApi();
+  agentsReply = { status: 500, body: { error: "boom" } };
+  await expect(bot({ automationDir: auto }).exists()).rejects.toBeInstanceOf(OpenBotDown);
 });
