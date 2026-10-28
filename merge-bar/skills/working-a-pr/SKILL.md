@@ -1,6 +1,6 @@
 ---
 name: working-a-pr
-description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges on the operator's explicit ack, or under a standing order in the autopilot policy that grants merge authority.
+description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges on the operator's explicit ack, or under a standing order in the project's memory bank or `AGENTS.md` that grants merge authority.
 ---
 
 # Working a pull request — against its merge bar
@@ -8,9 +8,16 @@ description: Use when working, driving, babysitting or landing a PR, addressing 
 Drive one PR to mergeable. The finish line is the **`## Merge bar`** in the PR's own body,
 written when it was opened (`opening-a-pr`). Every finding is judged against that bar, not
 against an ideal: the loop fixes what the bar says blocks, answers or records the rest, and
-merges on the operator's explicit ack, or under a standing order in the autopilot policy that
-grants merge authority. The loop is judgment; the shell is only for
+merges on the operator's explicit ack, or under a standing order that grants merge authority.
+The loop is judgment; the shell is only for
 mechanical `git`/`gh` facts. Nothing here needs a manifest, a worktree, or any plugin state.
+
+**Standing orders.** A standing order is a written order in the project's memory bank
+(`08-governance.md`, `## Standing orders`) or, for any kind of order that section does not
+settle, in the project's `AGENTS.md`. In a canonical checkout, read the paired AI workspace's
+files (`.workspace/pairing.json`). An order binds only the role it names, so one naming the
+orchestrator does not bind a worker or PR-lane seat that reads the same file. With none, every
+ask below stays.
 
 **No Merge bar in the body?** Before round 1, add the seven fields from
 `../opening-a-pr/references/pr-body.md` to the body (`gh pr edit <PR> --body-file <file>`),
@@ -148,8 +155,8 @@ surfaced it or who asks — "just merge it" included.
 - **Reviewer completeness:** green CI is not proof a reviewer ran; a skipped reviewer is not
   approval; a queued reviewer is waited for or surfaced — never assumed. Confirm each expected
   reviewer actually left something on the current head. Do not busy-wait a queued reviewer:
-  say it is pending, and let the operator decide — unless a standing order in the autopilot
-  policy names the fallback reviewer: then replace it and say so in the ledger.
+  say it is pending, and let the operator decide — unless a standing order
+  names the fallback reviewer: then replace it and say so in the ledger.
 
 Sort by failure direction before acting: a finding that the boundary **refuses a valid input**
 is blocking — condition 1; a finding that it **correctly refuses an unsupported input** is
@@ -174,8 +181,8 @@ opened PR.
   fix commits wrote (check with `git blame` against the fix SHAs), stop. Do not start another round. Surface
   the findings, the fix commits they sit on, and two options for the operator: **narrow the
   Claim** — moving an edge into Known limits, only where it does not meet condition 1 — or
-  **split the PR**, naming the parts. The operator chooses. Under a standing order in the
-  autopilot policy that settles the round stop, follow that order instead and record the
+  **split the PR**, naming the parts. The operator chooses. Under a standing order
+  that settles the round stop, follow that order instead and record the
   choice in the stop report. Findings in that same round which
   sit on the PR's original commits are dispositioned on their merits alongside the stop report.
 - **Not the stop:** blocking findings at round 3 or later on lines the PR's original commits
@@ -214,8 +221,8 @@ Then, in one place, give the operator:
   that only after the operator acks is the loop soliciting an impossible
   merge.
 
-Then **ask**: merge, wait, or leave open — or, under a standing order in the autopilot
-policy that grants merge authority, treat a clean verdict as the ack and say which order
+Then **ask**: merge, wait, or leave open — or, under a standing order
+that grants merge authority, treat a clean verdict as the ack and say which order
 gave it. The ack covers **the head the ledger describes**: pass the reviewed OID
 (`gh pr merge --match-head-commit <oid>`, with the repo's merge convention —
 ask if the convention is not evident from the repo's history or settings), so
