@@ -203,6 +203,14 @@ line and each layer's result, so the `--external-executor` lane's close leaves a
 record, and the spine retrospective carries each item's `verifier:` line. No `lib/`
 behaviour change, no state change.
 
+Since 1.30.0 (#984), `/ossify:start` and `/ossify:adopt` seed the reviewer's project home in
+the AI workspace only, never overwriting an existing file: `CODING_STANDARDS.md`,
+`review-ledger.md`, and a `## Review` section in `08-governance.md`. `/ossify:adopt` also runs a
+history pass that drafts standards entries from review history: a class that recurs in two or
+more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
+can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
+review-ledger line per merged PR. No `lib/` code, no state change.
+
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and
 OMP read it directly. Neither writes `CLAUDE.md`. `/start` replaces a
