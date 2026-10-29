@@ -1,0 +1,1 @@
+{"scores":{"recurrence":5,"acceptance":5,"result_line":4,"placement":5},"pass":true,"notes":"Proposes only the three-PR no-assertion class with rule and Why, skips the single-PR #15 rename, writes nothing before acceptance, and puts the result line in ADOPTION.md with counts and window #8-#25, though the line is conditional on the answer."}
