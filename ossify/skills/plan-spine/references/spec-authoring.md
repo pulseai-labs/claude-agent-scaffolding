@@ -147,6 +147,10 @@ the two disagree, it is authoritative. The worker's Gate 2 also shape-checks the
 parsed rows (`work-item/references/pre-flight.md`), so a malformed AC is a
 blocking gap **at pre-flight** rather than a confusing failure at the close gate.
 
+**An AC that diffs against a commit names a fixed sha**, the base the spine is
+planned on, never a moving ref such as `origin/main`, which holds the item's own
+change once the spine lands and fails a re-run of the gate (#981).
+
 **An AC expected GREEN at start.** A regression guard, or a deletion check whose state the
 spine starts in, passes before the work, and the RED gate stops on it
 (`work-item/SKILL.md` §4). Declare each such AC below the ACs, one line each:

@@ -4,9 +4,11 @@ Depth for SKILL.md §4, step 2. This is the orchestrator-side gate over one work
 item's output (spec §6, last bullet). It runs on the resolved `$spec`, `$report`
 and `$wt` from `work-item-close.md` §1 — **never on a placeholder**.
 
-Four layers, in order, and §4c's mutation check with Layer 4. **Halt on the
-first failure in any layer**, and a halt is terminal: no later layer runs, no
-commit, no merge, no status write.
+Four layers, in order, and §4c's mutation check with Layer 4. **Layers 1 and 2
+halt on their first failure**: no later layer runs. Layers 3, 4 and §4c are one
+verifier pass, so **every halting verdict that pass returns is surfaced,
+recorded in `verify.md`, and named by the halt** — none hides another. A halt is
+terminal: no commit, no merge, no status write.
 
 ---
 
@@ -22,9 +24,11 @@ for the opposite reason:
 | Why | nobody is listening; a partial picture forces a second dispatch that costs more than the failed commands did | there *is* a human to route to, and the recovery choice does not improve with more failures attached |
 
 So the two are not inconsistent, and neither is a bug to be "aligned" with the
-other. If you are tempted to make this one gather everything first: the first
-failure is what the recovery menu acts on, and running the rest changes files,
-burns time, and buries it.
+other. If you are tempted to run the verifier past a Layer 1 or 2 failure: that
+failure is what the recovery menu acts on, and the pass burns time and buries
+it. The verifier pass is the exception, because it has already run when its
+verdicts arrive: dropping one saves nothing and sends the re-dispatch to fix
+half the item.
 
 ---
 
@@ -285,15 +289,16 @@ spine-close code review (`references/code-review.md`) reads that file as an inpu
 Advisory means advisory: no pattern or absence finding halts, delays, or re-runs
 this close (D5).
 
-**A halting run's finding set is written to `verify.md` too, the `[fidelity]`
-finding included — that write is the durable rejection record (#673 C2).**
+**A halting run's finding set is written to `verify.md` too, every halting
+verdict included — `[rule]`, `[fidelity]`, `[mutation]`. The `[fidelity]` line is
+the durable rejection record (#673 C2).**
 Without it, a staged worktree after a rejection is byte-identical to a
 `close-finished` result: a fresh session's re-entry re-verifies and returns the
 very result the gate rejected, and a stochastic Layer 4 pass can accept it
 without the correction. `work-item-close.md` §2 owns the write; the re-entry
 inventory reads a `[fidelity]` line there as route `halt:close-rejected`; the
-next completed Layer 4 run overwrites the file (deleted at zero findings),
-which is what clears the record.
+next completed verifier pass overwrites the file, which is what clears the
+record.
 
 **If a `fidelity` and an `absence` finding land on the same underlying gap**
 (the lenses can both notice it despite the partition above) — normalize before
@@ -402,6 +407,12 @@ consequences and stop:
    | `[fidelity]` — Layer 4 | the deviation is real and §7 does not declare it | re-dispatch: the code aligns to the spec, or §7 declares the deviation honestly; only where the *spec itself* is wrong, back through `/plan-spine` — never amended at this gate |
    | `[mutation]` — §4c | the added or changed test, which cannot fail | re-dispatch the implementer with the vacuous test named |
 
+   **One pass, several tags:** offer the menu once, for all of them; a
+   re-dispatch carries every one. When `[fidelity]` and `[mutation]` name the
+   same test, the `[mutation]` row applies, with the fidelity claim attached:
+   declaring the deviation in §7 does not clear it, since the test still cannot
+   fail.
+
    A Layer 3 halt offered "re-author the AC" is being offered the wrong document:
    no AC is involved, and the honest options are amend the pattern, or fix the
    code. **A pattern amendment is never a quiet by-product of one work item's
@@ -416,7 +427,8 @@ reach it (`work-item-close.md` §5).
 
 - **Running a layer on a placeholder path.** `$spec`, `$report` and `$wt` were
   resolved for you; `<spec path>` is a filename.
-- **Gathering all failures before halting.** §1.
+- **Running the verifier past a Layer 1 or 2 failure, or halting on one of its
+  verdicts and dropping the rest.** §1.
 - **Re-implementing the zero-tests guard**, or expecting it on a non-`exit 0`
   expectation (§2).
 - **Grepping lib output for `[report cross-check]`** (§3).

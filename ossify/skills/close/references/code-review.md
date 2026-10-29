@@ -52,7 +52,7 @@ looking for permission. Each axis is cheap on its own and worthless once
 contaminated by the other.
 
 > **On sub-agents:** the absorption spec sketched these as parallel sub-agent
-> passes. **ossify does not dispatch review to another agent** — its workers are
+> passes. **ossify dispatches no spine review to another agent** — its workers are
 > `implementer-agent` and work-item close's `verifier-agent`, and neither reviews
 > a spine (`work-item-close.md` §2). Sequence
 > is what buys the separation here, not isolation: finish A, write its findings
@@ -114,9 +114,9 @@ prevent, so read them in **two passes, not one**. Each spine work item's
 `work-item-close.md` §1 Route B does (the spine dir, glob-recovered, then
 `work-<wi>/`); every item has already closed by the time you run, so Route B's
 reconstruction is always the one in scope here, never Route A's return
-payload. Absent is a clean signal, not a gap — not every close writes one
-(impl-check.md §4b: `pattern`, `absence`, and a declared `fidelity` finding,
-never a halt).
+payload. Every verifier pass writes one, with zero findings too; read only its
+findings, not its `verifier:` and layer-result lines. Absent is not a gap: a
+close before ossify 1.29.1 wrote one only on findings.
 
 **Walk the non-`abandoned` items only — the same set `hosting_repos` read
 above.** A withdrawn item was never dispatched: it has no `work-<wi>/` directory
