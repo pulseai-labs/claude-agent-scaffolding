@@ -2,7 +2,7 @@
 
 Depth for SKILL.md §13. This is **ossify's own** derivation brief — the memory
 bank and `AGENTS.md` are authored here, from the lean spec sections, not by
-calling scaffold-onboard. The 14-file structure and the harvest mechanics carry
+calling scaffold-onboard. The 15-file structure and the harvest mechanics carry
 over unchanged; only the *derivation source* is re-anchored.
 
 You author these files yourself, in conversation, reading the lean MASTER-SPEC
@@ -97,6 +97,8 @@ them.
 
 - **Memory bank + `AGENTS.md`** → the **AI workspace** (they are agent
   scaffolding, not product code).
+- **`CODING_STANDARDS.md`** and **`review-ledger.md`** → the **AI workspace**, per
+  `reviewer-home.md` §1.
 - **`PUBLIC_BOUNDARY.md`** → each **public repo root**.
 - **Lean MASTER-SPEC** → AI workspace. **EXECUTIVE-SUMMARY** → per the project's
   manifest routing.

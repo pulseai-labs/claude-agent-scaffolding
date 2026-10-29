@@ -31,9 +31,10 @@ Three parts and nothing else. No fill-in markers, no `TODO`, no empty rule headi
    crew verifier's standards claim. No implementer brief points at it. Entries sit over merge-bar's
    baseline and override it where they conflict. Each entry is a defect class with a rule, a
    **Why** and its source PRs, and the reviewer sweeps the repo for it, not only the diff.
-2. **`## Read these where they live`**, a pointer list. Add a line only for a file that exists:
-   the canonical's `CLAUDE.md` sections on testing or review, a style guide, the memory bank's
-   `03-code-patterns.md` machine-checkable rules. Pointers only. Never copy a project doc or
+2. **`## Read these where they live`**, a pointer list. Add a line only for a file that exists
+   and carries rules: the canonical's `CLAUDE.md` sections on testing or review, a style guide, the memory bank's
+   `03-code-patterns.md`, once its machine-checkable rules section holds a rule (a freshly seeded,
+   empty section gets no line). Pointers only. Never copy a project doc or
    merge-bar's baseline into the stub. When no such file exists, keep the heading and say in one
    sentence that the project has no such docs yet.
 3. **One sentence of current state**, verbatim: `No project entries yet. Entries come from review findings that recur, accepted by the operator.`

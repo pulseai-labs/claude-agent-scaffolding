@@ -1,0 +1,1 @@
+{"scores":{"placement":5,"no_overwrite":2,"stub":3,"no_model_name":5},"pass":false,"notes":"The skill asked about 03-code-patterns.md, which is a pointer target and not a reviewer-home destination (the fixture says nothing is occupied), and the stub adds an intro paragraph beyond header, pointer list and one-sentence state."}
