@@ -13,6 +13,7 @@ import type { Forge } from "../src/forge.ts";
 import { HostDownError } from "../src/host.ts";
 import { setHostForTest } from "../src/hosts/select.ts";
 import { openStore, type RunState } from "../src/state.ts";
+import { screenOf } from "./blocked-setup.ts";
 import { FakeHost } from "./fake-host.ts";
 
 const T0 = Date.parse("2026-10-26T10:00:00.000Z");
@@ -328,6 +329,25 @@ test("screen tail keeps the last 12 non-empty lines", async () => {
   const lines = Array.from({ length: 15 }, (_, i) => `l${i}`);
   await blockedAt1({ screen: lines.join("\n\n") });
   expect(notices[0].text.split(" — screen: ")[1]).toBe(lines.slice(3).join(" | "));
+});
+
+test("screen tail keeps an omp ask picker's question when it scrolled out of the last 12 lines (#930)", async () => {
+  const screen = screenOf("terminal-read-omp-ask.json");
+  await blockedAt1({ screen });
+  const tail = notices[0].text.split(" — screen: ")[1];
+  const last12 = screen.split("\n").map((l) => l.trim()).filter((l) => l !== "").slice(-12).join(" | ");
+  expect(last12).not.toContain("spike: which colour?"); // the recorded screen's question is out of the plain tail
+  expect(tail).toBe(`spike: which colour? | … | ${last12}`);
+});
+
+test("control: a picker question already in the tail is not added again", async () => {
+  // The live box alone, without the three status lines below it: twelve lines, the question in them.
+  const lines = screenOf("terminal-read-omp-ask.json").split("\n");
+  const box = lines.slice(lines.findLastIndex((l) => l.startsWith("╭─ Ask")), -3).join("\n");
+  await blockedAt1({ screen: box });
+  const tail = notices[0].text.split(" — screen: ")[1];
+  expect(tail.split("spike: which colour?").length).toBe(2);
+  expect(tail.startsWith("╭─ Ask")).toBe(true);
 });
 
 test("a host with no screen method keeps the 0.4.0 path: no park, the stall clock runs", async () => {

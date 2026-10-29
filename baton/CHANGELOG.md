@@ -2,6 +2,45 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.9.0 - 2026-10-29
+
+The follow-ups triaged on 2026-10-29: #920, #906, #930, #908, #969 and three items of #899.
+
+- **Fixed: a malformed `run.json` is refused (#920).** `readRun` refuses a run.json that is not an
+  object, whose `id` is not its directory name, whose `status` is not `armed`, `parked`, `disarmed`
+  or `done`, or whose `units` is not an object of objects keyed by their own id. Before, an array of
+  units loaded, lost every unit on the next save and replayed the unit files. The CLI prints the
+  real error (rc 2) instead of "no such run"; the tick reports it; the file is never rewritten.
+- **Changed: a hook-failure park names its hook (#906).** `before failed`, `after_launch failed` and
+  `run failed` (a merge stage's `run_after` too) add `hook` (1-based) and `argv` to the park event
+  and end the notice with ` — hook <n> (<program>)`; the rendered arguments, which may hold a
+  param's value, stay in the event and never leave the host. The reasons are unchanged,
+  so the driver guard and `driver.md` still match. A driver's escalate notice keeps the suffix.
+- **Fixed: Orca message files of refused launches are removed (#930).** New optional
+  `Host.endRun(runId)`: the Orca host removes the run's files under `<state>/orca/messages/` when the
+  run finishes and on `disarm`.
+- **Changed: a `thread gone` park points at `seat.log` (#930).** New optional `Host.goneNote()`; the
+  Orca host's names `<state>/claims/seat.log`, where a launcher refusal is logged.
+- **Changed: a blocked park's screen tail keeps the picker's question (#930)** when it scrolled out of
+  the last 12 lines, for the pickers `parsePicker` reads.
+- **Changed: the park event leaves `questions` off when the list is empty (#899).** A test pins that a
+  plain `unpark` keeps a unit's triaged request ids.
+- **Changed: the example recipe (#908, #899).** `correct.md`, `spine-work.md` and `lane.md` end
+  with a numbered step that writes their done file with the exact command. The spine PR's ack
+  notice names the phone's Merge button.
+- **Fixed: `baton-seat` refuses a message it cannot read after its checks (#930)** (`nomsg`),
+  instead of launching the seat with an empty prompt: a disarm's message cleanup could race a
+  launch.
+- **Changed: `running-a-spine-on-baton` (#969).** The bridge check reads baton's `notify` argv and the
+  bridge version; the agent check reads `agents[<repo>]` first; `oss` comes from the project's
+  install entry; roots fall back to `oss repo_root`; the preflight checks one `target_repo`, the
+  recipe copy's first use and `~/.local/bin/baton`; values are quoted; a yes that changes a value
+  shows the command again; the arm is confirmed from `run.json`.
+- **Added: `tests/skill.test.ts`** pins the skill's approval stop and no-watch rule and the done-file
+  briefs' last step.
+- Known limits: per-hook labels are not offered (index and program only); the question is kept only for
+  pickers `parsePicker` reads; `{pending.questions}` still renders `[]` for an empty list.
+
 ## 0.8.0 - 2026-10-29
 
 baton's first skill: a project's orchestrator can take a planned ossify spine to an armed run

@@ -135,6 +135,19 @@ test("message file is removed after reading, so a re-run starts no second seat",
   expect(readFileSync(logFile(), "utf8")).toMatch(/ nomsg cwd /);
 });
 
+test("a message that cannot be read after its checks refuses nomsg, never an empty prompt (#930)", () => {
+  writeFileSync(claimFile(proj), GOOD);
+  writeFileSync(msg, "hello");
+  // A cat that fails stands in for a file removed between the checks and the read.
+  const bin = join(base, "failing-cat");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(join(bin, "cat"), "#!/bin/sh\nexit 1\n", { mode: 0o755 });
+  const r = run(proj, msg, { PATH: `${bin}:${process.env.PATH}` });
+  expect(r.rc).toBe(78);
+  expect(existsSync(ran)).toBe(false);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ nomsg cwd /);
+});
+
 function rmRan() {
   Bun.spawnSync(["rm", "-f", ran]);
 }

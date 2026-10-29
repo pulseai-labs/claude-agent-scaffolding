@@ -11,6 +11,9 @@ export const MERGE_FAILURES_TO_PARK = 3;
 /** The PR a merge-stage park is about: its URL, why it stopped, and the red checks by name. */
 export type ParkPr = { url: string; why: "red" | "conflict"; failing?: string[] };
 
+/** The hook a park failed on: its 1-based place in its list and its rendered argv. */
+export type HookFailure = { hook: number; argv: string[] };
+
 export type MergeEnv = {
   run: RunState;
   forge: Forge;
@@ -18,11 +21,12 @@ export type MergeEnv = {
   prViews: Map<string, PrView>;
   scope(u: UnitState, extra?: Partial<Scope>): Scope;
   ev(kind: string, obj?: Record<string, unknown>): void;
-  park(u: UnitState, reason: string): Promise<void>;
+  /** `hook` is the failed hook a `run failed` park records and names in its notice. */
+  park(u: UnitState, reason: string, hook?: HookFailure): Promise<void>;
   /** `pr` is what a park by this move records and names in its notice. */
   move(u: UnitState, to: string, pr?: ParkPr): Promise<void>;
-  /** Run hook argvs in order with no shell; false at the first non-zero. */
-  hooks(list: string[][] | undefined, scope: Scope, cwd: string): boolean;
+  /** Run hook argvs in order with no shell; the first that exits non-zero, or undefined when all pass. */
+  hooks(list: string[][] | undefined, scope: Scope, cwd: string): HookFailure | undefined;
   save(): void;
   merged(u: UnitState): void;
 };
@@ -67,7 +71,8 @@ export async function mergeUnit(env: MergeEnv, u: UnitState, stage: MergeStage):
       env.ev("not landed", { unit: u.id, pr: url, head: view.head, base });
       return env.park(u, "not landed");
     }
-    if (!env.hooks(stage.run_after, scope, existsSync(repo) ? repo : env.run.dir)) return env.park(u, "run failed");
+    const failed = env.hooks(stage.run_after, scope, existsSync(repo) ? repo : env.run.dir);
+    if (failed) return env.park(u, "run failed", failed);
     env.ev("merged", { unit: u.id, pr: url, head: view.head });
     env.merged(u);
     return env.move(u, stage.outcomes.merged);

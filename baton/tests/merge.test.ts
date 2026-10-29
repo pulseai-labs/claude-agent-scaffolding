@@ -289,10 +289,15 @@ test("merged and landed runs run_after then moves on", async () => {
 
 test("a failing run_after parks and does not report merged", async () => {
   forge.views.set(URL1, { ...green, state: "MERGED", head: landPr("feat") });
-  await arm(mergeStage({ run_after: [["false"]] }));
+  await arm(mergeStage({ run_after: [["true"], ["false"]] }));
   await doTick();
   expect(parkedOf("o1")).toBe("run failed");
   expect(kinds()).not.toContain("merged");
+  // The park names the failed hook (#906): in its event, and at the end of its notice.
+  const park = readFileSync(join(state, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n")
+    .map((l) => JSON.parse(l)).filter((e) => e.kind === "park").at(-1);
+  expect([park.hook, park.argv]).toEqual([2, ["false"]]);
+  expect(readFileSync(join(state, "notify.log"), "utf8").trim().endsWith("parked in merge: run failed — hook 2 (false)")).toBe(true);
 });
 
 test("wrong base parks", async () => {

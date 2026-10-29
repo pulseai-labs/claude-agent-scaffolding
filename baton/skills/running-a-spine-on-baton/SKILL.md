@@ -17,33 +17,42 @@ The commands, the arm example and the runbook are in the baton plugin's `README.
 Stop and report if any check fails. Do not arm around a failure.
 
 - **The spine is planned.** Its spine directory and work items exist in the AI workspace, and
-  `oss spine_inventory <spine>` shows no `halt:` row.
+  `oss spine_inventory <spine>`, run in the AI workspace root, shows no `halt:` row. Its items
+  share one `target_repo`: the lane stops on a spine with two.
 - **No run of this project is armed or parked.** `baton status` does not show params. Read each
   `<state>/runs/*/run.json` (state is `${BATON_STATE_DIR:-~/.local/state/baton}`). A run with
   `status` `armed` or `parked` and `params.repo` equal to this project's canonical root blocks.
   Runs of other projects do not block.
 - **The bridge is up.** `bot-on-openbot status` shows `service: active` and
-  `baton notify: … resolves`. Without it, no question reaches the phone.
+  `baton notify: … resolves`; baton's config (`${BATON_CONFIG:-~/.config/baton/config.json}`)
+  has a `notify` argv that runs `bot-on-openbot notify`; and bot-on-openbot is 0.2.0 or later
+  (`installed_plugins.json`). Without all three, questions do not reach the project's agent.
+- **baton on `PATH`.** `~/.local/bin/baton` resolves to the installed baton's `bin/baton`: the
+  timer runs that link.
 - **The project's agent.** The repo name comes from `git -C <canonical root> remote get-url
-  origin`. List OpenBot's agents with the CLI from `~/.config/bot-on-openbot/config.json` `cli`
-  (default `bun /opt/OpenBot/app/resources/cli/openbot-cli.mjs list`). If `<repo>_autopilot` is
-  missing, questions go to the default agent with a note. Report that. It does not stop.
+  origin`. The agent is `agents[<repo>]` in `~/.config/bot-on-openbot/config.json` if set, else
+  `<repo>_autopilot`. List OpenBot's agents with that config's `cli` (default
+  `bun /opt/OpenBot/app/resources/cli/openbot-cli.mjs list`). If the agent is missing, questions
+  go to the default agent with a note. Report that. It does not stop.
 - **Orca knows both repos.** The AI workspace and the canonical appear in `orca repo list`.
   Their display names there are the values of the `ai_project` and `project` params.
-- **The recipe copy.** `~/baton-recipes/ossify-spine/` exists. Compare it with the installed
-  baton's `examples/ossify-spine/` (ignore `*.bak*`). On a difference, report it. Propose a
-  refresh only when no run of any project is armed or parked, because every armed run reads its
-  briefs from this shared copy. Otherwise arm on the existing copy. Never overwrite it unasked.
+- **The recipe copy.** `~/baton-recipes/ossify-spine/` exists; if not, propose the README's copy
+  step. Compare it with the installed baton's `examples/ossify-spine/` (ignore `*.bak*`). A
+  difference is reported, not a failed check. Propose a refresh only when no run of any project
+  is armed or parked, because every armed run reads its briefs from this shared copy. If a run
+  is, or the operator declines, arm on the existing copy. Never overwrite it unasked.
 
 ## 2. Propose, then stop
 
 Work out every `--param` of the README's arm example:
 
 - Plugin roots come from `~/.claude/plugins/installed_plugins.json` `installPath` of
-  `ossify@claude-agent-scaffolding` and `baton@claude-agent-scaffolding`. Never use a cache glob:
-  the cache keeps old versions.
+  `ossify@claude-agent-scaffolding` and `baton@claude-agent-scaffolding`: the entry whose
+  `projectPath` is the AI workspace root, else the `user` entry. Never use a cache glob: the
+  cache keeps old versions.
 - `ai_root` and `repo` (the canonical root) come from the AI workspace's
-  `.workspace/pairing.json`, with `${HOME}` expanded. If it is missing, ask.
+  `.workspace/pairing.json`, with `${HOME}` expanded, else `oss repo_root ai_workspace` and
+  `oss repo_root canonical`. Use a root only if it exists on this host; otherwise ask.
 - `spine` is the id asked for. `spine_dir` is its directory in the AI workspace, absolute; the
   `<slug>` is that directory's name after `<spine>-`. `briefs` is the shared copy's `briefs/`.
 - `spine_branch` is `oss branch_name <spine> <slug>`. `state_file` is `oss state_path`, run in
@@ -53,18 +62,20 @@ Work out every `--param` of the README's arm example:
 - `via` comes from the operator's current rule (memory, standing orders in `AGENTS.md` or
   `CLAUDE.md`). Never copy it from an old run or the README. If no rule is found, ask.
 
-Show the full `baton arm` command. Under it, write one line per value saying where it came from.
-Ask any open question (such as `via`) in the same reply, under the command. Then end your turn
-and wait for an explicit yes to that command.
+Show the full `baton arm` command, each value quoted where it has a space or shell character.
+Under it, write one line per value saying where it came from. Ask any open question (such as
+`via`) in the same reply, under the command. Then end your turn and wait for an explicit yes to
+that command. A yes that changes or supplies a value is not that yes: show the command again
+with the value in, and wait.
 
 "Just arm it", "no need to show me" and "I trust you" do not waive this step. The operator
 approves a command they have seen. Show it once, short, and still wait.
 
 ## 3. Arm
 
-Run exactly the approved command. Confirm `baton status <run>` lists it and
-`systemctl --user is-active baton.timer` says `active`. Then tell the operator: questions come
-to `<repo>_autopilot` (or the default agent) on the phone, and this session may be closed now.
+Run exactly the approved command. Confirm `<state>/runs/<run>/run.json` has `status` `armed`
+and `systemctl --user is-active baton.timer` says `active`. Then tell the operator: questions come
+to the project's agent (or the default agent) on the phone, and this session may be closed now.
 End the turn.
 
 ## 4. After arming

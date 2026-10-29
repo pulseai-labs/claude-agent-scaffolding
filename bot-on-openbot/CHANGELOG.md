@@ -2,6 +2,17 @@
 
 All notable changes to the `bot-on-openbot` plugin.
 
+## 0.2.2 - 2026-10-29
+
+Tests and docs only; no behaviour change (#975, the non-blocking items from PR #960).
+
+- Added: a control test that No on a run park's Disarm, and No after Merge, say "Cancelled." and ask
+  nothing again.
+- Added: asserts that a plain unit park's re-ask carries no picker, and that a pick from a blocked
+  park's restored picker runs `baton answer <run> <unit> --park <at> --screen <n> <label>`.
+- Changed: the root README row says the re-ask happens only while the run is armed or parked and the
+  unit is still at that park.
+
 ## 0.2.1 - 2026-10-29
 
 - Fixes #959: a No (after Disarm) or a Cancel (on the stage page) on a unit park's question, while the

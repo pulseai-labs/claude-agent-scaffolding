@@ -138,6 +138,9 @@ test("No on a unit park's Disarm asks the park's question again while the park i
   const again = next(PARK, 2);
   expect(again).toMatchObject({ phase: "asked", run: "r1", unit: "u1", park_at: P1, title: r.title });
   expect(again.say).toBeUndefined();
+  // a plain (not blocked) park comes back without a picker
+  expect(r.picker).toBeUndefined();
+  expect(again.picker).toBeUndefined();
   expect(labels(again.offer)).toEqual(labels(r.offer));
   expect(again.offer!.text).toBe(`Cancelled; nothing ran.\n${r.offer!.text}`);
   // the question asked again works as the first one did
@@ -179,6 +182,33 @@ test("No on a blocked park's Disarm asks the blocked question again, with its pi
   expect(again.offer!.text).toBe(`Cancelled; nothing ran.\n${r.offer!.text}`);
   expect(again.picker).toEqual(COLOURS as Picker);
   expect(again).toMatchObject({ unit: "u5", park_at: P5 });
+  // a worker option on the restored picker runs the same screen-checked answer as the first question
+  expect(env.runs).toEqual([]);
+  await handleTap(again, "green (recommended)", ctx());
+  expect(env.runs).toEqual([["baton", "answer", "r1", "u5", "--park", P5, "--screen", "2", "green"]]);
+  expect(next(BLOCKED, 4).say).toBe('r1/u5 waits on a question: sent "green" to the worker');
+});
+
+test("No on a run park's Disarm, and No after Merge, say Cancelled and ask nothing again (#959 control)", async () => {
+  // the run is parked, so stillOpen holds: only the record's kind keeps these from a re-ask
+  env.writeRun(defaultRun({ status: "parked" }));
+  const RUN_PARK = "r1/run/park/2026-10-27T12:00:00.000Z";
+  const offer = offerFor({ kind: "run-park", run: "r1" }, "baton r1 parked", "r1")!;
+  record({ key: RUN_PARK, phase: "asked", run: "r1", title: offer.title, offer, ask_id: "d1" });
+  await handleTap(find(RUN_PARK)!, "Disarm", ctx());
+  await handleTap(next(RUN_PARK), "No", ctx());
+  expect(next(RUN_PARK, 2)).toMatchObject({ say: "Cancelled." });
+  expect(next(RUN_PARK, 2).offer).toBeUndefined();
+  expect(find(`${RUN_PARK}#3`)).toBeUndefined();
+
+  env.reply.fn = (argv) => (argv[2] === "view" ? { rc: 0, stdout: '{"number":7,"baseRefName":"main"}', stderr: "" } : { rc: 0, stdout: "", stderr: "" });
+  await handleTap(move(), "Merge", ctx());
+  await handleTap(next(MOVE), "No", ctx());
+  expect(next(MOVE, 2)).toMatchObject({ say: "Cancelled." });
+  expect(next(MOVE, 2).offer).toBeUndefined();
+  expect(find(`${MOVE}#3`)).toBeUndefined();
+  // only the Merge check ran; neither No ran a command
+  expect(env.runs).toEqual([["gh", "pr", "view", PR, "--json", "number,baseRefName"]]);
 });
 
 test("No after Merge still only says Cancelled (#959 covers unit parks only)", async () => {

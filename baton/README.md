@@ -49,7 +49,8 @@ execs
 `omp-seat <seat> --via <via> <message>`. It refuses with exit 78, one line on stderr and one in
 `<state>/claims/seat.log`, on no claim, a bad claim line, a claim with no seat or via, a message
 file that is missing or 131072 bytes or more, or an `omp-seat` it cannot run (the message file
-stays); it never starts a seat without its claim.
+stays); it never starts a seat without its claim. A run's message files left behind are removed
+when the run finishes and on `baton disarm`.
 
 Status and interrupt. From `orca terminal list` and `orca worktree ps`: a terminal not listed is
 `gone` only when `orca terminal read` confirms it (a terminal-gone error or status `exited`), and a
@@ -65,6 +66,9 @@ The blocked park. A worker in `waiting` with no structured question (an omp `ask
 `blocked` with its text but no options) parks at once, on the next tick, and keeps its terminal: no
 interrupt, claim and directory stay. The notice reads
 `baton <run>/<unit> blocked in <stage> (project <project>): the worker waits on a question — answer it in the worker's terminal — screen: <tail>`.
+The tail is the screen's last 12 non-empty lines, at most 1500 characters. When the screen holds a
+live picker (see Answering a blocked park) whose question line is not among them, as an omp `ask`
+box is taller than the tail, the tail starts with it: `<question> | … | <last lines>`.
 Answer in the worker's terminal in Orca; when the worker moves on, the park clears itself and the
 session is watched again. `baton unpark <run> <unit>` clears it by hand, and `--to <stage>` ends
 the session and moves the unit. A stop file wins, `disarm` closes the worker, no driver takes it
@@ -92,7 +96,10 @@ Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
   row until its next hook event and reads `active`: a worker blocked across a restart is caught by
   the stall rule, not the blocked park.
 - A process that dies leaves the terminal list and reads `gone`; a `baton-seat` refusal reads the
-  same way. Orca has no failure state to map.
+  same way. Orca has no failure state to map, so a `thread gone` park's notice ends with
+  `— if the launcher refused it, the reason is in <state>/claims/seat.log` (the absolute path).
+- The question is kept in a blocked park's screen tail only for a picker `baton screen` can parse;
+  a screen of any other shape gets the plain last lines.
 
 ## Answering a blocked park
 
@@ -231,7 +238,8 @@ the result file rendered for that launch once (a valid one is then removed; a re
   (`driver resume`). A unit that parks again with the same stage and reason after a driver resumed it
   goes straight to the operator.
 - `{"result":"escalate","action":..,"ledger":{..}}`: the one park notice, `baton <run>/<unit> parked
-  in <stage>: <reason> — <action>`, with the PR suffix a merge-stage park carries (`driver escalate`).
+  in <stage>: <reason> — <action>`, with the suffixes the park's own notice would carry: a merge-stage
+  park's PR, a failed hook, the `thread gone` note (see State and config, Orca host) (`driver escalate`).
 - `{"result":"stop","reason":..,"ledger":{..}}`: the run parks, `driver stop: <reason>` (`driver stop`).
 
 `ledger` is `{q, a, why, rejected}`, all non-empty; baton appends it as one line to the recipe's
@@ -257,6 +265,14 @@ State lives in `${BATON_STATE_DIR:-~/.local/state/baton}`: `runs/<id>/run.json` 
 `events.jsonl`, `claims/` (one env file per launch directory, plus `lookup.log`), `launch/`
 (per-launch worktrees), `notify.log`, and a `lock`.
 
+`run.json` is baton's own state; every command and the tick refuse one whose top-level shape baton
+never writes: not a JSON object, an `id` other than the run's directory name, a `status` other than
+`armed`, `parked`, `disarmed` or `done`, or `units` that is not an object of objects each keyed by
+its own `id` (an array of units, say). The error names the run and the field, for example
+`run r1: run.json: units is not an object`; the file is left as it is. Copy a run directory only
+with its `id` changed to match, and never turn `units` into an array (`jq '.units |= map(..)'`
+does).
+
 Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every key is optional:
 
 - `host`: `"orca"` (the default and only value); `orca.cli` and `orca.launcher` (see Orca host).
@@ -268,8 +284,12 @@ Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every
   recipe's `slots`, over the defaults `{"session": 2, "build": 1}`.
 
 The `park` event in `events.jsonl` is `{kind, unit, stage, reason}` plus `thread` (the seat's
-thread id, when the unit had a session) and, on `second prompt` and `triage gave no answer`,
-`questions` (the pending request's questions, JSON-stringified). The driver adds the events
+thread id, when the unit had a session); on `second prompt` and `triage gave no answer`,
+`questions` (the pending request's questions, JSON-stringified; left off when there are none); and
+on `before failed`, `after_launch failed` and `run failed`, `hook` (the failed hook's 1-based place
+in its list) and `argv` (its rendered argv). Those three parks' notices end with
+` — hook <n> (<program>)`, the argv's first word without its directory, after the PR a merge-stage
+park names: a notice leaves the host, so the rendered arguments stay in the event; an escalated driver notice carries the same suffixes. The driver adds the events
 `driver`, `driver resume`, `driver escalate`, `driver stop` and `driver dropped`.
 
 ```json
@@ -316,8 +336,8 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - **A spine PR conflict parks `spine-pr`** in `spine_wait`. Resolve it on the spine branch in the
   canonical root (merge the base in; never rebase or force-push), push, delete
   `out/spine-pr/review.md`, then `baton unpark <run> spine-pr --to spine_review`.
-- **The spine PR ack.** On the "merge it by hand" notice, read the PR's needs-you list, then merge
-  it; baton sees the merge and runs the second spine close.
+- **The spine PR ack.** On the "passed review … merge it" notice, read the PR's needs-you list, then
+  merge it (the phone's Merge button, or by hand); baton sees the merge and runs the second spine close.
 - **`--to spine_work` is refused while `spine-pr` has a live session** (a review is running): wait
   for the review to end, then unpark.
 - **A `land` park** names its reason. `run failed`: the canonical root is not on the spine branch

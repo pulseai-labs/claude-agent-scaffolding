@@ -1,7 +1,7 @@
 // The Orca host: baton's Host interface over the `orca` CLI. A thread is a terminal; its id is the
 // terminal handle (`term_...`). Reply shapes come from Orca 1.4.238 (tests/fixtures/orca/).
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { AnswerRefused, HostDownError, LaunchError, type Host, type LaunchRequest, type ThreadStatus } from "../host.ts";
@@ -75,6 +75,9 @@ export function mapOrcaState(terminal: object | undefined, agent: object | undef
 
 type Repo = { id: string; displayName: string; path: string };
 
+/** Where `launch` writes each launch's message file, named `<encoded nonce>.txt`. */
+const messagesDir = () => join(stateDir(), "orca", "messages");
+
 export class OrcaHost implements Host {
   private cli: string;
   private launcher: string;
@@ -121,7 +124,7 @@ export class OrcaHost implements Host {
     this.lists = undefined;
     const repo = this.repo(r.project);
     // The message goes through a file; only paths reach the shell. baton-seat deletes the file.
-    const dir = join(stateDir(), "orca", "messages");
+    const dir = messagesDir();
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     chmodSync(dir, 0o700);
     const file = join(dir, `${encodeURIComponent(r.nonce)}.txt`);
@@ -223,6 +226,23 @@ export class OrcaHost implements Host {
     // `--text` sends the bytes as given: `\r` is Enter, `\x1b[A` is Up (OpenBot-bridge spike).
     const res = this.onTerminal(["terminal", "send", "--terminal", threadId, "--text", text]);
     if (res === undefined) throw new AnswerRefused("terminal gone");
+  }
+
+  /**
+   * Remove the run's message files. `baton-seat` deletes the file it reads, but a refusal keeps it
+   * (#930), and a launch whose outcome was unknown keeps it for step 0. Every nonce starts with
+   * `<run>/`, so the encoded prefix `<run>%2F` names this run's files and no other run's.
+   */
+  async endRun(runId: string): Promise<void> {
+    const dir = messagesDir();
+    if (!existsSync(dir)) return;
+    const prefix = encodeURIComponent(`${runId}/`);
+    for (const f of readdirSync(dir)) if (f.startsWith(prefix)) rmSync(join(dir, f), { force: true });
+  }
+
+  /** A launcher refusal and a dead process both leave the terminal list (#930): name the refusal log. */
+  goneNote(): string {
+    return `if the launcher refused it, the reason is in ${join(stateDir(), "claims", "seat.log")}`;
   }
 
   async screen(threadId: string): Promise<string> {
