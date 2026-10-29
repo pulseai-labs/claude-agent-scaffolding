@@ -169,6 +169,12 @@ adds binds nothing in that PR. An order binds only the role it names, and one na
 no role binds no one. `/ossify:start` seeds the section empty; with no order the human
 walks, as before. No `lib/` code, no state change.
 
+Since 1.27.1 (#963), that ack and that order merge a two-way door only where merge-bar's
+`working-a-pr` runs: a one-way door, or a body with no `Door:` line, goes to the merge holder
+(the orchestrator where one runs, otherwise the operator) with
+`merge-bar/skills/working-a-pr/references/one-way-door.md`. A patch tags after its merge, so it is one-way. The bundled loop
+is unchanged. No `lib/` code, no state change.
+
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and
 OMP read it directly. Neither writes `CLAUDE.md`. `/start` replaces a

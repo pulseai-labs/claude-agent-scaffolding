@@ -148,10 +148,12 @@ never saw. Treat a new ledger line or a new hit exactly as §2 says.
 Either way, the body carries one `Closes #<n>` line per issue this patch
 resolves, one per line: GitHub closes only the first issue of `Closes #1, #2`.
 **The merge is the operator's, or a standing order's in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority (lookup: `close/references/cumulative-demo.md` §3).**
+Where `working-a-pr` runs, a patch is a one-way door (§6 tags it), so it goes to the merge holder
+(the orchestrator where one runs, otherwise the operator) with `merge-bar/skills/working-a-pr/references/one-way-door.md`.
 
 ## 6. Tag after the merge
 
-After the operator merges, confirm the merge commit's tree carries the new
+After the merge, confirm the merge commit's tree carries the new
 version, then tag that commit the way the project tags its releases. Read
 `git -C "<repo-root>" tag --sort=-creatordate` for the convention (annotated or
 not, the prefix, the version form) and follow it:
@@ -176,7 +178,8 @@ adopt it.
 - **Reading `touch_check` rc 2 as clean**, or a `risk_gate` hit as advisory (§2).
 - **Bumping one manifest** and leaving the old version on another surface (§4).
 - **Merging on the operator's behalf** — a merge with neither the operator's ack
-  nor a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority — or tagging before the
+  nor a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority, or, under
+  `working-a-pr`, by anyone but the merge holder — or tagging before the
   merge (§5, §6).
 - **Recording the patch in ossify state.** Git is the record (top of this file).
 
