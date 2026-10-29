@@ -59,7 +59,7 @@ block states — typed before the lane:
 The lane is a shell **function**, and Orca types `--command` into the terminal's interactive
 shell, so it resolves; `exec <lane>` fails and leaves a shell. The model read: the rendered
 screen where `model_shows: screen` must show `expected_model:`, and the same read carries
-the status line `seat: <role>` (`roles.md`).
+the status line `seat: <role>` (`roles.md`) — where the seat's row names a `rail:`, that rail's check runs in place of the status line.
 
 ## Readiness
 

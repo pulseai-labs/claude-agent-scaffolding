@@ -158,6 +158,8 @@ Every command's syntax comes from the layer's guide.
    own worktree mutation, never a worker's task and never on the PR branch: a detached
    worktree at the item head, seeded only by `git checkout <base> -- <path>` on a path the
    implementer's report names, re-checked without saying what was seeded, then removed.
+   Its `fail` is the expected answer, never counted toward a second fail; the item passes
+   only on a re-check of its real head after it.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
    at the PR head, brief its review command (`config.md`, `review:`; `/code-review <PR> <LEVEL>` by default), every finding returned in the report file.
    **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from

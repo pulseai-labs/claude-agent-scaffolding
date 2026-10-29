@@ -24,7 +24,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
 REF_BUDGET=232          # 2026-10-29 (0.8.1, #954): +3 — the machine-file `rail:` key: its field
-                        # entry, its profile-table row, and the rendered row's rail tail.
+                        # entry (two lines) and its profile-table row (one). The rendered row's
+                        # rail tail lengthened an existing line and took none (corrected in 0.8.2, #987).
                         # 2026-10-18 (V13 fix): -1 — the `host:` bullet dropped the restated
                         # report-read clause (`roles.md` owns that rule). 230 -> 229.
                         # 2026-10-18 (0.4.0, Task 13): +22 — the machine-file `host:` key ships
@@ -114,7 +115,7 @@ pin "$CONFIG_MD" 'a machine name the layer file'"'"'s Machines step accepts' \
 pin "$CONFIG_MD" '| `host:` | the machine entry | the launch | every resolved profile that crosses a session' \
   "the profile table says the host travels in every crossing profile"
 pin "$CONFIG_MD" 'model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>' \
-  "the rendered row ends with the host"
+  "the rendered row's launch fields end with the host"
 pin "$CONFIG_MD" 'the row names the resolver'"'"'s own machine under the layer'"'"'s' \
   "a host-less entry's row names the resolver's own machine, never an inferred one"
 pin "$CONFIG_MD" 'never the words `this machine`' \
@@ -126,14 +127,17 @@ pin "$CONFIG_MD" 'A profile that crosses a session carries its seat'"'"'s machin
 # 0.8.1 (#954): an agent whose guard is not seat-mods (Devin's seat guard) names that rail and
 # its check, the rail crosses with the row, and the model read takes a passing check in
 # place of the `seat: <role>` status line — else every such launch logs "no guards".
-pin "$CONFIG_MD" '- `rail:` — optional: the guard this agent runs under in place of seat-mods, and the one command' \
-  "the machine file's rail key names the guard and its check"
+pin "$CONFIG_MD" '- `rail:` — optional, one line `<guard> — <check command>` holding no `|` (the row'"'"'s separator): the guard this agent runs under in place of seat-mods and the one command that checks it' \
+  "the machine file's rail key names the guard and its check, one line with no |" flat
 pin "$CONFIG_MD" '| `rail:` | the machine entry | the model read | every resolved profile that names one, as the row'"'"'s tail |' \
   "the profile table says the rail travels as the row's tail"
-pin "$CONFIG_MD" 'host: <machine>`, then ` | rail: <rail>` where the entry names one' \
+pin "$CONFIG_MD" 'host: <machine>[ | rail: <rail>]`, the bracketed tail only where the entry names one' \
   "the rendered row carries the rail after the host"
+# 0.8.2 (#987): "machine last, before any rail" contradicted itself once the rail followed it.
+pin "$CONFIG_MD" 'its machine after every launch field, only a rail'"'"'s tail after it' \
+  "the row-order sentence puts only the rail after the machine"
 ROLES_MD="$PLUGIN_ROOT/skills/orchestrate/references/roles.md"
-pin "$ROLES_MD" 'unless the seat'"'"'s row names a `rail:` (`config.md`), whose check the launching session runs once instead: a pass records that rail, a fail no guards.' \
+pin "$ROLES_MD" 'unless the seat'"'"'s row names a `rail:` (`config.md`), whose check the launching session runs instead, once per launch at the model read (a molt is not a launch, below): a pass records that rail, a fail no guards.' \
   "the model read takes a named rail's passing check in place of the status line" flat
 pin "$CONFIG_MD" 'the close brief'"'"'s demo-walk row' \
   "the carry rule names the close brief's demo-walk row among the crossing surfaces"
