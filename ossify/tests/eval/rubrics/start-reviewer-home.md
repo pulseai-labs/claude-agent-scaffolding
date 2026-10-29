@@ -18,7 +18,7 @@ fixture where it should not fire, on whether the skill correctly held off. There
 3. **The stub** — it has only the header, the `## Read these where they live` list and the
    one-sentence current state. A pointer line appears only for a file the fixture says exists,
    and none copies a project doc's rules. There is no `TODO`, fill-in marker, empty rule heading
-   or entry. A fixture with no project docs gets no pointer lines. Where nothing is written, score
+   or entry. The `03-code-patterns.md` pointer is written whenever that file exists, even with an empty rules section; a fixture with no other project docs gets only that pointer. Where nothing is written, score
    this on whether the skill held off.
 4. **No model name** — the governance `## Review` section names no model. It points at the
    crew file or standing orders for the reviewer seat, and names CodeRabbit or CI review only

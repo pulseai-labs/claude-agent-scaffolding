@@ -1,7 +1,7 @@
 ---
 scenario_id: 03-standards-file-exists
 expected_outcome: propose-to-record
-expected_reason: The recurring class (a test that asserts nothing, in #12, #19 and #23) is found, but CODING_STANDARDS.md was already in the AI workspace before this run, so nothing is written to it. The proposal is listed in ADOPTION.md for the operator to place, and the result line records the counts and the window. The existing file is untouched.
+expected_reason: The recurring class (a test that asserts nothing, in #12, #19 and #23) is found, but CODING_STANDARDS.md was already in the AI workspace before this run, so nothing is written to it. The proposal is listed in ADOPTION.md for the operator to place, and the result line is 'Reviewer home: 1 proposed, 0 accepted (standards file kept; proposals listed below), window #8–#25'. The existing file is untouched.
 ---
 The operator is at the end of `/ossify:adopt` §6 on `ledgerline`, a dual-repo project that
 shipped before ossify. The AI workspace is `/home/dev/projects/ledgerline-ai` and the canonical
@@ -19,4 +19,4 @@ the behaviour it names". On #15 one reviewer wrote, "rename `tmp` to `pending_en
 other findings are each on a single PR. None of the three existing entries covers tests that
 assert nothing.
 
-The conductor is at the history pass, and the operator is ready to answer on any proposal.
+The conductor is at the history pass, and the operator says they will place the proposal for the test class themselves; nothing is written to the file.

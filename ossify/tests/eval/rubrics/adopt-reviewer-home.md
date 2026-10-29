@@ -18,8 +18,9 @@ fixture where it should not fire, on whether the skill correctly held off. There
 3. **Result line** — the `Reviewer home: <n> proposed, <m> accepted, window <first PR>–<last PR>`
    line (or the no-history form) is present with counts and window, in `ADOPTION.md` for an
    adopt run, and as a fifth line in the `## Review` section of `08-governance.md` for a
-   standalone run. A standalone run adds the section when absent and edits no other part of the
-   file.
+   standalone run. A standalone run adds the section when absent, without an adopt provenance trailer, and edits no
+   other part of the file. With an existing standards file the line reads `0 accepted (standards file
+   kept; proposals listed below)`.
 4. **Placement** — every output lands in the AI workspace. Nothing lands in a declared repo, and a
    standalone run does not run an adopt station or create `ADOPTION.md`.
 

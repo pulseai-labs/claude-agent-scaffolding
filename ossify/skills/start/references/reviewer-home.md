@@ -35,10 +35,12 @@ Three parts and nothing else. No fill-in markers, no `TODO`, no empty rule headi
    **Why** and its source PRs, and the reviewer sweeps the repo for it, not only the diff.
 2. **`## Read these where they live`**, a pointer list. Add a line only for a file that exists
    and carries rules: the canonical's `CLAUDE.md` sections on testing or review, a style guide, the memory bank's
-   `03-code-patterns.md`, once its machine-checkable rules section holds a rule (a freshly seeded,
-   empty section gets no line). Pointers only. Never copy a project doc or
-   merge-bar's baseline into the stub. When no such file exists, keep the heading and say in one
-   sentence that the project has no such docs yet.
+   `03-code-patterns.md`. The `03-code-patterns.md` line is written whenever that file exists, even
+   when this run authored it with an empty machine-checkable rules section, because crew's
+   verifier stops at the first standards file and so reads the stub instead of `03-code-patterns.md`.
+   Every other pointer needs its file to exist and carry rules. Pointers only. Never copy a
+   project doc or merge-bar's baseline into the stub. When no pointer can be written, keep the
+   heading and say in one sentence that the project has no such docs yet.
 3. **One sentence of current state**, verbatim: `No project entries yet. Entries come from review findings that recur, accepted by the operator.`
 
 ## 3. The review ledger
@@ -74,23 +76,29 @@ Sources:
 
 A finding becomes a proposal only when it recurs in two or more PRs. Each proposal states the class,
 the rule, the **Why** and the source PRs. The operator accepts, edits or rejects each one.
-Only accepted entries are written. They go under `## Entries` in `CODING_STANDARDS.md`.
+Only accepted entries are written. They go under `## Entries` in `CODING_STANDARDS.md`. In a stub
+this run wrote, the first accepted entry removes the stub's `No project entries yet.` sentence, which
+the entry makes false. Never edit a pre-existing standards file.
 
 When `CODING_STANDARDS.md` already exists, write nothing to it. List the proposals in `ADOPTION.md`
-for the operator to place.
+for the operator to place. `<m>` counts entries written to the file, so it is 0 here, and the result
+line says where the proposals went (below).
 
 Adopt never overwrites: on an adopted project `08-governance.md` is occupied, so append its
 `## Review` section (§4) only when the file has none, with adopt's provenance trailer
-(`adopt/SKILL.md` C5). Otherwise leave the file and name it in the hand-off.
+(`adopt/SKILL.md` C5; a §6 standalone run writes none). Otherwise leave the file and name it in the hand-off.
 
 `ADOPTION.md` gets one line: `Reviewer home: <n> proposed, <m> accepted, window <first PR>–<last PR>`,
+with an existing standards file, `<m>` is 0 and the line reads
+`Reviewer home: <n> proposed, 0 accepted (standards file kept; proposals listed below), window <first PR>–<last PR>`;
 or `Reviewer home: no review history` when there is none. With no history the stub stays plain.
 
 ## 6. On an existing project
 
 For a project ossify already started or adopted. Follow §1–§5 as written, with these changes:
 
-- Run no adopt station.
+- Run no adopt station. Append the `## Review` section with no provenance trailer: adopt's
+  `source: adoption` and `r0 baseline` do not apply to a project it did not adopt.
 - `ADOPTION.md` may not exist. Record the result line as a fifth line in the `## Review` section
   of `08-governance.md`, the section that holds the four lines of §4.
 - When `08-governance.md` has no `## Review` section, add it, as part of seeding the project.

@@ -1,7 +1,7 @@
 ---
 scenario_id: 03-no-project-docs
 expected_outcome: seed
-expected_reason: Nothing is occupied. The canonical has no CLAUDE.md, no style guide, and the memory bank has no 03-code-patterns.md rules to point at, so the stub carries no pointer lines. It still has the header and the one-sentence current state, no TODO, no empty rule heading, and no invented pointer to a file that does not exist.
+expected_reason: Nothing is occupied. The canonical has no CLAUDE.md, no style guide, and no other docs to point at, so the stub carries only the 03-code-patterns.md pointer (the file exists, seeded empty by this run, and crew's verifier reads the stub instead of it) and no 'no such docs yet' sentence. It still has the header and the one-sentence current state, no TODO, no empty rule heading, and no invented pointer to a file that does not exist.
 ---
 The operator is at `/start` §13 in a dual-repo project, `quillbase`. The AI workspace is
 `/home/dev/projects/quillbase-ai` and the private canonical is `/home/dev/projects/quillbase`.

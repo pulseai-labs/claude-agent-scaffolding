@@ -1,7 +1,7 @@
 ---
 scenario_id: 04-existing-project-standalone
 expected_outcome: standalone-seed
-expected_reason: ossify started this project, so no adopt station runs and ADOPTION.md is not used. The skill follows reviewer-home.md section 1 to 5 as written. The free destinations are seeded in the AI workspace, the history pass proposes the recurring class for the operator, and the result line goes as a fifth line in the 08-governance.md Review section. Because that file has no Review section, the section is added, and no other part of the file is edited.
+expected_reason: ossify started this project, so no adopt station runs and ADOPTION.md is not used. The skill follows reviewer-home.md section 1 to 5 as written. The free destinations are seeded in the AI workspace, the history pass proposes the recurring class for the operator, and the result line goes as a fifth line in the 08-governance.md Review section. Because that file has no Review section, the section is added with no adopt provenance trailer (no source: adoption, no r0 baseline), and no other part of the file is edited.
 ---
 The project is `ledgerline`, a dual-repo project that `/ossify:start` set up some weeks ago and
 that is now in Release 1, mid-spine. The AI workspace is `/home/dev/projects/ledgerline-ai`
