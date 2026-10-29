@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import {
-  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync,
+  existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -292,6 +292,150 @@ test("a LaunchError counts one attempt and removes the claim", async () => {
   await doTick();
   expect(host.launches.length).toBe(1);
   expect(host.launches[0].request.nonce).toBe("r1/a/work/2");
+});
+
+// ---- roles ----------------------------------------------------------------------------
+
+const ROLE_TABLE = {
+  implementer: {
+    agent: "agent-a", argv: ["run-a", "--x"], brief_delivery: "inject", expected_model: "model-a", effort: "high",
+    env: { SEAT_MODS_ROLE: "implementer", X: "1" }, review: "/review <PR_URL>",
+  },
+  plain: { agent: "agent-p", argv: ["run-p"], brief_delivery: "file", expected_model: "model-p", effort: "low", env: {} },
+};
+
+/** A role stage: no instance or model; its agent comes from the run's role table. */
+function roleSess(over: Record<string, unknown> = {}) {
+  const { instance: _i, model: _m, ...rest } = sess({ role: "implementer", env: { SEAT_MODS_ROLE: "coordinator" }, ...over });
+  return rest;
+}
+
+async function armRoles(rec: unknown, table: unknown = ROLE_TABLE, id = "r1") {
+  const file = join(root, `${id}.recipe.json`);
+  const seats = join(root, `${id}.roles.json`);
+  writeFileSync(file, JSON.stringify(rec));
+  writeFileSync(seats, JSON.stringify(table));
+  for (const s of (rec as { seed: { id: string }[] }).seed) mkdirSync(join(root, "w", s.id), { recursive: true });
+  expect(await main(["arm", file, "--run", id, "--param", `root=${root}`, "--seats", seats, "--no-timer"])).toBe(0);
+}
+
+test("role-stage-claim-merges-env: the table's env under the stage's, plus the role keys", async () => {
+  await armRoles(recipe({ work: roleSess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches.length).toBe(1);
+  expect(host.launches[0].claim).toEqual({
+    nonce: "r1/a/work/1",
+    env: { SEAT_MODS_ROLE: "coordinator", X: "1", BATON_ROLE: "implementer", BATON_ROLE_TABLE: join(runDir(), "seats.json") },
+  });
+});
+
+test("role-stage-launch-request: instance is the table's agent, model its expected model", async () => {
+  await armRoles(recipe({ work: roleSess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  const r = host.launches[0].request;
+  expect(r.instance).toBe("agent-a");
+  expect(r.model).toBe("model-a");
+});
+
+test("agent-review-renders: {agent.name} and {agent.review} render in the message", async () => {
+  await armRoles(recipe({ work: roleSess({ message: "{agent.name}: {agent.review}" }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches[0].request.message).toBe("agent-a: /review <PR_URL>");
+});
+
+test("a role with no review parks a message that uses {agent.review}, before any claim", async () => {
+  await armRoles(recipe({ work: roleSess({ role: "plain", message: "{agent.review}" }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches.length).toBe(0);
+  expect(claimFiles()).toEqual([]);
+  expect(runState().units.a.parked?.reason).toContain("agent.review");
+});
+
+test("control: a role with no review launches when the message does not use {agent.review}", async () => {
+  await armRoles(recipe({ work: roleSess({ role: "plain", message: "{agent.name}" }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches[0].request.message).toBe("agent-p");
+  expect(host.launches[0].request.instance).toBe("agent-p");
+});
+
+test("missing-seats-file-parks: no seats.json parks launch failed naming it, and writes no claim", async () => {
+  await armRoles(recipe({ work: roleSess() }, ["a"]));
+  rmSync(join(runDir(), "seats.json"));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches.length).toBe(0);
+  expect(claimFiles()).toEqual([]);
+  expect(runState().units.a.parked?.reason).toBe("launch failed");
+  const ev = events().find((e) => e.kind === "launch failed");
+  expect(String(ev?.reason)).toContain("seats.json");
+});
+
+test("a table without the stage's role parks launch failed naming the role, and writes no claim", async () => {
+  await armRoles(recipe({ work: roleSess() }, ["a"]));
+  writeFileSync(join(runDir(), "seats.json"), JSON.stringify({ plain: ROLE_TABLE.plain }));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches.length).toBe(0);
+  expect(claimFiles()).toEqual([]);
+  expect(runState().units.a.parked?.reason).toBe("launch failed");
+  const ev = events().find((e) => e.kind === "launch failed");
+  expect(String(ev?.reason)).toContain('"implementer"');
+});
+
+test("an invalid seats.json parks launch failed naming it", async () => {
+  await armRoles(recipe({ work: roleSess() }, ["a"]));
+  writeFileSync(join(runDir(), "seats.json"), JSON.stringify({ implementer: { agent: "x" } }));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches.length).toBe(0);
+  expect(runState().units.a.parked?.reason).toBe("launch failed");
+  expect(String(events().find((e) => e.kind === "launch failed")?.reason)).toContain("seats.json");
+});
+
+test("role-less-stage-unchanged: an old-style stage in a run with a table writes the same claim as before", async () => {
+  await armRoles(recipe({ work: sess(), other: roleSess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  const l = host.launches[0];
+  expect(l.claim).toEqual({ nonce: "r1/a/work/1", env: { K: "v-a" } });
+  expect(l.request.instance).toBe("inst");
+  expect(l.request.model).toBe("mod");
+});
+
+test("a role stage's successor launches on the table's agent and model", async () => {
+  await armRoles(recipe({
+    work: roleSess({ handoff: { file: "{run.dir}/h/{unit.id}", token: "handed-off", message: "resume {agent.name} {handoff_path}" } }),
+  }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [handoffWrite(1)] } });
+  await doTick();
+  host.advance();
+  at(2);
+  await doTick();
+  expect(host.launches.length).toBe(2);
+  const r = host.launches[1].request;
+  expect(r.instance).toBe("agent-a");
+  expect(r.model).toBe("model-a");
+  expect(r.message).toBe("resume agent-a /tmp/hand a.md");
+});
+
+test("a role stage's successor parks launch failed when seats.json is gone", async () => {
+  await armRoles(recipe({
+    work: roleSess({ handoff: { file: "{run.dir}/h/{unit.id}", token: "handed-off", message: "resume {handoff_path}" } }),
+  }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [handoffWrite(1)] } });
+  await doTick();
+  host.advance();
+  rmSync(join(runDir(), "seats.json"));
+  at(2);
+  await doTick();
+  expect(host.launches.length).toBe(1);
+  expect(runState().units.a.parked?.reason).toBe("launch failed");
+  expect(claimFiles()).toEqual([]);
 });
 
 // ---- successors -----------------------------------------------------------------------

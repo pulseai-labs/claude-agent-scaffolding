@@ -526,3 +526,48 @@ describe("stage role", () => {
     expect(Object.fromEntries(m)).toEqual({ implementer: ["implement", "correct"] });
   });
 });
+
+describe("agent placeholders", () => {
+  const roled = () => {
+    const r = relay();
+    delete r.stages.planner.instance;
+    delete r.stages.planner.model;
+    r.stages.planner.role = "implementer";
+    return r;
+  };
+  test("{agent.name} and {agent.review} validate in a role stage's message and handoff message", () => {
+    const r = roled();
+    r.stages.planner.message = "{agent.name} {agent.review}";
+    r.stages.planner.handoff = { file: "{run.dir}/h", token: "x", message: "{agent.name}" };
+    const res = validate(r);
+    if (!res.ok) throw new Error(res.errors.join("; "));
+  });
+  test("refused in a stage without a role", () => {
+    const r = relay();
+    r.stages.planner.message = "{agent.review}";
+    expectError(r, "stages.planner.message: {agent.review} is allowed only in the message of a stage with a role");
+  });
+  test("refused outside the message of a role stage", () => {
+    const r = roled();
+    r.stages.planner.title = "{agent.name}";
+    expectError(r, "stages.planner.title: {agent.name} is allowed only");
+    const r2 = roled();
+    r2.stages.planner.env = { A: "{agent.name}" };
+    expectError(r2, "stages.planner.env.A: {agent.name} is allowed only");
+  });
+  test("triage and driver messages with a role", () => {
+    const r = relay();
+    r.triage = { kind: "triage", role: "triage", project: "/p", cwd: "/p", title: "t", message: "{agent.name}", env: {}, note_file: "{run.dir}/n" };
+    expect(validate(r).ok).toBe(true);
+    const r2 = relay();
+    r2.triage = { ...r.triage, role: undefined, instance: "i", model: "m" };
+    delete r2.triage.role;
+    expectError(r2, "triage.message: {agent.name} is allowed only");
+  });
+  test("render: agent names render from scope; an absent review is a render failure", () => {
+    expect(render("{agent.name} {agent.review}", { ...scope, agent: { name: "a", review: "/r <PR_URL>" } })).toBe("a /r <PR_URL>");
+    expect(() => render("{agent.review}", { ...scope, agent: { name: "a" } })).toThrow("no agent.review in scope");
+    expect(() => render("{agent.name}", scope)).toThrow("no agent in scope");
+    expect(render("{agent.name}", { ...scope, agent: { name: "a" } })).toBe("a");
+  });
+});

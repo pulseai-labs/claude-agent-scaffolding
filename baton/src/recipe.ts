@@ -103,6 +103,8 @@ export type Scope = {
   pr?: { url: string; head: string };
   driver?: { reason: string; stage: string; launch: string };
   pending?: { thread: string; request: string; questions: string; stage: string };
+  /** A role stage's agent, from the run's role table; `review` only when the table gives one. */
+  agent?: { name: string; review?: string };
 };
 
 // ---- names -------------------------------------------------------------------------
@@ -154,6 +156,9 @@ const PENDING_NAMES = new Set(["pending.thread", "pending.request", "pending.que
 const DRIVER_NAMES = new Set(["driver.reason", "driver.stage", "driver.launch"]);
 type PlaceholderMode = "stage" | "triage" | "driver" | "driver-file";
 
+// Usable only in the message (and a session's handoff message) of a stage with a role.
+const AGENT_NAMES = new Set(["agent.name", "agent.review"]);
+
 /** Is `name` (the text between braces) a placeholder the recipe may use? Returns a reason or null. */
 function placeholderProblem(name: string, params: Set<string>, mode: PlaceholderMode = "stage"): string | null {
   if (FIXED_NAMES.has(name)) return null;
@@ -196,6 +201,12 @@ export function render(tpl: string, scope: Scope): string {
       case "driver.launch":
         if (!scope.driver) throw new Error("no driver in scope");
         return scope.driver[name.slice(7) as "reason" | "stage" | "launch"];
+      case "agent.name":
+        if (!scope.agent) throw new Error("no agent in scope");
+        return scope.agent.name;
+      case "agent.review":
+        if (scope.agent?.review === undefined) throw new Error("no agent.review in scope");
+        return scope.agent.review;
     }
     if (name.startsWith("param.")) {
       const k = name.slice(6);
@@ -518,9 +529,22 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
   }
 
   // Placeholders: every string in the recipe may use only the closed set, and params must be declared.
+  // The paths where {agent.*} may appear: the messages of the stages that name a role.
+  const agentPaths = new Set<string>();
+  for (const [name, st] of Object.entries(stages)) {
+    if (isObj(st) && st.kind === "session" && st.role !== undefined) {
+      agentPaths.add(`stages.${name}.message`).add(`stages.${name}.handoff.message`);
+    }
+  }
+  if (isObj(r.triage) && r.triage.role !== undefined) agentPaths.add("triage.message");
+  if (isObj(r.driver) && r.driver.role !== undefined) agentPaths.add("driver.message");
   const walk = (v: unknown, path: string, mode: PlaceholderMode = "stage") => {
     if (isStr(v)) {
       for (const m of v.matchAll(PLACEHOLDER_RE)) {
+        if (AGENT_NAMES.has(m[1])) {
+          if (!agentPaths.has(path)) err(path, `{${m[1]}} is allowed only in the message of a stage with a role`);
+          continue;
+        }
         const problem = placeholderProblem(m[1], params, mode);
         if (problem) err(path, problem);
       }
