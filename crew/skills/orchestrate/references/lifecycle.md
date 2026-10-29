@@ -54,7 +54,9 @@ Every command's syntax comes from the layer's guide.
    dispatch continues and rebinds that file; a first dispatch names a fresh one), and
    the child templates it will construct, verbatim as `briefs.md`'s
    dispatch matrix lists them for a work-PR session: steps 8-12 are that session's loop,
-   and you relay the merge word to it rather than merging yourself. Once every returned
+   and you relay the merge word to it rather than merging yourself — except that a
+   `handed off: one-way <OID>` return makes you the merge holder, merging it by step 12's
+   one-way rule pinned to that OID, with no word relayed back. Once every returned
    PR has merged, dispatch the record pass — a second close, marked `coordinator` before
    its command (the layer's `Seat marking`) — and only then tear down:
    **step 12's worker release and branch deletion wait for that pass** — the work-PR
@@ -155,13 +157,19 @@ Every command's syntax comes from the layer's guide.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
    at the PR head, brief its review command (`config.md`, `review:`; `/code-review <PR> <LEVEL>` by default), every finding returned in the report file.
    **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from
-   its seat over the fix range alone — one scoped delta re-review — and its findings enter the
+   its seat over the fix range alone — one scoped delta re-review; a `/merge-bar:review-pr`
+   reviewer is a fresh seat running `/merge-bar:review-pr <PR_URL> --round <n> --previous
+   <previous report path>` — and its findings enter the
    disposition baseline like any other, so a repository whose bot does not review a push still
    reaches a complete signal on the head it asks about. Every finding returned in the report file
-   as file, line, severity, claim. The reviewer posts nothing to GitHub and edits
+   as file, line, severity, claim, or as that report's classes. The reviewer posts nothing to GitHub and edits
    nothing, so that file is the sole copy of the review. Release the reviewer only
    after its report file validates — findings lines present in the stated schema, or
-   `Findings: none` on a clean review, with the reviewed head equal to the PR head; on
+   `Findings: none` on a clean review, or a `/merge-bar:review-pr` report with its
+   `## Coverage` table and a `Bar:` line on every `### C<n>` class (no class is a clean
+   review; a class blocks unless its `Bar:` is `non-blocking` or it carries `Closes:`, and a
+   `Still open:` class keeps its `Bar:`), with the reviewed head —
+   that report's `Head:` — equal to the PR head; on
    a malformed report, send one bounded correction request
    before release.
 9. **Disposition.** Each finding becomes **fix**, **defer** as a tracked issue, or
@@ -211,6 +219,10 @@ Every command's syntax comes from the layer's guide.
     as the blocker, and a new actionable finding returns to step 10.
     The run's `run.merge_word` decides where the merge word comes from. With `standing`, the operator's
     standing word is it: a clean gate set on that SHA is the agreed condition, so merge with no ask (#837).
+    A one-way door — a `handed off: one-way <OID>` return, or where merge-bar's `working-a-pr` runs a
+    body with `Door: one-way` or no `Door:` line — follows merge-bar's
+    `skills/working-a-pr/references/one-way-door.md` under either word, `standing` included: its
+    reads and its clean install are a verifier dispatch, and the merge below is pinned to that OID.
     With `operator`, the ask says that this run's brief or the operator set an operator merge gate:
     ask for the merge word naming that SHA. Under either word, a dispatch whose
     merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator: tell them the word and the

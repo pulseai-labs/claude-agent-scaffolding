@@ -190,7 +190,9 @@ then, in either case:
   Reviewed head: <sha>
   Summary: <two sentences>
 The head line is not optional on a clean review: nothing ties a verdict to a SHA
-without it.
+without it. When REVIEW_INVOCATION is `/merge-bar:review-pr`, your report file is instead
+that command's report, whole, in merge-bar's `skills/reviewing-a-pr/references/report.md`
+shape; its `Head:` line is the reviewed head.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
