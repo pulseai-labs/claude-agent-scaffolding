@@ -75,7 +75,9 @@ the list. An ossify implementer's list adds its handoff's directory; a brief wit
 names it `SCRATCH_DIR`. The layer's `Seat launch` says how its own command sets all of this.
 
 **The model read's status line.** The model read of a guarded seat also reads its status line
-for `seat: <role>`; its absence there means no guards — a coordinator records that in its report
+for `seat: <role>`; its absence there means no guards — unless the seat's row names a `rail:`
+(`config.md`), whose check the launching session runs once instead: a pass records that rail,
+a fail no guards. A coordinator records that in its report
 file (to the top), the top records one from its own launches to the operator, and a missing
 status line halts no seat, re-launches none and is never silently dropped. The layer's step says
 which read carries it.

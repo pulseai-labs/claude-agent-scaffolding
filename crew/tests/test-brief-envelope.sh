@@ -38,6 +38,9 @@ ENVELOPE_FILES='briefs.md ossify-briefs.md ossify-pr-briefs.md ossify-close-writ
 # check's subject: everything from `MOLT:` through the `(read as PING says; ...)` clause.
 MOLT_CLAUSE_RE='^MOLT: if molt warns you, send one ping, `<PING_SEND> '"'"'\[crew molt [a-z-]+\] <pct> <(task id|SPINE_ID)>'"'"'` \(read as PING says; never when NOTIFY_RUN is `none`\)'
 
+# The PING line's read of the run file: pane and machine on one line (#955).
+PING_READ="read \`jq -r '\"\\(.run.orchestrator.pane) \\(.run.orchestrator.machine)\"' <NOTIFY_RUN>\` at that moment — one line, the pane then the machine;"
+
 # shellcheck source=/dev/null
 . "$SCRIPT_DIR/_helpers.sh"
 
@@ -61,6 +64,11 @@ envelope_findings() { # <dir holding the four brief files>
     printf '%s\n' "$ping" | grep -F '<PING_SEND>' >/dev/null || printf 'a PING: line carries no <PING_SEND> slot\n'
     printf '%s\n' "$ping" | grep -E '\[crew report [a-z-]+\]' >/dev/null || printf 'a PING: line carries no [crew report <role>] tag\n'
     printf '%s\n' "$ping" | grep -F 'herdr' >/dev/null && printf 'a PING: line names a layer command\n'
+    # 0.8.1 (#955): pane and machine come back on ONE line. The two-value form printed two,
+    # and `read pane machine` took an empty machine and skipped the ping.
+    n="$(printf '%s\n' "$ping" | grep -cF "$PING_READ")"
+    [ "$n" -eq "$(printf '%s\n' "$ping" | wc -l | tr -d ' ')" ] \
+      || printf 'a PING: line does not read pane and machine as one line\n'
   fi
 
   # 2. The MOLT: lines: every one carries the same send clause.
@@ -164,6 +172,21 @@ if [ "$(printf '%s\n' "$out" | grep -c .)" -eq 2 ] \
   pass "control: one PING line carrying a layer command again fails, both halves named"
 else
   fail "control: one PING line carrying a layer command again fails, both halves named" "got: ${out:-<none>}"
+fi
+# #955's control: every PING line back on the two-value read keeps the lines identical, so
+# only the one-line fact can see it — and it must, alone.
+for l in $ENVELOPE_FILES; do cp "$REF/$l" "$ctl/$l"; done
+for l in $ENVELOPE_FILES; do
+  PR="$PING_READ" awk 'BEGIN { r = ENVIRON["PR"]; o = "read `jq -r '"'"'.run.orchestrator.pane, .run.orchestrator.machine'"'"' <NOTIFY_RUN>` at that moment;" }
+    /^PING:/ { i = index($0, r); if (i) $0 = substr($0, 1, i - 1) o substr($0, i + length(r)) } { print }' \
+    "$ctl/$l" > "$ctl/$l.mut" && mv "$ctl/$l.mut" "$ctl/$l"
+done
+out="$(envelope_findings "$ctl")"
+if [ "$out" = "a PING: line does not read pane and machine as one line" ] \
+   && grep -hF '.run.orchestrator.pane, .run.orchestrator.machine' "$ctl"/*.md >/dev/null; then
+  pass "control: the two-line pane/machine read fails, and only that fact names it"
+else
+  fail "control: the two-line pane/machine read fails, and only that fact names it" "got: ${out:-<none>}"
 fi
 rm -rf "$ctl"
 if [ ! -e "$ctl" ]; then

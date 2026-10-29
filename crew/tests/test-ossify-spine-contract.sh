@@ -2218,12 +2218,53 @@ n_eq "$BRIEFS_MD" 'RULES THAT DO NOT LOAD HERE' 3 \
 # Three halves: the claim and its verbatim evidence, the lookup order (merge-bar
 # reviewing-a-pr's, then the memory bank), and the absence rule that keeps a missing
 # file from failing the claim. `flat`: the claim wraps.
-pin "$GENERIC_BRIEFS_MD" '4. The diff follows <standards file> and the conventions the repo follows in fact: quote the rule line, or the neighbouring committed file, and the hunk.' \
-  "the verifier CLAIMS carry the standards claim with verbatim evidence" flat
+pin "$GENERIC_BRIEFS_MD" '4. [standards] The diff follows <standards file> and the conventions the repo follows in fact:' \
+  "the verifier CLAIMS carry the standards claim" flat
 pin "$GENERIC_BRIEFS_MD" '`CODING_STANDARDS.md` at the paired AI workspace root (the directory beside this repo whose `.workspace/pairing.json` has `canonical.name` equal to this repo'"'"'s name), else at the repo root, else the ossify memory bank'"'"'s `03-code-patterns.md`, else `none — looked at <paths>`.' \
   "the standards claim resolves workspace, repo root, memory bank, then none" flat
 pin "$GENERIC_BRIEFS_MD" 'With none, judge conventions-in-fact alone; absence of a file is never `cannot determine`. Never delete this claim.' \
   "a missing standards file is never cannot-determine, and the claim is never deleted" flat
+
+# 0.8.1 (#979): the standards claim's evidence names the file it judged and quotes both
+# halves. The #951 pilot's verifier wrote the bare file name and paraphrased the hunk, under
+# a claim that said "quote ... and the hunk".
+pin "$GENERIC_BRIEFS_MD" 'name <standards file> by the path filled here, and quote the rule line, or the neighbouring committed file, and the hunk, each verbatim, never paraphrased.' \
+  "the standards claim's evidence carries the resolved path and the verbatim hunk" flat
+# 0.8.1 (#979): a claim is found by its tag, not its number — an item verifier's ACs come
+# first, so the fixed claims' numbers move. Each fixed claim carries its tag, and both DONE
+# shapes keep it.
+for _t in '1. [ac] <acceptance' '2. [diff] The diff matches' '3. [mutation] When the item' \
+          '4. [standards] The diff follows'; do
+  pin "$GENERIC_BRIEFS_MD" "$_t" "the verifier claim carries its tag: $_t"
+done
+pin "$GENERIC_BRIEFS_MD" '1. [<tag>] <claim>: pass | fail | cannot determine' \
+  "the generic verifier's DONE line keeps each claim's tag"
+pin "$BRIEFS_MD" 'one line per claim, its [tag] first' \
+  "the item verifier's DONE line keeps each claim's tag"
+# 0.8.1 (#952): a re-check is the verifier brief sent again, refilled — never a hand-edited
+# copy — and it judges the tree it now names. One pin per carrier: the generic template,
+# the item verifier, lifecycle step 7 and the spine's correct path.
+pin "$GENERIC_BRIEFS_MD" 'A re-check is this brief sent again, every slot refilled: judge the tree named here, never your previous check'"'"'s.' \
+  "the generic verifier brief says what a re-check is" flat
+pin "$BRIEFS_MD" 'A re-check is this brief sent again, refilled: judge the tree named above, never your previous check'"'"'s.' \
+  "the item verifier brief says what a re-check is"
+pin "$LIFECYCLE_MD" 'verifier — its brief sent again, every slot refilled (`briefs.md`)' \
+  "lifecycle step 7's re-check names the brief it sends" flat
+pin "$BRIEFS_MD" 'the full recheck — this file'"'"'s item-verifier brief, refilled — to the' \
+  "the spine's correct path names the re-check's brief" flat
+# 0.8.1 (#952): one diff form for a committed head and a staged tree, so no top edits the
+# diff command for a staged re-check; and an empty revert is named, not passed.
+pin "$GENERIC_BRIEFS_MD" '`git diff --cached <the item'"'"'s base sha>`, which covers a committed head and a staged tree.' \
+  "the diff claim names one diff form for a committed head and a staged tree" flat
+pin "$GENERIC_BRIEFS_MD" 'a revert that changes no file is `cannot determine`, naming the paths tried.' \
+  "the mutation claim says what an empty revert is" flat
+# 0.8.1 (#953): a calibration fixture has an owner and a place.
+pin "$LIFECYCLE_MD" 'is the top'"'"'s own worktree mutation, never a worker'"'"'s task and never on the PR branch' \
+  "a calibration fixture is the top's, never a worker's, never on the PR branch" flat
+pin "$LIFECYCLE_MD" 'seeded only by `git checkout <base> -- <path>` on a path the implementer'"'"'s report names' \
+  "a calibration fixture is seeded only by a base checkout of a reported path" flat
+pin "$SKILL_MD" 'worktree (a calibration fixture'"'"'s included, `lifecycle.md` step 7)' \
+  "the delegation floor admits the calibration fixture's worktree" flat
 
 section "the seat-mods guard reaches every launch site"
 

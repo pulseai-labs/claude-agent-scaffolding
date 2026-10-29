@@ -42,7 +42,8 @@ Your own turns take these kinds of action, and no others:
 3. Read the seats' report files.
 4. Decide.
 5. Converse: operator questions, and answers to what workers write in their report files.
-6. Execute single authorized mutations: worktree, tab and pane creation, dispatch,
+6. Execute single authorized mutations: worktree (a calibration fixture's included,
+   `lifecycle.md` step 7), tab and pane creation, dispatch,
    the PR comment, the merge — and, after it, the teardown: releasing workers (a pane
    closed, or a worktree removed), closing the run, and the verified branch delete.
 
