@@ -127,7 +127,65 @@ test("Disarm asks Yes/No; Yes runs baton disarm; No cancels", async () => {
   await handleTap(park(), "Disarm", ctx());
   await handleTap(next(PARK, 3), "No", ctx());
   expect(env.runs.length).toBe(1);
-  expect(next(PARK, 4).say).toBe("Cancelled.");
+  expect(next(PARK, 4).offer!.text).toBe("Cancelled; nothing ran.\nbaton r1/u1 parked in build: second prompt");
+});
+
+test("No on a unit park's Disarm asks the park's question again while the park is open (#959)", async () => {
+  const r = park();
+  await handleTap(r, "Disarm", ctx());
+  await handleTap(next(PARK), "No", ctx());
+  expect(env.runs).toEqual([]);
+  const again = next(PARK, 2);
+  expect(again).toMatchObject({ phase: "asked", run: "r1", unit: "u1", park_at: P1, title: r.title });
+  expect(again.say).toBeUndefined();
+  expect(labels(again.offer)).toEqual(labels(r.offer));
+  expect(again.offer!.text).toBe(`Cancelled; nothing ran.\n${r.offer!.text}`);
+  // the question asked again works as the first one did
+  await handleTap(again, "Unpark", ctx());
+  expect(env.runs).toEqual([["baton", "unpark", "r1", "u1"]]);
+});
+
+test("Cancel on a unit park's stage page asks the park's question again (#959)", async () => {
+  const r = park();
+  await handleTap(r, "Unpark to stage…", ctx());
+  await handleTap(next(PARK), "Cancel", ctx());
+  expect(env.runs).toEqual([]);
+  expect(labels(next(PARK, 2).offer)).toEqual(labels(r.offer));
+  expect(next(PARK, 2).offer!.text).toBe(`Cancelled; nothing ran.\n${r.offer!.text}`);
+});
+
+test("No after the unit park cleared only says Cancelled (#959)", async () => {
+  await handleTap(park(), "Disarm", ctx());
+  env.writeRun(defaultRun({ units: { u1: { id: "u1", stage: "review", parked: null, vars: {} } } }));
+  await handleTap(next(PARK), "No", ctx());
+  expect(next(PARK, 2).say).toBe("Cancelled.");
+  expect(next(PARK, 2).offer).toBeUndefined();
+});
+
+test("No after the run was disarmed only says Cancelled (#959)", async () => {
+  await handleTap(park(), "Disarm", ctx());
+  env.writeRun(defaultRun({ status: "disarmed" }));
+  await handleTap(next(PARK), "No", ctx());
+  expect(next(PARK, 2).say).toBe("Cancelled.");
+});
+
+test("No on a blocked park's Disarm asks the blocked question again, with its picker (#959)", async () => {
+  const r = blocked();
+  await handleTap(r, "More…", ctx());
+  await handleTap(next(BLOCKED), "Disarm", ctx());
+  await handleTap(next(BLOCKED, 2), "No", ctx());
+  const again = next(BLOCKED, 3);
+  expect(labels(again.offer)).toEqual(labels(r.offer));
+  expect(again.offer!.text).toBe(`Cancelled; nothing ran.\n${r.offer!.text}`);
+  expect(again.picker).toEqual(COLOURS as Picker);
+  expect(again).toMatchObject({ unit: "u5", park_at: P5 });
+});
+
+test("No after Merge still only says Cancelled (#959 covers unit parks only)", async () => {
+  env.reply.fn = (argv) => (argv[2] === "view" ? { rc: 0, stdout: '{"number":7,"baseRefName":"main"}', stderr: "" } : { rc: 0, stdout: "", stderr: "" });
+  await handleTap(move(), "Merge", ctx());
+  await handleTap(next(MOVE), "No", ctx());
+  expect(next(MOVE, 2).say).toBe("Cancelled.");
 });
 
 test("Merge checks the PR, asks Yes/No, and Yes merges at the reviewed head", async () => {

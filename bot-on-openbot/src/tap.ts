@@ -13,6 +13,7 @@ import { newestPark, readUnit } from "./baton-state.ts";
 import { close, find, followUp, type DeliveryRec } from "./deliveries.ts";
 import { confirmOffer, moreOffer, refusedOffer, stageOffer, type Act, type Offer } from "./offer.ts";
 import type { OpenBot } from "./openbot.ts";
+import { stillOpen } from "./settle.ts";
 import { stateDir } from "./paths.ts";
 import { log } from "./log.ts";
 
@@ -162,9 +163,20 @@ async function act(rec: DeliveryRec, a: Act, ctx: TapCtx): Promise<number | unde
     case "merge-yes":
       if (!PR_URL_RE.test(a.pr_url)) return result("Merge", { rc: 1, stderr: "not a PR URL" });
       return result("Merge", await merge(a.pr_url, a.head_sha, runner));
-    case "no":
+    case "no": {
+      // A unit park's No or Cancel, while the park is still open, asks the park's own question again
+      // (#959): a mistaken No must not leave the park with nothing on the phone that can act on it.
+      const root = find(rec.key.split("#")[0]!);
+      if (rec.unit && rec.park_at && root?.offer && stillOpen(rec)) {
+        followUp(rec, {
+          offer: { ...root.offer, text: `Cancelled; nothing ran.\n${root.offer.text}` },
+          ...(root.picker ? { picker: root.picker } : {}),
+        });
+        return undefined;
+      }
       say("Cancelled.");
       return undefined;
+    }
     case "open-pr":
       say(`${rec.title}: ${a.pr_url}`);
       return undefined;
