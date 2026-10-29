@@ -10,13 +10,15 @@ All notable changes to the `crew` plugin.
 review command keeps the `Findings:` / `Reviewed head:` / `Summary:` schema. The work-PR
 session's step 3 and lifecycle step 8 accept either shape: a `reviewing-a-pr` report validates
 with its `## Coverage` table and a `Bar:` line on every `### C<n>` class, no class is a clean
-review, a class blocks unless its `Bar:` is `non-blocking`, and a `Head:` off the PR head is
+review, a class blocks unless its `Bar:` is `non-blocking` or it carries `Closes:` (a `Still
+open:` class keeps its `Bar:`), and a `Head:` off the PR head is
 historical (step 3) or fails validation (step 8), exactly as a mismatched `Reviewed head:` does.
 Its fix-range re-review is a fresh seat running `/merge-bar:review-pr <PR_URL> --round <n>
 --previous <previous report path>`. Where `working-a-pr` runs, the work-PR session never merges
-a one-way door (`Door: one-way`, or no `Door:` line): its report hands it to the top with
-merge-bar's `skills/working-a-pr/references/one-way-door.md`. The two-way merge path is
-unchanged.
+a one-way door (`Door: one-way`, or no `Door:` line): it returns `handed off: one-way <reviewed
+head OID>`, and the top, as merge holder, follows merge-bar's
+`skills/working-a-pr/references/one-way-door.md` under either merge word, `standing` included,
+and merges pinned to that OID. The two-way merge path is unchanged.
 
 ## 0.6.0
 

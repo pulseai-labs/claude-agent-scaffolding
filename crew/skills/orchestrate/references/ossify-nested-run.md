@@ -197,7 +197,8 @@ a first dispatch names a fresh one. On creation and on continue/rebind it writes
 beside the pane — this server's machine, per the layer file — and `run.orchestrator.session` (`lifecycle.md` step 1). It owns both PR seats in a `run.json` of its own,
 relays one summary per round, and asks you for the merge word; you answer as `lifecycle.md` step 12's `run.merge_word` says (with
 `standing`, a clean gate set is the word; with `operator`, you ask the operator), and the merge lands under the reply's executor — a merge commit on the named SHA, session or
-operator alike. `lifecycle.md` steps 8-12 are that session's loop, not yours.
+operator alike. A `handed off: one-way <OID>` return asks no word: you merge it by step 12's
+one-way rule. `lifecycle.md` steps 8-12 are that session's loop, not yours.
 
 **Then, once every returned PR has merged, one record pass** — a second
 `/ossify:close <spine-id>`, to another fresh close session — marked `coordinator` before

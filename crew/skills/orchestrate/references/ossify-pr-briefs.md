@@ -132,7 +132,7 @@ command's syntax comes from the layer's own guide (`references/layers/<layer>.md
 your own seats is you: every seat you launch, send to, wait on or release follows it,
 except that where it says the operator, you mean the top, through your report file.
 
-TASK: drive PR_NUMBER to a merge on the top's word.
+TASK: drive PR_NUMBER to a merge on the top's word, or a one-way door to step 6's hand-off.
   1. Create RUN_JSON for your two seats, or continue it if it exists. A session that
      binds an existing `run.json` rewrites `run.orchestrator` to its own address from
      the layer's Identity — dagr's stable-agent fallback otherwise — in the same producer loop every other
@@ -161,14 +161,14 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      Seat launch) — confirm the model as its row's `model_shows` says and from the first reply,
      and brief it to run REVIEW_INVOCATION. Read the findings from its
      report file — it posts nothing; that file is the only copy. Validate it against the reviewer
-     brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines plus
-     both; a `/merge-bar:review-pr` report instead validates with its `## Coverage` table and a
-     `Bar:` line on every `### C<n>` class, its `Head:` the reviewed head (no class is a clean
-     review; a class blocks unless its `Bar:` is `non-blocking`) — before passing anything on; on a
-     malformed body send ONE bounded correction request and re-validate, escalating a second
-     malformed body to the top. A mismatched reviewed head makes the review historical, a `Head:`
-     that is not the PR head included — re-fetch the GitHub signals rather than commissioning
-     another; absent or untriaged signals never satisfy the merge gate.
+     brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines plus both;
+     a `/merge-bar:review-pr` report instead validates with its `## Coverage` table and a `Bar:` line on
+     every `### C<n>` class, its `Head:` the reviewed head (no class is a clean review; a class blocks
+     unless its `Bar:` is `non-blocking` or it carries `Closes:`, and a `Still open:` class keeps its
+     `Bar:`) — before passing anything on; on a malformed body send ONE bounded correction request and
+     re-validate, escalating a second malformed body to the top. A mismatched reviewed head makes the
+     review historical, a `Head:` that is not the PR head included — re-fetch the GitHub signals rather
+     than commissioning another; absent or untriaged signals never satisfy the merge gate.
   4. THEN run `/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT` — initial
      runs carrying those findings in as its disposition inputs, resumed runs
      carrying the PRIOR_REVIEW baseline. It owns the whole loop — started first
@@ -220,17 +220,16 @@ TASK: drive PR_NUMBER to a merge on the top's word.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: write your report file, returning PR_REPO, PR_NUMBER and every ledger
-comment id, plus one of two outcomes: the merge SHA; or
-`open: <PR url> at <head sha>`, with RUN_JSON's path and the pane its `run.orchestrator`
-names at writing, when the word you were relayed was wait or leave
-open, or at a fix-round boundary once the context-ceiling notice or a molt warning has fired — then stand
+DONE: write your report file, returning PR_REPO, PR_NUMBER and every ledger comment id, plus one
+of three outcomes: the merge SHA; `handed off: one-way <reviewed head OID>`, only for step 6's
+one-way door; or `open: <PR url> at <head sha>`, with RUN_JSON's path and the pane its
+`run.orchestrator` names at writing, when the word you were relayed was wait or leave open, or at a fix-round boundary once the context-ceiling notice or a molt warning has fired — then stand
 down your own armed waits before you return, as the top and a spine session do: one
 report must wake one session (`lifecycle.md`, "Your own rotation"). On the open shape, first release both seats and close the workspaces you created for them, as step 6 does; then persist its review record —
 whether the delegated review ran, its reviewed head, its clean/findings state and
 summary, the fix rounds run, and the durable ledger/comment references — the next
 fresh work-PR dispatch receives it as PRIOR_REVIEW in a fresh brief, the review
-state reused. Both settle this dispatch; on the open shape the top does not advance to the record
+state reused. All three settle this dispatch; on the open shape the top does not advance to the record
 pass — a later merge is a new work-PR dispatch, not a resumption of this one. Then:
 Changed / Evidence / Open / Files as ids, SHAs, counts and a report path.
 

@@ -1764,6 +1764,16 @@ pin "$LIFECYCLE_MD" 'or a `/merge-bar:review-pr` report with its `## Coverage` t
   "step 8 accepts a reviewing-a-pr report (#963)" flat
 pin "$LIFECYCLE_MD" 'with the reviewed head — that report'"'"'s `Head:` — equal to the PR head' \
   "control: step 8 holds a reviewing-a-pr report to the PR head (#963)" flat
+# #965 round 1: a round 2+ class that closes a prior one does not block; a still-open
+# one keeps its Bar. The one-way hand-off has a return shape and a receiver.
+pin "$PRBRIEFS_MD" 'or it carries `Closes:`, and a `Still open:` class keeps its' \
+  "the work-PR session reads a Closes: class as not blocking (#965)"
+pin "$LIFECYCLE_MD" 'or it carries `Closes:`, and a `Still open:` class keeps its `Bar:`' \
+  "step 8 reads a Closes: class as not blocking (#965)" flat
+pin "$PRBRIEFS_MD" '`handed off: one-way <reviewed head OID>`, only for step 6'"'"'s' \
+  "the work-PR session returns a one-way door as a hand-off (#965)"
+pin "$LIFECYCLE_MD" 'under either word, `standing` included' \
+  "step 12 runs one-way-door.md for a one-way door even under standing (#965)"
 pin "$LIFECYCLE_MD" 'dispatch a work-PR session' \
   "1b dispatches a work-PR session per returned PR"
 pin "$SKILL_MD" 'the spine'"'"'s seats in `.crew/roles.md`' \

@@ -54,7 +54,9 @@ Every command's syntax comes from the layer's guide.
    dispatch continues and rebinds that file; a first dispatch names a fresh one), and
    the child templates it will construct, verbatim as `briefs.md`'s
    dispatch matrix lists them for a work-PR session: steps 8-12 are that session's loop,
-   and you relay the merge word to it rather than merging yourself. Once every returned
+   and you relay the merge word to it rather than merging yourself — except that a
+   `handed off: one-way <OID>` return makes you the merge holder, merging it by step 12's
+   one-way rule pinned to that OID, with no word relayed back. Once every returned
    PR has merged, dispatch the record pass — a second close, marked `coordinator` before
    its command (the layer's `Seat marking`) — and only then tear down:
    **step 12's worker release and branch deletion wait for that pass** — the work-PR
@@ -165,7 +167,8 @@ Every command's syntax comes from the layer's guide.
    after its report file validates — findings lines present in the stated schema, or
    `Findings: none` on a clean review, or a `/merge-bar:review-pr` report with its
    `## Coverage` table and a `Bar:` line on every `### C<n>` class (no class is a clean
-   review; a class blocks unless its `Bar:` is `non-blocking`), with the reviewed head —
+   review; a class blocks unless its `Bar:` is `non-blocking` or it carries `Closes:`, and a
+   `Still open:` class keeps its `Bar:`), with the reviewed head —
    that report's `Head:` — equal to the PR head; on
    a malformed report, send one bounded correction request
    before release.
@@ -216,6 +219,10 @@ Every command's syntax comes from the layer's guide.
     as the blocker, and a new actionable finding returns to step 10.
     The run's `run.merge_word` decides where the merge word comes from. With `standing`, the operator's
     standing word is it: a clean gate set on that SHA is the agreed condition, so merge with no ask (#837).
+    A one-way door — a `handed off: one-way <OID>` return, or where merge-bar's `working-a-pr` runs a
+    body with `Door: one-way` or no `Door:` line — follows merge-bar's
+    `skills/working-a-pr/references/one-way-door.md` under either word, `standing` included: its
+    reads and its clean install are a verifier dispatch, and the merge below is pinned to that OID.
     With `operator`, the ask says that this run's brief or the operator set an operator merge gate:
     ask for the merge word naming that SHA. Under either word, a dispatch whose
     merge executor is the operator (`MERGE_EXECUTOR=operator`) still goes to the operator: tell them the word and the
