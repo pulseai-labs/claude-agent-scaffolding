@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
 reviews:
-  profile: chill
+  profile: assertive
   path_instructions:
     - path: "**"
       instructions: |
@@ -10,3 +10,44 @@ reviews:
         Everything else is a non-blocking suggestion. An input or state the change does not
         handle is not a finding by itself unless it meets that rule; a documented refusal of
         an unsupported input is correct behaviour.
+  pre_merge_checks:
+    docstrings:
+      mode: "off"
+    custom_checks:
+      - name: Merge bar in the body
+        mode: warning
+        instructions: |
+          The PR body has all seven sections: `## Claim`, `## Scope`, `## Known limits`,
+          `## Merge danger` (with a `Door:` line), `## Merge bar`, `## Evidence` and
+          `## Closes`. Fail and name each missing section. Pass when all seven are present.
+      - name: Plugin version carried everywhere
+        mode: warning
+        instructions: |
+          A plugin is a top-level directory with a `.claude-plugin/plugin.json` or an
+          `.omp-plugin/` manifest. When the diff changes a shipped file of a plugin (anything
+          under its `skills/`, `commands/`, `agents/`, `hooks/`, `bin/`, `lib/` or its
+          manifests), check: its `version` changes in `.claude-plugin/plugin.json`; its
+          `.codex-plugin/plugin.json`, if present, has the same version; its `CHANGELOG.md`
+          has a heading for that version; and the root `README.md` shows that version in the
+          plugin's table row and in its Layout line. Fail and name each missing one. Pass when
+          no shipped plugin file changed. Changes only under a plugin's `tests/` need no bump.
+      - name: No process records in this repo
+        mode: warning
+        instructions: |
+          This public repo holds the product only. Design specs, plans, session handoffs,
+          review records and run evidence belong in the private paired workspace. Fail when the
+          diff adds such a file (for example under `docs/superpowers/`, a `handoff-*.md`, or a
+          report of a run outside a plugin's `tests/`). `docs/conventions/` is product and is
+          allowed. Pass otherwise.
+      - name: Code on a user's path names its question
+        mode: warning
+        instructions: |
+          `docs/conventions/skill-first.md` allows shipped code only under its question 2
+          (mechanical work on closed input) or question 3 (a check on open input that can only
+          add a stop). When the diff adds code that ships in a plugin and runs for a user
+          (`bin/`, `lib/`, `hooks/`, or a script a skill runs), the PR body must name the
+          question that allows it. Fail when it names none. Test, build, CI and release
+          tooling is out of scope. Pass when no such code is added.
+knowledge_base:
+  learnings:
+    scope: local
