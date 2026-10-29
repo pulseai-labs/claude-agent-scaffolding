@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  nonce, own, render, threadTitle, validate, RUN_ID_RE, type Scope,
+  nonce, own, recipeRoles, render, threadTitle, validate, RUN_ID_RE, type Scope,
 } from "../src/recipe.ts";
 
 const FIX = join(import.meta.dir, "fixtures", "recipes");
@@ -482,5 +482,47 @@ describe("render", () => {
     expect(() => render("{driver.launch}", scope)).toThrow("no driver in scope");
     expect(() => render("{driver.reason}", scope)).toThrow("no driver in scope");
     expect(() => render("{driver.stage}", scope)).toThrow("no driver in scope");
+  });
+});
+
+describe("stage role", () => {
+  const roled = (role: string) => {
+    const r = relay();
+    delete r.stages.planner.instance;
+    delete r.stages.planner.model;
+    r.stages.planner.role = role;
+    return r;
+  };
+  test("role-replaces-instance-and-model", () => {
+    expect(validate(roled("implementer")).ok).toBe(true);
+  });
+  test("role-name-shape", () => {
+    expectError(roled("bad_role"), "role must match ^[A-Za-z][A-Za-z0-9 -]*$");
+  });
+  test("role names with a space and capitals validate", () => {
+    expect(validate(roled("work-PR session")).ok).toBe(true);
+    expect(validate(roled("spine session")).ok).toBe(true);
+  });
+  test("no-role-still-needs-instance", () => {
+    const r = relay();
+    delete r.stages.planner.instance;
+    expectError(r, "stages.planner.instance: must be a string");
+  });
+  test("role on triage and driver", () => {
+    const r = relay();
+    r.triage = { kind: "triage", role: "triage", project: "/p", cwd: "/p", title: "t", message: "m", env: {}, note_file: "{run.dir}/n" };
+    expect(errorsOf({ ...r, triage: { ...r.triage, role: "x!" } }).some((e) => e.includes("triage.role"))).toBe(true);
+    const res = validate(r);
+    expect(res.ok).toBe(true);
+  });
+  test("recipe-roles-map", () => {
+    const r = relay();
+    r.stages.implement = { ...r.stages.planner, role: "implementer" };
+    r.stages.correct = { ...r.stages.planner, role: "implementer" };
+    for (const n of ["implement", "correct"]) { delete r.stages[n].instance; delete r.stages[n].model; }
+    const res = validate(r);
+    if (!res.ok) throw new Error(res.errors.join("; "));
+    const m = recipeRoles(res.recipe);
+    expect(Object.fromEntries(m)).toEqual({ implementer: ["implement", "correct"] });
   });
 });

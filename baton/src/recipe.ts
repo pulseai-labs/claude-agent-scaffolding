@@ -18,8 +18,10 @@ export type Outcome = { when: Signal[]; to: string; run?: string[][]; notify?: s
 
 export type SessionStage = {
   kind: "session";
-  instance: string;
-  model: string;
+  /** Role naming the agent that launches this stage. When set, `instance` and `model` are optional. */
+  role?: string;
+  instance?: string;
+  model?: string;
   project: string;
   cwd: string;
   title: string;
@@ -221,6 +223,22 @@ const PR_TESTS = ["open", "merged", "closed", "checks_green", "checks_red", "mer
 const COUNTS = ["all", "any", "none"];
 const TERMINALS = ["done", "park"];
 
+/** Role names may hold spaces and capitals. */
+export const ROLE_RE = /^[A-Za-z][A-Za-z0-9 -]*$/;
+
+/** Role to the names of the stages using it (the triage and driver stages are named "triage" and "driver"). */
+export function recipeRoles(r: Recipe): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  const add = (role: string | undefined, name: string) => {
+    if (role === undefined) return;
+    out.set(role, [...(out.get(role) ?? []), name]);
+  };
+  for (const [name, st] of Object.entries(r.stages)) if (st.kind === "session") add(st.role, name);
+  add(r.triage?.role, "triage");
+  add(r.driver?.role, "driver");
+  return out;
+}
+
 export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: false; errors: string[] } {
   const errors: string[] = [];
   const err = (path: string, msg: string) => errors.push(`${path}: ${msg}`);
@@ -322,7 +340,11 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
 
   // The launch fields a session stage, the triage stage and the driver stage share.
   const launchFields = (p: string, st: Obj) => {
+    if (st.role !== undefined && (!isStr(st.role) || !ROLE_RE.test(st.role))) {
+      err(`${p}.role`, `role must match ${ROLE_RE.source}`);
+    }
     for (const f of ["instance", "model", "project", "cwd", "title", "message"]) {
+      if ((f === "instance" || f === "model") && st.role !== undefined && st[f] === undefined) continue;
       if (!isStr(st[f])) err(`${p}.${f}`, "must be a string");
     }
     if (!isObj(st.env)) err(`${p}.env`, "must be an object of string values");

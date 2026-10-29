@@ -986,8 +986,8 @@ class RunTick {
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(triage.env)) env[k] = render(v, scope);
     const title = render(triage.title, scope);
-    const instance = render(triage.instance, scope);
-    const model = render(triage.model, scope);
+    const instance = render(triage.instance ?? "", scope);
+    const model = render(triage.model ?? "", scope);
     const text = render(triage.message, scope);
     const note = render(triage.note_file, this.scope(u));
 
@@ -1079,8 +1079,8 @@ class RunTick {
       nonce: n,
       title: threadTitle(render(stage.title, scope), n),
       project: this.launchedWith(stage, scope, old).project,
-      instance: render(stage.instance, scope),
-      model: render(stage.model, scope),
+      instance: render(stage.instance ?? "", scope),
+      model: render(stage.model ?? "", scope),
       cwd: old.launch_dir,
       message: render(stage.handoff!.message, scope),
     };
@@ -1213,8 +1213,8 @@ class RunTick {
     // Every request field renders before any side effect: a render failure parks with nothing
     // bound and no claim written.
     const title = render(stage.title, scope);
-    const instance = render(stage.instance, scope);
-    const model = render(stage.model, scope);
+    const instance = render(stage.instance ?? "", scope);
+    const model = render(stage.model ?? "", scope);
     const text = render(stage.message, scope);
 
     const holder = this.cwdHolder(cwd);
@@ -1438,7 +1438,7 @@ class RunTick {
       for (const [k, v] of Object.entries(drv.env)) env[k] = render(v, scope);
       f = {
         project: render(drv.project, scope), cwd: render(drv.cwd, scope), env,
-        title: render(drv.title, scope), instance: render(drv.instance, scope), model: render(drv.model, scope),
+        title: render(drv.title, scope), instance: render(drv.instance ?? "", scope), model: render(drv.model ?? "", scope),
         text: render(drv.message, scope), stateFile: render(drv.state_file, scope),
         resultFile: render(drv.result_file, scope), ledger: render(drv.ledger, scope),
       };
