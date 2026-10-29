@@ -47,7 +47,10 @@ read it. The file holds no line of its own at creation, and this file states no 
 
 ## 4. The review section
 
-`## Review` in `08-governance.md`, four lines:
+`## Review` is part of `08-governance.md` as this run authors it at §13, four lines. When
+`08-governance.md` was an occupied destination the operator chose to keep, do not add the section
+and never append to the kept file; name it in the hand-off so the operator can add it by hand.
+The four lines:
 
 - the standards file path;
 - the review ledger path, and `tech-debt.md` for the `[KL]`/`[TD]` lines;

@@ -6,7 +6,7 @@ expected_reason: Nothing is occupied. The canonical has no CLAUDE.md, no style g
 The operator is at `/start` §13 in a dual-repo project, `quillbase`. The AI workspace is
 `/home/dev/projects/quillbase-ai` and the private canonical is `/home/dev/projects/quillbase`.
 The canonical holds a `README.md` and a `.git` and nothing else: no `CLAUDE.md`, no `AGENTS.md`,
-no `docs/` directory. The memory bank's `03-code-patterns.md` was just seeded with an empty
+no `docs/` directory. The memory bank, authored earlier in §13 by this run, seeded `03-code-patterns.md` with an empty
 machine-checkable rules section. No `CODING_STANDARDS.md` or `review-ledger.md` exists. The
 operator has told the ceremony the project has no CI review.
 
