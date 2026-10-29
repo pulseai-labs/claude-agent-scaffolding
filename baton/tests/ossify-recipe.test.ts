@@ -100,18 +100,29 @@ describe("ossify-spine recipe", () => {
     expect(agentNames('"via": "omp-glm-flash", "x": "claude-sonnet-high", "y": "Devin"')).toEqual(["omp-", "claude-", "Devin"]);
   });
 
-  test("every session stage runs molt as a child", () => {
+  test("every session stage but verify runs molt as a child", () => {
     for (const [name, s] of sessions(loadRecipe())) {
       const where = `stage ${name}`;
+      expect([where, s.stop_file]).toEqual([where, `${OUT}/stop`]);
+      expect([where, s.env.SPINE_STOP_FILE]).toEqual([where, `${OUT}/stop`]);
+      expect([where, s.before?.[0]]).toEqual([where, ["mkdir", "-p", OUT]]);
+      if (name === "verify") continue; // its seat writes only OUT and the worktree; no molt, no ledger
       expect([where, s.env.MOLT_HANDOFF]).toEqual([where, "parent"]);
       expect(s.handoff).not.toBeNull();
       expect([where, s.handoff!.file]).toEqual([where, `${OUT}/molt.log`]);
       expect([where, s.env.MOLT_STATUS_PATH]).toEqual([where, s.handoff!.file]);
-      expect([where, s.stop_file]).toEqual([where, `${OUT}/stop`]);
-      expect([where, s.env.SPINE_STOP_FILE]).toEqual([where, `${OUT}/stop`]);
       expect([where, s.env.SPINE_LEDGER]).toEqual([where, "{param.spine_dir}/autopilot-ledger.md"]);
-      expect([where, s.before?.[0]]).toEqual([where, ["mkdir", "-p", OUT]]);
     }
+  });
+
+  test("verify-writes-only-its-out: no ledger, no molt, the stop file inside its write allowance", () => {
+    const v = loadRecipe().stages.verify as SessionStage;
+    expect(Object.keys(v.env).sort()).toEqual(["OSSIFY_VERIFY_WORKTREE", "SEAT_MODS_ALLOW", "SEAT_MODS_ROLE", "SPINE_STOP_FILE"]);
+    expect(v.handoff ?? null).toBeNull();
+    expect(v.env.SPINE_STOP_FILE.startsWith(`${v.env.SEAT_MODS_ALLOW}/`)).toBe(true);
+    expect(v.message).not.toContain("Ledger:");
+    // control: another session stage still carries the ledger
+    expect((loadRecipe().stages.implement as SessionStage).env.SPINE_LEDGER).toBe("{param.spine_dir}/autopilot-ledger.md");
   });
 
   const ROLES = {
@@ -388,6 +399,7 @@ describe("ossify-spine briefs", () => {
       '"rule"', '"lenses"', '"mutation"', "red | stayed-green | undetermined",
       "then restore it from that saved copy — never from git", "after every mutation is restored",
       "temp name in the same directory, then `mv`",
+      "never append to `$SPINE_LEDGER`", "decide nothing on the run's behalf", "a finding in the verdict",
     ]) {
       expect([pin, v.includes(pin)]).toEqual([pin, true]);
     }

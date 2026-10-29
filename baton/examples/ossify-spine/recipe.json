@@ -178,20 +178,17 @@
       "cwd": "{unit.vars.worktree_path}",
       "launch_dir": "worktree",
       "title": "verify {unit.id}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/verify.md, and follow them. Your agent name: {agent.name}. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Report: {param.spine_dir}/work-{unit.id}/report.md. Worktree: {unit.vars.worktree_path}. Base SHA: {unit.vars.base_sha}. Verdict file: {run.dir}/out/{unit.id}/verdict.json. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/verify.md, and follow them. Your agent name: {agent.name}. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Report: {param.spine_dir}/work-{unit.id}/report.md. Worktree: {unit.vars.worktree_path}. Base SHA: {unit.vars.base_sha}. Verdict file: {run.dir}/out/{unit.id}/verdict.json. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop.",
       "env": {
         "SEAT_MODS_ROLE": "verifier",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
         "OSSIFY_VERIFY_WORKTREE": "{unit.vars.worktree_path}",
-        "MOLT_HANDOFF": "parent",
-        "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
-        "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
         "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
       },
       "slots": ["session", "build"],
       "before": [["mkdir", "-p", "{run.dir}/out/{unit.id}"], ["rm", "-f", "{run.dir}/out/{unit.id}/verdict.json"]],
       "stop_file": "{run.dir}/out/{unit.id}/stop",
-      "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
+      "handoff": null,
       "outcomes": [
         { "when": [{ "file": "{run.dir}/out/{unit.id}/verdict.json" }], "to": "close" }
       ]
