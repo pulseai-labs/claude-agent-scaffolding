@@ -54,12 +54,3 @@ knowledge_base:
   code_guidelines:
     filePatterns:
       - "pulseai-labs/claude-agent-scaffolding-internal:CODING_STANDARDS.md"
-  linked_repositories:
-    - repository: "pulseai-labs/claude-agent-scaffolding-internal"
-      instructions: |
-        The private workspace paired with this repo. For a PR that names a spec, plan or
-        issue, read that spec or plan under docs/superpowers/specs/ or docs/superpowers/plans/,
-        and read CODING_STANDARDS.md at its root. Use them to judge whether the diff does what
-        the spec says. That repo is private and this one is public: never quote, paste or
-        summarise its content in a comment here. Name the file path and state the rule in your
-        own words only.
