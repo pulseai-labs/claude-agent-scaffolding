@@ -1,7 +1,9 @@
+Followed by /ossify:start and /ossify:adopt, and on its own for a project that ossify already runs (§6).
+
 # Reviewer home — the standards stub, the review ledger and the Review section
 
 Depth for SKILL.md §13. `/start` gives the project a place for its reviewer to read from and
-write to. This file can also be followed on its own for an existing ossify project (§6).
+write to.
 
 ---
 
@@ -58,3 +60,38 @@ The four lines:
   name, or the operator's choice per PR when neither does. Name no model;
 - CodeRabbit or any CI review, when the project has one, as an extra that gates nothing. Omit this
   line when the project has none.
+
+## 5. Adopt's history pass
+
+After §1–§4 are written, adopt reads the project's review history and proposes the first entries.
+Sources:
+
+- review comments and review bodies on the last 30 merged PRs (`gh`), or all of them if fewer;
+- any review ledger already in the AI workspace;
+- `[KL]` and `[TD]` lines in `tech-debt.md`;
+- review sections of the canonical's `CLAUDE.md`. These become pointers in the stub's
+  `## Read these where they live`, never entries.
+
+A finding becomes a proposal only when it recurs in two or more PRs. Each proposal states the class,
+the rule, the **Why** and the source PRs. The operator accepts, edits or rejects each one.
+Only accepted entries are written. They go under `## Entries` in `CODING_STANDARDS.md`.
+
+When `CODING_STANDARDS.md` already exists, write nothing to it. List the proposals in `ADOPTION.md`
+for the operator to place.
+
+Adopt never overwrites: on an adopted project `08-governance.md` is occupied, so append its
+`## Review` section (§4) only when the file has none, with adopt's provenance trailer
+(`adopt/SKILL.md` C5). Otherwise leave the file and name it in the hand-off.
+
+`ADOPTION.md` gets one line: `Reviewer home: <n> proposed, <m> accepted, window <first PR>–<last PR>`,
+or `Reviewer home: no review history` when there is none. With no history the stub stays plain.
+
+## 6. On an existing project
+
+For a project ossify already started or adopted. Follow §1–§5 as written, with these changes:
+
+- Run no adopt station.
+- `ADOPTION.md` may not exist. Record the result line as a fifth line in the `## Review` section
+  of `08-governance.md`, the section that holds the four lines of §4.
+- When `08-governance.md` has no `## Review` section, add it, as part of seeding the project.
+  Never edit any other part of the file.

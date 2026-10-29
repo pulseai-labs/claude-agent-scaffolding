@@ -240,6 +240,7 @@ no blank destinations — an adopted project is all occupied surface.
 | `EXECUTIVE-SUMMARY.md` | leave; no gate reads it |
 | memory bank | append with harvest's provenance trailer (`close/references/harvest.md`), declaring `source: adoption` with the baseline this pass recorded — `r0 baseline <sha>`, one `<repo>=<sha>` per declared repo when the adoption spans several; **never truncate**. For `09-known-issues.md` / `10-decisions-log.md`, harvest's never-regenerate rule wins — they hold the history adoption preserves (#268; the brief's conditional is still owed) |
 | `tech-debt.md`, `PUBLIC_BOUNDARY.md` | author (absent) |
+| `CODING_STANDARDS.md`, `review-ledger.md`, `08-governance.md` `## Review` | author when absent, per `../start/references/reviewer-home.md` §1–§4; then its `reviewer-home.md` §5 history pass |
 | each declared repo's `docs/adr/` | append only, continuing the series |
 
 ### C6 — Record the demo-ledger seed candidates
@@ -263,7 +264,8 @@ the shipped surface.
 | Bones / risk gates / feature map / posture / Release 0 closed | `project-state.json` | `oss` verbs — into §3's init state |
 | `PUBLIC_BOUNDARY.md` | each public repo root | author |
 | Stub retrospective | `"$(oss release_dir r0)/release-retrospective.md"` | author — records the adoption |
-| **Adoption record** | `<ai-workspace>/ADOPTION.md` | author — baseline table, gates passed, merged-vs-authored, **every C2 gap**, a C2 result line per declared repo (the baseline SHA its clean checkout ran at; the `shipped` steps exercised of the total, and how — the command run, or the walk the operator watched; the gaps found), the C6 seed candidates, and the per-station lines the floor requires: `feature_add`/`bone_add`/`risk_gate_add`/`posture_set` counts; each C3 category `answered` (bone ref) or `not-applicable` **operator-ruled** with its reason; critic `ran\|skip`, a skip being the operator's typed bypass; smoke verified/unverified counts; **a zero names what produced it** — the §8 family walk behind `risk_gate_add: 0`, the empty external-pin inventory behind `smoke 0/0`, the C2 result line behind no C2 gaps |
+| `CODING_STANDARDS.md`, `review-ledger.md`, `08-governance.md` `## Review` | AI workspace | author when absent; `reviewer-home.md` §5 |
+| **Adoption record** | `<ai-workspace>/ADOPTION.md` | author — baseline table, gates passed, merged-vs-authored, **every C2 gap**, a C2 result line per declared repo (the baseline SHA its clean checkout ran at; the `shipped` steps exercised of the total, and how — the command run, or the walk the operator watched; the gaps found), the C6 seed candidates, the `Reviewer home:` result line (`reviewer-home.md` §5), and the per-station lines the floor requires: `feature_add`/`bone_add`/`risk_gate_add`/`posture_set` counts; each C3 category `answered` (bone ref) or `not-applicable` **operator-ruled** with its reason; critic `ran\|skip`, a skip being the operator's typed bypass; smoke verified/unverified counts; **a zero names what produced it** — the §8 family walk behind `risk_gate_add: 0`, the empty external-pin inventory behind `smoke 0/0`, the C2 result line behind no C2 gaps |
 
 The adoption record is the point: the only artifact saying what adoption
 did; `doctor` consults it when spec and state disagree (doctor §1).

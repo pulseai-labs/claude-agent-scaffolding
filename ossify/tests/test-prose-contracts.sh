@@ -2073,6 +2073,9 @@ pin "$_SS" '| Memory bank (15 files) + `AGENTS.md` + `CODING_STANDARDS.md` | AI 
 pin "$_RH" 'Nothing here lands in a declared repo.' "reviewer home never writes a declared repo"
 pin "$_MB" '| `review-ledger.md` |' "memory-bank brief lists the review ledger"
 pin "$_OD5" '`CODING_STANDARDS.md`' "occupied check covers the standards stub"
+pin "$_AS" 'then its `reviewer-home.md` §5 history pass' "adopt routes to the history pass"
+pin "$_RH" 'A finding becomes a proposal only when it recurs in two or more PRs.' "recurrence floor"
+pin "$_RH" 'Only accepted entries are written.' "operator accepts each entry"
 _r=1; grep -Fq "$_MARK" "$_OD5" && grep -Fq 'first line' "$_OD5" && grep -Fq 'counts as unoccupied' "$_OD5" && _r=0
 _pin "$_r" "occupied-destinations has no workspace-init stub exception - /start leaves the marked stub in place, so it never becomes ossify's AGENTS.md (#554)"
 _r=1; grep -Fq 'leftover `CLAUDE.md`' "$_OD5" && grep -Fq 'ossify:doctor' "$_OD5" && _r=0
