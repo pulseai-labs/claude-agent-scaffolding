@@ -46,8 +46,9 @@ the loop ran, the report was updated, the work was staged, so `mode` is
 | `report_path` | **Absolute** (starts with `/`) and **ends in `report.md`**. |
 | `summary` | One line. On all-pass, what the item delivered. On any fail, **name the failing ACs** and point at the report. |
 | `stage_status` | Exactly one of `"all_staged"`, `"partial"`, `"none"` (SKILL.md §8). |
+| `report_text` | **Optional.** The whole report as a JSON string, present only when the harness refused your report write (SKILL.md §7). Your caller writes it to `report_path` verbatim. |
 
-All four keys are required, every time.
+The first four keys are required, every time.
 
 ```
 {"mode": "complete", "report_path": "/abs/path/to/work-r1.s2.w1/report.md", "summary": "AC-1,2,4 pass; AC-3 fail (anchor text mismatch) — see report", "stage_status": "all_staged"}

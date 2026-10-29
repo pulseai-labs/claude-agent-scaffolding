@@ -598,7 +598,19 @@ cannot, because each dispatch is a fresh context that has no idea it is the thir
 The count lives in state (`work_items[].dispatches`, §5), so it survives a
 respawned session — a molt handoff mid-round does not reset an item's cap.
 
-**`complete`** — the execution loop ran to the end. Hand the item to the work-item
+**`complete`** — the execution loop ran to the end. **First, make the report a
+file (#978).** Claude Code refuses a subagent's Write of `report.md`, so the
+implementer returns it as `report_text` (`references/returns.md` §2). When the
+return carries `report_text`, write it with Write to `report_path` verbatim — no
+edit, no note inside it — replacing any file there, and print
+`report: <wi-id> written by the lane from report_text`. Only to the `report.md`
+beside this item's `handoff.md`: any other `report_path` is a halt naming it. A
+return with no `report_text` and no file at `report_path` halts:
+`halt: <wi-id> returned complete with no report at <report_path> and no report_text`.
+That is not a Layer 2 failure, and not a re-dispatch: the work is staged, so Gate
+3 would refuse one.
+
+Then hand the item to the work-item
 close layer (`close`), which runs the gate, commits in the worktree, and merges
 `work/<wi-id>-<slug>` into the spine branch you are parked on.
 
@@ -744,6 +756,7 @@ and cut-missing blocks. The round mapping (§2b step 2) and the per-route repair
 - **Appending clarifications anywhere but the handoff** (§6).
 - **Counting iterations in the worker**, or expecting it to (§6).
 - **Pre-placing `report.md`** (§4).
+- **Closing a `complete` return before its `report_text` is a file** (§6).
 - **Starting round *K+1* with an `active` item behind you** (§7).
 - **Adding a work item or an AC at the barrier** for a request that arrived
   mid-spine (§7).

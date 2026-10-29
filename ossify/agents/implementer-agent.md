@@ -114,6 +114,10 @@ or `nice-to-have` — never `high`, `low`, or `critical`. `gaps` must be non-emp
 required key, a non-enum value, or prose without the JSON envelope is each a
 contract violation on its own.
 
+**As a Claude Code subagent, do not Write `report.md`:** the harness refuses a
+subagent's Write of any `report*.md`. Return the ten sections as the string value
+of an added `"report_text"` key in the `complete` JSON; the lane writes the file.
+
 ## Invocation flow
 
 1. Read this file (you are here).

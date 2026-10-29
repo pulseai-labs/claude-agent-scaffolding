@@ -226,7 +226,8 @@ The §4 record is what a **finished** item returns. Four checks, all terminal:
 
 1. **Field parity.** Every field in §4 and no other, `implementer_return` carrying
    exactly the complete return's four keys (`references/returns.md` §2):
-   `mode`, `report_path`, `summary`, `stage_status`.
+   `mode`, `report_path`, `summary`, `stage_status` — never `report_text`: the
+   report is a file before the result returns, because `report_oid` hashes it.
 2. **`coordinator_verdict` is `accepted`** — not a softer accept that reads like one.
 3. **`mode` is `complete`.** An item that surfaced gaps did not finish and comes
    back as §5b's record; any other `mode` here is malformed.

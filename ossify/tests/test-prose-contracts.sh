@@ -2304,4 +2304,36 @@ pin "$_RO" '`--detach`, where it gets no request and the caller closes it (§2b)
 _ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$_CMD")"
 t_assert_eq '"<id> [--pr]"' "$_ah" "close.md argument-hint declares the optional flag"
 
+# #978: Claude Code refuses a subagent's Write of a `report*.md` file, so the
+# dispatched implementer returns its report as `report_text` and the lane writes
+# it to report_path before close. One optional key; report.md keeps its name.
+_978_RO="$WI/references/round-orchestration.md"
+pin "$WI/SKILL.md" 'retry it by another tool or name: return the report in `report_text` (§9)' \
+  "#978 SKILL.md §7: a refused report write goes to report_text, never another tool"
+pin "$WI/SKILL.md" 'Add `"report_text": "<the whole report>"` to `complete`' \
+  "#978 SKILL.md §9: report_text is the one optional complete key"
+pin "$WI/references/returns.md" '| `report_text` | **Optional.** The whole report as a JSON string, present only when the harness refused your report write' \
+  "#978 returns.md §2: report_text row is optional and conditional"
+pin "$HERE/../agents/implementer-agent.md" '**As a Claude Code subagent, do not Write `report.md`:**' \
+  "#978 implementer-agent.md: the Claude Code subagent returns report_text instead of writing"
+pin "$_978_RO" 'return carries `report_text`, write it with Write to `report_path` verbatim' \
+  "#978 RO §6: the lane writes report_text verbatim to report_path"
+pin "$_978_RO" 'any other `report_path` is a halt naming it' \
+  "#978 RO §6: report_text is written only beside the item's handoff"
+pin "$_978_RO" '`halt: <wi-id> returned complete with no report at <report_path> and no report_text`' \
+  "#978 RO §6: no file and no report_text is a named halt"
+_r=1; _w="$(grep -nF 'write it with Write to `report_path` verbatim' "$_978_RO" | cut -d: -f1)"; _h="$(grep -nF 'Then hand the item to the work-item' "$_978_RO" | cut -d: -f1)"
+[ -n "$_w" ] && [ -n "$_h" ] && [ "$_w" -lt "$_h" ] && _r=0
+_pin "$_r" "#978 RO §6: the report is not written before the item goes to close"
+pin "$WI/references/external-executor.md" '`mode`, `report_path`, `summary`, `stage_status` — never `report_text`' \
+  "#978 EXT §5a: an external result carries no report_text"
+pin "$HERE/../skills/close/references/work-item-close.md" "The report's *content* reaches close only as a file" \
+  "#978 close Route A: the report reaches close as a file"
+# Adjacent control for the loosening: the complete TEMPLATE stays four keys, so
+# handoffs and the external record's parity are unchanged.
+_r=1; _t="$(_shape "$WI/references/returns.md" complete)"; [ -n "$_t" ] && case "$_t" in *report_text*) ;; *) _r=0;; esac
+_pin "$_r" "#978 returns.md: the complete template gained report_text (it must stay four keys)"
+_r=1; ! grep -Fq 'deliberately not in the return payload' "$HERE/../skills/close/references/work-item-close.md" && _r=0
+_pin "$_r" "#978 close Route A: still says the report content is never in the return payload"
+
 t_summary
