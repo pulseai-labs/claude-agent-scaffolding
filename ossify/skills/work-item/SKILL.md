@@ -279,7 +279,10 @@ carry it into the report and the return `summary`.
 ## 7. Report
 
 Author `report.md` next to `spec.md` and `handoff.md` in the work item's
-directory, using Write against the absolute path.
+directory, using Write against the absolute path. **Where the harness refuses
+that write** (Claude Code refuses a subagent's Write of `report*.md`), do not
+retry it by another tool or name: return the report in `report_text` (§9), and
+your caller writes it to `report_path`.
 
 **Read `references/report-contract.md` before you write it.** That file holds the
 pinned ten-section set, verbatim, and it is the *only* copy — the section headings
@@ -335,7 +338,8 @@ envelope is each a contract violation on its own. `mode` is literally `"complete
 or `"gaps-surfaced"` — never `failed`, `blocked`, `complete-with-fail`, or
 `clarification-needed`. `severity` is exactly `blocking` or `nice-to-have` — never
 `high`, `low`, or `critical`. `gaps` must be non-empty. `report_path` is absolute
-and ends in `report.md`.
+and ends in `report.md`. Add `"report_text": "<the whole report>"` to `complete`
+only when §7's write was refused.
 
 Complete-mode fires **even when verification failed** — the execution loop
 completed, which is what `mode` reports; AC outcomes live in the report and are

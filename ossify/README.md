@@ -1,4 +1,4 @@
-# ossify (v1.28.0)
+# ossify (v1.29.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -186,6 +186,14 @@ all three conditions halts as a fifth tag, `[mutation]`. Where no agent can be d
 (Codex, OMP, a subagent context) the close runs the same checks itself and prints
 `verifier: inline`; inside an `--external-executor` lane Layers 3 and 4 stay in the closing
 session and the caller's verifier owns mutation. No `lib/` code, no state change.
+
+Since 1.29.0 (#978), the default lane works on a Claude Code that refuses a subagent's
+Write of a `report*.md` file. The implementer's `complete` return gains one optional key,
+`report_text`: as a Claude Code subagent it returns the report there instead of writing
+`report.md`, and the lane writes that text verbatim to `report_path` before close runs.
+A `complete` return with no report file and no `report_text` is a named halt, not a
+Layer 2 failure. `report.md` keeps its name, and an `--external-executor` result still
+carries the four keys. No `lib/` code, no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and

@@ -73,8 +73,10 @@ after it.
 
 ### Route A — in the round flow
 
-The report's *content* is deliberately not in the return payload, but
-`report_path` **is**, and it is guaranteed absolute and ending in `report.md`
+The report's *content* reaches close only as a file — a `report_text` in the
+return was written to `report_path` by the lane first
+(`work-item/references/round-orchestration.md` §6) — and
+`report_path` **is** in the return, guaranteed absolute and ending in `report.md`
 (`work-item/references/returns.md` §2). `spec.md` is its sibling: `work-item/SKILL.md`
 §7 authors the report next to `spec.md` and `handoff.md` in the work item's
 directory.
