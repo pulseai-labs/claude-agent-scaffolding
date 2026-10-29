@@ -107,7 +107,8 @@ fi
 if [ ! -f "$omp_seat_bin" ] || [ ! -x "$omp_seat_bin" ]; then
   refuse noexec
 fi
-text="$(cat -- "$msgfile" 2>/dev/null; printf x)"
+# A file removed after the checks (a disarm's cleanup, #930) is a refusal, never an empty prompt.
+text="$(cat -- "$msgfile" 2>/dev/null && printf x)" || refuse nomsg
 text="${text%x}"
 rm -f -- "$msgfile"
 

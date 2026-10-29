@@ -288,8 +288,8 @@ thread id, when the unit had a session); on `second prompt` and `triage gave no 
 `questions` (the pending request's questions, JSON-stringified; left off when there are none); and
 on `before failed`, `after_launch failed` and `run failed`, `hook` (the failed hook's 1-based place
 in its list) and `argv` (its rendered argv). Those three parks' notices end with
-` — hook <n>: <argv joined by spaces>`, cut to 120 characters, after the PR a merge-stage park
-names; an escalated driver notice carries the same suffixes. The driver adds the events
+` — hook <n> (<program>)`, the argv's first word without its directory, after the PR a merge-stage
+park names: a notice leaves the host, so the rendered arguments stay in the event; an escalated driver notice carries the same suffixes. The driver adds the events
 `driver`, `driver resume`, `driver escalate`, `driver stop` and `driver dropped`.
 
 ```json

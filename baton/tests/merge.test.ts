@@ -297,7 +297,7 @@ test("a failing run_after parks and does not report merged", async () => {
   const park = readFileSync(join(state, "runs", "r1", "events.jsonl"), "utf8").trim().split("\n")
     .map((l) => JSON.parse(l)).filter((e) => e.kind === "park").at(-1);
   expect([park.hook, park.argv]).toEqual([2, ["false"]]);
-  expect(readFileSync(join(state, "notify.log"), "utf8").trim().endsWith("parked in merge: run failed — hook 2: false")).toBe(true);
+  expect(readFileSync(join(state, "notify.log"), "utf8").trim().endsWith("parked in merge: run failed — hook 2 (false)")).toBe(true);
 });
 
 test("wrong base parks", async () => {

@@ -12,7 +12,7 @@ import { createHash } from "node:crypto";
 import {
   appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync,
 } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, basename } from "node:path";
 import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claims.ts";
 import { ledgerLine, readDriverResult, renderDriverState } from "./driver.ts";
 import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
@@ -77,8 +77,6 @@ const WALK_LIMIT = 5000;
 /** A blocked park's notice carries the last lines of the screen, cut to this many characters. */
 const SCREEN_LINES = 12;
 const SCREEN_CHARS = 1500;
-/** A failed hook's argv in a park notice is cut to this many characters; the event keeps it whole. */
-const HOOK_CHARS = 120;
 
 const emptyReport = (): TickReport => ({ launched: [], transitioned: [], parked: [], merged: [], errors: [] });
 const isHostError = (e: unknown) => e instanceof HostAuthError || e instanceof HostDownError;
@@ -160,11 +158,13 @@ function prSuffix(pr: ParkPr | undefined): string {
     : ` — ${pr.why === "conflict" ? "conflict" : `red${pr.failing ? `: ${pr.failing.join(", ")}` : ""}`} — ${pr.url}`;
 }
 
-/** A failed hook's notice suffix: its index and argv, the argv cut to HOOK_CHARS (#906). */
+/**
+ * A failed hook's notice suffix: its index and program name (#906). The notice leaves the host, so
+ * it never carries the rendered arguments, which may hold a param's value; the event keeps them.
+ */
 function hookSuffix(h: HookFailure | undefined): string {
   if (h === undefined) return "";
-  const text = h.argv.join(" ");
-  return ` — hook ${h.hook}: ${text.length > HOOK_CHARS ? text.slice(0, HOOK_CHARS - 1) + "…" : text}`;
+  return ` — hook ${h.hook} (${basename(h.argv[0] ?? "")})`;
 }
 
 function removeFile(path: string): void {

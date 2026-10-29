@@ -256,7 +256,7 @@ test("an escalated before failed park keeps the failing hook at the end of its n
   await driverEnds();
   const n = notices();
   expect(n.length).toBe(1);
-  expect(n[0].endsWith("baton r1/a parked in work: before failed — raise the cap — hook 2: false")).toBe(true);
+  expect(n[0].endsWith("baton r1/a parked in work: before failed — raise the cap — hook 2 (false)")).toBe(true);
 });
 
 test("escalate sends one action", async () => {

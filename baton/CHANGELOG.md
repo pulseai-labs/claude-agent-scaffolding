@@ -13,7 +13,8 @@ The follow-ups triaged on 2026-10-29: #920, #906, #930, #908, #969 and three ite
   real error (rc 2) instead of "no such run"; the tick reports it; the file is never rewritten.
 - **Changed: a hook-failure park names its hook (#906).** `before failed`, `after_launch failed` and
   `run failed` (a merge stage's `run_after` too) add `hook` (1-based) and `argv` to the park event
-  and end the notice with ` — hook <n>: <argv>` (cut to 120 characters). The reasons are unchanged,
+  and end the notice with ` — hook <n> (<program>)`; the rendered arguments, which may hold a
+  param's value, stay in the event and never leave the host. The reasons are unchanged,
   so the driver guard and `driver.md` still match. A driver's escalate notice keeps the suffix.
 - **Fixed: Orca message files of refused launches are removed (#930).** New optional
   `Host.endRun(runId)`: the Orca host removes the run's files under `<state>/orca/messages/` when the
@@ -24,8 +25,10 @@ The follow-ups triaged on 2026-10-29: #920, #906, #930, #908, #969 and three ite
   the last 12 lines, for the pickers `parsePicker` reads.
 - **Changed: the park event leaves `questions` off when the list is empty (#899).** A test pins that a
   plain `unpark` keeps a unit's triaged request ids.
-- **Changed: the example recipe (#908, #899).** `correct.md` and `spine-work.md` end with a numbered
-  step that writes their done file with the exact command. The spine PR's ack notice names the
+- **Changed: the example recipe (#908, #899).** `correct.md`, `spine-work.md` and `lane.md` end with a numbered
+  step that writes their done file with the exact command.
+- **Fixed: `baton-seat` refuses a message file that vanished after its checks** (`nomsg`), instead of
+  launching the seat with an empty prompt (a disarm's message cleanup could race a launch). The spine PR's ack notice names the
   phone's Merge button.
 - **Changed: `running-a-spine-on-baton` (#969).** The bridge check reads baton's `notify` argv and the
   bridge version; the agent check reads `agents[<repo>]` first; `oss` comes from the project's

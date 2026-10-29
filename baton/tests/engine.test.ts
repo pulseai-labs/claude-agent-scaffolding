@@ -617,7 +617,7 @@ test("a before failed park names the failing hook in its event and at the end of
   expect(e.hook).toBe(2);
   expect(e.argv).toEqual(["sh", "-c", "exit 3", "a"]);
   expect(notifyLines().length).toBe(1);
-  expect(notifyLines()[0].endsWith("baton r1/a parked in work: before failed — hook 2: sh -c exit 3 a")).toBe(true);
+  expect(notifyLines()[0].endsWith("baton r1/a parked in work: before failed — hook 2 (sh)")).toBe(true);
 });
 
 test("a run failed park and an after_launch failed park name their hook too", async () => {
@@ -637,20 +637,19 @@ test("a run failed park and an after_launch failed park name their hook too", as
     ["a", "run failed", 1, ["false"]],
   ]);
   expect(notifyLines().map((l) => l.slice(l.indexOf(" baton ") + 1))).toEqual([
-    "baton r1/b parked in late: after_launch failed — hook 3: sh -c exit 1",
-    "baton r1/a parked in work: run failed — hook 1: false",
+    "baton r1/b parked in late: after_launch failed — hook 3 (sh)",
+    "baton r1/a parked in work: run failed — hook 1 (false)",
   ]);
 });
 
-test("a long hook argv is cut in the notice and kept whole in the event", async () => {
-  const long = "x".repeat(300);
-  await arm(recipe({ work: sess({ before: [["sh", "-c", `exit 1 # ${long}`]] }) }, ["a"]));
+test("a hook's arguments stay in the event and never reach the notice", async () => {
+  const secret = "token-" + "x".repeat(40);
+  await arm(recipe({ work: sess({ before: [["/usr/bin/sh", "-c", `exit 1 # ${secret}`]] }) }, ["a"]));
   host = new FakeHost({ work: { ticks: 1, end: "completed" } });
   await doTick();
-  expect(lastPark().argv).toEqual(["sh", "-c", `exit 1 # ${long}`]);
-  const tail = notifyLines()[0].split(" — hook 1: ")[1];
-  expect(tail.length).toBe(120);
-  expect(tail).toBe(`sh -c exit 1 # ${long}`.slice(0, 119) + "…");
+  expect(lastPark().argv).toEqual(["/usr/bin/sh", "-c", `exit 1 # ${secret}`]);
+  expect(notifyLines()[0].endsWith("before failed — hook 1 (sh)")).toBe(true);
+  expect(notifyLines()[0]).not.toContain(secret);
 });
 
 test("control: a park with no failed hook carries no hook field and no hook suffix", async () => {
