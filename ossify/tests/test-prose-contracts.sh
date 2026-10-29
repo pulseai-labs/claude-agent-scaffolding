@@ -2064,8 +2064,15 @@ _IC="$_OSSR/skills/doctor/references/interop-check.md"
 _DS="$_OSSR/skills/doctor/SKILL.md"
 _AS="$_OSSR/skills/adopt/SKILL.md"
 _MARK='<!-- workspace-init stub: ossify:start replaces this file -->'
-_r=1; grep -Fq '## 3. `AGENTS.md`' "$_MB" && ! grep -Fq '## 3. `CLAUDE.md`' "$_MB" && grep -Fq '| Memory bank (14 files) + `AGENTS.md` | AI workspace |' "$_SS" && _r=0
+_r=1; grep -Fq '## 3. `AGENTS.md`' "$_MB" && ! grep -Fq '## 3. `CLAUDE.md`' "$_MB" && grep -Fq '| Memory bank (15 files) + `AGENTS.md` + `CODING_STANDARDS.md` | AI workspace, per `references/reviewer-home.md` |' "$_SS" && _r=0
 _pin "$_r" "start authors CLAUDE.md - a new workspace gets the file Codex and OMP never read"
+# 1.30.0 (#984) - the reviewer project home: start seeds a standards stub, a review ledger and a
+# governance Review section, all in the AI workspace. Behaviour is judged by start-reviewer-home.
+_RH="$_OSSR/skills/start/references/reviewer-home.md"
+pin "$_SS" '| Memory bank (15 files) + `AGENTS.md` + `CODING_STANDARDS.md` | AI workspace, per `references/reviewer-home.md` |' "start §13 routes the reviewer home"
+pin "$_RH" 'Nothing here lands in a declared repo.' "reviewer home never writes a declared repo"
+pin "$_MB" '| `review-ledger.md` |' "memory-bank brief lists the review ledger"
+pin "$_OD5" '`CODING_STANDARDS.md`' "occupied check covers the standards stub"
 _r=1; grep -Fq "$_MARK" "$_OD5" && grep -Fq 'first line' "$_OD5" && grep -Fq 'counts as unoccupied' "$_OD5" && _r=0
 _pin "$_r" "occupied-destinations has no workspace-init stub exception - /start leaves the marked stub in place, so it never becomes ossify's AGENTS.md (#554)"
 _r=1; grep -Fq 'leftover `CLAUDE.md`' "$_OD5" && grep -Fq 'ossify:doctor' "$_OD5" && _r=0
