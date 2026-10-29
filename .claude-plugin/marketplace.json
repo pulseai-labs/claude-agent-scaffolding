@@ -68,7 +68,7 @@
     },
     {
       "name": "baton",
-      "description": "A recipe-driven engine that launches model sessions in Orca terminals when a unit is due, waits on closed signals at no token cost, and merges pull requests only by the recipe's rule; a worker blocked on a question reaches the operator at once. Ships an example recipe that runs an ossify spine. A CLI, a claim launcher and a systemd timer; no skill.",
+      "description": "A recipe-driven engine that launches model sessions in Orca terminals when a unit is due, waits on closed signals at no token cost, and merges pull requests only by the recipe's rule; a worker blocked on a question reaches the operator at once. Ships an example recipe that runs an ossify spine. A CLI, a claim launcher, a systemd timer and one skill for the orchestrator that arms a run.",
       "category": "workflow",
       "source": "./baton"
     },
