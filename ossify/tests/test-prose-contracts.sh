@@ -2236,7 +2236,7 @@ _CLP="$HERE/../skills/close/SKILL.md"
 _CMD="$HERE/../commands/close.md"
 pin "$_WCP" 'git -C "$repo_root" merge --no-ff "$wi_branch" -m "merge $wi" || { echo "close: merge conflict - halt"; exit 1; }' \
   "control: close section 4's local merge line is unchanged (default /close <id> behaves as before)"
-pin "$_CLP" '`--pr` applies to a work-item close only' "close grammar: --pr on a spine or release id refuses"
+pin "$_CLP" 'Both apply to a work-item close only' "close grammar: --pr on a spine or release id refuses"
 pin "$_CLP" '`/close <wi-id> --pr`' "close grammar: the work-item --pr shape is named"
 pin "$_WCP" '## 4a. PR mode' "work-item-close.md has section 4a"
 pin "$_WCP" 'never a local merge' "4a: a missing remote leg halts, never a local merge (the #339 rule)"
@@ -2302,7 +2302,7 @@ _pin "$_r" "EXT 2b: still says 'runs §2 through §4 unchanged' instead of namin
 # close-finished item yields to section 2b under --detach (no request; the caller closes).
 pin "$_RO" '`--detach`, where it gets no request and the caller closes it (§2b)' "RO 3 N2: close-finished under --detach gets no request, matching EXT 2b"
 _ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$_CMD")"
-t_assert_eq '"<id> [--pr]"' "$_ah" "close.md argument-hint declares the optional flag"
+t_assert_eq '"<id> [--pr] [--verdict <file>]"' "$_ah" "close.md argument-hint declares the optional flag"
 
 # #978: Claude Code refuses a subagent's Write of a `report*.md` file, so the
 # dispatched implementer returns its report as `report_text` and the lane writes
@@ -2423,5 +2423,7 @@ pin "$SKILLS/../commands/close.md" '[--verdict <file>]' \
   "#993 commands/close.md: the argument hint carries --verdict"
 pin "$SKILLS/close/SKILL.md" '`--verdict <file>`' \
   "#993 close SKILL.md §9: the argument grammar names --verdict"
+pin "$_981_WC" 'Not under `--verdict`: there the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched.' \
+  "#993 work-item-close §2: the inline pass is excluded under --verdict"
 
 t_summary

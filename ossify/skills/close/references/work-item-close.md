@@ -221,7 +221,7 @@ tags, the same `verify.md`, the same correction packet), and print
 `verifier: <agent> on <model>` from the file. Without `--verdict` nothing in this
 section changes.
 
-**Where no agent can be dispatched, the close runs the pass itself** — Codex,
+Not under `--verdict`: there the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched. **Where no agent can be dispatched, the close runs the pass itself** — Codex,
 OMP, a subagent context, a refused `Task` grant. Apply §4, §4b and §4c in this
 session, from the diff and never from report §5, and print
 `verifier: inline — <host or why>` in the close summary. Not a halt. **Inside an
