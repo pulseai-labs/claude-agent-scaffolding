@@ -2,6 +2,33 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.8.1
+
+**Text only — five verifier-pilot frictions (#952, #953, #954, #955, #979).**
+
+- **The ping reads one line (#955).** Every `PING:` line reads the run file with
+  `jq -r '"\(.run.orchestrator.pane) \(.run.orchestrator.machine)"'`: pane and machine on one
+  line. The two-value form printed two, and a worker's `read pane machine` took an empty machine
+  and skipped its ping as a mismatch.
+- **A re-check is the verifier brief, refilled (#952).** Lifecycle step 7, the generic verifier
+  template and the item verifier say so: every slot refilled, the tree it now names judged, never
+  the previous check's. The diff claim names one form, `git diff --cached <base sha>`, which covers
+  a committed head and a staged tree, so no top edits it for a staged re-check. A revert that
+  changes no file is `cannot determine`, naming the paths tried; an item that changes only tests
+  drops the mutation claim.
+- **Calibration fixtures have an owner (#953).** A seeded defect the verifier must fail is the
+  top's own worktree mutation (delegation floor, kind 6): a detached worktree at the item head,
+  seeded only by `git checkout <base> -- <path>` on a path the implementer's report names, never a
+  worker's task and never on the PR branch, removed after its re-check.
+- **A named rail (#954).** A machine entry may carry `rail:` — the guard the agent runs under in
+  place of seat-mods and the one command that checks it. It travels as the profile row's tail, and
+  the model read runs that check instead of reading the `seat: <role>` status line: a pass records
+  the rail, a fail records no guards.
+- **The standards claim names what it judged (#979).** Its evidence names `<standards file>` by
+  the path the brief filled and quotes the rule line (or neighbour) and the hunk verbatim. The
+  fixed claims carry tags — `[ac]`, `[diff]`, `[mutation]`, `[standards]` — and both verifier DONE
+  shapes keep them, since an item verifier's ACs come first and move the numbers.
+
 ## 0.8.0
 
 **Text only (#951).** The verifier brief's CLAIMS gain a fourth claim, never deleted: the diff
