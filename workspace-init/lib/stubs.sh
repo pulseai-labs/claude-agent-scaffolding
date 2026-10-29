@@ -12,11 +12,11 @@
 set -u
 
 if ! declare -F wi_log_op >/dev/null 2>&1; then
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 
 if ! declare -F wi_manifest_read >/dev/null 2>&1; then
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/manifest.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/manifest.sh"
 fi
 
 # Internal: derive the init-log path from the AI workspace root.
@@ -70,7 +70,7 @@ wi_stub_agents_md() {
     return 1
   }
 
-  local tmpl="${WI_TEMPLATES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/AGENTS.md.stub.tmpl"
+  local tmpl="${WI_TEMPLATES_DIR:-$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/AGENTS.md.stub.tmpl"
   local out="${ai_root}/AGENTS.md"
 
   if [[ ! -f "$tmpl" ]]; then
@@ -117,7 +117,7 @@ wi_stub_readme() {
     return 1
   }
 
-  local tmpl="${WI_TEMPLATES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/README.md.tmpl"
+  local tmpl="${WI_TEMPLATES_DIR:-$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/README.md.tmpl"
   local out="${ai_root}/README.md"
 
   if [[ ! -f "$tmpl" ]]; then

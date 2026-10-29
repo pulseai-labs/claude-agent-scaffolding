@@ -12,7 +12,7 @@
 set -u
 
 if ! declare -F wi_log_op >/dev/null 2>&1; then
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 
 # Internal: derive the init-log path from the AI workspace root.
@@ -382,7 +382,7 @@ wi_skeleton_seed_subdirs() {
   # belt-and-braces so the plugin still works if someone deletes the template).
   local gi="${ai_root}/.gitignore"
   if [[ ! -f "$gi" ]]; then
-    local tmpl="${WI_TEMPLATES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/gitignore.tmpl"
+    local tmpl="${WI_TEMPLATES_DIR:-$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/gitignore.tmpl"
     if [[ -f "$tmpl" ]]; then
       if ! cp "$tmpl" "$gi"; then
         wi_log_error "wi_skeleton_seed_subdirs: cp failed: $tmpl -> $gi"

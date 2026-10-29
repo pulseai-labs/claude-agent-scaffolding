@@ -11,8 +11,8 @@
 #   abs:<path>     a fixed absolute path (a pair that is neither; host-bound)
 # self and sibling are resolved from the repo this hook runs in, so the hook
 # keeps working when both repos sit side by side under another parent on
-# another host. They are baked only when the install target's .git is a
-# directory, which is what lets the parent of the common git dir name it.
+# another host. They are baked only when the install target's physical common
+# git dir is <target>/.git, which is what lets its parent name the worktree.
 AI_WORKSPACE_REF=__AI_WORKSPACE_REF__
 
 commit_msg_file="$1"
@@ -48,9 +48,11 @@ else
     self|sibling:*)
       # The main worktree is the parent of the common git dir, from a linked
       # worktree as well; a common dir not named .git has no such parent.
+      # CDPATH is cleared: git can print a relative .git, which an exported
+      # CDPATH would otherwise send to another directory (and cd would echo).
       repo_root=""
       if common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" \
-          && common_dir="$(cd "$common_dir" 2>/dev/null && pwd -P)" \
+          && common_dir="$(CDPATH= cd -- "$common_dir" 2>/dev/null && pwd -P)" \
           && [[ "${common_dir##*/}" == ".git" ]]; then
         repo_root="${common_dir%/.git}"
       fi

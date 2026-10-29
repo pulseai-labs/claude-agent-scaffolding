@@ -112,7 +112,7 @@ A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` (and t
 
 - `self` — the hook is the AI workspace's own.
 - `sibling:<dir>` — the AI workspace is `<dir>` beside the canonical. `/init-workspace` always creates a side-by-side pair, and `/pair-workspace` does when the AI workspace goes in the canonical's parent (its default). The pair keeps its filter when both repos move together — to another parent, or another host.
-- `abs:<path>` — a pair that is not side by side (a `/pair-workspace` parent you chose elsewhere, or two existing repos paired by `/pair-existing-dual`), or a repo whose `.git` is a file (`--separate-git-dir`). This form is host-bound: on a host where `<path>` does not exist, the hook blocks.
+- `abs:<path>` — a pair that is not side by side (a `/pair-workspace` parent you chose elsewhere, or two existing repos paired by `/pair-existing-dual`), or a repo whose git directory is not physically `<repo>/.git` (a `.git` file from `--separate-git-dir`, or a `.git` symlink). This form is host-bound: on a host where `<path>` does not exist, the hook blocks.
 
 `self` and `sibling` resolve from the repository's main worktree, so commits from a linked worktree (`git worktree add`) use the same manifest. On every commit to the canonical:
 
@@ -151,7 +151,7 @@ Re-baking updates the hooks only. The roots recorded inside `pairing.json` — w
 
 It rewrites `ai_workspace.root` and `ai_workspace.name` to the workspace's current location — and, only with `--canonical-root`, `canonical.root` and `canonical.name` for a canonical that moved too. Every other field (`project_type`, the remotes, `default_branch`, any customised `git_policy`) is kept. It refuses without changing anything if the manifest is missing or corrupt; repair that first (below).
 
-**`cannot locate this repository's main worktree`.** The hook carries `self` or `sibling:<dir>`, but the repo's `.git` is now a file (`git init --separate-git-dir`, or a move into a submodule), so its main worktree cannot be found from its git directory. Re-run the install above; it records the `abs:` form for such a repo. **`unrecognised AI workspace reference`.** The hook was hand-edited; re-run the install above.
+**`cannot locate this repository's main worktree`.** The hook carries `self` or `sibling:<dir>`, but the repo's git directory is no longer `<repo>/.git` — `.git` became a file (`git init --separate-git-dir`, a move into a submodule) or a symlink to a directory with another name — so its main worktree cannot be found from its git directory. Re-run the install above; it checks the git directory the same way the hook does and records the `abs:` form for such a repo. **`unrecognised AI workspace reference`.** The hook was hand-edited; re-run the install above.
 
 **`manifest not found`, `not a single JSON object`, `enforce missing or not a boolean`, or `cannot read … blocked_patterns`.** The manifest at `<ai-workspace>/.workspace/pairing.json` is missing or corrupt. Repair it without losing canonical metadata — `project_type`, `canonical.git_remote`, `canonical.default_branch`, and any customised `git_policy` are the fields to keep. If the file still parses, read them first:
 

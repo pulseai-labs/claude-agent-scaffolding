@@ -13,11 +13,11 @@ set -u
 
 if ! declare -F wi_log_op >/dev/null 2>&1; then
   # shellcheck disable=SC1091
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 if ! declare -F wi_git_is_linked_worktree >/dev/null 2>&1; then
   # shellcheck disable=SC1091
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skeleton.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skeleton.sh"
 fi
 
 # Locate the hooks/commit-msg.tmpl. WI_HOOKS_DIR (set by tests/_helpers.sh) is
@@ -29,7 +29,7 @@ _wi_trace_filter_template() {
   if [[ -n "${WI_HOOKS_DIR:-}" ]]; then
     echo "${WI_HOOKS_DIR}/commit-msg.tmpl"
   else
-    echo "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/commit-msg.tmpl"
+    echo "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/commit-msg.tmpl"
   fi
 }
 
@@ -81,16 +81,30 @@ _wi_trace_filter_check_ai_root() {
 #   self           target IS the AI workspace
 #   sibling:<dir>  target and AI workspace share a parent directory
 #   abs:<path>     anything else, or no target given (host-bound fallback)
-# self and sibling need the target's own .git directory: the hook finds its
-# main worktree as the parent of the common git dir, which a .git FILE
-# (separate git dir, submodule) does not give. Both roots are compared as
-# physical paths, so a symlinked spelling of either still matches.
+# self and sibling are baked only when the hook's own resolution will hold:
+# the hook takes its main worktree as the parent of the PHYSICAL common git
+# dir, and only when that dir is named .git. _wi_trace_filter_main_root
+# mirrors that, and also requires the parent to be the target itself, so a
+# .git FILE (separate git dir, submodule), a .git SYMLINK to a dir with
+# another name, or a .git dir that is not the target's own all get abs:
+# (#983 review C1, C5). Both roots are compared as physical paths.
+_wi_trace_filter_main_root() {
+  local target_phys="$1" common
+  common="$(git -C "$target_phys" rev-parse --git-common-dir 2>/dev/null)" || return 1
+  [[ "$common" == /* ]] || common="${target_phys}/${common}"
+  common="$(CDPATH= cd -- "$common" 2>/dev/null && pwd -P)" || return 1
+  [[ "$common" == "${target_phys}/.git" ]]
+}
+
 _wi_trace_filter_ref() {
   local ai_root="$1" target_repo="${2:-}"
-  if [[ -n "$target_repo" && -d "$target_repo/.git" && -d "$ai_root" ]]; then
-    local ai_phys target_phys
+  local ai_phys="" target_phys=""
+  if [[ -n "$target_repo" && -d "$target_repo" && -d "$ai_root" ]]; then
     ai_phys="$(wi_realpath "$ai_root")"
     target_phys="$(wi_realpath "$target_repo")"
+  fi
+  if [[ -n "$ai_phys" && -n "$target_phys" ]] \
+      && _wi_trace_filter_main_root "$target_phys"; then
     if [[ -n "$ai_phys" && "$ai_phys" == "$target_phys" ]]; then
       printf 'self\n'; return 0
     fi

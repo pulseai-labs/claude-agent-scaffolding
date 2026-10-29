@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # tests/test-hook-portable.sh — #983: the commit-msg hook finds the manifest
 # from the repo it runs in, not from an absolute path baked on one host.
-# Covers (8 tests):
+# Covers (11 tests):
 #   X1. a pair moved to another parent (old absolute path gone): both hooks
 #       find the manifest, a trailer is blocked by the pattern, a clean commit
 #       passes — from each repo and from a linked worktree of the canonical
@@ -16,6 +16,15 @@
 #   X7. a canonical whose .git turned into a file after install: fail closed;
 #       re-installing there bakes abs:<path> and filters again
 #   X8. an unrecognised reference: fail closed
+#   X9. a canonical whose .git is a symlink: the installer bakes abs:, as the
+#       hook could not resolve sibling there; a hook already baked sibling
+#       before the symlink fails closed, and re-installing clears it
+#       (#983 review C1 — the README remedy must not loop)
+#   X10. an exported CDPATH holding a .git: install and commit both ignore
+#       it (#983 review C2)
+#   X11. a .git symlink to a directory that IS named .git but belongs to
+#       another parent: abs:, since the hook would resolve against that
+#       parent (#983 review C5)
 
 source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
@@ -179,6 +188,51 @@ test_X8_unrecognised_reference_fails_closed() {
   _assert_closed "$_WI_TMP/err" "unrecognised AI workspace reference: bogus" || return 1
 }
 
+test_X9_symlinked_git_dir_bakes_absolute() {
+  local d="$_WI_TMP/x9"
+  _make_pair "$d" || return 1
+  # Canonical's .git becomes a symlink to a directory with another name.
+  mkdir -p "$d/store"
+  mv "$d/p/.git" "$d/store/p-real.git" && ln -s "$d/store/p-real.git" "$d/p/.git" || return 1
+  [[ -L "$d/p/.git" && -d "$d/p/.git" ]] || { echo "    precondition: .git is not a symlinked dir"; return 1; }
+  # The hook baked sibling before the change, so it cannot resolve now.
+  _commit "$d/p" 'clean subject' "$_WI_TMP/err" && { echo "    commit allowed with an unresolvable root"; return 1; }
+  _assert_closed "$_WI_TMP/err" "cannot locate this repository's main worktree" || return 1
+  # The README remedy: re-install. It must record abs:, not sibling again.
+  "$WI_BIN" trace_filter_install "$d/p-ai" "$d/p" 2>/dev/null || { echo "    re-install failed"; return 1; }
+  assert_eq "abs:$d/p-ai" "$(_ref "$d/store/p-real.git/hooks/commit-msg")" \
+    "a symlinked .git must bake abs:" || return 1
+  _assert_filters "$d/p" "symlinked-.git canonical" || return 1
+}
+
+test_X10_exported_cdpath_is_ignored() {
+  local d="$_WI_TMP/x10"
+  mkdir -p "$d/decoy/.git"
+  # Install under the CDPATH as well: the installer's own check must hold.
+  ( export CDPATH="$d/decoy"; _make_pair "$d/pair" ) || return 1
+  assert_eq "sibling:p-ai" "$(_ref "$d/pair/p/.git/hooks/commit-msg")" || return 1
+  # git hands the hook a relative .git in the main worktree; with CDPATH
+  # honoured, cd .git would land in decoy/.git and echo its path.
+  ( export CDPATH="$d/decoy"; _assert_filters "$d/pair/p" "canonical under CDPATH" ) || return 1
+  ( export CDPATH="$d/decoy"; _assert_filters "$d/pair/p-ai" "AI workspace under CDPATH" ) || return 1
+  # The lib's path canonicaliser takes relative input too; CDPATH must not
+  # redirect it either (the same class, swept across lib/).
+  local got
+  got="$(cd "$d/pair/p" && CDPATH="$d/decoy" wi_realpath .git)"
+  assert_eq "$d/pair/p/.git" "$got" "wi_realpath followed CDPATH" || return 1
+}
+
+test_X11_git_dir_of_another_parent_bakes_absolute() {
+  local d="$_WI_TMP/x11"
+  _make_pair "$d" || return 1
+  mkdir -p "$d/store/elsewhere"
+  mv "$d/p/.git" "$d/store/elsewhere/.git" && ln -s "$d/store/elsewhere/.git" "$d/p/.git" || return 1
+  "$WI_BIN" trace_filter_install "$d/p-ai" "$d/p" 2>/dev/null || { echo "    install failed"; return 1; }
+  assert_eq "abs:$d/p-ai" "$(_ref "$d/store/elsewhere/.git/hooks/commit-msg")" \
+    "a .git whose parent is not the repo must bake abs:" || return 1
+  _assert_filters "$d/p" "foreign-parent .git canonical" || return 1
+}
+
 wi_test_run test_X1_moved_pair_resolves_from_its_own_repo
 wi_test_run test_X2_legacy_dead_path_hook_is_rewritten_by_repair
 wi_test_run test_X3_missing_sibling_workspace_fails_closed
@@ -187,5 +241,8 @@ wi_test_run test_X5_escape_keeps_the_filter_running
 wi_test_run test_X6_non_sibling_pair_bakes_absolute_path
 wi_test_run test_X7_git_file_repo_fails_closed
 wi_test_run test_X8_unrecognised_reference_fails_closed
+wi_test_run test_X9_symlinked_git_dir_bakes_absolute
+wi_test_run test_X10_exported_cdpath_is_ignored
+wi_test_run test_X11_git_dir_of_another_parent_bakes_absolute
 
 wi_test_summary
