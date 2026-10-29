@@ -155,13 +155,18 @@ Every command's syntax comes from the layer's guide.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
    at the PR head, brief its review command (`config.md`, `review:`; `/code-review <PR> <LEVEL>` by default), every finding returned in the report file.
    **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from
-   its seat over the fix range alone — one scoped delta re-review — and its findings enter the
+   its seat over the fix range alone — one scoped delta re-review; a `/merge-bar:review-pr`
+   reviewer is a fresh seat running `/merge-bar:review-pr <PR_URL> --round <n> --previous
+   <previous report path>` — and its findings enter the
    disposition baseline like any other, so a repository whose bot does not review a push still
    reaches a complete signal on the head it asks about. Every finding returned in the report file
-   as file, line, severity, claim. The reviewer posts nothing to GitHub and edits
+   as file, line, severity, claim, or as that report's classes. The reviewer posts nothing to GitHub and edits
    nothing, so that file is the sole copy of the review. Release the reviewer only
    after its report file validates — findings lines present in the stated schema, or
-   `Findings: none` on a clean review, with the reviewed head equal to the PR head; on
+   `Findings: none` on a clean review, or a `/merge-bar:review-pr` report with its
+   `## Coverage` table and a `Bar:` line on every `### C<n>` class (no class is a clean
+   review; a class blocks unless its `Bar:` is `non-blocking`), with the reviewed head —
+   that report's `Head:` — equal to the PR head; on
    a malformed report, send one bounded correction request
    before release.
 9. **Disposition.** Each finding becomes **fix**, **defer** as a tracked issue, or

@@ -160,12 +160,14 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      re-creation of it carries the guard before its command (role `reviewer`, `MECHANICS`
      Seat launch) — confirm the model as its row's `model_shows` says and from the first reply,
      and brief it to run REVIEW_INVOCATION. Read the findings from its
-     report file — it posts nothing; that file is the only copy. Validate it against the
-     reviewer brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or
-     finding lines plus both — before passing anything on; on a malformed body send
-     ONE bounded correction request and re-validate, escalating a second malformed body to
-     the top. A mismatched reviewed head makes the review historical — re-fetch the GitHub
-     signals rather than commissioning
+     report file — it posts nothing; that file is the only copy. Validate it against the reviewer
+     brief's schema — `Findings: none` with `Reviewed head:` and `Summary:`, or finding lines plus
+     both; a `/merge-bar:review-pr` report instead validates with its `## Coverage` table and a
+     `Bar:` line on every `### C<n>` class, its `Head:` the reviewed head (no class is a clean
+     review; a class blocks unless its `Bar:` is `non-blocking`) — before passing anything on; on a
+     malformed body send ONE bounded correction request and re-validate, escalating a second
+     malformed body to the top. A mismatched reviewed head makes the review historical, a `Head:`
+     that is not the PR head included — re-fetch the GitHub signals rather than commissioning
      another; absent or untriaged signals never satisfy the merge gate.
   4. THEN run `/ossify:work-pr $PR_NUMBER --repo-root $REPO_ROOT` — initial
      runs carrying those findings in as its disposition inputs, resumed runs
@@ -191,15 +193,20 @@ TASK: drive PR_NUMBER to a merge on the top's word.
      on the new head — the bots review every push where they are installed, so the current-head
      verdict is read there; where none is, the reviewer seat is re-dispatched over the fix range
      — re-created if it was released, and guarded before its command then (role `reviewer`,
-     `MECHANICS` Seat launch). A post-disposition finding returns through a blocking question to the
+     `MECHANICS` Seat launch); a `/merge-bar:review-pr` reviewer is a fresh seat running
+     `/merge-bar:review-pr <PR_URL> --round <n> --previous <previous report path>`. A post-disposition
+     finding returns through a blocking question to the
      top before any seat acts on it, never fixed by you or silently deferred. Relay ONE batched
      summary per round; STOPPING_RULE decides when fixing stops, counting the fix rounds
      PRIOR_REVIEW carries. `merge-bar` means `/ossify:work-pr` runs `working-a-pr`, whose
      round stop decides and whose Merge bar is never narrowed by a stopping rule.
-  6. When the gate is clean, ask the top for the merge word. MERGE_EXECUTOR
-     is the top's explicit assignment, not something you infer — never parse
-     permission settings, never probe by attempting a merge. On `session`: on
-     the reply, re-fetch the whole gate set once more and
+  6. Where merge-bar's `working-a-pr` runs, a one-way door — the body's `Door: one-way`, or no
+     `Door:` line — is never merged here: at a clean gate your report hands it to the top, the merge
+     holder, with the reviewed head OID, the ledger and merge-bar's
+     `skills/working-a-pr/references/one-way-door.md`, then release your seats as below. Otherwise,
+     when the gate is clean, ask the top for the merge word. MERGE_EXECUTOR is the top's explicit
+     assignment, not something you infer — never parse permission settings, never probe by
+     attempting a merge. On `session`: on the reply, re-fetch the whole gate set once more and
      merge bound to the named SHA, as a merge commit. On `operator`: your ask
      names the operator as executor, the approved SHA and the merge-commit
      convention; on the reply you re-fetch the gates, the operator's landing
