@@ -1,7 +1,7 @@
 {
   "version": 1,
   "name": "ossify-spine",
-  "params": ["spine", "spine_branch", "spine_dir", "ai_root", "ai_project", "repo", "project", "state_file", "oss", "briefs", "via"],
+  "params": ["spine", "spine_branch", "spine_dir", "ai_root", "ai_project", "repo", "project", "state_file", "oss", "briefs"],
   "slots": { "session": 2, "build": 1 },
   "sources": [
     {
@@ -24,8 +24,7 @@
   "seed": [{ "id": "lane", "stage": "lane" }],
   "triage": {
     "kind": "triage",
-    "instance": "OMP_Seat",
-    "model": "default",
+    "role": "triage",
     "project": "{param.ai_project}",
     "cwd": "{param.ai_root}",
     "launch_dir": "worktree",
@@ -34,8 +33,6 @@
     "env": {
       "SEAT_MODS_ROLE": "orchestrator",
       "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-      "OMP_T3_VIA": "{param.via}",
-      "OMP_T3_SEAT": "worker",
       "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
       "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
     },
@@ -44,8 +41,7 @@
   },
   "driver": {
     "kind": "driver",
-    "instance": "OMP_Seat",
-    "model": "default",
+    "role": "driver",
     "project": "{param.ai_project}",
     "cwd": "{param.ai_root}",
     "launch_dir": "worktree",
@@ -53,22 +49,19 @@
     "message": "Read {param.briefs}/driver.md and follow it. Unit: {unit.id}. Parked in: {driver.stage}. Reason: {driver.reason}. State file: {run.dir}/out/{unit.id}/driver-state.md. Result file: {run.dir}/out/{unit.id}/driver-result-{driver.launch}.json. Briefs: {param.briefs}. Spine: {param.spine_dir}.",
     "env": {
       "SEAT_MODS_ROLE": "reviewer",
-      "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-      "OMP_T3_VIA": "{param.via}",
-      "OMP_T3_SEAT": "worker"
+      "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}"
     },
     "stall_minutes": 15,
     "state_file": "{run.dir}/out/{unit.id}/driver-state.md",
     "result_file": "{run.dir}/out/{unit.id}/driver-result-{driver.launch}.json",
     "ledger": "{param.spine_dir}/autopilot-ledger.md",
     "clearing": ["rerun-check", "remove-file"],
-    "resume_to": { "correct": ["reclose"] }
+    "resume_to": { "correct": ["verify"] }
   },
   "stages": {
     "lane": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "spine session",
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root",
@@ -77,8 +70,6 @@
       "env": {
         "SEAT_MODS_ROLE": "coordinator",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -97,7 +88,7 @@
         {
           "when": [
             { "file": "{run.dir}/out/{unit.id}/lane.done" },
-            { "units": { "group": "{run.group}", "stages": ["implement", "gap_wait", "regap", "close", "correct", "reclose", "land"], "count": "none" } }
+            { "units": { "group": "{run.group}", "stages": ["implement", "gap_wait", "regap", "verify", "close", "correct", "land"], "count": "none" } }
           ],
           "to": "park",
           "run": [["rm", "-f", "{run.dir}/out/{unit.id}/lane.done"]]
@@ -117,8 +108,7 @@
     },
     "implement": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "implementer",
       "project": "{param.project}",
       "cwd": "{unit.vars.worktree_path}",
       "launch_dir": "worktree",
@@ -127,8 +117,6 @@
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{param.spine_dir}/work-{unit.id}:{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -143,7 +131,7 @@
       "stop_file": "{run.dir}/out/{unit.id}/stop",
       "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
       "outcomes": [
-        { "when": [{ "file": "{param.spine_dir}/work-{unit.id}/report.md" }], "to": "close" },
+        { "when": [{ "file": "{param.spine_dir}/work-{unit.id}/report.md" }], "to": "verify" },
         { "when": [{ "file": "{run.dir}/out/{unit.id}/gaps.json" }], "to": "gap_wait" }
       ]
     },
@@ -153,7 +141,7 @@
         {
           "when": [
             { "active": "none-in-group" },
-            { "units": { "group": "{run.group}", "stages": ["implement", "regap", "correct", "reclose"], "count": "none" } }
+            { "units": { "group": "{run.group}", "stages": ["implement", "regap", "verify", "close", "correct"], "count": "none" } }
           ],
           "to": "regap"
         }
@@ -161,8 +149,7 @@
     },
     "regap": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "spine session",
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root",
@@ -171,8 +158,6 @@
       "env": {
         "SEAT_MODS_ROLE": "coordinator",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -186,19 +171,41 @@
         { "when": [{ "record_changed": true }], "to": "implement" }
       ]
     },
+    "verify": {
+      "kind": "session",
+      "role": "verifier",
+      "project": "{param.project}",
+      "cwd": "{unit.vars.worktree_path}",
+      "launch_dir": "worktree",
+      "title": "verify {unit.id}",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/verify.md, and follow them. Your agent name: {agent.name}. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Report: {param.spine_dir}/work-{unit.id}/report.md. Worktree: {unit.vars.worktree_path}. Base SHA: {unit.vars.base_sha}. Verdict file: {run.dir}/out/{unit.id}/verdict.json. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "env": {
+        "SEAT_MODS_ROLE": "verifier",
+        "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
+        "OSSIFY_VERIFY_WORKTREE": "{unit.vars.worktree_path}",
+        "MOLT_HANDOFF": "parent",
+        "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
+        "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
+        "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
+      },
+      "slots": ["session", "build"],
+      "before": [["mkdir", "-p", "{run.dir}/out/{unit.id}"], ["rm", "-f", "{run.dir}/out/{unit.id}/verdict.json"]],
+      "stop_file": "{run.dir}/out/{unit.id}/stop",
+      "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
+      "outcomes": [
+        { "when": [{ "file": "{run.dir}/out/{unit.id}/verdict.json" }], "to": "close" }
+      ]
+    },
     "close": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "close session",
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root", "title": "close {unit.id}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Worktree: {unit.vars.worktree_path}. Branch: {unit.vars.branch}. Base SHA: {unit.vars.base_sha}. Correction packet: {run.dir}/out/{unit.id}/correction.txt. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Worktree: {unit.vars.worktree_path}. Branch: {unit.vars.branch}. Base SHA: {unit.vars.base_sha}. Verdict file: {run.dir}/out/{unit.id}/verdict.json. Correction packet: {run.dir}/out/{unit.id}/correction.txt. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -221,8 +228,7 @@
     },
     "correct": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "implementer",
       "project": "{param.project}",
       "cwd": "{unit.vars.worktree_path}",
       "launch_dir": "worktree",
@@ -231,8 +237,6 @@
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{param.spine_dir}/work-{unit.id}:{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -249,41 +253,8 @@
       "outcomes": [
         {
           "when": [{ "file": "{run.dir}/out/{unit.id}/corrected" }],
-          "to": "reclose",
+          "to": "verify",
           "run": [["rm", "-f", "{run.dir}/out/{unit.id}/corrected", "{run.dir}/out/{unit.id}/correction.txt"]]
-        }
-      ]
-    },
-    "reclose": {
-      "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
-      "project": "{param.ai_project}",
-      "cwd": "{param.ai_root}",
-      "launch_dir": "root", "title": "reclose {unit.id}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Worktree: {unit.vars.worktree_path}. Branch: {unit.vars.branch}. Base SHA: {unit.vars.base_sha}. Correction packet: {run.dir}/out/{unit.id}/correction.txt. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
-      "env": {
-        "SEAT_MODS_ROLE": "implementer",
-        "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
-        "MOLT_HANDOFF": "parent",
-        "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
-        "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
-        "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
-      },
-      "slots": ["session"],
-      "before": [["mkdir", "-p", "{run.dir}/out/{unit.id}"]],
-      "stop_file": "{run.dir}/out/{unit.id}/stop",
-      "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
-      "outcomes": [
-        {
-          "when": [{ "exit0": ["jq", "-e", "--arg", "w", "{unit.id}", "any(.work_items[]; .id == $w and (.pr_url | type) == \"string\")", "{param.state_file}"] }],
-          "to": "land"
-        },
-        {
-          "when": [{ "file": "{run.dir}/out/{unit.id}/correction.txt" }],
-          "to": "correct"
         }
       ]
     },
@@ -304,8 +275,7 @@
     },
     "spine_open": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "close session",
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root",
@@ -314,8 +284,6 @@
       "env": {
         "SEAT_MODS_ROLE": "coordinator",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -331,18 +299,15 @@
     },
     "spine_review": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "reviewer",
       "project": "{param.project}",
       "cwd": "{param.repo}",
       "launch_dir": "worktree",
       "title": "spine review {param.spine}",
-      "message": "/review {unit.vars.pr_url} Then read {param.briefs}/common.md and {param.briefs}/spine-review.md, and write {run.dir}/out/{unit.id}/review.md whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA, then the findings. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "{agent.review} {unit.vars.pr_url} Then read {param.briefs}/common.md and {param.briefs}/spine-review.md, and write {run.dir}/out/{unit.id}/review.md whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA, then the findings. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "reviewer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -389,8 +354,7 @@
     },
     "spine_work": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "work-PR session",
       "project": "{param.project}",
       "cwd": "{param.repo}",
       "launch_dir": "root",
@@ -399,8 +363,6 @@
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}:{param.spine_dir}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
@@ -427,8 +389,7 @@
     },
     "spine_finish": {
       "kind": "session",
-      "instance": "OMP_Seat",
-      "model": "default",
+      "role": "close session",
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root",
@@ -437,8 +398,6 @@
       "env": {
         "SEAT_MODS_ROLE": "coordinator",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
-        "OMP_T3_VIA": "{param.via}",
-        "OMP_T3_SEAT": "worker",
         "MOLT_HANDOFF": "parent",
         "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
         "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",

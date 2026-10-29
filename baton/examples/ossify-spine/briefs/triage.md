@@ -1,6 +1,6 @@
 # Triage a stuck seat
 
-A seat is waiting on a prompt no one will answer. Your message gives the stuck thread, its stage, the request and its questions. Read the brief the stuck stage's seat was given: `common.md`, plus the stage's own file next to this one, named for the stage with `_` written as `-` (`spine_review` reads `spine-review.md`; `reclose` reads `close.md`). Then choose exactly one action, checking in this order and stopping at the first that applies:
+A seat is waiting on a prompt no one will answer. Your message gives the stuck thread, its stage, the request and its questions. Read the brief the stuck stage's seat was given: `common.md`, plus the stage's own file next to this one, named for the stage with `_` written as `-` (`spine_review` reads `spine-review.md`). Then choose exactly one action, checking in this order and stopping at the first that applies:
 
 1. **Stop** when the prompt is a stop-rule question (see `common.md`), asks you to approve a merge, a push or a force operation, or you are unsure: write one paragraph to `$SPINE_STOP_FILE`. A question that is answerable from the brief but touches an ADR, a bone or the skeleton is still a stop.
 2. **Answer** when the brief determines the answer. Run `baton answer <run> <unit> "<label>"`, with the run and unit from your message and the chosen option's `label`, exactly. Exit 75 (a tick holds the lock): wait a minute and retry once. Any other non-zero exit: write the note file and stop.
