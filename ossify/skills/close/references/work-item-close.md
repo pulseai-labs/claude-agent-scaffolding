@@ -197,6 +197,30 @@ is a halt naming it. Apply every verdict the pass returns — `[rule]` (Layer 3)
 `[fidelity]` (§4b), `[mutation]` (§4c): any one halts, and the halt names all
 of them. Print `verifier: ossify:verifier-agent on <model>` in the close summary.
 
+**With `--verdict <file>` the verdict is a caller's, and the close dispatches nothing.**
+A baton `verify` stage has already run the pass in a seat of the operator's choosing.
+Run Layers 1 and 2 as above; dispatch no `ossify:verifier-agent` and run no
+before/after fingerprint. Read the file: it is one JSON object with `mode: verified`
+and the keys `model`, `agent`, `work_item_id`, `identity`, `rule`, `lenses`,
+`mutation`. Anything else, or a missing key, is a halt naming the key. A
+`work_item_id` other than `$wi` is `close: verdict is for <id>, not $wi - halt`.
+Then recompute the worktree identity with the same three commands, now that no
+mutation is pending:
+
+```bash
+vid=""   # the verdict's identity key, as the file carries it
+t="$(git -C "$wt" write-tree)" && s="$(git -C "$wt" status --porcelain)" && d="$(git -C "$wt" diff --binary)" \
+  || { echo "close: cannot fingerprint $wt for the verdict - halt"; exit 1; }
+now="$(printf '%s\n%s\n%s\n' "$t" "$s" "$d" | git hash-object --stdin)"
+[ "$now" = "$vid" ] || { echo "close: verdict identity $vid does not match $wt now ($now) - the item changed after verify - halt"; exit 1; }
+```
+
+A mismatch is a halt: the item changed after the verdict was written. Otherwise apply
+`rule`, `lenses` and `mutation` exactly as the agent's return is applied (the same
+tags, the same `verify.md`, the same correction packet), and print
+`verifier: <agent> on <model>` from the file. Without `--verdict` nothing in this
+section changes.
+
 **Where no agent can be dispatched, the close runs the pass itself** — Codex,
 OMP, a subagent context, a refused `Task` grant. Apply §4, §4b and §4c in this
 session, from the diff and never from report §5, and print

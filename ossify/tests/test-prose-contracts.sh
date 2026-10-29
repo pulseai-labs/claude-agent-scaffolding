@@ -2409,4 +2409,19 @@ pin "$SKILLS/close/SKILL.md" '`report.md`, `verify.md` and the state' \
 pin "$SKILLS/plan-spine/references/spec-authoring.md" '**An AC that diffs against a commit names a fixed sha**' \
   "#981 spec-authoring: base-relative ACs pin a sha, never a moving ref"
 
+# ---------------------------------------------------------------------------
+# 1.30.0 (#993). /close <wi> --pr --verdict <file>: a caller's verifier verdict
+# replaces the close's own dispatch, bound to the worktree by an identity hash.
+# ---------------------------------------------------------------------------
+pin "$_981_WC" '--verdict <file>' \
+  "#993 work-item-close §2: the --verdict arm exists"
+pin "$_981_WC" 'close: verdict identity' \
+  "#993 work-item-close §2: a stale verdict halts on its identity"
+pin "$_981_WC" 'verifier: <agent> on <model>' \
+  "#993 work-item-close §2: the verdict arm prints the verifier line from the file"
+pin "$SKILLS/../commands/close.md" '[--verdict <file>]' \
+  "#993 commands/close.md: the argument hint carries --verdict"
+pin "$SKILLS/close/SKILL.md" '`--verdict <file>`' \
+  "#993 close SKILL.md §9: the argument grammar names --verdict"
+
 t_summary

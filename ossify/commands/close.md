@@ -1,6 +1,6 @@
 ---
 description: Run the ossify close ceremony on an id — context-routed to work item, spine, or release by the id's shape
-argument-hint: "<id> [--pr]"
+argument-hint: "<id> [--pr] [--verdict <file>]"
 allowed-tools: Bash(bash:*), Read, Write, Edit, Glob, Grep, Skill, Task
 ---
 
