@@ -142,7 +142,7 @@ agent.
 | Yes (Disarm) | `baton disarm <run>` | a message with the result |
 | Merge | `gh pr view <pr> --json number,baseRefName` | a Yes/No question naming the PR, head and base; a failed check is a message saying why |
 | Yes (Merge) | `gh pr merge <pr> --merge --match-head-commit <reviewed head>` | a message with the result |
-| No, Cancel | nothing | the message "Cancelled." |
+| No, Cancel | nothing | on a unit park still at its park: the park's question again, its text starting "Cancelled; nothing ran."; else the message "Cancelled." |
 | Open PR | nothing | a message with the PR URL |
 | a worker option, tapped or typed exactly | `baton answer <run> <unit> --park <at> --screen <n> <label>` | a message; refused: the question again, its text `Not sent: <baton's reason>`, with Show question and Disarm |
 | typed text, on a blocked park whose picker has an Other row | `baton answer <run> <unit> --park <at> --screen-text <text> --question <line>` | as a worker option |
