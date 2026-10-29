@@ -65,8 +65,12 @@ test_A1_agents_md_writes_file_with_project_name() {
   assert_contains 'legacy scaffold stack' "$content" || return 1
   assert_not_contains 'for existing source or history' "$content" || return 1
 
-  assert_contains "$canonical_root" "$content" || return 1
-  assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+  # #983: the canonical is named and pointed at through the manifest, never
+  # located by an absolute path that holds on one host only.
+  assert_contains 'Paired canonical repo: `a1` (its location is `canonical.root` in `.workspace/pairing.json`)' "$content" || return 1
+  assert_not_contains "$canonical_root" "$content" || return 1
+  assert_not_contains "$_WI_TMP" "$content" || return 1
+  assert_not_contains '${CANONICAL_NAME}' "$content" || return 1
   local first; first="$(head -n 1 "${ai_root}/AGENTS.md")"
   assert_eq '<!-- workspace-init stub: ossify:start replaces this file -->' "$first" || return 1
   # The single file carries what the CLAUDE.md stub used to: the trace filter.
@@ -159,10 +163,11 @@ test_A5_dispatcher_path_renders_marker() {
   assert_contains 'Unknown function: wi_stub_claude_md' "$err" || return 1
 }
 
-test_A6_ampersand_in_canonical_root_survives_render() {
+test_A6_ampersand_in_canonical_name_survives_render() {
   # D3/#768: a canonical path with `&` (or `\`) used to be mangled by the
   # ${var//pat/repl} splice under bash 5.2+ patsub_replacement, leaving the
-  # literal ${CANONICAL_ROOT} in the one instruction file every agent reads.
+  # literal placeholder in the one instruction file every agent reads. Since
+  # #983 the stub carries the canonical's name, which keeps the `&`.
   # End-to-end through the dispatcher, which is where the real path arrives.
   local ai_root="$_WI_TMP/a6-ai" canonical_root="$_WI_TMP/a6/R&D"
   mkdir -p "$ai_root" "$canonical_root"
@@ -170,8 +175,8 @@ test_A6_ampersand_in_canonical_root_survives_render() {
   "$WI_PLUGIN_ROOT/bin/wi" stub_agents_md "$ai_root" "p" >/dev/null 2>&1 || { echo "    dispatcher failed"; return 1; }
 
   local content; content="$(cat "$ai_root/AGENTS.md")"
-  assert_contains "$canonical_root" "$content" || return 1
-  assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+  assert_contains 'Paired canonical repo: `R&D`' "$content" || return 1
+  assert_not_contains '${CANONICAL_NAME}' "$content" || return 1
   # Adjacent control: the render still substitutes the other var, so the fix
   # did not disable substitution wholesale.
   assert_contains 'p — AI workspace' "$content" || return 1
@@ -196,9 +201,12 @@ test_R1_readme_writes_file_with_substitution() {
   local content
   content="$(cat "${ai_root}/README.md")"
   assert_contains "readme-proj" "$content" || return 1
-  assert_contains "$canonical_root" "$content" || return 1
+  # #983: named, not located — see test_A1.
+  assert_contains 'Paired with canonical `r1` (its location is `canonical.root`' "$content" || return 1
+  assert_contains 'Those live in canonical (`r1`)' "$content" || return 1
+  assert_not_contains "$_WI_TMP" "$content" || return 1
   assert_not_contains '${PROJECT_NAME}' "$content" || return 1
-  assert_not_contains '${CANONICAL_ROOT}' "$content" || return 1
+  assert_not_contains '${CANONICAL_NAME}' "$content" || return 1
 
   # S8: the rendered README routes lifecycle to ossify and does not claim
   # bootstrap already authored a memory bank or sprint specs.
@@ -284,7 +292,7 @@ wi_test_run test_A3_agents_md_idempotent
 wi_test_run test_A7_agents_md_logs_write_file
 wi_test_run test_A4_no_claude_md_written
 wi_test_run test_A5_dispatcher_path_renders_marker
-wi_test_run test_A6_ampersand_in_canonical_root_survives_render
+wi_test_run test_A6_ampersand_in_canonical_name_survives_render
 
 echo ""
 echo "R. README.md"

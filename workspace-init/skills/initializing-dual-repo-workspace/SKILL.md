@@ -244,7 +244,8 @@ Three sequential sub-steps; any failure triggers full rollback:
    with the unborn branch explicitly set to `main`, independent of the user's
    `init.defaultBranch` configuration.
 2. `"$wi_bin" trace_filter_install_pair "$ai_root" "$canonical_root"` — render
-   `hooks/commit-msg.tmpl` with the baked AI workspace path and install to
+   `hooks/commit-msg.tmpl` with a reference to the AI workspace (`self` or
+   `sibling:<dir>`, resolved at commit time from the repo the hook runs in) and install to
    `<ai_root>/.git/hooks/commit-msg` AND `<canonical_root>/.git/hooks/commit-msg`,
    `chmod +x` on both.
 3. `"$wi_bin" git_stage_ai_workspace "$ai_root"` — `git -C "$ai_root" add .` (stages
