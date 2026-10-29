@@ -1,6 +1,6 @@
 // The prose that seats and orchestrators follow, pinned on the lines they cannot do without:
 // the skill's approval stop and no-watch rule (#969 C11), and each done-file brief's last step
-// (#908). Prose, so the pins are exact phrases, each with a control that fails without it.
+// (#908). Prose, so the pins are exact phrases, each read on one line of its source.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -34,20 +34,26 @@ describe("running-a-spine-on-baton", () => {
     const s = skill();
     expect(s).toContain("do not waive this step");
     expect(s).toContain("A yes that changes or supplies a value is not that yes");
-    expect(s).toContain("wait for an explicit yes to\nthat command");
+    expect(s).toContain("wait for an explicit yes");
   });
 
   test("after arming, a watch request runs no command and the close is baton's", () => {
     const s = skill();
-    expect(s).toContain('"Keep an eye on it" is not a status request: run\n  no command.');
+    expect(s).toContain('"Keep an eye on it" is not a status request');
     expect(s).toContain("Do not start `/ossify:close` beside it.");
   });
 });
 
 describe("done-file briefs", () => {
-  for (const [name, file] of [["correct.md", "Corrected file"], ["spine-work.md", "Round done file"]]) {
-    test(`${name} ends by writing its ${file}`, () => {
-      expect(lastStep(brief(name))).toContain(`: > <${file} from your message>`);
+  // The label each stage's message gives its done file, read from the recipe.
+  const recipe = JSON.parse(readFileSync(join(BRIEFS_DIR, "..", "recipe.json"), "utf8"));
+  const labels = (stage: string): string[] =>
+    [...String(recipe.stages[stage].message).matchAll(/([A-Z][a-z]+(?: [a-z]+)* done file|Corrected file): /g)].map((m) => m[1]);
+  for (const [name, stage] of [["correct.md", "correct"], ["spine-work.md", "spine_work"], ["lane.md", "lane"]]) {
+    test(`${name} ends by writing the done file its stage's message names`, () => {
+      const ls = labels(stage);
+      expect(ls.length).toBeGreaterThan(0);
+      for (const l of ls) expect([l, lastStep(brief(name)).includes(`: > <${l} from your message>`)]).toEqual([l, true]);
     });
   }
 

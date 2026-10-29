@@ -100,7 +100,9 @@ export function enterStage(u: UnitState, stage: string, noteFile?: string): void
   }
 }
 
-const RUN_STATUSES: readonly RunState["status"][] = ["armed", "parked", "disarmed", "done"];
+// Every status in the union: `satisfies` makes a type check (tsc, an editor) flag a status added there and missing here.
+const RUN_STATUS_SET = { armed: true, parked: true, disarmed: true, done: true } satisfies Record<RunState["status"], true>;
+const RUN_STATUSES = Object.keys(RUN_STATUS_SET) as RunState["status"][];
 const plainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
 
 /**
