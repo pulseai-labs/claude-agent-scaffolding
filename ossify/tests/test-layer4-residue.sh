@@ -2,9 +2,10 @@
 # ---------------------------------------------------------------------------
 # Layer 4 delegated-path residue gate (#507).
 #
-# Layer 4 runs inline on every harness; the delegated engine (the Workflow-tool
-# script, its selection conditions, its fingerprint guard, its fallback and its
-# print contract) is deleted. This test is the tripwire against a half-deletion:
+# The delegated engine (the Workflow-tool script, its selection conditions, its
+# fingerprint guard, its fallback and its print contract) is deleted. Since #951
+# Layer 4 runs in a registered verifier agent, or inline where none can be
+# dispatched - never through that engine. This test is the tripwire against a half-deletion:
 # any shipped ossify file still naming the mechanism goes RED here, naming the
 # file, the line and the needle that hit.
 #

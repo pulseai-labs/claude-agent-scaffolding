@@ -88,8 +88,9 @@ that fact and decides on it is.
    comes back to the lane as a fresh §4 record that passes the whole of criterion
    3 again, identity included, rather than being accepted on the continuation's
    inner shape. Layer 4 runs
-   **inline** under this mode as under every mode — the close applies the
-   lenses itself and there is no second engine to route to. Inventing a new
+   **inline** under this mode — the closing session applies the lenses itself,
+   dispatches no verifier and runs no mutation check, and there is no second
+   engine to route to. Inventing a new
    return mode, sending the correction to a fresh executor, or routing Layer 4
    to a multi-agent pass of any kind is a wrong answer.
 

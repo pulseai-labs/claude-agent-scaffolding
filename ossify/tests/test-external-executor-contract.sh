@@ -13,8 +13,9 @@
 #   - zero subagent-invocation forms in the external branch
 #   - the two-value return enum, unchanged by the correction continuation
 #   - zero `orca` in ossify's shipped product surfaces
-#   - the universal inline Layer 4 route (the deletion's absence side is
-#     test-layer4-residue.sh's, not duplicated here)
+#   - the Layer 4 route: close dispatches its verifier, except inside an
+#     external lane, where Layer 4 stays inline (the deleted engine's absence
+#     side is test-layer4-residue.sh's, not duplicated here)
 #
 # COUNTING is one awk index() pass per needle. `grep -c` counts matching LINES
 # and cannot see two hits on one line; `… | grep -q` can fail on a TRUE match
@@ -206,11 +207,15 @@ for form in 'Task(' 'Agent(' 'subagent_type'; do
 done
 
 # ---------------------------------------------------------------------------
-# 7. Layer 4 route — inline everywhere, including under external mode
+# 7. Layer 4 route — close dispatches its verifier; external mode stays inline
 # ---------------------------------------------------------------------------
 nonempty "$WIC" "work-item-close.md exists"
-pin "$WIC" 'Layer 4 runs inline' \
-  "work-item-close.md states the universal inline Layer 4 pass"
+pin "$WIC" 'the close dispatches `ossify:verifier-agent` for Layers 3 and 4 and the §4c mutation check' \
+  "work-item-close.md dispatches the verifier for Layers 3, 4 and mutation (#951)"
+pin "$WIC" 'lane closing its own items** Layers 3 and 4 run in this' \
+  "work-item-close.md keeps Layers 3 and 4 in the closing session inside an external lane (#951 D3)"
+pin "$EXT" 'mutation check in this mode (`impl-check.md` §4c): the caller' \
+  "external-executor.md says close runs no mutation check in this mode (#951 D3)"
 pin "$EXT" 'runs Layer 4 inline' \
   "external-executor.md still names the inline Layer 4 route under its mode"
 

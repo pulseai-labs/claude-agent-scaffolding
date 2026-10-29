@@ -5,8 +5,9 @@ expected_reason: NEGATIVE CONTROL. The command carries no flag, so nothing about
   mode applies — the lane dispatches ossify:implementer-agent per work item exactly
   as it always has, builds no request or result record, and invokes no caller-supplied
   procedure. The presence of a caller in the session activates nothing; the flag is
-  the only switch. At work-item close Layer 4 runs INLINE — it runs inline on every
-  harness, so the no-flag path differs from external mode on nothing here. The wrong
+  the only switch. At work-item close the no-flag path dispatches ossify:verifier-agent
+  for Layers 3 and 4 and the mutation check (inline only where no agent can be
+  dispatched); only inside an external lane do they stay in the closing session. The wrong
   answer this fixture falsifies is a model that has read the external-executor
   contract and applies any part of it because the conditions "look like" a
   caller-driven run

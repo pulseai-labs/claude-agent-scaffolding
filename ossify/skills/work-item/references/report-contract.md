@@ -33,7 +33,7 @@ an empty section reads as "considered, nothing to say", a missing section reads 
 | `## 2. Summary` | What the item actually delivered, in a short paragraph. The one-line return `summary` is this, compressed. |
 | `## 3. ACs — verification status` | **A table**, one row per `auto:` AC. See §2 below. |
 | `## 4. Files changed` | Every file created or edited, with a one-line note on what changed in it. |
-| `## 5. Verification commands run` | One row per command — the command, its exit code, pass/fail, and an output excerpt for anything that failed. Then, **per new or changed test**, whether it can fail and how that was shown — the mutation applied, that it went red, and how it was restored, or why judgment sufficed. |
+| `## 5. Verification commands run` | One row per command — the command, its exit code, pass/fail, and an output excerpt for anything that failed. |
 | `## 6. Decisions during execution` | Judgment calls you made **inside** the spec's latitude — a defensible default where the spec was silent, a data-structure choice, a nice-to-have gap you absorbed. |
 | `## 7. Deviations from spec` | Places where what you built **differs from what the spec says**, with the reason. Empty is the expected state. |
 | `## 8. Blockers and advisories` | Everything that impeded the run without being a pre-flight gap — **every RED-gate rc 2 advisory**, **every recorded skip-escape override you honoured**, a missing runner, a structural surprise, a `stage_status` of `none` or `partial`. |
@@ -108,8 +108,6 @@ own numbering — the behaviour is implemented, the two numbering schemes disagr
 |---|---|---|
 | `pytest tests/` | 0 | pass |
 | `python -m tocgen sample.md` | 0 | fail — expected `- [Install](#install)`, got `- [Install](#install-1)` |
-
-Can each test fail? Per new or changed test: `tests/test_slugify.py::test_unicode_heading` — mutated `slugify` to return the input (line echoed back), the test went red, restored from the copy and re-ran green. (`test_slugify.py::test_empty` — judgment sufficed: it asserts a `ValueError` the unmutated code cannot raise by accident.)
 
 ## 6. Decisions during execution
 

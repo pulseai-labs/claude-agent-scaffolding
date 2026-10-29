@@ -1810,8 +1810,35 @@ CBW='**Check before you write.** Check every precondition before the first write
 for f in work-item/SKILL.md patch/SKILL.md close/references/harvest.md adopt/SKILL.md plan-spine/SKILL.md; do
   pin "$HERE/../skills/$f" "$CBW" "check-before-write block, verbatim and once, in $f"
 done
-# D5: the can-it-fail review step lives once, in work-item §6.
-pin "$WI/SKILL.md" '**Can each test fail?**' "work-item §6 carries the can-it-fail review step"
+# D5, moved by #951: the implementer no longer verifies its own tests. No
+# self-verification text survives in the work-item tree or its registration.
+t_assert_eq "" "$(grep -rn -e 'Can each test fail' -e 'verification-before-completion' -e 'whether it can fail' "$WI" "$HERE/../agents/implementer-agent.md")" \
+  "work-item and implementer-agent carry no self-verification step (#951)"
+# #951: the check moved to close, run by a fresh verifier (impl-check §4c).
+_IC951="$HERE/../skills/close/references/impl-check.md"
+_WC951="$HERE/../skills/close/references/work-item-close.md"
+_VA951="$HERE/../agents/verifier-agent.md"
+pin "$_IC951" '**Can each test fail?**' "impl-check §4c carries the can-it-fail check (#951)"
+pin "$_IC951" '[mutation]           <test> - stayed green with <mutation> applied on its path' \
+  "impl-check §5 lists the [mutation] tag (#951 D8)"
+pin "$_IC951" 'Five tags, spelled exactly as above.' "impl-check §5 says five tags (#951 D8)"
+pin "$_IC951" '| `[mutation]` — §4c |' "impl-check §6's recovery table has the [mutation] row (#951 D8)"
+pin "$_IC951" 'held. This **halts** with `[mutation]`.' "impl-check §4c halts only on an evidenced stayed-green (#951 D8)"
+pin "$_VA951" 'tools: Bash, Read, Edit, Glob, Grep' "verifier-agent's registration grants exactly its five tools (#951 D4)"
+t_assert_eq 1 "$(awk '/^tools: /{n++} END{print n+0}' "$_VA951")" "verifier-agent has one tools line (#951)"
+t_assert_eq "tools: Bash, Read, Edit, Glob, Grep" "$(awk '/^tools: /{print; exit}' "$_VA951")" "verifier-agent's tools line is exact (#951 D4)"
+pin "$_VA951" 'model: inherit' "verifier-agent inherits its model unless close passes one (#951 D6)"
+pin "$_VA951" '§4, §4b and §4c, and follow them.' "verifier-agent points at impl-check §4, §4b and §4c (#951 D2)"
+pin "$_VA951" '{"mode": "verified", "model": "<model you run>", "rule": [{"file","line","pattern","claim"}], "lenses": [<impl-check.md §4b finding schema>], "mutation": [{"test","mutation","result": "red | stayed-green | undetermined","evidence"}]}' \
+  "verifier-agent restates the verified return shape (#951 D4)"
+pin "$_VA951" '{"mode": "refused", "reason": "<the input you could not read>"}' "verifier-agent restates the refused return (#951 D4)"
+pin "$_WC951" 'When `OSSIFY_VERIFIER_MODEL` is set' "work-item-close §2 reads OSSIFY_VERIFIER_MODEL (#951 D6)"
+pin "$_WC951" '`model: inherit` applies; print `verifier model: inherited (same as this' "work-item-close §2 prints the inherited-model notice (#951 D6)"
+pin "$_WC951" '`verifier: inline — <host or why>`' "work-item-close §2 names the inline fallback line (#951 D7)"
+pin "$_WC951" '`verifier: ossify:verifier-agent on <model>`' "work-item-close §2 names the dispatched-verifier summary line (#951 D4)"
+t_assert_eq 1 "$(awk '/^allowed-tools:/ && /, Task$/ {n++} END{print n+0}' "$HERE/../commands/close.md")" \
+  "commands/close.md grants Task so a standalone /close can dispatch the verifier (#951)"
+pin "$SKILLS/close/SKILL.md" '`[mutation]`), and the `verifier:` line' "close SKILL.md §10's summary names the [mutation] tag and the verifier line (#951)"
 
 # ---------------------------------------------------------------------------
 # 1.19.0 (#497): the bones a spine's PLAN declares. plan-spine writes SPINE.md's
@@ -1931,8 +1958,8 @@ pin "$_AG" '`Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Skill` — `Skill`
   "implementer-agent.md's binding allowlist names Skill and its one use (#281)"
 pin "$WI/SKILL.md" 'the dispatched registration grants it since 1.19.3 (#281)' \
   "work-item SKILL.md §12 says the dispatched path composes too (#281)"
-pin "$WI/SKILL.md" 'or either skill is not installed, §5 and §6→§8 of this body are the' \
-  "work-item SKILL.md §12 falls back to the body when a composed skill is not installed (#281)"
+pin "$WI/SKILL.md" 'or the skill is not installed, §5 of this body is the' \
+  "work-item SKILL.md §12 falls back to the body when the composed skill is not installed (#281, #951)"
 pin "$WI/SKILL.md" 'Where a composed skill and this body disagree, this body wins:' \
   "work-item SKILL.md §12 says the body wins over a composed skill (#281)"
 t_assert_eq 0 "$(awk 'index($0, "Until #281") {n++} END {print n+0}' "$WI/SKILL.md")" \

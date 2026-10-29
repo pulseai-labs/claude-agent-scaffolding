@@ -166,16 +166,47 @@ result from a pass that never opened the file. Skipping this check does not
 fail loudly: a read that never happened still produces a clean-looking
 findings list, and the gate reports green having verified nothing.
 
-**Layer 4 runs inline — the close applies the three §4b lenses itself**
-(`references/impl-check.md`), on every harness. Read the staged diff,
-`spec.md`, `handoff.md`, report §7 and the patterns file
-(`03-code-patterns.md`, resolved as Layer 3 resolved it), and emit findings in
-the §4b schema. There is no selection step and no second engine: this pass is
-Layer 4, on every close that reaches it.
+**After Layers 1 and 2, the close dispatches `ossify:verifier-agent` for Layers 3 and 4 and the §4c mutation check**
+(`references/impl-check.md`), through the host's agent tool. Its prompt names
+absolute `$spec`, `$report`, `$wt`, the `handoff.md` path, the patterns file
+(`03-code-patterns.md`, resolved as Layer 3 resolves it, or `absent`) and the
+diff mode: `staged`, or `committed <base_sha>..HEAD` on a `--pr` resume (§4a).
+When `OSSIFY_VERIFIER_MODEL` is set (a `settings.json` env block, as with
+`OSSIFY_ADVERSARY`), pass it as the tool's `model`. Unset, the registration's
+`model: inherit` applies; print `verifier model: inherited (same as this
+session) — set OSSIFY_VERIFIER_MODEL to separate it`. A value the agent tool
+refuses is a halt that names the value, never a quiet fallback.
+
+The agent mutates in place, so record the worktree before the dispatch and
+compare after the return. The reference value is yours, never the agent's:
+
+```bash
+before=""   # empty before the dispatch; after the return, the value it printed then
+t="$(git -C "$wt" write-tree)" && s="$(git -C "$wt" status --porcelain)" && d="$(git -C "$wt" diff --binary)" \
+  || { echo "close: cannot fingerprint $wt for the verifier - halt"; exit 1; }
+now="$(printf '%s\n%s\n%s\n' "$t" "$s" "$d" | git hash-object --stdin)"
+if [ -z "$before" ]; then echo "verifier identity: $now"
+elif [ "$now" != "$before" ]; then echo "close: verifier left $wt changed - halt"; exit 1; fi
+```
+
+The agent returns one JSON object (`agents/verifier-agent.md`): `verified`,
+or `refused` with a reason. A `refused` return, or anything not in that shape,
+is a halt naming it. Apply the verdicts in order — `[rule]` (Layer 3),
+`[fidelity]` (§4b), `[mutation]` (§4c) — and print
+`verifier: ossify:verifier-agent on <model>` in the close summary.
+
+**Where no agent can be dispatched, the close runs the pass itself** — Codex,
+OMP, a subagent context, a refused `Task` grant. Apply §4, §4b and §4c in this
+session, from the diff and never from report §5, and print
+`verifier: inline — <host or why>` in the close summary. Not a halt. **Inside an
+`--external-executor` lane closing its own items** Layers 3 and 4 run in this
+session and no mutation check runs: the caller's verifier owns it
+(`work-item/references/external-executor.md` §6). A `--detach` caller's later
+`/close` is outside the lane, so it dispatches.
 
 Apply the §4b verdict rule to the findings: an undeclared `fidelity` finding
 fires the `[fidelity]` halt. **Every completed Layer 4 run writes its finding
-set to `<work-item-dir>/verify.md`** — `$(dirname "$report")` on Route A,
+set, with any `stayed-green` or `undetermined` mutation result, to `<work-item-dir>/verify.md`** — `$(dirname "$report")` on Route A,
 `$wi_dir` on Route B — and echoes it in the close summary. When the run halts
 on `[fidelity]`, the set written INCLUDES that halting finding: **the rejection
 is recorded durably (#673 C2)**, because a staged worktree after a rejection is

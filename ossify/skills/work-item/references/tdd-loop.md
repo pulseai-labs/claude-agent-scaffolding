@@ -105,8 +105,8 @@ the report**, and both need the same sanity check first.
    passes on first run because the production code already handled the case (a
    library default, a framework behaviour).
 
-**The sanity check, in both cases:** run SKILL.md §6's "Can each test fail?" step
-on this test now, not at the end. A test that passes both with and without the
+**The sanity check, in both cases:** break the production code once, watch the
+new test go red, restore. A test that passes both with and without the
 behaviour is testing nothing, and a vacuous green here is worse than a failure —
 it ships as evidence.
 
