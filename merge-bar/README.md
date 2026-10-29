@@ -23,6 +23,7 @@ Everything else is non-blocking.
 |---|---|---|
 | `opening-a-pr` | `/merge-bar:open-pr` | Writes the seven-field body (Claim, Scope, Known limits, Merge danger, Merge bar, Evidence, Closes) and opens the PR |
 | `working-a-pr` | `/merge-bar:work-pr <PR>` | Works the PR to mergeable against its own bar; merges a two-way door on your ack, or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority; a one-way door goes to the merge holder |
+| `reviewing-a-pr` | `/merge-bar:review-pr <PR>` | Reviews the PR as defect classes with every site, each sorted against its own bar, in two fresh-context axes (standards, and the Claim or spec); round 2+ reviews only the fix diff and each prior class's closure. Reports only |
 | `setting-up-reviewers` | `/merge-bar:setup-reviewers` | Once per repository: `AGENTS.md` review rules, and `.coderabbit.yaml` if public |
 
 On Codex, invoke the skills by name.

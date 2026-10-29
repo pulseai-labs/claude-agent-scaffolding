@@ -1,5 +1,5 @@
 ---
-scenario_id: W12-reviewer-report-and-round-2
+scenario_id: W15-reviewer-report-and-round-2
 expected_outcome: report-classes-one-push-fresh-round-2-reviewer
 expected_reason: the round-1 review report is a finding signal — the ledger and the §2.5 class list start from its two blocking classes (C1, C2), with every listed site closed, and its non-blocking class C3 is answered; the driver posts the report as ONE PR comment, makes all fixes in one push, then starts a fresh reviewer on the new head — a crew reviewer seat, since crew is present — with `--round 2 --previous <url of that posted comment>`, scoped to the fix diff plus each prior class's closure; the driver never reviews its own fixes in its own context (its own sweep of the fix diff is a pre-push check, not the re-review), and it does not treat the round-2 verdict as available until that reviewer reports on the new head
 ---
