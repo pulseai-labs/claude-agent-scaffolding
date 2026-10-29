@@ -12,7 +12,7 @@ without this marketplace's workspace memory (#964).
   project's OpenBot agent, both repos in Orca, the shared recipe copy against the installed
   example), then the full `baton arm` command with one source line per value, then a stop for the
   operator's yes. After arming: no watching, status only on request, and the README runbook for
-  parks. The skill points to this README and copies none of it.
+  parks. The skill points to this README for the commands, the arm example and the runbook.
 - Known limits: the `ossify-spine` example recipe only. The seat model `via` comes from the
   operator's current rule, so a project with no recorded rule gets a question. No Codex manifest.
 

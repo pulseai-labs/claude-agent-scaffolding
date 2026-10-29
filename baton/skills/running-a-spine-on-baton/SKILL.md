@@ -33,7 +33,7 @@ Stop and report if any check fails. Do not arm around a failure.
 - **The recipe copy.** `~/baton-recipes/ossify-spine/` exists. Compare it with the installed
   baton's `examples/ossify-spine/` (ignore `*.bak*`). On a difference, report it. Propose a
   refresh only when no run of any project is armed or parked, because every armed run reads its
-  briefs from this shared copy. Never overwrite it unasked.
+  briefs from this shared copy. Otherwise arm on the existing copy. Never overwrite it unasked.
 
 ## 2. Propose, then stop
 
@@ -44,6 +44,8 @@ Work out every `--param` of the README's arm example:
   the cache keeps old versions.
 - `ai_root` and `repo` (the canonical root) come from the AI workspace's
   `.workspace/pairing.json`, with `${HOME}` expanded. If it is missing, ask.
+- `spine` is the id asked for. `spine_dir` is its directory in the AI workspace, absolute; the
+  `<slug>` is that directory's name after `<spine>-`. `briefs` is the shared copy's `briefs/`.
 - `spine_branch` is `oss branch_name <spine> <slug>`. `state_file` is `oss state_path`, run in
   the AI workspace root.
 - The run id is the spine id with `.` as `-` (`r3.s7` → `r3-s7`). If that run dir exists,
@@ -74,9 +76,10 @@ End the turn.
 - **Status on request only.** `baton status <run>` or `baton report <run>`. Read
   `out/<unit>/` files only when the operator asks about that unit. Do not read seat transcripts.
 - **A park, on request.** Point to the README runbook. The fallbacks are
-  `baton unpark <run> <unit> [--to <stage>]` and `baton disarm <run>`.
-- **The end.** The operator merges the spine PR. Then `/ossify:close <spine>` runs, in a session
-  the operator picks.
+  `baton unpark <run> <unit> [--to <stage>]` and `baton disarm <run>`. A mistaken No on a unit
+  park asks again on its own (bot-on-openbot 0.2.1).
+- **The end.** The operator merges the spine PR. baton sees the merge and runs the second spine
+  close itself. Do not start `/ossify:close` beside it.
 
 ## Red flags
 
