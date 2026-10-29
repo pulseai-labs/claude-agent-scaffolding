@@ -2,6 +2,18 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.8.0
+
+**Text only (#951).** The verifier brief's CLAIMS gain a fourth claim, never deleted: the diff
+follows `<standards file>` and the conventions the repo follows in fact, with the rule line or
+the neighbouring committed file quoted beside the hunk. The dispatcher fills `<standards file>`
+in merge-bar `reviewing-a-pr`'s order — `CODING_STANDARDS.md` at the paired AI workspace root,
+else at the repo root — then the ossify memory bank's `03-code-patterns.md`, else `none — looked
+at <paths>`. With none, the verifier judges conventions-in-fact alone; a missing file is never
+`cannot determine`. An activated spine's item verifier gets the claim through the CLAIMS body
+`ossify-briefs.md` already supplies verbatim, so that file and `verifier_procedure:
+all-claims-work-item-verify/v1` are unchanged. Every verifier report now carries a claim-4 line.
+
 ## 0.7.0
 
 **Text only (#963).** `orchestrate` follows merge-bar 0.6.0. Where `REVIEW_INVOCATION` is

@@ -227,6 +227,14 @@ CLAIMS:, a numbered list the orchestrator fills from the work item's spec:
   3. When the item adds or changes a test: that test fails when the item's implementation
      edits, not the test, are reverted in a disposable worktree; when no test is added or
      changed, delete this claim (never `cannot determine`).
+  4. The diff follows <standards file> and the conventions the repo follows in fact: quote
+     the rule line, or the neighbouring committed file, and the hunk. <standards file> is
+     the dispatcher's fill: `CODING_STANDARDS.md` at the paired AI workspace root (the
+     directory beside this repo whose `.workspace/pairing.json` has `canonical.name` equal
+     to this repo's name), else at the repo root, else the ossify memory bank's
+     `03-code-patterns.md`, else `none — looked at <paths>`. With none, judge
+     conventions-in-fact alone; absence of a file is never `cannot determine`. Never
+     delete this claim.
 
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 

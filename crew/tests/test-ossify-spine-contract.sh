@@ -2213,6 +2213,18 @@ pin "$COMMAND_MD" 'Bash(mv:*)' \
 n_eq "$BRIEFS_MD" 'RULES THAT DO NOT LOAD HERE' 3 \
   "all three session briefs carry the rules slot"
 
+# 0.8.0 (#951): the verifier's standards claim. ossify-briefs.md's item verifier
+# inherits briefs.md's CLAIMS body verbatim, so the claim is pinned where it is written.
+# Three halves: the claim and its verbatim evidence, the lookup order (merge-bar
+# reviewing-a-pr's, then the memory bank), and the absence rule that keeps a missing
+# file from failing the claim. `flat`: the claim wraps.
+pin "$GENERIC_BRIEFS_MD" '4. The diff follows <standards file> and the conventions the repo follows in fact: quote the rule line, or the neighbouring committed file, and the hunk.' \
+  "the verifier CLAIMS carry the standards claim with verbatim evidence" flat
+pin "$GENERIC_BRIEFS_MD" '`CODING_STANDARDS.md` at the paired AI workspace root (the directory beside this repo whose `.workspace/pairing.json` has `canonical.name` equal to this repo'"'"'s name), else at the repo root, else the ossify memory bank'"'"'s `03-code-patterns.md`, else `none — looked at <paths>`.' \
+  "the standards claim resolves workspace, repo root, memory bank, then none" flat
+pin "$GENERIC_BRIEFS_MD" 'With none, judge conventions-in-fact alone; absence of a file is never `cannot determine`. Never delete this claim.' \
+  "a missing standards file is never cannot-determine, and the claim is never deleted" flat
+
 section "the seat-mods guard reaches every launch site"
 
 # The guard is a launch-time export (`layers/herdr.md`, the launch's step 2), and the
