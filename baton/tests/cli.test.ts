@@ -498,3 +498,61 @@ test("a malformed run.json is refused by name, not read as no such run, and is l
   // adjacent control: a run that does not exist still reads no such run
   expect((await runIn(st, "status", "nope")).err).toContain("no such run: nope");
 });
+
+// ---- arm --seats ------------------------------------------------------------------------
+
+import { createHash } from "node:crypto";
+
+function roleRecipe(dir: string, role: string | null): string {
+  const r = JSON.parse(readFileSync(RELAY, "utf8"));
+  if (role !== null) {
+    r.stages.planner.role = role;
+    delete r.stages.planner.instance;
+    delete r.stages.planner.model;
+  }
+  const f = join(dir, "r.json");
+  writeFileSync(f, JSON.stringify(r));
+  return f;
+}
+const seatsFile = (dir: string, roles: string[]): string => {
+  const t: Record<string, unknown> = {};
+  for (const r of roles) t[r] = { agent: "claude", argv: ["claude"], brief_delivery: "inject", expected_model: "m", effort: "high", env: {} };
+  const f = join(dir, "seats-in.json");
+  writeFileSync(f, JSON.stringify(t, null, 2) + "\n");
+  return f;
+};
+
+test("arm-refuses-missing-role", async () => {
+  const state = newState();
+  const rec = roleRecipe(state, "verifier");
+  const r = await runIn(state, "arm", rec, "--run", "x1", ...PARAMS, "--no-timer", "--seats", seatsFile(state, ["builder"]));
+  expect(r.rc).not.toBe(0);
+  expect(r.err).toContain('role table has no role "verifier" (stage planner)');
+  expect(existsSync(join(state, "runs", "x1"))).toBe(false);
+});
+
+test("arm-requires-seats-when-roles", async () => {
+  const state = newState();
+  const r = await runIn(state, "arm", roleRecipe(state, "verifier"), "--run", "x2", ...PARAMS, "--no-timer");
+  expect(r.rc).toBe(2);
+  expect(r.err).toContain("--seats");
+  expect(existsSync(join(state, "runs", "x2"))).toBe(false);
+});
+
+test("arm-copies-seats", async () => {
+  const state = newState();
+  const sf = seatsFile(state, ["verifier", "extra"]);
+  const r = await runIn(state, "arm", roleRecipe(state, "verifier"), "--run", "x3", ...PARAMS, "--no-timer", "--seats", sf);
+  expect(r.rc).toBe(0);
+  const copied = readFileSync(join(state, "runs", "x3", "seats.json"));
+  expect(copied.equals(readFileSync(sf))).toBe(true);
+  expect(runJson(state, "x3").seats_sha256).toBe(createHash("sha256").update(copied).digest("hex"));
+});
+
+test("arm-without-roles-unchanged", async () => {
+  const state = newState();
+  const r = await runIn(state, "arm", roleRecipe(state, null), "--run", "x4", ...PARAMS, "--no-timer");
+  expect(r.rc).toBe(0);
+  expect(existsSync(join(state, "runs", "x4", "seats.json"))).toBe(false);
+  expect(runJson(state, "x4").seats_sha256).toBeUndefined();
+});
