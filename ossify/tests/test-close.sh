@@ -234,6 +234,35 @@ else
   T_PASS=$((T_PASS+1))
 fi
 
+# #951 D5: the verifier mutates in place, so close fingerprints the worktree
+# before the dispatch and compares after the return. Executed from the shipped
+# block: a clean restore compares equal; an unrestored edit to a staged file, a
+# further edit to an already partly-staged file, and a stray file each halt.
+VI_WT="$TMP/vi-wt"; mkdir -p "$VI_WT"
+git -C "$VI_WT" init -q && printf 'a\n' > "$VI_WT/f" && printf 'p\n' > "$VI_WT/g" \
+  && git -C "$VI_WT" add f g && git -C "$VI_WT" -c user.email=t@t -c user.name=t commit -qm base \
+  && printf 'b\n' > "$VI_WT/f" && git -C "$VI_WT" add f && printf 'q\n' > "$VI_WT/g" && git -C "$VI_WT" add g && printf 'r\n' > "$VI_WT/g"
+VI_BLOCK="$TMP/vi-block.sh"
+VI_WIC="$SKILLS/close/references/work-item-close.md"
+_extract_block "$VI_WIC" 'verifier identity:' "$VI_BLOCK"
+t_capture bash -c "set -uo pipefail; wt='$VI_WT'; . '$VI_BLOCK'"
+t_assert_rc 0 "verifier identity: the before-dispatch run succeeds"
+VI_ID="${T_OUT#verifier identity: }"
+case "$VI_ID" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) T_PASS=$((T_PASS+1));; *) T_FAIL=$((T_FAIL+1)); echo "FAIL: verifier identity block printed no hash: $T_OUT";; esac
+VI_CMP="$TMP/vi-cmp.sh"; sed "s/^before=\"\"/before=\"$VI_ID\"/" "$VI_BLOCK" > "$VI_CMP"
+t_assert_eq 1 "$(grep -c "^before=\"$VI_ID\"" "$VI_CMP")" "verifier identity: the compare copy carries the recorded value"
+_vi_run() { t_capture bash -c "set -uo pipefail; wt='$VI_WT'; . '$VI_CMP'"; }
+_vi_run; t_assert_rc 0 "verifier identity: an untouched worktree compares equal"
+cp "$VI_WT/f" "$TMP/vi-f"; printf 'mutant\n' > "$VI_WT/f"; _vi_run
+t_assert_rc 1 "verifier identity: an unrestored edit to a staged file halts"
+t_assert_contains "$T_OUT" "close: verifier left $VI_WT changed - halt" "...with the named halt"
+cp "$TMP/vi-f" "$VI_WT/f"; _vi_run; t_assert_rc 0 "verifier identity: a restore from the saved copy compares equal again"
+cp "$VI_WT/g" "$TMP/vi-g"; printf 'mutant\n' > "$VI_WT/g"; _vi_run
+t_assert_rc 1 "verifier identity: an edit to an already partly-staged file halts (status alone would not see it)"
+cp "$TMP/vi-g" "$VI_WT/g"; : > "$VI_WT/stray"; _vi_run
+t_assert_rc 1 "verifier identity: a stray file left in the worktree halts"
+rm -f "$VI_WT/stray"
+
 # Layer 2 - report cross-check. Assert the LIB's real message; the
 # `[report cross-check]` prefix is the skill's surfacing convention and appears
 # in no lib, so a ceremony grepping for it would find nothing forever.

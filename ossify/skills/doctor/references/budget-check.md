@@ -99,14 +99,14 @@ measured vacuously is worse.
 
 ## 3. The agent-listing budget nothing enforces
 
-`agents/implementer-agent.md`'s description is loaded in every agent-listing
-context. In v0.3 it was cut from roughly **2,000 characters to under 600** by
-moving the full execution contract into the body — at the time, the single
-largest every-call string in the plugin.
+Each `agents/*.md` description (`implementer-agent.md`, `verifier-agent.md`) is
+loaded in every agent-listing context. In v0.3 the implementer's was cut from
+roughly **2,000 characters to under 600** by moving the full execution contract
+into the body — at the time, the single largest every-call string in the plugin.
 
-**No test holds it there.** If it regrows, nothing goes red.
+**No test holds them there.** If one regrows, nothing goes red.
 
-So measure it rather than quoting a remembered figure:
+So measure them rather than quoting a remembered figure:
 
 ```bash
 oss_bin="$(command -v oss 2>/dev/null || true)"
@@ -116,10 +116,12 @@ if [ -n "$oss_bin" ]; then
 fi
 [ -n "$oss_bin" ] || { echo "cannot resolve the ossify dispatcher: nothing on PATH answers as ossify" >&2; exit 1; }
 oss_root="$(cd "$(dirname "$oss_bin")/.." && pwd)"
-awk -F'description: ' '/^description: /{print length($2); exit}' "$oss_root/agents/implementer-agent.md"
+for a in "$oss_root"/agents/*.md; do
+  printf '%s ' "${a##*/}"; awk -F'description: ' '/^description: /{print length($2); exit}' "$a"
+done
 ```
 
-Two notes on reading that number. It counts the raw YAML value **including the
+Two notes on reading those numbers. It counts the raw YAML value **including the
 surrounding quotes** when the description is quoted, so it runs a couple of
 characters over the string itself — close enough to judge, not close enough to
 quote as exact. And the figure is deliberately not written down here: the one

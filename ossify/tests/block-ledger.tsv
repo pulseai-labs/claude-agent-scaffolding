@@ -130,6 +130,7 @@ O	skills/close/references/patch-lane.md	touch_check	tests/test-close.sh	a patch 
 D	skills/close/references/patch-lane.md	1	#138	the patch commit's branch placement block - CL-1 says the target branch is unspecified, so executing it needs the design decision first. #272/#310 Task 9 keyed the block to a `repo_key` (any declared repo, not only canonical); the underlying CL-1 gap is unchanged
 I	skills/close/references/patch-lane.md	1	single patch_add call with <placeholder> args
 O	skills/close/references/work-item-close.md	abbrev-ref	tests/test-close.sh	W1: the merge guard fires when the item's own repo (target_repo, not always canonical since #272/#310 Task 9) is parked on the wrong branch
+O	skills/close/references/work-item-close.md	verifier identity:	tests/test-close.sh	#951 D5: the before/after worktree fingerprint around the verifier dispatch - an unrestored staged edit, an edit to a partly-staged file and a stray file each halt
 D	skills/close/references/work-item-close.md	4	#138	path resolution (which now reads .status and refuses an `abandoned` item BEFORE diagnosing a missing worktree, #531) - and that arm's route out reopens an already-closed parent spine, since un-withdrawing alone leaves a planned item inside a closed spine that release close's tag selector then accepts, the spec-exists halt, the staged-changes read, and the Route A/B close sequence
 D	skills/close/references/work-item-close.md	1	#138	section 4a's PR-mode block (/close <wi-id> --pr): the remote-leg probe and the spine-branch push when origin lacks it, commit-or-resume, push, existing-PR lookup, gh pr create and work_item_pr. Pinned by prose-contract pins; walked by hand against a throwaway bare-origin fixture with a stubbed gh (task 3 live check), not extracted by the suite - it needs gh and a remote
 I	skills/close/references/work-item-close.md	1	a single <placeholder> assignment showing the report path's origin
@@ -235,10 +236,10 @@ H	skills/close/references/release-close.md	143548614-14087
 H	skills/close/references/retrospective.md	3602587869-249
 H	skills/close/references/routing.md	261804248-259
 H	skills/close/references/spine-close.md	666032420-46233
-H	skills/close/references/work-item-close.md	1098212727-10840
+H	skills/close/references/work-item-close.md	1529921170-11360
 H	commands/doctor.md	729179949-141
 H	skills/doctor/SKILL.md	630905567-126
-H	skills/doctor/references/budget-check.md	2942541912-1024
+H	skills/doctor/references/budget-check.md	4087089281-1058
 H	skills/doctor/references/interop-check.md	1003299360-1052
 H	skills/doctor/references/spec-validation.md	3469818852-7018
 H	skills/doctor/references/state-inspection.md	2907377792-5955

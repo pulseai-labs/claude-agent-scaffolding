@@ -52,8 +52,9 @@ looking for permission. Each axis is cheap on its own and worthless once
 contaminated by the other.
 
 > **On sub-agents:** the absorption spec sketched these as parallel sub-agent
-> passes. **ossify does not dispatch review to another agent** — `implementer-agent`
-> is its only worker, and that is deliberate (`work-item/SKILL.md` §1). Sequence
+> passes. **ossify does not dispatch review to another agent** — its workers are
+> `implementer-agent` and work-item close's `verifier-agent`, and neither reviews
+> a spine (`work-item-close.md` §2). Sequence
 > is what buys the separation here, not isolation: finish A, write its findings
 > down, *then* open the spec. Writing A's findings before reading the spec is what
 > makes the separation real rather than intended.

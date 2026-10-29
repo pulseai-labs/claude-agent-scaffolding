@@ -488,7 +488,8 @@ It carries, in this order:
 1. **What closed** — the id and scope, and whether every step ran or the ceremony
    halted partway.
 2. **Gate outcomes** — each blocking gate with its verdict, source-tagged the way
-   the step reported it (`[AC]`, `[report cross-check]`, `[rule]`, `[fidelity]`).
+   the step reported it (`[AC]`, `[report cross-check]`, `[rule]`, `[fidelity]`,
+   `[mutation]`), and the `verifier:` line (`work-item-close.md` §2).
 3. **Anything a step told you to record here.** Several steps route their output
    to the summary rather than to a file: `harvest.md` §2's missing-report gaps,
    §5's rule-authoring referrals, and §8's harvest outcomes. If a step says "record it in the

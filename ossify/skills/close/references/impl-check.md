@@ -4,8 +4,9 @@ Depth for SKILL.md §4, step 2. This is the orchestrator-side gate over one work
 item's output (spec §6, last bullet). It runs on the resolved `$spec`, `$report`
 and `$wt` from `work-item-close.md` §1 — **never on a placeholder**.
 
-Four layers, in order. **Halt on the first failure in any layer**, and a halt is
-terminal: no later layer runs, no commit, no merge, no status write.
+Four layers, in order, and §4c's mutation check with Layer 4. **Halt on the
+first failure in any layer**, and a halt is terminal: no later layer runs, no
+commit, no merge, no status write.
 
 ---
 
@@ -210,7 +211,7 @@ by interpretation at a close gate is how a rule set stops meaning anything.
 Layer 3 asked whether the diff violates a pattern the project *wrote down*. Layer 4
 is the semantic pass nothing else in the gate can do: **does the diff implement the
 spec, follow the repo's patterns, and omit nothing the spec requires.** It runs
-after Layer 3, on the same staged diff, and the close applies the lenses itself
+after Layer 3, on the same diff, in the verifier pass below
 (`work-item-close.md` §2 drives; this section owns the lenses).
 
 ### The lenses
@@ -307,22 +308,50 @@ claim and evidence carry over.
 | Layer 3 | diff vs `03-code-patterns.md` | a **documented** pattern violated | yes (`[rule]`) |
 | Layer 4 `fidelity` | diff vs `spec.md` + report §7 | is it the code the item was supposed to write, and does the report say so honestly | yes, undeclared only (`[fidelity]`) |
 | Layer 4 `pattern` / `absence` | diff vs conventions-in-fact / spec artifacts | what a documented rule never captures | no — advisory to `verify.md` |
+| §4c mutation | each added or changed test vs a mutation of the code it guards | can the test fail | yes, evidenced `stayed-green` only (`[mutation]`) |
 | code-review (spine close) | the spine's whole diff | is it **good** code; did the *intent* drift | no — advisory, dispositioned |
 
 Layer 4 catches a defect while the item is still open that code review would only
 see once the spine's diff is one thing; code review still owns craft and
 spine-level intent. Neither re-runs the other.
 
-### The pass — every harness, inline
+### The pass — a fresh verifier, or inline
 
-After Layer 3, read the staged diff, `spec.md`, `handoff.md`, report §7 and the
-patterns file, apply the three lenses yourself, and emit findings in the schema.
-`pattern`'s neighbouring-files read (§4b above) comes from the COMMITTED tree
+Layers 3 and 4 and §4c run as one pass, by `ossify:verifier-agent` in a context
+that did not build the item, or by the closing session where no agent can be
+dispatched (`work-item-close.md` §2 owns which, and applies the verdicts). Read
+the diff (staged, or `$base_sha..HEAD` on a `--pr` resume), `spec.md`,
+`handoff.md`, report §7 and the patterns file, apply the three lenses, and emit
+findings in the schema. Never take a mutation answer from the implementer's
+report §5. `pattern`'s neighbouring-files read (§4b above) comes from the COMMITTED tree
 only (`git show HEAD:<path>`), never the raw worktree filesystem — an
 explained `partial` stage (`work-item-close.md` §3) can leave uncommitted
 edits sitting there that were never meant to inform this judgment, in either
-direction. This pass is the judgment with the host's own context — the same
-pass on every close that reaches it (`work-item-close.md` §2).
+direction.
+
+---
+
+## 4c. Mutation — can each test fail?
+
+**Can each test fail?** A green run proves nothing about a test that cannot go
+red. For each test the diff adds or changes, mutate the production code it
+guards and hold three conditions: the mutation is semantic (not a syntax
+error), it applied (echo the changed line back), and it runs on the path the
+test exercises. Run the test, then restore from a copy saved outside the
+worktree, never from git (`git checkout` drops the staged work). A text pin
+binds to text the change writes and matches it exactly once; a phrase that
+also occurs elsewhere keeps the pin green when the guarded line is deleted.
+
+Each result is one of:
+
+- `red` — the test failed under the mutation. It can fail.
+- `stayed-green` — the test passed, and the evidence shows all three conditions
+  held. This **halts** with `[mutation]`.
+- `undetermined` — a condition could not be shown. Advisory, to `verify.md`.
+
+No added or changed test, no result. Inside an `--external-executor` lane
+closing its own items, close runs no mutation check: the caller's verifier
+owns it (`work-item/references/external-executor.md` §6).
 
 ---
 
@@ -337,10 +366,11 @@ criterion:
 [report cross-check] report does not account for: AC-2
 [rule]               <file>:<line> - <the documented pattern it violates>
 [fidelity]           <file>:<line> - the diff deviates from spec.md: <claim>; report §7 does not declare it
+[mutation]           <test> - stayed green with <mutation> applied on its path
 ```
 
-Do not invent a fifth tag, do not translate one into prose, and do not merge two
-layers' findings under one tag. Four tags, spelled exactly as above.
+Do not invent a sixth tag, do not translate one into prose, and do not merge two
+layers' findings under one tag. Five tags, spelled exactly as above.
 
 ---
 
@@ -361,8 +391,8 @@ consequences and stop:
    code is wrong. Rewriting a criterion to match what was built is how a gate
    becomes decorative, and it is silent: every later run passes.
 
-   **Which criterion depends on the layer that halted**, because the four layers
-   are judged against four different documents:
+   **Which criterion depends on the tag that halted**, because each is judged
+   against a different document:
 
    | Halting layer | The criterion is | Fixing it means |
    |---|---|---|
@@ -370,6 +400,7 @@ consequences and stop:
    | `[report cross-check]` — Layer 2 | the report's AC table | the report under-accounts; the fix is in `report.md`, not the spec |
    | `[rule]` — Layer 3 | the pattern in `03-code-patterns.md` | amend the pattern in the memory bank — with the user, since it binds every future spine |
    | `[fidelity]` — Layer 4 | the deviation is real and §7 does not declare it | re-dispatch: the code aligns to the spec, or §7 declares the deviation honestly; only where the *spec itself* is wrong, back through `/plan-spine` — never amended at this gate |
+   | `[mutation]` — §4c | the added or changed test, which cannot fail | re-dispatch the implementer with the vacuous test named |
 
    A Layer 3 halt offered "re-author the AC" is being offered the wrong document:
    no AC is involved, and the honest options are amend the pattern, or fix the
@@ -397,5 +428,7 @@ reach it (`work-item-close.md` §5).
 - **Halting on a pattern or absence finding.** Advisory by decision (§4b); the
   only Layer 4 halt is an undeclared fidelity deviation, under the `[fidelity]`
   tag.
+- **Taking a mutation answer from report §5, or halting on `undetermined`.** The
+  pass mutates for itself; only an evidenced `stayed-green` halts (§4c).
 - **Letting `verify.md` advisories evaporate.** They are spine-close code
   review's input; advisory does not mean disposable.

@@ -308,12 +308,11 @@ finishes, it comes back as a §4 record and goes through §5a.
 
 ## 6. Layer 4 under this mode
 
-External mode **runs Layer 4 inline** — the lenses applied by the close itself,
-per `close/references/impl-check.md` §4b — which is no distinction at all:
-Layer 4 runs inline on every harness, and this mode changes nothing about it.
-The caller's own reviewer already covered the item, and the close's pass adds
-exactly what it adds on the no-flag path — one read, one findings set, the same
-verdict rule.
+External mode **runs Layer 4 inline** — the lenses applied by the closing
+session itself, per `close/references/impl-check.md` §4b, with no verifier
+dispatched. The caller's own reviewer already covered the item, and the close's
+pass adds one read, one findings set, the same verdict rule. Close runs no
+mutation check in this mode (`impl-check.md` §4c): the caller's verifier owns it.
 
 The lenses, the finding schema and the verdict rule are `impl-check.md`'s and do
 not change.
