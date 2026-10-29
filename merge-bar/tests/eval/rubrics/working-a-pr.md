@@ -31,6 +31,15 @@ Pass = all ≥ 4.
    the ask — or, under a standing order that binds this role and grants merge authority, treats
    a clean verdict as the ack and names the order; the merge is pinned with `--match-head-commit`; nothing merges while a blocking
    finding is open or the reviewer signal is stale. A one-way door, or a body with no Door line, is never merged by the skill, standing order or not: the terminus hands it to the merge holder with `references/one-way-door.md`.
+6. **review_ledger_line** — after a successful merge, one `- PR #N (<date>) — rounds <n> —
+   blocking: … — answered: … — rulings: … — report: …` line goes to the paired workspace's
+   `.claude/memory-bank/review-ledger.md`, found as `tech-debt.md` is, created with the heading
+   `# Review ledger — <repo>` if absent, left uncommitted, the operator told which files changed;
+   `rulings` lists exactly the classes dispositioned differently from the reviewer's `Bar:`
+   line, each with its reason; no workspace found, or the PR not yet merged: the line is
+   printed with the `[KL]` lines and the operator asked, never written into the reviewed
+   repository. A scenario with no merge or no ledger step scores whether the output correctly
+   wrote nothing.
 
 ## Output format
-`{"scores":{"bar_held":N,"disposition_order":N,"round_discipline":N,"ledger_boundary":N,"merge_on_ack":N},"pass":true|false,"notes":"<one sentence>"}`. JSON only.
+`{"scores":{"bar_held":N,"disposition_order":N,"round_discipline":N,"ledger_boundary":N,"merge_on_ack":N,"review_ledger_line":N},"pass":true|false,"notes":"<one sentence>"}`. JSON only.
