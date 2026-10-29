@@ -12,7 +12,7 @@ set -u
 # Auto-source helpers if not already loaded (mirrors stubs.sh pattern).
 if ! declare -F wi_log_op >/dev/null 2>&1; then
   # shellcheck source=./_helpers.sh
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 
 # ---------------------------------------------------------------------------

@@ -241,18 +241,15 @@ test_PK1_both_repos_have_baked_hook() {
   [[ -x "$ai_hook" ]] || { echo "    ai hook not +x"; return 1; }
   [[ -x "$cn_hook" ]] || { echo "    canonical hook not +x"; return 1; }
 
-  local ai_root_canon
-  ai_root_canon="$(wi_realpath "$parent/proj1-ai")"
-  # The path is baked shell-quoted (printf %q) so any byte survives — evaluate
-  # the assignment line exactly as bash would rather than unpicking quotes.
+  # #983: the hooks bake a reference resolved from the repo they run in — the
+  # AI workspace's own hook names itself, the canonical's names its sibling —
+  # never an absolute path that is valid on one host only. Evaluate each
+  # assignment line exactly as bash would rather than unpicking quotes.
   local baked_ai baked_cn
-  baked_ai="$(eval "$(grep -m1 -E '^AI_WORKSPACE_PATH=' "$ai_hook")"; printf '%s' "$AI_WORKSPACE_PATH")"
-  baked_cn="$(eval "$(grep -m1 -E '^AI_WORKSPACE_PATH=' "$cn_hook")"; printf '%s' "$AI_WORKSPACE_PATH")"
-  local baked_ai_canon baked_cn_canon
-  baked_ai_canon="$(wi_realpath "$baked_ai")"
-  baked_cn_canon="$(wi_realpath "$baked_cn")"
-  assert_eq "$ai_root_canon" "$baked_ai_canon" || { echo "    ai hook baked-path mismatch"; return 1; }
-  assert_eq "$ai_root_canon" "$baked_cn_canon" || { echo "    canonical hook baked-path mismatch"; return 1; }
+  baked_ai="$(eval "$(grep -m1 -E '^AI_WORKSPACE_REF=' "$ai_hook")"; printf '%s' "$AI_WORKSPACE_REF")"
+  baked_cn="$(eval "$(grep -m1 -E '^AI_WORKSPACE_REF=' "$cn_hook")"; printf '%s' "$AI_WORKSPACE_REF")"
+  assert_eq "self" "$baked_ai" || { echo "    ai-hook reference mismatch"; return 1; }
+  assert_eq "sibling:proj1-ai" "$baked_cn" || { echo "    canonical-hook reference mismatch"; return 1; }
 }
 
 # ---------------------------------------------------------------------------

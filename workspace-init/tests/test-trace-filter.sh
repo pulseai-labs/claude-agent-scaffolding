@@ -34,6 +34,12 @@ _render_hook() {
   echo "$hook"
 }
 
+# The AI workspace reference a hook bakes (#983), evaluated exactly as bash
+# reads the assignment line rather than unpicking its quoting.
+_baked_ref() {
+  ( eval "$(grep -m1 -E '^AI_WORKSPACE_REF=' "$1")"; printf '%s' "$AI_WORKSPACE_REF" )
+}
+
 _write_msg() {
   local d="$1"
   local content="$2"
@@ -345,8 +351,8 @@ test_E7_unicode_robot_at_line_start_blocks() {
 test_E8_render_substitutes_token() {
   local d; d="$(_make_fixture)"
   local hook; hook="$(_render_hook "$d")"
-  if grep -q '__AI_WORKSPACE_PATH__' "$hook"; then
-    echo "    placeholder __AI_WORKSPACE_PATH__ still present in rendered hook"
+  if grep -q '__AI_WORKSPACE_REF__' "$hook"; then
+    echo "    placeholder __AI_WORKSPACE_REF__ still present in rendered hook"
     return 1
   fi
   if ! grep -qF "$d/foo-ai" "$hook"; then
@@ -562,8 +568,8 @@ test_F3_install_replaces_own_marked_hook() {
     echo "    re-install over our own hook refused"; return 1; }
   grep -qF '# workspace-init:managed-hook' "$cn/.git/hooks/commit-msg" || {
     echo "    re-rendered hook lost the marker"; return 1; }
-  grep -qF "$ai" "$cn/.git/hooks/commit-msg" || {
-    echo "    re-rendered hook did not bake the AI path"; return 1; }
+  assert_eq "sibling:foo-ai" "$(_baked_ref "$cn/.git/hooks/commit-msg")" \
+    "re-rendered hook must bake the sibling AI workspace" || return 1
 }
 
 test_F4_foreign_hook_mentioning_workspace_init_refused() {
@@ -661,7 +667,7 @@ test_SC7_space_in_path()             { _assert_e2e_trace_filter_blocks 'wk- dir-
 test_SC8_squote_in_path()            { _assert_e2e_trace_filter_blocks "wk-'-ai"; }
 # The path may itself contain the placeholder text — the render must terminate
 # and the baked value must stay literal (guards the substitution loop shape).
-test_SC9_placeholder_text_in_path()  { _assert_e2e_trace_filter_blocks 'wk-__AI_WORKSPACE_PATH__-ai'; }
+test_SC9_placeholder_text_in_path()  { _assert_e2e_trace_filter_blocks 'wk-__AI_WORKSPACE_REF__-ai'; }
 
 # ---------------------------------------------------------------------------
 # Named-repair contract (#481) + moved-workspace end-to-end — 2 tests
@@ -732,9 +738,10 @@ test_M1_moved_workspace_repair_restores_filter() {
       -m 'clean' 2>"$d/clean-err"
   rc=$?
   [[ "$rc" -eq 0 ]] || { echo "    clean commit blocked after repair"; cat "$d/clean-err"; return 1; }
-  # And the AI-workspace-side hook was re-baked too (pair form).
-  grep -qF "$moved" "$cn/.git/hooks/commit-msg" || {
-    echo "    canonical hook not re-baked to the moved path"; return 1; }
+  # And the canonical hook now names the moved workspace (#983: by sibling
+  # name, resolved at commit time).
+  assert_eq "sibling:proj-ai-MOVED" "$(_baked_ref "$cn/.git/hooks/commit-msg")" \
+    "canonical hook not re-baked to the moved workspace" || return 1
 }
 
 test_M2_moved_workspace_full_repair_updates_manifest_roots() {
@@ -977,8 +984,8 @@ test_H5_pair_repair_updates_canonical_despite_foreign_ai_hook() {
   fi
   cmp -s "$d/foreign.orig" "$fh" || { echo "    foreign AI hook was destroyed"; return 1; }
   # …but the canonical hook was still re-baked to the moved workspace.
-  grep -qF "$moved" "$cn/.git/hooks/commit-msg" || {
-    echo "    canonical hook was not re-baked to the moved path"; return 1; }
+  assert_eq "sibling:proj-ai-MOVED" "$(_baked_ref "$cn/.git/hooks/commit-msg")" \
+    "canonical hook was not re-baked to the moved workspace" || return 1
   git -C "$cn" -c user.email=t@t -c user.name=t commit -q --allow-empty \
       -m $'z\n\nCo-Authored-By: Bot <bot@x>' 2>"$d/after-err"
   local rc=$?
@@ -1074,8 +1081,8 @@ test_Q5_pair_install_validates_ai_root_before_writes() {
   rm -f "$cn/.git/hooks/commit-msg"
   if "$WI_BIN" trace_filter_install_pair "$ai" "$cn" 2>"$d/err3"; then
     echo "    pair must still report the AI-side refusal"; return 1; fi
-  grep -qF "$ai" "$cn/.git/hooks/commit-msg" || {
-    echo "    canonical hook not re-installed for the valid root"; return 1; }
+  assert_eq "sibling:ai-side" "$(_baked_ref "$cn/.git/hooks/commit-msg")" \
+    "canonical hook not re-installed for the valid root" || return 1
   grep -qF 'workspace-init:managed-hook' "$cn/.git/hooks/commit-msg" || {
     echo "    canonical hook missing the managed marker"; return 1; }
   cmp -s "$d/foreign.orig" "$fh" || {
@@ -1125,8 +1132,8 @@ test_Q6_single_install_validates_ai_root_before_writes() {
   rm -f "$cn/.git/hooks/commit-msg"
   ( cd "$d" && "$WI_BIN" trace_filter_install ai-side canonical ) 2>/dev/null || {
     echo "    relative valid AI root was refused"; return 1; }
-  grep -qF "$(cd "$ai" && pwd -P)" "$cn/.git/hooks/commit-msg" || {
-    echo "    relative install did not bake the absolute AI root"; return 1; }
+  assert_eq "sibling:ai-side" "$(_baked_ref "$cn/.git/hooks/commit-msg")" \
+    "relative install did not resolve the AI root" || return 1
 }
 
 # ---------------------------------------------------------------------------
