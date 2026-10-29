@@ -1,1 +1,1 @@
-{"scores":{"placement":5,"no_overwrite":5,"stub":5,"no_model_name":5},"pass":true,"notes":"The output refuses, names both triggers (public posture and identical ai_workspace/canonical roots), writes nothing, and invents no occupied-file question."}
+{"scores":{"placement":5,"no_overwrite":5,"stub":5,"no_model_name":5},"pass":true,"notes":"Refuses on both triggers (public posture and ai_workspace root equal to the canonical root), writes nothing, and asks no occupied-file question."}
