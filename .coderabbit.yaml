@@ -51,6 +51,3 @@ reviews:
 knowledge_base:
   learnings:
     scope: local
-  code_guidelines:
-    filePatterns:
-      - "pulseai-labs/claude-agent-scaffolding-internal:CODING_STANDARDS.md"
