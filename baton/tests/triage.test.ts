@@ -320,6 +320,19 @@ test("unpark --to clears triaged and the note", async () => {
   expect(existsSync(note())).toBe(false);
 });
 
+test("plain unpark keeps the triaged request ids", async () => {
+  await triaged();
+  host.finish("thread-2", "completed");
+  at(2);
+  await doTick(); // parks: no answer
+  expect(runState().units.a.parked?.reason).toBe("triage gave no answer");
+  expect(runState().units.a.triaged).toEqual(["req-1"]);
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  const u = runState().units.a;
+  expect(u.parked).toBeUndefined();
+  expect(u.triaged).toEqual(["req-1"]);
+});
+
 test("report counts triage", async () => {
   await arm(recipe({ work: sess() }, ["a", "b"]));
   host = new FakeHost({ work: pendingSeat(), triage: TRIAGE });
@@ -749,6 +762,17 @@ test("a second request while the triage is out records its questions", async () 
   expect(e.reason).toBe("second prompt");
   expect(e.thread).toBe("thread-1");
   expect(JSON.parse(e.questions)).toEqual(OTHER.questions);
+});
+
+test("a second request with no questions leaves the questions field off the park (#899)", async () => {
+  await triaged();
+  host.raise("thread-1", { id: "req-2", questions: [] });
+  at(2);
+  await doTick();
+  const e = lastPark();
+  expect(e.reason).toBe("second prompt");
+  expect(e.thread).toBe("thread-1");
+  expect("questions" in e).toBe(false);
 });
 
 test("a second request seen as the triage ends records its questions", async () => {

@@ -89,4 +89,12 @@ export interface Host {
    * their screen check.
    */
   keys?(threadId: string, text: string): Promise<void>;
+  /**
+   * Remove what the host keeps for run `runId` outside the run directory. Called once the run is
+   * done (before it is marked done: a host error retries next tick) and on `disarm`. A run with
+   * nothing kept is not an error.
+   */
+  endRun?(runId: string): Promise<void>;
+  /** One clause the engine appends to a `thread gone` park's notice: where to look for why. */
+  goneNote?(): string;
 }

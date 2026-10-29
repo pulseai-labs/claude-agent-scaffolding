@@ -245,6 +245,20 @@ test("refused resume escalates", async () => {
   ]);
 });
 
+test("an escalated before failed park keeps the failing hook at the end of its notice (#906)", async () => {
+  const rec = recipe(["a"]);
+  (rec.stages.work as Record<string, unknown>).before = [["true"], ["false"]];
+  await arm(rec);
+  host = new FakeHost({ work: SEAT, fix: SEAT, driver: driverWrites(escalateJson("raise the cap")) });
+  await doTick(); // a parks before failed; its driver launches
+  expect(runState().units.a.parked?.reason).toBe("before failed");
+  expect(notices()).toEqual([]);
+  await driverEnds();
+  const n = notices();
+  expect(n.length).toBe(1);
+  expect(n[0].endsWith("baton r1/a parked in work: before failed — raise the cap — hook 2: false")).toBe(true);
+});
+
 test("escalate sends one action", async () => {
   await parked(driverWrites(escalateJson("walk d47")));
   await driverEnds();

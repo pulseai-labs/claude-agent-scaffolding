@@ -24,7 +24,8 @@ import {
   DEFAULT_SLOTS, DEFAULT_STAGE_SLOTS, isProtoName, nonce as launchNonce, own, render, threadTitle, UNIT_ID_RE,
   type DriverStage, type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type TriageStage, type WaitStage,
 } from "./recipe.ts";
-import { mergeUnit, type ParkPr } from "./merge.ts";
+import { mergeUnit, type HookFailure, type ParkPr } from "./merge.ts";
+import { parsePicker } from "./picker.ts";
 import { runSummary } from "./summary.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
 import { enterStage, type KeptThread, type RunState, type Session, type Store, type UnitState } from "./state.ts";
@@ -76,6 +77,8 @@ const WALK_LIMIT = 5000;
 /** A blocked park's notice carries the last lines of the screen, cut to this many characters. */
 const SCREEN_LINES = 12;
 const SCREEN_CHARS = 1500;
+/** A failed hook's argv in a park notice is cut to this many characters; the event keeps it whole. */
+const HOOK_CHARS = 120;
 
 const emptyReport = (): TickReport => ({ launched: [], transitioned: [], parked: [], merged: [], errors: [] });
 const isHostError = (e: unknown) => e instanceof HostAuthError || e instanceof HostDownError;
@@ -155,6 +158,13 @@ export function triageNote(run: RunState, recipe: Recipe, u: UnitState): string 
 function prSuffix(pr: ParkPr | undefined): string {
   return pr === undefined ? ""
     : ` — ${pr.why === "conflict" ? "conflict" : `red${pr.failing ? `: ${pr.failing.join(", ")}` : ""}`} — ${pr.url}`;
+}
+
+/** A failed hook's notice suffix: its index and argv, the argv cut to HOOK_CHARS (#906). */
+function hookSuffix(h: HookFailure | undefined): string {
+  if (h === undefined) return "";
+  const text = h.argv.join(" ");
+  return ` — hook ${h.hook}: ${text.length > HOOK_CHARS ? text.slice(0, HOOK_CHARS - 1) + "…" : text}`;
 }
 
 function removeFile(path: string): void {
@@ -362,7 +372,7 @@ class RunTick {
 
   private async park(
     u: UnitState, reason: string,
-    o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr } = {},
+    o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr; hook?: HookFailure } = {},
   ): Promise<void> {
     const thread = u.session?.thread_id ?? o.thread; // endSession deletes the session; a caller that ended it first passes it
     await this.endSession(u, { ...o, keep: "unpark" });
@@ -372,13 +382,14 @@ class RunTick {
     this.ev("park", {
       unit: u.id, stage: u.stage, reason,
       ...(thread ? { thread } : {}),
-      ...(o.questions ? { questions: JSON.stringify(o.questions) } : {}),
+      ...(o.questions?.length ? { questions: JSON.stringify(o.questions) } : {}),
       ...(o.pr ? { pr: o.pr.url, pr_state: o.pr.why, ...(o.pr.failing ? { failing: o.pr.failing } : {}) } : {}),
+      ...(o.hook ? { hook: o.hook.hook, argv: o.hook.argv } : {}),
     });
     this.report.parked.push(u.id);
     // With a driver, step 7 settles the park: only its escalate or stop reaches the operator.
     if (this.recipe.driver) return;
-    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}${prSuffix(o.pr)}`);
+    await this.notify(`${this.run.id}/${u.id}/park/${at}`, `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${reason}${prSuffix(o.pr)}${hookSuffix(o.hook)}${this.goneSuffix(reason)}`);
   }
 
   /** `note` is the outcome's notice, rendered by the caller before any side effect. */
@@ -393,17 +404,17 @@ class RunTick {
     if (note !== undefined) await this.notify(`${this.run.id}/${u.id}/${o.to}/${this.nowIso()}`, note);
   }
 
-  /** Run hook argvs in order with no shell; false at the first non-zero. */
-  private hooks(list: string[][] | undefined, scope: Scope, cwd: string): boolean {
-    for (const argv of list ?? []) {
+  /** Run hook argvs in order with no shell; the first that exits non-zero, or undefined when all pass. */
+  private hooks(list: string[][] | undefined, scope: Scope, cwd: string): HookFailure | undefined {
+    for (const [i, argv] of (list ?? []).entries()) {
       const rendered = argv.map((a) => render(a, scope));
       const rc = runArgv(rendered, cwd, HOOK_TIMEOUT_MS);
       if (rc !== 0) {
         this.ev("hook failed", { unit: scope.unit.id, argv: rendered, rc });
-        return false;
+        return { hook: i + 1, argv: rendered };
       }
     }
-    return true;
+    return undefined;
   }
 
   private existingDir(...dirs: (string | undefined)[]): string {
@@ -439,7 +450,8 @@ class RunTick {
     // Rendered before any side effect: a notice that cannot render parks the unit with no hook
     // run, its session still in place for the park to end, and no move.
     const note = m.o.notify === undefined ? undefined : render(m.o.notify, m.scope);
-    if (!this.hooks(m.o.run, m.scope, hookCwd)) return this.park(u, "run failed");
+    const failed = this.hooks(m.o.run, m.scope, hookCwd);
+    if (failed) return this.park(u, "run failed", { hook: failed });
     const thread = u.session?.thread_id; // endSession deletes the session; a park by outcome still records it
     // A park by outcome keeps the thread as any park does.
     await this.endSession(u, m.o.to === "park" ? { keep: "unpark" } : {});
@@ -827,7 +839,11 @@ class RunTick {
       `baton ${this.run.id}/${u.id} blocked in ${u.stage} (project ${project}): the worker waits on a question — answer it in the worker's terminal — screen: ${tail}`);
   }
 
-  /** The screen's last non-empty lines, trimmed and joined; `unavailable` with nothing to read. */
+  /**
+   * The screen's last non-empty lines, trimmed and joined; `unavailable` with nothing to read. A
+   * live picker whose question line is not among them (an omp ask box is taller than the tail)
+   * gets the question first, `<question> | … | <tail>` (#930).
+   */
   private async screenTail(thread: string): Promise<string> {
     let text: string;
     try {
@@ -838,7 +854,12 @@ class RunTick {
     }
     const lines = text.split("\n").map((l) => l.trim()).filter((l) => l !== "");
     if (lines.length === 0) return "unavailable";
-    return lines.slice(-SCREEN_LINES).join(" | ").slice(-SCREEN_CHARS);
+    const tail = lines.slice(-SCREEN_LINES);
+    const q = parsePicker(text)?.question;
+    if (q === undefined || tail.some((l) => l.includes(q))) return tail.join(" | ").slice(-SCREEN_CHARS);
+    const head = `${q} | … | `;
+    const room = SCREEN_CHARS - head.length;
+    return room > 0 ? head + tail.join(" | ").slice(-room) : head.slice(0, SCREEN_CHARS);
   }
 
   /** `kind` names the event: a triage that asks for a relaunch logs `triage relaunch`. */
@@ -1141,7 +1162,7 @@ class RunTick {
         run: this.run, forge: this.opts.forge, prViews: this.prViews,
         scope: (x, extra) => this.scope(x, extra),
         ev: (k, o) => this.ev(k, o),
-        park: (x, reason) => this.park(x, reason),
+        park: (x, reason, hook) => this.park(x, reason, { hook }),
         move: (x, to, pr) => this.move(x, { when: [], to }, undefined, undefined, pr),
         hooks: (list, scope, cwd) => this.hooks(list, scope, cwd),
         save: () => this.save(),
@@ -1208,7 +1229,8 @@ class RunTick {
     if (!this.slotsFree(stage)) return;
     delete u.cwd_busy;
     if ((own(u.launches, u.stage) ?? 0) >= (stage.max_launches ?? DEFAULT_MAX_LAUNCHES)) return this.park(u, "cap");
-    if (!this.hooks(stage.before, scope, this.existingDir(cwd))) return this.park(u, "before failed");
+    const failed = this.hooks(stage.before, scope, this.existingDir(cwd));
+    if (failed) return this.park(u, "before failed", { hook: failed });
 
     const seqBefore = own(u.seq, u.stage);
     const nn = this.mint(u);
@@ -1252,9 +1274,8 @@ class RunTick {
       message: text,
     };
     if (!(await this.start(u, s, req))) return;
-    if (!this.hooks(stage.after_launch, scope, this.existingDir(dir))) {
-      await this.park(u, "after_launch failed", { interrupt: "after_launch failed" });
-    }
+    const lateFail = this.hooks(stage.after_launch, scope, this.existingDir(dir));
+    if (lateFail) await this.park(u, "after_launch failed", { interrupt: "after_launch failed", hook: lateFail });
   }
 
   // ---- drivers ----------------------------------------------------------------------------
@@ -1360,11 +1381,30 @@ class RunTick {
     this.save();
     this.ev("driver escalate", { unit: u.id, stage: u.stage, reason: p.reason, action });
     await this.notify(`${this.run.id}/${u.id}/park/${p.at}`,
-      `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${p.reason} — ${action}${prSuffix(this.parkPr(u))}`);
+      `baton ${this.run.id}/${u.id} parked in ${u.stage}: ${p.reason} — ${action}${this.parkSuffix(u)}${this.goneSuffix(p.reason)}`);
   }
 
-  /** The PR detail the unit's latest park event recorded, as park() was given it; undefined without one. */
-  private parkPr(u: UnitState): ParkPr | undefined {
+  /** A `thread gone` park's notice ends with the host's note on where to look (#930); others add nothing. */
+  private goneSuffix(reason: string): string {
+    return reason === "thread gone" && this.host.goneNote ? ` — ${this.host.goneNote()}` : "";
+  }
+
+  /** The PR and failed-hook suffixes of the unit's latest park event, as park() wrote them. */
+  private parkSuffix(u: UnitState): string {
+    const e = this.lastParkEvent(u);
+    if (!e) return "";
+    let pr: ParkPr | undefined;
+    if (typeof e.pr === "string" && (e.pr_state === "red" || e.pr_state === "conflict")) {
+      const failing = Array.isArray(e.failing) && e.failing.every((f) => typeof f === "string") ? e.failing as string[] : undefined;
+      pr = { url: e.pr, why: e.pr_state, ...(failing ? { failing } : {}) };
+    }
+    const hook = Number.isInteger(e.hook) && Array.isArray(e.argv) && e.argv.every((a) => typeof a === "string")
+      ? { hook: e.hook as number, argv: e.argv as string[] } : undefined;
+    return prSuffix(pr) + hookSuffix(hook);
+  }
+
+  /** The unit's latest park event; undefined without one. */
+  private lastParkEvent(u: UnitState): Record<string, unknown> | undefined {
     let text = "";
     try {
       text = readFileSync(join(this.run.dir, "events.jsonl"), "utf8");
@@ -1378,9 +1418,7 @@ class RunTick {
         if (e !== null && typeof e === "object" && e.kind === "park" && e.unit === u.id) last = e;
       } catch { /* a blank or torn line is not an event */ }
     }
-    if (!last || typeof last.pr !== "string" || (last.pr_state !== "red" && last.pr_state !== "conflict")) return undefined;
-    const failing = Array.isArray(last.failing) && last.failing.every((f) => typeof f === "string") ? last.failing as string[] : undefined;
-    return { url: last.pr, why: last.pr_state, ...(failing ? { failing } : {}) };
+    return last;
   }
 
   /**
@@ -1485,6 +1523,13 @@ class RunTick {
     // Every kept thread closes before the run is marked done: a host error retries next tick.
     if (this.host.close) {
       for (const u of this.ordered()) for (const k of [...(u.kept ?? [])]) await this.closeKeptThread(u, k);
+    }
+    // So are the host's per-run leftovers (#930); any other failure is reported and the run ends.
+    try {
+      await this.host.endRun?.(this.run.id);
+    } catch (e) {
+      if (isHostError(e)) throw e;
+      this.report.errors.push(`${this.run.id}: end run: ${message(e)}`);
     }
     this.run.status = "done";
     this.save();

@@ -172,3 +172,59 @@ test("a short write never replaces a claim: the old claim survives and no temp f
   expect(underLimit(null, dir, claim(`{ K: "v".repeat(20000) }`))).toBe(0);
   expect(readFileSync(join(claims, file), "utf8")).toContain("v".repeat(20000));
 });
+
+// ---- run.json shape (#920) ------------------------------------------------------------
+
+/** Write `run` as r1's run.json by hand, as a hand edit would leave it. */
+function handWritten(run: unknown): ReturnType<typeof openStore> {
+  const s = openStore(tmp());
+  mkdirSync(s.runDir("r1"), { recursive: true });
+  writeFileSync(join(s.runDir("r1"), "run.json"), JSON.stringify(run));
+  return s;
+}
+const unitOf = (id: string) => ({ id, group: 0, order: 0, vars: {}, stage: "work", launches: {}, stalls: 0 });
+
+test("readRun refuses a run.json whose units is an array, naming the run and the field", () => {
+  // The #920 shape: `jq '.units |= map(...)'` turned the object into an array of the same units.
+  const s = handWritten({ ...sample("r1"), units: [unitOf("a")] });
+  expect(() => s.readRun("r1")).toThrow("run r1: run.json: units is not an object");
+  // adjacent control: the same unit keyed by its id loads
+  const ok = handWritten({ ...sample("r1"), units: { a: unitOf("a") } });
+  expect(ok.readRun("r1").units.a.stage).toBe("work");
+});
+
+test("readRun refuses a units that is null, a string or missing", () => {
+  for (const units of [null, "a", undefined]) {
+    const s = handWritten({ ...sample("r1"), units });
+    expect(() => s.readRun("r1")).toThrow("run r1: run.json: units is not an object");
+  }
+});
+
+test("readRun refuses a unit record that is not an object or is keyed by another id", () => {
+  expect(() => handWritten({ ...sample("r1"), units: { a: null } }).readRun("r1"))
+    .toThrow("run r1: run.json: units.a is not an object");
+  expect(() => handWritten({ ...sample("r1"), units: { a: [] } }).readRun("r1"))
+    .toThrow("run r1: run.json: units.a is not an object");
+  expect(() => handWritten({ ...sample("r1"), units: { a: unitOf("b") } }).readRun("r1"))
+    .toThrow('run r1: run.json: units.a has id "b"');
+});
+
+test("readRun refuses a run.json that is not an object, has another run's id, or an unknown status", () => {
+  expect(() => handWritten([]).readRun("r1")).toThrow("run r1: run.json is not an object");
+  expect(() => handWritten(null).readRun("r1")).toThrow("run r1: run.json is not an object");
+  // A copied run directory keeps the old id: a save would write the old run's directory.
+  expect(() => handWritten(sample("r0")).readRun("r1")).toThrow('run r1: run.json: id is "r0"');
+  expect(() => handWritten({ ...sample("r1"), status: "paused" }).readRun("r1"))
+    .toThrow('run r1: run.json: status "paused" is not one of armed, parked, disarmed, done');
+  // adjacent control: every known status loads
+  for (const status of ["armed", "parked", "disarmed", "done"]) {
+    expect(handWritten({ ...sample("r1"), status }).readRun("r1").status).toBe(status);
+  }
+});
+
+test("readRun of a run with no run.json still throws ENOENT", () => {
+  const s = openStore(tmp());
+  let code: string | undefined;
+  try { s.readRun("nope"); } catch (e) { code = (e as NodeJS.ErrnoException).code; }
+  expect(code).toBe("ENOENT");
+});

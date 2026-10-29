@@ -9,6 +9,7 @@ import { main } from "../src/cli.ts";
 import { exitCode, tick, type TickReport } from "../src/engine.ts";
 import type { Forge } from "../src/forge.ts";
 import { HostDownError, LaunchError, type LaunchRequest } from "../src/host.ts";
+import { setHostForTest } from "../src/hosts/select.ts";
 import { notifyOnce } from "../src/notify.ts";
 import { openStore, type RunState } from "../src/state.ts";
 import { FakeForge } from "./fake-forge.ts";
@@ -600,6 +601,68 @@ test("stop file parks only that unit", async () => {
   expect(liveClaim(claimKey(join(root, "w", "a")))).toBeNull();
   expect(liveClaim(claimKey(join(root, "w", "b")))).toBe("r1/b/work/1");
   expect(notifyLines().length).toBe(1);
+});
+
+// A failed hook's park names it (#906): the reason stays the same, the event carries the hook's
+// 1-based index and rendered argv, and the notice ends with them, as a merge park ends with its PR.
+const lastPark = () => events().filter((e) => e.kind === "park").at(-1);
+
+test("a before failed park names the failing hook in its event and at the end of its notice", async () => {
+  await arm(recipe({ work: sess({ before: [["true"], ["sh", "-c", "exit 3", "{unit.id}"]] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(host.launches.length).toBe(0);
+  const e = lastPark();
+  expect(e.reason).toBe("before failed");
+  expect(e.hook).toBe(2);
+  expect(e.argv).toEqual(["sh", "-c", "exit 3", "a"]);
+  expect(notifyLines().length).toBe(1);
+  expect(notifyLines()[0].endsWith("baton r1/a parked in work: before failed — hook 2: sh -c exit 3 a")).toBe(true);
+});
+
+test("a run failed park and an after_launch failed park name their hook too", async () => {
+  await arm(recipe({
+    work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "done", run: [["false"]] }] }),
+    late: sess({ after_launch: [["true"], ["true"], ["sh", "-c", "exit 1"]] }),
+  }, ["a", "b"], { seed: [{ id: "a", stage: "work" }, { id: "b", stage: "late" }] }));
+  mkdirSync(join(root, "w", "b"), { recursive: true });
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] }, late: { ticks: 100, end: "completed" } });
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  const parks = events().filter((e) => e.kind === "park");
+  expect(parks.map((e) => [e.unit, e.reason, e.hook, e.argv])).toEqual([
+    ["b", "after_launch failed", 3, ["sh", "-c", "exit 1"]],
+    ["a", "run failed", 1, ["false"]],
+  ]);
+  expect(notifyLines().map((l) => l.slice(l.indexOf(" baton ") + 1))).toEqual([
+    "baton r1/b parked in late: after_launch failed — hook 3: sh -c exit 1",
+    "baton r1/a parked in work: run failed — hook 1: false",
+  ]);
+});
+
+test("a long hook argv is cut in the notice and kept whole in the event", async () => {
+  const long = "x".repeat(300);
+  await arm(recipe({ work: sess({ before: [["sh", "-c", `exit 1 # ${long}`]] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  expect(lastPark().argv).toEqual(["sh", "-c", `exit 1 # ${long}`]);
+  const tail = notifyLines()[0].split(" — hook 1: ")[1];
+  expect(tail.length).toBe(120);
+  expect(tail).toBe(`sh -c exit 1 # ${long}`.slice(0, 119) + "…");
+});
+
+test("control: a park with no failed hook carries no hook field and no hook suffix", async () => {
+  await arm(recipe({ work: sess({ stop_file: "{run.dir}/stop/{unit.id}", before: [["true"]] }) }, ["a"]));
+  mkdirSync(join(runDir(), "stop"), { recursive: true });
+  writeFileSync(join(runDir(), "stop", "a"), "halt");
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  const e = lastPark();
+  expect(e.reason).toBe("stop");
+  expect("hook" in e || "argv" in e).toBe(false);
+  expect(notifyLines()[0].endsWith("parked in work: stop")).toBe(true);
 });
 
 test("cap parks at max_launches before running before", async () => {
@@ -1382,4 +1445,84 @@ test("notify argv renders {key} and {message}", async () => {
   const [key, msg] = readFileSync(out, "utf8").trim().split("\n");
   expect(key).toMatch(/^r1\/u1\/park\/\d{4}-/);
   expect(msg).toBe("baton r1/u1 parked in work: cap");
+});
+
+// ---- host leftovers and the thread gone note (#930) ----------------------------------------
+
+test("a run that finishes asks the host once to drop what it keeps for the run", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
+  const ended: string[] = [];
+  host.endRun = async (id) => { ended.push(id); };
+  await doTick();
+  expect(ended).toEqual([]); // not done yet
+  host.advance();
+  at(1);
+  await doTick();
+  expect(runState().status).toBe("done");
+  expect(ended).toEqual(["r1"]);
+  at(2);
+  await doTick();
+  expect(ended).toEqual(["r1"]);
+});
+
+test("a host error at endRun leaves the run armed: the next tick retries it", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed", writes: [DONE_WRITE()] } });
+  let fail = true;
+  const ended: string[] = [];
+  host.endRun = async (id) => {
+    if (fail) throw new HostDownError("orca unreachable");
+    ended.push(id);
+  };
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  expect(runState().status).toBe("armed");
+  fail = false;
+  at(2);
+  await doTick();
+  expect(runState().status).toBe("done");
+  expect(ended).toEqual(["r1"]);
+});
+
+test("disarm asks the host to drop what it keeps for the run", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  const ended: string[] = [];
+  host.endRun = async (id) => { ended.push(id); };
+  await doTick();
+  setHostForTest(host);
+  try {
+    expect(await main(["disarm", "r1"])).toBe(0);
+  } finally {
+    setHostForTest(null);
+  }
+  expect(ended).toEqual(["r1"]);
+  expect(runState().status).toBe("disarmed");
+});
+
+test("a thread gone park ends its notice with the host's gone note; a host with none adds nothing", async () => {
+  for (const note of ["see /s/claims/seat.log", undefined]) {
+    fresh();
+    await arm(recipe({ work: sess({ max_launches: 1 }) }, ["a"]));
+    host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+    if (note) host.goneNote = () => note;
+    await doTick();
+    host.drop("thread-1");
+    at(1);
+    await doTick();
+    expect(runState().units.a.parked?.reason).toBe("thread gone");
+    const want = `baton r1/a parked in work: thread gone${note ? ` — ${note}` : ""}`;
+    expect([note, notifyLines()[0].endsWith(want)]).toEqual([note, true]);
+  }
+});
+
+test("control: the gone note is only on a thread gone park", async () => {
+  await arm(recipe({ work: sess({ before: [["false"]] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  host.goneNote = () => "see seat.log";
+  await doTick();
+  expect(notifyLines()[0]).not.toContain("seat.log");
 });

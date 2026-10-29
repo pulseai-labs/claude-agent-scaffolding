@@ -350,3 +350,34 @@ describe("interrupt, close, screen", () => {
     expect(await thrown(host().screen!(HANDLE))).toBeInstanceOf(HostDownError);
   });
 });
+
+describe("run end and thread gone (#930)", () => {
+  const msg = (nonce: string) => `${encodeURIComponent(nonce)}.txt`;
+  test("endRun removes only that run's message files", async () => {
+    const dir = join(state, "orca", "messages");
+    mkdirSync(dir, { recursive: true });
+    const files = [msg("r/u/s/1"), msg("r/v/driver/2"), msg("r2/u/s/1"), msg("rr/u/s/1"), "other.txt"];
+    for (const f of files) writeFileSync(join(dir, f), "x");
+    await host().endRun("r");
+    expect(readdirSync(dir).sort()).toEqual([msg("r2/u/s/1"), msg("rr/u/s/1"), "other.txt"].sort());
+    expect(argvLog()).toEqual([]); // no Orca call: the files are baton's own
+  });
+
+  test("endRun with no messages directory is a no-op", async () => {
+    await host().endRun("r");
+    expect(existsSync(join(state, "orca", "messages"))).toBe(false);
+  });
+
+  test("a launch refused by the terminal's launcher leaves its message file until endRun", async () => {
+    replies({ "terminal create": "terminal-create.json" });
+    await host().launch(req());
+    const file = join(state, "orca", "messages", msg("r/u/s/1"));
+    expect(existsSync(file)).toBe(true); // a refusal (exit 78) does not delete it
+    await host().endRun("r");
+    expect(existsSync(file)).toBe(false);
+  });
+
+  test("goneNote points at the launcher's refusal log under the state dir", () => {
+    expect(host().goneNote()).toBe(`if the launcher refused it, the reason is in ${join(state, "claims", "seat.log")}`);
+  });
+});

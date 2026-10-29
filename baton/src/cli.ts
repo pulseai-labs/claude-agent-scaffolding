@@ -67,6 +67,11 @@ function validateCmd(args: string[]): number {
   return fail(res.errors.join("\n"));
 }
 
+/** A failed readRun: a run with no run.json is no such run; a malformed one says what is wrong (#920). */
+function runError(e: unknown, id: string): string {
+  return (e as NodeJS.ErrnoException).code === "ENOENT" ? `no such run: ${id}` : (e as Error).message;
+}
+
 /** Run `fn` under the store lock; a busy lock is rc 75 (try again later). */
 async function locked(fn: () => Promise<number>): Promise<number> {
   const r = await openStore().withLock(fn);
@@ -182,8 +187,8 @@ function statusCmd(args: string[]): number {
     let run: RunState;
     try {
       run = store.readRun(id);
-    } catch {
-      return fail(`no such run: ${id}`);
+    } catch (e) {
+      return fail(runError(e, id));
     }
     for (const u of Object.values(run.units)) {
       const launches = Object.values(u.launches).reduce((a, b) => a + b, 0);
@@ -203,8 +208,8 @@ async function disarmCmd(args: string[]): Promise<number> {
     let run: RunState;
     try {
       run = store.readRun(id);
-    } catch {
-      return fail(`no such run: ${id}`);
+    } catch (e) {
+      return fail(runError(e, id));
     }
     for (const u of Object.values(run.units)) {
       if (u.triage) removeClaim(u.triage.session.claim_key, u.triage.session.claim_nonce);
@@ -223,7 +228,8 @@ async function disarmCmd(args: string[]): Promise<number> {
 /**
  * Close every kept thread of the run, and a blocked park's worker thread, then release its
  * directory. A failure is printed and the disarm goes on; an entry that could not be closed stays
- * in `u.kept` (a blocked park's in `u.session`), its directory unreleased.
+ * in `u.kept` (a blocked park's in `u.session`), its directory unreleased. Then the host drops
+ * what it keeps for the run (`endRun`, #930); a failure there is printed too.
  */
 async function closeKept(run: RunState): Promise<void> {
   let host: Host | undefined;
@@ -262,6 +268,11 @@ async function closeKept(run: RunState): Promise<void> {
       if (await closeThenRelease({ thread: s.thread_id, project: s.project!, cwd: s.cwd!, dir: s.launch_dir })) delete u.session;
     }
   }
+  try {
+    await host?.endRun?.(run.id);
+  } catch (e) {
+    process.stderr.write(`baton disarm: could not remove the run's host files: ${(e as Error).message}\n`);
+  }
 }
 
 async function unparkCmd(args: string[]): Promise<number> {
@@ -286,8 +297,8 @@ async function unparkCmd(args: string[]): Promise<number> {
     let run: RunState;
     try {
       run = store.readRun(runId!);
-    } catch {
-      return fail(`no such run: ${runId}`);
+    } catch (e) {
+      return fail(runError(e, runId!));
     }
     if (unitId === undefined) {
       delete run.parked;
@@ -349,8 +360,8 @@ async function answerCmd(args: string[]): Promise<number> {
     let run: RunState;
     try {
       run = store.readRun(runId);
-    } catch {
-      return fail(`no such run: ${runId}`);
+    } catch (e) {
+      return fail(runError(e, runId));
     }
     const unit = own(run.units, unitId);
     if (!unit) return fail(`no such unit: ${unitId}`);
@@ -418,8 +429,8 @@ async function answerScreenCmd(args: string[]): Promise<number> {
     let run: RunState;
     try {
       run = store.readRun(req.run);
-    } catch {
-      return refuse(`no such run: ${req.run}`);
+    } catch (e) {
+      return refuse(runError(e, req.run));
     }
     const b = blockedThread(run, req.unit);
     if (typeof b === "string") return refuse(b);
@@ -487,8 +498,8 @@ async function screenCmd(args: string[]): Promise<number> {
   let run: RunState;
   try {
     run = openStore().readRun(runId);
-  } catch {
-    return refuse(`no such run: ${runId}`);
+  } catch (e) {
+    return refuse(runError(e, runId));
   }
   const b = blockedThread(run, unitId);
   if (typeof b === "string") return refuse(b);

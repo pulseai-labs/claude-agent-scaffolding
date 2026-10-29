@@ -100,6 +100,30 @@ export function enterStage(u: UnitState, stage: string, noteFile?: string): void
   }
 }
 
+const RUN_STATUSES: readonly RunState["status"][] = ["armed", "parked", "disarmed", "done"];
+const plainObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === "object" && !Array.isArray(v);
+
+/**
+ * Refuse a run.json whose top-level shape baton never writes (#920): it is not an object, its id
+ * is not the run's directory name, its status is not one baton sets, or its units are not an
+ * object of objects keyed by their own id. Only that: the rest of a unit is read where it is used.
+ * An array of units would load, lose every unit on the next save, and replay the unit files.
+ */
+export function checkRunShape(id: string, raw: unknown): RunState {
+  const bad = (what: string) => new Error(`run ${id}: run.json${what}`);
+  if (!plainObject(raw)) throw bad(" is not an object");
+  if (raw.id !== id) throw bad(`: id is ${JSON.stringify(raw.id)}`);
+  if (!RUN_STATUSES.includes(raw.status as RunState["status"])) {
+    throw bad(`: status ${JSON.stringify(raw.status)} is not one of ${RUN_STATUSES.join(", ")}`);
+  }
+  if (!plainObject(raw.units)) throw bad(": units is not an object");
+  for (const [k, u] of Object.entries(raw.units)) {
+    if (!plainObject(u)) throw bad(`: units.${k} is not an object`);
+    if (u.id !== k) throw bad(`: units.${k} has id ${JSON.stringify(u.id)}`);
+  }
+  return raw as RunState;
+}
+
 export type RunState = {
   id: string;
   dir: string;
@@ -263,7 +287,14 @@ export function openStore(dir: string = stateDir()): Store {
       }
     },
     readRun(id: string): RunState {
-      return JSON.parse(readFileSync(join(runDir(id), "run.json"), "utf8")) as RunState;
+      const text = readFileSync(join(runDir(id), "run.json"), "utf8");
+      let raw: unknown;
+      try {
+        raw = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`run ${id}: run.json: ${(e as Error).message}`);
+      }
+      return checkRunShape(id, raw);
     },
     writeRun(run: RunState): void {
       const d = runDir(run.id);

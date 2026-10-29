@@ -80,6 +80,9 @@ export class FakeHost implements Host {
   declare screen?: (threadId: string) => Promise<string>;
   declare respond?: (threadId: string, requestId: string, answers: Record<string, string>) => Promise<void>;
   declare keys?: (threadId: string, text: string) => Promise<void>;
+  /** Not set by the constructor: a test that needs them assigns them. */
+  declare endRun?: (runId: string) => Promise<void>;
+  declare goneNote?: () => string;
   private threads: Thread[] = [];
 
   constructor(public script: Record<string, Behaviour>, opts: { withOptional?: boolean } = {}) {

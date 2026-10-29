@@ -321,7 +321,7 @@ test("a two-item round runs to the second spine close", async () => {
   // One notice names the spine PR: the ask to merge it.
   const log = readFileSync(join(state, "notify.log"), "utf8").split("\n").filter((l) => l.includes(prUrl(SPINE_UNIT)));
   expect(log).toHaveLength(1);
-  expect(log[0]).toContain("merge it by hand");
+  expect(log[0]).toContain("then merge it (the phone's Merge button, or by hand)");
   expect(readState().spines[0].status).toBe("closed");
   expect(readdirSync(join(state, "claims"))).toEqual([]);
 });

@@ -383,7 +383,7 @@
             { "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "mergeable" } }
           ],
           "to": "spine_ack",
-          "notify": "Spine {param.spine} PR {unit.vars.pr_url} passed review and is green and mergeable: read its needs-you list and any CodeRabbit thread newer than the last push, then merge it by hand."
+          "notify": "Spine {param.spine} PR {unit.vars.pr_url} passed review and is green and mergeable: read its needs-you list and any CodeRabbit thread newer than the last push, then merge it (the phone's Merge button, or by hand)."
         }
       ]
     },

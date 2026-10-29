@@ -476,3 +476,25 @@ test("in-place unpark works with a missing or invalid recipe.json (no stop file 
     expect(existsSync(stop)).toBe(true);
   }
 });
+
+test("a malformed run.json is refused by name, not read as no such run, and is left as it was (#920)", async () => {
+  const st = newState();
+  await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer");
+  const path = join(st, "runs", "r1", "run.json");
+  const run = runJson(st, "r1");
+  run.units = Object.values(run.units);
+  writeFileSync(path, JSON.stringify(run));
+  const bytes = readFileSync(path, "utf8");
+  for (const argv of [["status", "r1"], ["status"], ["disarm", "r1"], ["unpark", "r1"], ["unpark", "r1", "planner"], ["screen", "r1", "planner"]]) {
+    const r = await runIn(st, ...argv);
+    expect([argv, r.rc]).toEqual([argv, 2]);
+    expect(r.err).toContain("run r1: run.json: units is not an object");
+    expect(r.err).not.toContain("no such run");
+  }
+  const t = await runIn(st, "tick", "--run", "r1");
+  expect(t.rc).toBe(1);
+  expect(t.err).toContain("run r1: run.json: units is not an object");
+  expect(readFileSync(path, "utf8")).toBe(bytes);
+  // adjacent control: a run that does not exist still reads no such run
+  expect((await runIn(st, "status", "nope")).err).toContain("no such run: nope");
+});
