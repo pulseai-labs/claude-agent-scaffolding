@@ -1,4 +1,4 @@
-# ossify (v1.27.0)
+# ossify (v1.28.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -174,6 +174,18 @@ Since 1.27.1 (#963), that ack and that order merge a two-way door only where mer
 (the orchestrator where one runs, otherwise the operator) with
 `merge-bar/skills/working-a-pr/references/one-way-door.md`. A patch tags after its merge, so it is one-way. The bundled loop
 is unchanged. No `lib/` code, no state change.
+
+Since 1.28.0 (#951), the implementer builds and the close verifies. `work-item` no longer
+asks whether each test can fail, and report §5 carries commands and results only. Work-item
+close dispatches `ossify:verifier-agent` for Layer 3, Layer 4 and a new mutation check
+(`impl-check.md` §4c), in a context that did not build the item. Set `OSSIFY_VERIFIER_MODEL`
+in a `settings.json` env block to run it on another model; unset, it inherits the session's
+and the close says so. The close fingerprints the worktree before the dispatch and halts if
+the verifier leaves it changed. A test that stays green under a mutation whose evidence holds
+all three conditions halts as a fifth tag, `[mutation]`. Where no agent can be dispatched
+(Codex, OMP, a subagent context) the close runs the same checks itself and prints
+`verifier: inline`; inside an `--external-executor` lane Layers 3 and 4 stay in the closing
+session and the caller's verifier owns mutation. No `lib/` code, no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and
