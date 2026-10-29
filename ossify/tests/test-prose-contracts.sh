@@ -2335,5 +2335,20 @@ _r=1; _t="$(_shape "$WI/references/returns.md" complete)"; [ -n "$_t" ] && case 
 _pin "$_r" "#978 returns.md: the complete template gained report_text (it must stay four keys)"
 _r=1; ! grep -Fq 'deliberately not in the return payload' "$HERE/../skills/close/references/work-item-close.md" && _r=0
 _pin "$_r" "#978 close Route A: still says the report content is never in the return payload"
+# #978 round 1 C1: a staged item with no report (a lost return, or either §6
+# halt) has a named recovery that routes it close-finished, and every halt or
+# repair row that can reach it points there instead of at a re-dispatch.
+pin "$_978_RO" '**Recovering a staged item with no report (#978).** Never re-dispatch it.' \
+  "#978 C1 RO §6: the report-less staged item has a recovery that forbids re-dispatch"
+pin "$_978_RO" 'if you still hold it, else by hand from the staged diff' \
+  "#978 C1 RO §6: the recovery re-creates report.md from report_text or by hand"
+pin "$_978_RO" '`close-finished` (§2b), and close'"'"'s gate runs in full.' \
+  "#978 C1 RO §6: the recovery re-enters as close-finished"
+pin "$_978_RO" 'leave a staged item with no report; recover it as below.' \
+  "#978 C1 RO §6: both new halts name the recovery"
+pin "$_978_RO" 'halts `halt:dirty-worktree` too: never re-dispatch it, Gate 3 refuses a staged worktree — re-create the report per §6' \
+  "#978 C1 RO §2b: the dirty-worktree repair names the report recovery"
+pin "$_978_RO" 'instead, and §6'"'"'s *Recovering a staged item with no report* brings it here' \
+  "#978 C1 RO §3: the close-finished recovery names the report-less case"
 
 t_summary

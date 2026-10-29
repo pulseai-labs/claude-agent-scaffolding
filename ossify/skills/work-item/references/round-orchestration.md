@@ -351,7 +351,7 @@ arm's own repairs can hand back, and their routes out:
 | `halt:pr-not-local` — a `complete` item with a PR recorded whose commits the local spine branch lacks | the PR merged on the remote but the local spine branch lacks it: fetch and fast-forward the spine branch (`git merge --ff-only origin/<spine-branch>`), then re-run; never merge the work branch locally — that forks the local spine branch from the remote |
 | `halt:unreadable` | a repo root, a branch-presence probe, a `git status`, the `spine_base_get` base getter, a `verify.md` rejection record, or the state feed could not be read; fix that and re-run — nothing here is in the lane's hands (#673 A2/A3/G2) |
 | `halt:unclassified` — an `abandoned` item retaining execution evidence | halt rather than skip: inspect the item's recorded `branch`, `worktree_path`, `base_sha` and `dispatches`, its handoff/report, and the branch and worktree in its target repo. The operator decides which record is right before retrying; never erase evidence or invent a state-editing verb to clear the halt |
-| `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide — a branch no longer descended from its recorded `base_sha` is a history rewrite, never a landing: restore the expected history or re-dispatch the item (#673 H1); a completed item's dirty worktree halts here too, since cleanup's `worktree_remove` would refuse it at close (#673 I2); a recorded branch that is not this item's own `work/<wi-id>-*` is never reused for reattach, redispatch or merge (#673 L2) |
+| `halt:work-lost`, `halt:unclassified`, `halt:planned-with-worktree`, `halt:dirty-worktree` | state and repos disagree, or the shape is outside this table; surface both and decide — a branch no longer descended from its recorded `base_sha` is a history rewrite, never a landing: restore the expected history or re-dispatch the item (#673 H1); a completed item's dirty worktree halts here too, since cleanup's `worktree_remove` would refuse it at close (#673 I2); a recorded branch that is not this item's own `work/<wi-id>-*` is never reused for reattach, redispatch or merge (#673 L2); a staged result at its base whose `report.md` is missing (a return lost before the lane wrote it, #978) halts `halt:dirty-worktree` too: never re-dispatch it, Gate 3 refuses a staged worktree — re-create the report per §6's *Recovering a staged item with no report*, then re-run |
 
 **5. Continue into §3 for round *R*.**
 
@@ -410,7 +410,9 @@ first when it is missing. A `reattach` item takes whatever route the re-run
 inventory gave it. `close-finished` skips dispatch entirely — default mode
 hands it to close Route A as a complete return with the recorded `report_path`,
 summary `recovered on resume: return lost with the prior session`, and
-`stage_status all_staged` (close's gate runs in full); external mode sends it
+`stage_status all_staged` (close's gate runs in full). A lost return that
+carried `report_text` leaves no report, so that item reads `halt:dirty-worktree`
+instead, and §6's *Recovering a staged item with no report* brings it here; external mode sends it
 in the round's request set (`external-executor.md` §2a), except under
 `--detach`, where it gets no request and the caller closes it (§2b). An item already
 `complete` — a `skip` row for a merged item, or a `finish-status` /
@@ -608,7 +610,17 @@ beside this item's `handoff.md`: any other `report_path` is a halt naming it. A
 return with no `report_text` and no file at `report_path` halts:
 `halt: <wi-id> returned complete with no report at <report_path> and no report_text`.
 That is not a Layer 2 failure, and not a re-dispatch: the work is staged, so Gate
-3 would refuse one.
+3 would refuse one. Both halts, and a session that ended before this Write,
+leave a staged item with no report; recover it as below.
+
+**Recovering a staged item with no report (#978).** Never re-dispatch it.
+Re-create `report.md` beside the item's `handoff.md`: from `report_text` verbatim
+if you still hold it, else by hand from the staged diff
+(`git -C <worktree> diff --cached`), the handoff and the spec, with
+`references/report-contract.md`'s ten sections, re-running the handoff's
+verification commands for §3 and §5 and stating in §10 that the report was
+re-created. Then re-enter: a clean staged result at its base with a report reads
+`close-finished` (§2b), and close's gate runs in full.
 
 Then hand the item to the work-item
 close layer (`close`), which runs the gate, commits in the worktree, and merges
