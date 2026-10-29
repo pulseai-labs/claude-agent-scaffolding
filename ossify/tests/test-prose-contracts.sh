@@ -2392,7 +2392,9 @@ pin "$_981_WC" '**Every completed verifier pass writes' \
   "#980 work-item-close §2: every completed pass writes verify.md"
 pin "$_981_WC" 'line per layer (L1, L2, L3, L4, mutation; `not run` in an `--external-executor`' \
   "#980 work-item-close §2: verify.md carries each layer's result, external lane included"
-pin "$_981_WC" 'Only a halting finding is tagged' \
+pin "$_981_WC" 'Each halting verdict is one line that begins with its tag, or with `- `' \
+  "#981 C2 work-item-close §2: names the line shape _oss_inv_rejection anchors on"
+pin "$_981_WC" 'is tagged `[fidelity]`, a declared one is written as `fidelity`.' \
   "#980 work-item-close §2: [fidelity] marks only a halting finding (the rejection record)"
 absent_981 "$_981_WC" 'delete the file rather than' "#980 work-item-close §2: zero findings no longer deletes verify.md"
 pin "$_981_CR" '**ossify dispatches no spine review to another agent**' \

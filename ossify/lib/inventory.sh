@@ -40,7 +40,10 @@ _oss_inv_ref() { # $1=root $2=full ref
 _oss_inv_rejection() { # $1=verify.md ; rc 0 rejected · rc 1 no record · rc 2 unreadable
   local rc=0
   [ -e "$1" ] || [ -L "$1" ] || return 1
-  grep -qF '[fidelity]' "$1" 2>/dev/null || rc=$?
+  # Anchored to the line shape work-item-close §2 names for a halting verdict:
+  # the tag first, optionally after a `- ` list marker. A `[fidelity]` quoted
+  # mid-line (a [rule] claim, say) is not a rejection.
+  grep -qE '^(- )?\[fidelity\]' "$1" 2>/dev/null || rc=$?
   [ "$rc" -le 1 ] || rc=2
   return "$rc"
 }

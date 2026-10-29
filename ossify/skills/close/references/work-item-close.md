@@ -212,8 +212,9 @@ fires the `[fidelity]` halt. **Every completed verifier pass writes
 Route B — and echoes it in the close summary: the `verifier:` line, one result
 line per layer (L1, L2, L3, L4, mutation; `not run` in an `--external-executor`
 lane), then the findings and any `stayed-green` or `undetermined` mutation
-result, each halting verdict under its tag. Only a halting finding is tagged
-`[fidelity]`; a declared one is written as `fidelity`. The summary is a message,
+result. Each halting verdict is one line that begins with its tag, or with `- `
+and then the tag (`[fidelity] <file>:<line> - <claim>`); only a halting finding
+is tagged `[fidelity]`, a declared one is written as `fidelity`. The summary is a message,
 and in an `--external-executor` lane it belongs to the lane's session, so this
 file is the item's durable gate record (#980). When the pass halts, on any tag,
 `[rule]` included, the whole set is written with every halting verdict in it.

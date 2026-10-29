@@ -381,6 +381,20 @@ inv "$F"
 t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S28: a recorded [fidelity] rejection halts re-entry"
 t_assert_rc 3 "S28: ...rc 3"
 
+# S28b (#981 review C2): since 1.29.1 every pass writes verify.md, so a
+# non-halting line can QUOTE the tag. Only a line that begins with it (or with
+# `- ` and then it, work-item-close.md §2) is the rejection record.
+F="$TMP/s28b"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a
+V28B="$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"; mkdir -p "$V28B"
+echo r > "$V28B/report.md"
+printf 'verifier: inline - test\n- [rule] src/x.ts:3 - the claim quotes [fidelity] mid-line\n' > "$V28B/verify.md"
+inv "$F"
+t_assert_eq "close-finished" "$(route r0.s1.w1)" "S28b: a [fidelity] quoted mid-line is not a rejection"
+printf -- '- [fidelity] src/x.ts:3 - the diff deviates from spec.md\n' >> "$V28B/verify.md"
+inv "$F"
+t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S28b: a line-start '- [fidelity]' halting finding is a rejection"
+
 # S29 (#673 G3): a RECORDED base that no longer resolves halts the read-out -
 # a repo row naming it - instead of classifying `cut-missing` and failing
 # mid-repair after the earlier repos were already cut. The control (same
