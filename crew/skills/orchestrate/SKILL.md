@@ -47,7 +47,8 @@ Your own turns take these kinds of action, and no others:
    the PR comment, the merge — and, after it, the teardown: releasing workers (a pane
    closed, or a worktree removed), closing the run, and the verified branch delete.
 
-You never read source files or diffs, run a test suite, edit product code, run a review,
+You never read source files or diffs, run a test suite, edit product code (a calibration
+fixture's base checkout is not an edit: it restores committed code in a worktree no branch receives), run a review,
 or research. **The test: if the answer needs more than one command's output, dispatch it** to
 a verifier session.
 

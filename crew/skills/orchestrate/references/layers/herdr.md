@@ -67,7 +67,7 @@ dispatch:
 whose variables are the launch environment `roles.md`'s launch block states (`worktree create`
 takes no `--env`; `--env` carries only a seat's own scratch). The status line `roles.md` reads
 is the rendered viewport here: `--source visible` on the model read, even where a `banner`
-seat's model read is the default stream.
+seat's model read is the default stream; where the seat's row names a `rail:`, that rail's check runs in place of the status line.
 
 **The seat's command.** `herdr pane run <pane> "<command:>"`, verbatim from the entry —
 re-running a **launch** command into a pane whose foreground process is already that
