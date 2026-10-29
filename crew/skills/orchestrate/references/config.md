@@ -162,7 +162,7 @@ is free text: sentences the coordinator reads when it picks a seat (a stalled se
 fallback and bound among them, `completion.md`), and nothing parses them. The plugin ships the role list — orchestrator, implementer,
 verifier, reviewer and the coordinator seats (spine session,
 close session, work-PR session), plus a `doctor session` for `/ossify:doctor`
-dispatches; the project file fills them and does not define new
+dispatches, and baton's two: `triage` (answers a stuck seat's prompt only when the brief decides it) and `driver` (settles the parks its brief names). Crew's own runs launch neither; baton reads these two files through running-a-spine-on-baton. The project file fills them and does not define new
 built-ins. The close-review writer is not a project-file seat — the operator names
 its profile at the halt that creates it (`ossify-close-writer.md`).
 
