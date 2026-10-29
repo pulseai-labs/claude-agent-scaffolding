@@ -22,6 +22,9 @@ set -u
 omp_seat_bin="${BATON_OMP_SEAT:-$HOME/.local/bin/omp-seat}"
 state="${BATON_STATE_DIR:-$HOME/.local/state/baton}"
 msgfile="${1-}"
+# Role-path locals start empty so nothing inherited from the environment reaches the legacy path.
+role="" delivery="" table="" brief="" briefs=""
+argv=()
 
 # Linux MAX_ARG_STRLEN is 131072 bytes and counts the terminating NUL.
 max_msg=131071

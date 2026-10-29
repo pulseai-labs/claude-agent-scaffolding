@@ -341,3 +341,13 @@ test("legacy-omp-claim-unchanged: no BATON_ROLE still execs omp-seat", () => {
   writeFileSync(claimFile(proj), GOOD);
   expect(run(proj).json.argv).toEqual(["worker", "--via", "/v/w", "hello"]);
 });
+
+test("legacy claim ignores inherited role/delivery env: oversized message still refuses toolong", () => {
+  writeFileSync(claimFile(proj), GOOD);
+  writeFileSync(msg, "x".repeat(131072));
+  const r = run(proj, msg, { delivery: "file", role: "x" });
+  expect(r.rc).toBe(78);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ toolong cwd /);
+  expect(existsSync(msg)).toBe(true);
+  expect(existsSync(ran)).toBe(false);
+});
