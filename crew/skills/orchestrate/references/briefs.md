@@ -220,7 +220,8 @@ ROLE: verifier, read-only. State the model you are running in your first reply, 
 continue.
 
 PLACEMENT: <worktree abs-path or repo path>, at <ref or sha>. A re-check is this brief sent
-again, every slot refilled: judge the tree named here, never your previous check's.
+again, every slot refilled: judge the tree named here, never your previous check's. Two slots
+change: this line names the tree to judge now, and REPORT_PATH is new, never the first report's.
 
 CLAIMS:, a numbered list the orchestrator fills from the work item's spec:
   1. [ac] <acceptance criterion or requirement>: <how to check>
@@ -229,7 +230,8 @@ CLAIMS:, a numbered list the orchestrator fills from the work item's spec:
   3. [mutation] When the item adds or changes a test: that test fails when the item's
      implementation edits, not the test, are reverted in a disposable worktree; a revert
      that changes no file is `cannot determine`, naming the paths tried. When no test is
-     added or changed, or the item changes only tests, delete this claim (never `cannot determine`).
+     added or changed, or the item changes only tests, delete this claim (never `cannot determine`);
+     a test-only item is deleted here, never judged an empty revert.
   4. [standards] The diff follows <standards file> and the conventions the repo follows in
      fact: name <standards file> by the path filled here, and quote the rule line, or the
      neighbouring committed file, and the hunk, each verbatim, never paraphrased. <standards file> is

@@ -34,10 +34,10 @@ SPINE_COMMAND=<the command this seat was launched with, from its machine entry> 
 SPINE_EXPECTED_MODEL=<the model the banner or screen must show>
 SPINE_EFFORT=<the effort this seat was launched at>
 SEATS — the operator-approved seats for this spine. Use them verbatim.
-<item id> implementer: <agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>
-<item id> verifier:    <agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>
-Each row names its agent and its machine: a row whose machine is not yours launches through
-the layer's Machines step. A seat this block does not list halts the item and asks.
+<item id> implementer: <agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>[ | rail: <rail>]
+<item id> verifier:    <agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>[ | rail: <rail>]
+Each row names its agent and its machine, and a rail where its entry names one: a row whose
+machine is not yours launches through the layer's Machines step. A seat this block does not list halts the item and asks.
 HANDOFF_PATH=<a prior spine session's handoff path, or "none">
 Everything you tell the top — plan relay, question, halt, rotation, report — goes in your
 report file at REPORT_PATH; then wait, or stop where this brief says so. Your command's syntax
@@ -213,7 +213,7 @@ MOLT: if molt warns you, send one ping, `<PING_SEND> '[crew molt verifier] <pct>
 NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
 staged tree and `git status --porcelain` exactly as found before you write your report file;
 scratch goes under SCRATCH_DIR=<the seat's scratch directory>, never the worktree. Do not verify a second
-work item; you are retained for this one until it passes or escalates. A re-check is this brief sent again, refilled: judge the tree named above, never your previous check's.
+work item; you are retained for this one until it passes or escalates. A re-check is this brief sent again, refilled: judge the tree named above, never your previous check's. Two slots change: ROLE's `head_oid` and `tree_oid`, from the latest return, and REPORT_PATH, new, never the first report's.
 ```
 
 ---

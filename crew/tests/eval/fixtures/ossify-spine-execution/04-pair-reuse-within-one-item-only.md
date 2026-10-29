@@ -8,7 +8,7 @@ expected_reason: 'Retention is item-local, has an end, and its first failure is 
   verifier''s summary and three options - correct with the same pair, replace the
   pair, halt - and the pair idles until the reply lands. On a correct reply, and only
   then, the SAME implementer takes ONE consolidated correction carrying both findings
-  (not one message per finding) and the SAME verifier does the full recheck - the
+  (not one message per finding) and the SAME verifier does the full recheck, its brief refilled at a new REPORT_PATH - the
   pair is retained precisely because the item is still open. On a replace reply the
   old pair is RELEASED FIRST, that item''s worktree is RESET to the request''s base_sha
   with a clean porcelain - the rejected staged work is discarded, which is what replacing

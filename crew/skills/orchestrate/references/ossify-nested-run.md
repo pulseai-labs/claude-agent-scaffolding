@@ -80,7 +80,8 @@ releases every item pair and closes the workspace it created, as
    the verifier's summary and three options —
    correct with the same pair, replace the pair, halt — and it **blocks: the pair idles**
    and nothing on that item moves until the reply. *Correct* is one consolidated
-   correction to the same implementer, then the full recheck to the same verifier.
+   correction to the same implementer, then the full recheck — `ossify-briefs.md`'s item-verifier
+   brief, refilled, at a new REPORT_PATH — to the same verifier.
    *Replace* is the one exception to one pair per item: the old pair is released first,
    the item's worktree is **reset to the request's `base_sha` with a clean porcelain**
    — the rejected staged work is discarded, which is what replacing means — and the

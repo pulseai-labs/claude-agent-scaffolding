@@ -2,6 +2,28 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.8.2
+
+**Text only — the follow-ons from the 0.8.1 review (#987), closing #954.**
+
+- **The rail reaches a carried seat (#954).** The `SEATS` rows and the work-PR `REVIEWER` and
+  `PRFIX` rows end `[ | rail: <rail>]`, the rendered row's own tail, and both layers' model
+  reads run a named rail's check in place of the `seat: <role>` status line. A seat a
+  coordinator launches from a carried row records its rail, not "no guards".
+- **The rail's value has a format.** One line, `<guard> — <check command>`, holding no `|`,
+  which separates the row's fields. The row puts its machine after every launch field, with
+  only the rail tail after it, and the check runs once per launch, at the model read.
+- **A re-check names what changes.** Two slots: the tree it judges (the generic `PLACEMENT`, the
+  item verifier's `head_oid` and `tree_oid` from the latest return), and `REPORT_PATH`, a new
+  path, so the first report is kept. The spine's correct path in `ossify-nested-run.md` and the
+  eval rubric say the same.
+- **The calibration fixture is reconciled.** "Never edit product code" names its base checkout,
+  which restores committed code in a worktree no branch receives. Its expected `fail` never
+  counts toward a second fail, and the item passes only on a re-check of its real head after it.
+- **A test-only item deletes the mutation claim** and is never judged an empty revert.
+- **Pins** for the detached worktree at the item head and the blind re-check, each mutation-tested;
+  the config suite's budget comment credits its +3 lines to the right edit.
+
 ## 0.8.1
 
 **Text only — five verifier-pilot frictions (#952, #953, #954, #955, #979).**
