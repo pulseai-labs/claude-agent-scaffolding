@@ -1,5 +1,20 @@
 # workspace-init changelog
 
+## 0.10.1 (2026-10-29)
+
+The commit-msg hook finds the manifest from the repo it runs in (#983).
+
+### Fixed
+- **#983 — the hook no longer depends on an absolute path valid on one host.** It baked the AI workspace's absolute path at install, so a pair carried to another host (the #951 pilot, installed on the MacBook and run on Linux) named a path that did not exist there. Hooks from before 0.5.1 then printed `trace filter disabled` and let every commit through; hooks from 0.5.1 to 0.10.0 blocked every commit. The installer now records a reference: `self` for the AI workspace's own hook, `sibling:<dir>` for a canonical whose AI workspace sits beside it, and `abs:<path>` only for a pair that is neither, or for a repo whose `.git` is a file. The hook resolves `self` and `sibling` from its repository's main worktree, the parent of `git rev-parse --git-common-dir`, so the pair keeps its filter wherever the two repos move together, linked worktrees included. Every pair `/init-workspace` creates is side by side, and so is every `/pair-workspace` pair whose AI workspace takes the default parent.
+- **It still fails closed, and now names an escape.** A reference it cannot resolve, a workspace that is gone and a missing manifest each block the commit with the reason, as before. Each block now also names `WI_TRACE_FILTER_MANIFEST`: set it to the manifest's path for one commit and the hook reads that manifest and still runs every check, announcing the override on stderr. `--no-verify` remains, and switches the filter off. Closed rather than loud because a trailer that reaches public history cannot be taken back, while a blocked commit costs one repair command; the escape keeps that cost to one environment variable.
+- **The repair rewrites old hooks.** `wi trace_filter_install_pair <ai-workspace> <canonical>` already replaced a hook carrying the managed marker or the pre-0.5.1 header; it now writes the reference form over both. Installed hooks are not touched until it runs. There is no `/init-workspace --repair`. The old fail-open warning named it, and no release has shipped it.
+- **The stubs name the canonical instead of locating it.** `AGENTS.md` and `README.md` rendered `canonical.root`, an absolute path, into the workspace's instruction file. They now render `canonical.name` and point at `canonical.root` in `.workspace/pairing.json`.
+
+### Tests
+- New `tests/test-hook-portable.sh` (8 tests) runs the installed hook through real `git commit` in fixture repos where the install-time path is gone: a pair moved to another parent, from both repos and a linked worktree; a legacy fail-open hook carrying a dead path, rewritten by the repair; a missing workspace and a missing manifest failing closed and naming the escape; the escape still blocking a trailer; the `abs:` form for a pair that is not side by side; a `.git` turned into a file; an unrecognised reference. Each new assertion was mutation-tested with `tests/lib/mutate.sh` (16 mutants on the hook and installer, all killed).
+- `test_K1`, `test_PK1`, `test_F3`, `test_M1`, `test_H5`, `test_Q5` and `test_Q6` assert the baked reference rather than an absolute path. `test_E8` and `test_SC9` track the renamed placeholder. `test_A1`, `test_A6` and `test_R1` assert that the stubs name the canonical and contain no fixture path. Against the 0.10.0 renderer and templates those three fail.
+- Plugin suite: 13 files, 327 passed, 0 failed (319 before this release).
+
 ## 0.10.0 (2026-10-16)
 
 One instruction file: AGENTS.md.
