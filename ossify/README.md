@@ -1,4 +1,4 @@
-# ossify (v1.29.1)
+# ossify (v1.30.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
