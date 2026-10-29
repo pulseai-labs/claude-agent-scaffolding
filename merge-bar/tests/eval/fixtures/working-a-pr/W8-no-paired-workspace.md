@@ -8,3 +8,5 @@ body's Known limits lists "- Windows paths with a drive letter are rejected — 
 and "- Output is not streamed; files over 2 GB are refused". The checkout is
 `/home/dev/projects/widgets`. Its parent directory holds only `widgets/` and `notes.txt`; the
 repo has no `.ossify/` directory. The repo root does contain a `docs/` folder.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the old behavior; nothing outlives it."

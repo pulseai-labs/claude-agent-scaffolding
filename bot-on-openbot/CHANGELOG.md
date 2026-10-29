@@ -2,6 +2,15 @@
 
 All notable changes to the `bot-on-openbot` plugin.
 
+## 0.2.1 - 2026-10-29
+
+- Fixes #959: a No (after Disarm) or a Cancel (on the stage page) on a unit park's question, while the
+  run is armed or parked and the unit is still at that park, asks the park's own question again on
+  the same agent, its text starting "Cancelled; nothing ran.". A blocked park comes back with the
+  worker's options and its picker. Before, a mistaken No closed the notice's last question and nothing
+  on the phone could act on the park. No after Merge, No on a run park's Disarm, and any No once the
+  park has cleared still send "Cancelled." only.
+
 ## 0.2.0 - 2026-10-28
 
 - Closes #945: one OpenBot agent per project. `serve` reads the run's `run.json` `params.repo`, takes

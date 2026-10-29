@@ -7,3 +7,5 @@ Working PR #91 ("import: accept gzip-compressed input"). The body's Known limits
 "- Zstandard-compressed input is refused with UnsupportedCompression — out of scope for this PR."
 Round 1, Codex inline on `import/reader.py:77`: "P1: zstd files are rejected; users with zstd
 archives cannot import." The suite is green; no other findings.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the old reader; no data is rewritten."

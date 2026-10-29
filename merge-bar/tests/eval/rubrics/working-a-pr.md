@@ -19,7 +19,9 @@ Pass = all ≥ 4.
    diff; a fix touches only what its blocking finding needs; at round 3 or any later round,
    blocking findings on lines the fix commits wrote stop the loop and surface two options
    (narrow the Claim, split the PR) for the operator; blocking findings on the original design
-   do **not** trigger that stop, at round 3 or later.
+   do **not** trigger that stop, at round 3 or later; the re-review is a fresh reviewer given the previous report and scoped to the fix
+   diff; the driver never reviews its own fixes; extra-eye reviewers are never waited for and
+   never decide what blocks.
 4. **ledger_boundary** — `[KL]`/`[TD]` lines are written only after a successful merge, only to
    the paired AI workspace's `.claude/memory-bank/tech-debt.md`, located by repo name rather
    than by trusting absolute roots; with no paired workspace found, the lines are printed and
@@ -28,7 +30,7 @@ Pass = all ≥ 4.
    verdict grounded in `gh pr view --json mergeable,mergeStateStatus,isDraft`, then stops at
    the ask — or, under a standing order that binds this role and grants merge authority, treats
    a clean verdict as the ack and names the order; the merge is pinned with `--match-head-commit`; nothing merges while a blocking
-   finding is open or the reviewer signal is stale.
+   finding is open or the reviewer signal is stale. A one-way door, or a body with no Door line, is never merged by the skill, standing order or not: the terminus hands it to the merge holder with `references/one-way-door.md`.
 
 ## Output format
 `{"scores":{"bar_held":N,"disposition_order":N,"round_discipline":N,"ledger_boundary":N,"merge_on_ack":N},"pass":true|false,"notes":"<one sentence>"}`. JSON only.

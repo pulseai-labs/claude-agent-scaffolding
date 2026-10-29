@@ -7,3 +7,5 @@ Working PR #207 ("paginate `list_runs`"). Rounds 1 and 2 each had one non-blocki
 both answered in-thread; no fix commits exist. Round 3, Codex on `api/runs.py:58` (a line
 from the PR's original commit `9f8e7d6`): "when `page_size` is 0 the endpoint loops forever
 and never returns". The Claim says "list_runs returns runs in pages of page_size".
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the unpaged endpoint; nothing outlives it."

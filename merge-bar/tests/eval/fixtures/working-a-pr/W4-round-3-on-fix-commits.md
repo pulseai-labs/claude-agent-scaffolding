@@ -9,3 +9,5 @@ added (the retry loop never gives up), fixed in `d4e5f6a`. Round 3 now has two b
 findings: one on the backoff line `d4e5f6a` added (a negative sleep on clock skew corrupts
 the retry counter), one on the compare-and-swap helper `a1b2c3d` added (it swaps on a stale
 read). `git blame` confirms both lines come from those two fix commits.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores the locked writes; nothing outlives it."

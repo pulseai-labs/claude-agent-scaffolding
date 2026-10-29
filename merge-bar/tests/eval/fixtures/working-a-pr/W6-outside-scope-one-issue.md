@@ -9,3 +9,5 @@ Round 1, from CodeRabbit and Codex together:
 2. `http/auth.py:44` — the token cache ignores expiry.
 3. `http/auth.py:90` — a 401 from the refresh endpoint is swallowed.
 None of these files is in the diff. There are no findings on `http/client.py`.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge removes the retry; nothing outlives it."
