@@ -1742,6 +1742,38 @@ pin "$PRBRIEFS_MD" 'merge bound to the named SHA' \
   "the work-PR session merges bound to the SHA the top relayed"
 pin "$PRBRIEFS_MD" 'never a squash or rebase' \
   "the operator merge path is bound to the merge-commit convention too"
+# #963: a reviewing-a-pr report is the second accepted shape. The loosening has its
+# adjacent control in each validator: a `Head:` off the PR head still fails.
+pin "$GENERIC_BRIEFS_MD" 'When REVIEW_INVOCATION is `/merge-bar:review-pr`, your report file is instead that command'"'"'s report, whole' \
+  "a merge-bar reviewer returns that command's report whole (#963)" flat
+pin "$GENERIC_BRIEFS_MD" 'its `Head:` line is the reviewed head' \
+  "a merge-bar report's Head: is its reviewed head (#963)" flat
+pin "$PRBRIEFS_MD" 'a `/merge-bar:review-pr` report instead validates with its `## Coverage` table and a `Bar:` line on every `### C<n>` class, its `Head:` the reviewed head' \
+  "the work-PR session accepts a reviewing-a-pr report (#963)" flat
+pin "$PRBRIEFS_MD" 'A mismatched reviewed head makes the review historical, a `Head:` that is not the PR head included' \
+  "control: a reviewing-a-pr report off the PR head is historical (#963)" flat
+pin "$PRBRIEFS_MD" 'a class blocks unless its `Bar:` is `non-blocking`' \
+  "the work-PR session reads blocking from each class's Bar: (#963)" flat
+pin "$PRBRIEFS_MD" '`/merge-bar:review-pr <PR_URL> --round <n> --previous <previous report path>`' \
+  "the fix-range re-review of a merge-bar reviewer is its round 2+ command (#963)" flat
+pin "$PRBRIEFS_MD" 'a one-way door — the body'"'"'s `Door: one-way`, or no `Door:` line — is never merged here' \
+  "the work-PR session never merges a one-way door (#963)" flat
+pin "$PRBRIEFS_MD" 'skills/working-a-pr/references/one-way-door.md' \
+  "a one-way door goes to the top with merge-bar's checklist (#963)" flat
+pin "$LIFECYCLE_MD" 'or a `/merge-bar:review-pr` report with its `## Coverage` table and a `Bar:` line on every `### C<n>` class' \
+  "step 8 accepts a reviewing-a-pr report (#963)" flat
+pin "$LIFECYCLE_MD" 'with the reviewed head — that report'"'"'s `Head:` — equal to the PR head' \
+  "control: step 8 holds a reviewing-a-pr report to the PR head (#963)" flat
+# #965 round 1: a round 2+ class that closes a prior one does not block; a still-open
+# one keeps its Bar. The one-way hand-off has a return shape and a receiver.
+pin "$PRBRIEFS_MD" 'or it carries `Closes:`, and a `Still open:` class keeps its' \
+  "the work-PR session reads a Closes: class as not blocking (#965)"
+pin "$LIFECYCLE_MD" 'or it carries `Closes:`, and a `Still open:` class keeps its `Bar:`' \
+  "step 8 reads a Closes: class as not blocking (#965)" flat
+pin "$PRBRIEFS_MD" '`handed off: one-way <reviewed head OID>`, only for step 6'"'"'s' \
+  "the work-PR session returns a one-way door as a hand-off (#965)"
+pin "$LIFECYCLE_MD" 'under either word, `standing` included' \
+  "step 12 runs one-way-door.md for a one-way door even under standing (#965)"
 pin "$LIFECYCLE_MD" 'dispatch a work-PR session' \
   "1b dispatches a work-PR session per returned PR"
 pin "$SKILL_MD" 'the spine'"'"'s seats in `.crew/roles.md`' \
