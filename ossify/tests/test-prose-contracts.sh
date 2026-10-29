@@ -1810,8 +1810,10 @@ CBW='**Check before you write.** Check every precondition before the first write
 for f in work-item/SKILL.md patch/SKILL.md close/references/harvest.md adopt/SKILL.md plan-spine/SKILL.md; do
   pin "$HERE/../skills/$f" "$CBW" "check-before-write block, verbatim and once, in $f"
 done
-# D5: the can-it-fail review step lives once, in work-item §6.
-pin "$WI/SKILL.md" '**Can each test fail?**' "work-item §6 carries the can-it-fail review step"
+# D5, moved by #951: the implementer no longer verifies its own tests. No
+# self-verification text survives in the work-item tree or its registration.
+t_assert_eq "" "$(grep -rn -e 'Can each test fail' -e 'verification-before-completion' -e 'whether it can fail' "$WI" "$HERE/../agents/implementer-agent.md")" \
+  "work-item and implementer-agent carry no self-verification step (#951)"
 
 # ---------------------------------------------------------------------------
 # 1.19.0 (#497): the bones a spine's PLAN declares. plan-spine writes SPINE.md's
@@ -1931,8 +1933,8 @@ pin "$_AG" '`Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Skill` — `Skill`
   "implementer-agent.md's binding allowlist names Skill and its one use (#281)"
 pin "$WI/SKILL.md" 'the dispatched registration grants it since 1.19.3 (#281)' \
   "work-item SKILL.md §12 says the dispatched path composes too (#281)"
-pin "$WI/SKILL.md" 'or either skill is not installed, §5 and §6→§8 of this body are the' \
-  "work-item SKILL.md §12 falls back to the body when a composed skill is not installed (#281)"
+pin "$WI/SKILL.md" 'or the skill is not installed, §5 of this body is the' \
+  "work-item SKILL.md §12 falls back to the body when the composed skill is not installed (#281, #951)"
 pin "$WI/SKILL.md" 'Where a composed skill and this body disagree, this body wins:' \
   "work-item SKILL.md §12 says the body wins over a composed skill (#281)"
 t_assert_eq 0 "$(awk 'index($0, "Until #281") {n++} END {print n+0}' "$WI/SKILL.md")" \

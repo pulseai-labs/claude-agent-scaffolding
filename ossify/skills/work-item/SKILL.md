@@ -34,8 +34,8 @@ and has its own contract):
   at it. The dispatcher is **not** `plan-spine` — it authors your
   spec and the spine's demo lines and stops there. Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on Claude Code, Codex and OMP, so `oss` resolves in every Bash call; a variable set in one call is gone in the next.
 
-**On Claude Code, `ossify:implementer-agent` is the only worker ossify itself
-dispatches**, and it is the default. The one exception is opt-in and belongs to the lane, not to
+**On Claude Code, `ossify:implementer-agent` is the lane's only worker** (close
+dispatches its own verifier), and it is the default. The one exception is opt-in and belongs to the lane, not to
 you: `/run-spine <spine-id> --external-executor` hands execution to a
 caller-supplied procedure instead of dispatching anything
 (`references/external-executor.md`). Your contract below is identical either
@@ -265,8 +265,6 @@ oss verify_step "<worktree-abs>" "<command>" "<expectation>"   # 0 pass | 1 fail
 
 Capture, per command: exit code, a short output excerpt, and pass/fail.
 
-**Can each test fail?** A green run proves nothing about a test that cannot go red. Before the report, judge every test you wrote or changed: would it fail if the behaviour it guards were gone? When you are not sure, mutate the production code it guards and hold three conditions — the mutation is semantic (not a syntax error), it applied (echo the changed line back), and it runs on the path the test exercises. Confirm red, then restore from a copy you saved first, never from git (`git checkout` also drops your uncommitted work). A text pin binds to text this change writes and matches it exactly once; a phrase that also occurs elsewhere in the file keeps the pin green when the guarded line is deleted. Record each test's answer in report §5.
-
 **Explicitly NOT halt-on-first-fail** — the deliberate opposite of the
 orchestrator-side gate in `close`. Run all of them even after one fails. The
 orchestrator needs the full picture to pick a recovery path, and partial output
@@ -422,11 +420,10 @@ command's to emit, not this body's.
   dispatch grant. The no-commit guarantee is **prompt-enforced and audit-detected, never
   mechanically blocked** — your Bash tool can reach `git`, so the guarantee is
   your discipline plus the orchestrator's log audit, not a sandbox.
-- **Composed skills:** `superpowers:test-driven-development` for §5's discipline
-  and `superpowers:verification-before-completion` for the §6→§8 sanity check.
-  Compose them when your harness grants `Skill` — the dispatched registration grants it since 1.19.3 (#281) —
-  and both are installed; do not restate their bodies here. Where a harness grants
-  no `Skill`, or either skill is not installed, §5 and §6→§8 of this body are the
+- **Composed skill:** `superpowers:test-driven-development` for §5's discipline.
+  Compose it when your harness grants `Skill` — the dispatched registration grants it since 1.19.3 (#281) —
+  and it is installed; do not restate its body here. Where a harness grants
+  no `Skill`, or the skill is not installed, §5 of this body is the
   whole discipline. Where a composed skill and this body disagree, this body wins:
   a first-run GREEN that `references/tdd-loop.md` §2 accepts (a cascade from a
   sibling AC, or an rc-2 AC whose behaviour was already there) is recorded, never

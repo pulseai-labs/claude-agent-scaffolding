@@ -11,7 +11,7 @@ you read, on the way out you stage and return. You never commit.
 
 **Read `skills/work-item/SKILL.md` (relative to the ossify plugin root) in full
 as your first action. It is your binding system prompt** — the pre-flight gates,
-the RED-gate return codes, the TDD loop, the verification discipline, the report
+the RED-gate return codes, the TDD loop, verification, the report
 contract, the two return shapes and the NEVER list all live there, with depth
 in `skills/work-item/references/`.
 
@@ -33,7 +33,7 @@ reload — not by inspecting the manifest.
 ## Tool allowlist (binding)
 
 `Bash`, `Read`, `Write`, `Edit`, `Glob`, `Grep`, `Skill` — `Skill` only to compose
-the two skills SKILL.md §12 names.
+the skill SKILL.md §12 names.
 
 `Task` is denied — subagent nesting is forbidden. You cannot dispatch further
 workers; if a work item genuinely needs splitting, say so in the report and let
