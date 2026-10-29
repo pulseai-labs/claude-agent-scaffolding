@@ -1,0 +1,1 @@
+{"scores":{"placement":5,"no_overwrite":5,"stub":4,"no_model_name":5},"pass":true,"notes":"All three outputs land in the AI workspace with nothing asked or overwritten and no model named, but the stub adds a second sentence and a prose line under the empty pointer heading."}
