@@ -6,8 +6,8 @@ merges a pull request only by the recipe's rule, and notifies on parks, stalls a
 A merge-stage park on red checks or a conflict names the PR and the failing checks in its notice.
 A recipe with a `driver` stage sends the operator only what a driver could not settle (see Driver).
 It judges nothing: anything that needs judgment is a session the recipe launches. It ships a CLI,
-a claim launcher and a timer, and no skill, so Codex has nothing to load. It runs workers in Orca
-terminals (see Orca host). Needs `bun`.
+a claim launcher, a timer and one skill (see Skill). It runs workers in Orca terminals (see Orca
+host). Needs `bun`.
 
 ## Install
 
@@ -148,6 +148,15 @@ Known limits:
   free-text box open, and the answer is rc 4 with no event.
 - The check and the send are separate Orca calls: a picker that changes between the read and the
   send gets keys meant for the one read.
+
+## Skill
+
+`running-a-spine-on-baton` is for a project's orchestrator session asked to run a planned ossify
+spine on baton. It runs a read-only preflight, shows the exact `baton arm` command for the
+example recipe with where each value came from, arms it only on the operator's yes, and then
+spends no tokens on the run: questions reach the phone through bot-on-openbot, and status is
+read only when the operator asks. It points here for the commands and the runbook. Claude Code
+only: baton has no Codex manifest.
 
 ## Commands
 
