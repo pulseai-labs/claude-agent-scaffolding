@@ -152,8 +152,12 @@ Every command's syntax comes from the layer's guide.
    fast-implementer brief with the verifier's claims for a TASK (`briefs.md`;
    the layer file says how), wait for its report file
    naming the new head SHA, read that SHA's check-runs, then re-check on the retained
-   verifier; a second fail on the same item goes to the operator. The verifier is
-   released only at pass or escalation.
+   verifier — its brief sent again, every slot refilled (`briefs.md`); a second fail on the
+   same item goes to the operator. The verifier is released only at pass or escalation.
+   A calibration fixture — a seeded defect the verifier must report `fail` — is the top's
+   own worktree mutation, never a worker's task and never on the PR branch: a detached
+   worktree at the item head, seeded only by `git checkout <base> -- <path>` on a path the
+   implementer's report names, re-checked without saying what was seeded, then removed.
 8. **Review.** A review runs exactly once per PR: the reviewer seat in a fresh worktree
    at the PR head, brief its review command (`config.md`, `review:`; `/code-review <PR> <LEVEL>` by default), every finding returned in the report file.
    **A fixed head is revalidated, never re-reviewed whole**: the reviewer is re-dispatched from

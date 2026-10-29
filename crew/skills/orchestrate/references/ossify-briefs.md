@@ -26,7 +26,7 @@ PLACEMENT: <abs path of the repo or worktree the lane runs from>.
 INJECTED IDENTITIES — use these verbatim; do not rediscover them:
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when the layer can address the dispatcher's seat and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
 PING_SEND=<the layer's Send, filled by the dispatcher: how one line reaches a pane on your layer>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '[crew report coordinator] <task id> <kind> <path>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '"\(.run.orchestrator.pane) \(.run.orchestrator.machine)"' <NOTIFY_RUN>` at that moment — one line, the pane then the machine; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '[crew report coordinator] <task id> <kind> <path>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 RUN_JSON=<abs path of the run.json you write and own — never the top's>
 MECHANICS=<the directory this session read the orchestrate skill's SKILL.md from>/references/layers/<layer>.md
 SPINE_ID=<spine id>
@@ -91,7 +91,7 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      procedure; `cannot determine` counts as fail. On the FIRST failure ask the
      top, with the verifier's summary and the three options — correct, replace,
      halt — and block: the pair idles until the reply. Correct sends one
-     consolidated correction to the SAME implementer and the full recheck to the
+     consolidated correction to the SAME implementer and the full recheck — this file's item-verifier brief, refilled — to the
      SAME verifier; replace releases the old pair, resets that item's worktree to
      the request's base_sha with a clean porcelain (the rejected staged work is
      discarded), and re-requests the item so the fresh pair runs the ordinary
@@ -147,7 +147,7 @@ PLACEMENT: worktree <abs path>, branch <branch>, base <base-branch>. Use git -C
 for every git command; cd does not persist.
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when the layer can address the dispatcher's seat and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
 PING_SEND=<the layer's Send, filled by the dispatcher: how one line reaches a pane on your layer>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '[crew report implementer] <task id> <kind> <path>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '"\(.run.orchestrator.pane) \(.run.orchestrator.machine)"' <NOTIFY_RUN>` at that moment — one line, the pane then the machine; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '[crew report implementer] <task id> <kind> <path>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 Everything you say upward (plan, question, escalation, report) goes in that file.
 
 BEFORE ANY EDIT, in this order:
@@ -198,14 +198,14 @@ ROLE: verifier for <work-item-id>, read-only, in worktree <abs path>, at the acc
 value to match — a mismatch is a failed launch to report and stop.
 REPORT_PATH=<the absolute path this seat writes its report to>, replaced whole — a temp file in the same directory renamed over the path, never in pieces; NOTIFY_RUN=<the absolute path of the dispatcher's run.json — filled only when the layer can address the dispatcher's seat and your pane is on the dispatcher's machine; otherwise the sentinel `none`, which is never read or sent to>; NOTIFY_MACHINE=<your pane's machine, as the dispatcher's run.json records machines>
 PING_SEND=<the layer's Send, filled by the dispatcher: how one line reaches a pane on your layer>
-PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '.run.orchestrator.pane, .run.orchestrator.machine' <NOTIFY_RUN>` at that moment; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '[crew report verifier] <task id> <kind> <path>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
+PING: after every report rename — plan, question, escalation, late finding, final report — one send, no `--wait`, no retry, and only when NOTIFY_RUN is not `none`: read `jq -r '"\(.run.orchestrator.pane) \(.run.orchestrator.machine)"' <NOTIFY_RUN>` at that moment — one line, the pane then the machine; only when that machine equals NOTIFY_MACHINE, `<PING_SEND> '[crew report verifier] <task id> <kind> <path>'`, one single-quoted literal argument (a single quote in it is written `'\''`; `$` and backticks stay literal). A failed read or another machine skips the send. The report file is the contract; a failed send is left as it is. A skipped or failed send is never an answer: after a plan or a question, wait at that gate as if it had been delivered (#810).
 EXPECTED_MODEL=<this item's SEATS row names it — fill this line; a coordinator never sends it blank>
 
 CLAIMS: <the numbered list the coordinator fills from this item's spec, from the verifier body
 it supplied — every claim, so the verifier reads no other file for them>.
 RULES THAT DO NOT LOAD HERE: <paste verbatim, or "none">.
 
-DONE: write your report file with one line per claim — pass | fail | cannot
+DONE: write your report file with one line per claim, its [tag] first — pass | fail | cannot
 determine, with commands and output verbatim — then the caveats. `Cannot
 determine` counts as fail.
 
@@ -213,7 +213,7 @@ MOLT: if molt warns you, send one ping, `<PING_SEND> '[crew molt verifier] <pct>
 NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
 staged tree and `git status --porcelain` exactly as found before you write your report file;
 scratch goes under SCRATCH_DIR=<the seat's scratch directory>, never the worktree. Do not verify a second
-work item; you are retained for this one until it passes or escalates.
+work item; you are retained for this one until it passes or escalates. A re-check is this brief sent again, refilled: judge the tree named above, never your previous check's.
 ```
 
 ---

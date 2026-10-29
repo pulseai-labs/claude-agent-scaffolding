@@ -23,7 +23,9 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CONFIG_MD="$PLUGIN_ROOT/skills/orchestrate/references/config.md"
-REF_BUDGET=229          # 2026-10-18 (V13 fix): -1 — the `host:` bullet dropped the restated
+REF_BUDGET=232          # 2026-10-29 (0.8.1, #954): +3 — the machine-file `rail:` key: its field
+                        # entry, its profile-table row, and the rendered row's rail tail.
+                        # 2026-10-18 (V13 fix): -1 — the `host:` bullet dropped the restated
                         # report-read clause (`roles.md` owns that rule). 230 -> 229.
                         # 2026-10-18 (0.4.0, Task 13): +22 — the machine-file `host:` key ships
                         # with its first user, the demo walk: the field entry with its placement
@@ -121,6 +123,18 @@ pin "$CONFIG_MD" 'the row'"'"'s command, model and effort only' \
   "a brief's own launch record is named by field, not by position"
 pin "$CONFIG_MD" 'A profile that crosses a session carries its seat'"'"'s machine and its agent'"'"'s name' \
   "the carry rule is stated once"
+# 0.8.1 (#954): an agent whose guard is not seat-mods (Devin's seat guard) names that rail and
+# its check, the rail crosses with the row, and the model read takes a passing check in
+# place of the `seat: <role>` status line — else every such launch logs "no guards".
+pin "$CONFIG_MD" '- `rail:` — optional: the guard this agent runs under in place of seat-mods, and the one command' \
+  "the machine file's rail key names the guard and its check"
+pin "$CONFIG_MD" '| `rail:` | the machine entry | the model read | every resolved profile that names one, as the row'"'"'s tail |' \
+  "the profile table says the rail travels as the row's tail"
+pin "$CONFIG_MD" 'host: <machine>`, then ` | rail: <rail>` where the entry names one' \
+  "the rendered row carries the rail after the host"
+ROLES_MD="$PLUGIN_ROOT/skills/orchestrate/references/roles.md"
+pin "$ROLES_MD" 'unless the seat'"'"'s row names a `rail:` (`config.md`), whose check the launching session runs once instead: a pass records that rail, a fail no guards.' \
+  "the model read takes a named rail's passing check in place of the status line" flat
 pin "$CONFIG_MD" 'the close brief'"'"'s demo-walk row' \
   "the carry rule names the close brief's demo-walk row among the crossing surfaces"
 
