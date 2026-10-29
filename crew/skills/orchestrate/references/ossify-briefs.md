@@ -91,7 +91,7 @@ is not SPINE_EXPECTED_MODEL is a failed launch to report, not to work around.
      procedure; `cannot determine` counts as fail. On the FIRST failure ask the
      top, with the verifier's summary and the three options — correct, replace,
      halt — and block: the pair idles until the reply. Correct sends one
-     consolidated correction to the SAME implementer and the full recheck — this file's item-verifier brief, refilled — to the
+     consolidated correction to the SAME implementer and the full recheck — this file's item-verifier brief, refilled, a fresh `REPORT_PATH` in the same report directory — to the
      SAME verifier; replace releases the old pair, resets that item's worktree to
      the request's base_sha with a clean porcelain (the rejected staged work is
      discarded), and re-requests the item so the fresh pair runs the ordinary
@@ -213,7 +213,7 @@ MOLT: if molt warns you, send one ping, `<PING_SEND> '[crew molt verifier] <pct>
 NEVER: commit, push, or edit a tracked file outside the mutation check. Leave `HEAD`, the
 staged tree and `git status --porcelain` exactly as found before you write your report file;
 scratch goes under SCRATCH_DIR=<the seat's scratch directory>, never the worktree. Do not verify a second
-work item; you are retained for this one until it passes or escalates. A re-check is this brief sent again, refilled: judge the tree named above, never your previous check's. Two slots change: ROLE's `head_oid` and `tree_oid`, from the latest return, and REPORT_PATH, new, never the first report's.
+work item; you are retained for this one until it passes or escalates. A re-check is this brief sent again, refilled: judge the tree named above, never your previous check's. Two slots change: ROLE's `head_oid` and `tree_oid`, from the latest return, and a fresh `REPORT_PATH` in the same report directory, never the first report's.
 ```
 
 ---

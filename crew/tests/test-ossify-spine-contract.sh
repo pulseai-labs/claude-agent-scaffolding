@@ -2250,8 +2250,10 @@ pin "$BRIEFS_MD" 'A re-check is this brief sent again, refilled: judge the tree 
   "the item verifier brief says what a re-check is"
 pin "$LIFECYCLE_MD" 'verifier — its brief sent again, every slot refilled (`briefs.md`)' \
   "lifecycle step 7's re-check names the brief it sends" flat
-pin "$BRIEFS_MD" 'the full recheck — this file'"'"'s item-verifier brief, refilled — to the' \
-  "the spine's correct path names the re-check's brief" flat
+# 0.8.2 (#988 r1): the spine's correct path is a re-check too — a fresh report path in the
+# same report directory, which the retained verifier's SEAT_MODS_ALLOW holds from launch.
+pin "$BRIEFS_MD" 'the full recheck — this file'"'"'s item-verifier brief, refilled, a fresh `REPORT_PATH` in the same report directory — to the' \
+  "the spine's correct path names the re-check's brief and a fresh report path in the same directory" flat
 # 0.8.1 (#952): one diff form for a committed head and a staged tree, so no top edits the
 # diff command for a staged re-check; and an empty revert is named, not passed.
 pin "$GENERIC_BRIEFS_MD" '`git diff --cached <the item'"'"'s base sha>`, which covers a committed head and a staged tree.' \
@@ -2284,13 +2286,13 @@ pin "$GENERIC_BRIEFS_MD" 'or the item changes only tests, delete this claim (nev
 # 0.8.2 (#987): a re-check names the slots it changes; a new REPORT_PATH keeps the first
 # report, which reusing the path would replace. The spine's correct path and the eval
 # rubric carry the same re-check.
-pin "$GENERIC_BRIEFS_MD" 'Two slots change: this line names the tree to judge now, and REPORT_PATH is new, never the first report'"'"'s.' \
+pin "$GENERIC_BRIEFS_MD" 'Two slots change: this line names the tree to judge now, and a fresh `REPORT_PATH` in the same report directory, never the first report'"'"'s.' \
   "the generic verifier's re-check names the two slots that change" flat
-pin "$BRIEFS_MD" 'Two slots change: ROLE'"'"'s `head_oid` and `tree_oid`, from the latest return, and REPORT_PATH, new, never the first report'"'"'s.' \
+pin "$BRIEFS_MD" 'Two slots change: ROLE'"'"'s `head_oid` and `tree_oid`, from the latest return, and a fresh `REPORT_PATH` in the same report directory, never the first report'"'"'s.' \
   "the item verifier's re-check names the two slots that change"
-pin "$NESTED_MD" 'the full recheck — `ossify-briefs.md`'"'"'s item-verifier brief, refilled, at a new REPORT_PATH — to the same verifier.' \
+pin "$NESTED_MD" 'the full recheck — `ossify-briefs.md`'"'"'s item-verifier brief, refilled, a fresh `REPORT_PATH` in the same report directory — to the same verifier.' \
   "nested-run's correct path names the re-check's brief and a new report path" flat
-pin "$EVAL_RUBRIC_MD" 'the same verifier'"'"'s full recheck — its item-verifier brief refilled, at a new REPORT_PATH, never the first report'"'"'s' \
+pin "$EVAL_RUBRIC_MD" 'the same verifier'"'"'s full recheck — its item-verifier brief refilled, a fresh `REPORT_PATH` in the same report directory, never the first report'"'"'s' \
   "the eval rubric's correct path names the re-check's brief and a new report path" flat
 # 0.8.2 (#987, #954's other half): every carrier row takes the rail tail, so a seat a
 # coordinator launches from a carried row records its rail, not "no guards"; and each

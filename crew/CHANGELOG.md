@@ -14,8 +14,8 @@ All notable changes to the `crew` plugin.
   which separates the row's fields. The row puts its machine after every launch field, with
   only the rail tail after it, and the check runs once per launch, at the model read.
 - **A re-check names what changes.** Two slots: the tree it judges (the generic `PLACEMENT`, the
-  item verifier's `head_oid` and `tree_oid` from the latest return), and `REPORT_PATH`, a new
-  path, so the first report is kept. The spine's correct path in `ossify-nested-run.md` and the
+  item verifier's `head_oid` and `tree_oid` from the latest return), and a fresh `REPORT_PATH` in
+  the same report directory, so the first report is kept. The spine's correct path in `ossify-nested-run.md` and the
   eval rubric say the same.
 - **The calibration fixture is reconciled.** "Never edit product code" names its base checkout,
   which restores committed code in a worktree no branch receives. Its expected `fail` never

@@ -128,7 +128,7 @@ aligned.
    idling until the reply, and a second failure asking again rather than
    escalating silently. *Correct* is one consolidated correction to the same
    implementer and the same verifier's full recheck — its item-verifier brief
-   refilled, at a new REPORT_PATH, never the first report's; *replace* **releases the old pair
+   refilled, a fresh `REPORT_PATH` in the same report directory, never the first report's; *replace* **releases the old pair
    first**, then creates a fresh one at that item's SEATS row against the
    item's worktree reset to the request's `base_sha` with a clean porcelain —
    the rejected staged work is discarded, which is what replacing means — so two

@@ -221,7 +221,7 @@ continue.
 
 PLACEMENT: <worktree abs-path or repo path>, at <ref or sha>. A re-check is this brief sent
 again, every slot refilled: judge the tree named here, never your previous check's. Two slots
-change: this line names the tree to judge now, and REPORT_PATH is new, never the first report's.
+change: this line names the tree to judge now, and a fresh `REPORT_PATH` in the same report directory, never the first report's.
 
 CLAIMS:, a numbered list the orchestrator fills from the work item's spec:
   1. [ac] <acceptance criterion or requirement>: <how to check>
