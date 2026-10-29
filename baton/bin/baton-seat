@@ -9,7 +9,11 @@
 #   omp-seat "$OMP_T3_SEAT" --via "$OMP_T3_VIA" "<message text>"
 # Every refusal exits 78 with one line on stderr and one line in <state>/claims/seat.log:
 #   <utc> <result> cwd <cwd>
-# where <result> is the claim nonce, or none | invalid <line> | nomsg | toolong | noseat | noexec.
+# where <result> is the claim nonce, or none | invalid <line> | nomsg | toolong | noseat | noexec
+# | norole | noargv | notable.
+# A claim with BATON_ROLE and BATON_ROLE_TABLE (a role stage) execs the table's argv for that
+# role instead of omp-seat, with the message as the LAST argument (brief_delivery inject) or
+# "Read <state>/briefs/<nonce>.md and follow it." (file). Nothing else is added to the argv.
 # The claim keys keep the OMP_T3_ names from the retired T3 launcher, so staged recipes still run.
 
 set -u
@@ -86,11 +90,28 @@ exec 3<&-
 
 # 3. Export literally: no expansion, no quoting. The seat identity comes from the claim
 # alone, never from the terminal's own environment.
-unset OMP_T3_SEAT OMP_T3_VIA
+unset OMP_T3_SEAT OMP_T3_VIA BATON_ROLE BATON_ROLE_TABLE
 for i in "${!keys[@]}"; do
   export "${keys[$i]}=${vals[$i]}"
 done
-if [ -z "${OMP_T3_SEAT:-}" ] || [ -z "${OMP_T3_VIA:-}" ]; then
+role="${BATON_ROLE:-}"
+if [ -n "$role" ]; then
+  # Role claim: the seat is whatever argv the role table says; the OMP_T3_ keys are not needed.
+  table="${BATON_ROLE_TABLE:-}"
+  if [ -z "$table" ] || [ ! -f "$table" ]; then
+    refuse notable
+  fi
+  if ! jq -e --arg r "$role" 'type == "object" and has($r)' "$table" >/dev/null 2>&1; then
+    # unparseable table and absent role are told apart: jq -e on bad JSON exits 2 or 5 as well.
+    if jq -e . "$table" >/dev/null 2>&1; then refuse norole; else refuse notable; fi
+  fi
+  argv=()
+  mapfile -d '' -t argv < <(jq -j --arg r "$role" '(.[$r].argv // [])[] | tostring + "\u0000"' "$table" 2>/dev/null)
+  if [ "${#argv[@]}" -eq 0 ]; then
+    refuse noargv
+  fi
+  delivery="$(jq -r --arg r "$role" '.[$r].brief_delivery // "inject"' "$table" 2>/dev/null)"
+elif [ -z "${OMP_T3_SEAT:-}" ] || [ -z "${OMP_T3_VIA:-}" ]; then
   refuse noseat
 fi
 
@@ -100,18 +121,40 @@ if [ -z "$msgfile" ] || [ ! -f "$msgfile" ]; then
   refuse nomsg
 fi
 size="$(wc -c <"$msgfile" 2>/dev/null)" || refuse nomsg
-if [ "$size" -gt "$max_msg" ]; then
+if [ "$size" -gt "$max_msg" ] && [ "${delivery:-inject}" != file ]; then
   refuse toolong
 fi
 # 5. The seat program must be runnable before the message is spent: a refusal keeps the file.
-if [ ! -f "$omp_seat_bin" ] || [ ! -x "$omp_seat_bin" ]; then
+if [ -n "$role" ]; then
+  command -v -- "${argv[0]}" >/dev/null 2>&1 || refuse noexec
+  case "$delivery" in
+    inject|file) ;;
+    *) refuse noargv ;;
+  esac
+  if [ "$delivery" = file ] && ! [[ "$nonce" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    refuse "invalid 1"
+  fi
+elif [ ! -f "$omp_seat_bin" ] || [ ! -x "$omp_seat_bin" ]; then
   refuse noexec
 fi
 # A file removed after the checks (a disarm's cleanup, #930) is a refusal, never an empty prompt.
-text="$(cat -- "$msgfile" 2>/dev/null && printf x)" || refuse nomsg
-text="${text%x}"
-rm -f -- "$msgfile"
+if [ -n "$role" ] && [ "$delivery" = file ]; then
+  # The message moves to a file the agent reads: no argument-size limit applies.
+  briefs="$state/briefs"
+  brief="$briefs/$nonce.md"
+  mkdir -p -- "$briefs" 2>/dev/null && (umask 077 && cp -- "$msgfile" "$brief") 2>/dev/null \
+    && chmod 600 -- "$brief" 2>/dev/null || refuse nomsg
+  rm -f -- "$msgfile"
+  text="Read $brief and follow it."
+else
+  text="$(cat -- "$msgfile" 2>/dev/null && printf x)" || refuse nomsg
+  text="${text%x}"
+  rm -f -- "$msgfile"
+fi
 
 # 6. Log and launch. exec leaves no wrapper between the terminal and omp.
 log_line "$nonce"
+if [ -n "$role" ]; then
+  exec "${argv[@]}" "$text"
+fi
 exec "$omp_seat_bin" "$OMP_T3_SEAT" --via "$OMP_T3_VIA" "$text"

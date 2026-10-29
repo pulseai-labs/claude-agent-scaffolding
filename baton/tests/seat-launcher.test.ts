@@ -264,3 +264,80 @@ test("parity: every key claims.ts refuses, the launcher refuses", () => {
     process.env.HOME = saved.h;
   }
 });
+
+// --- #993: role claims exec the table's argv ---
+const roleClaim = (role: string, extra = "") =>
+  `# baton n2\nBATON_ROLE=${role}\nBATON_ROLE_TABLE=${join(base, "seats.json")}\n${extra}`;
+const writeTable = (t: unknown) => writeFileSync(join(base, "seats.json"), JSON.stringify(t));
+const entry = (argv: string[], brief_delivery = "inject") => ({ agent: "x", argv, brief_delivery });
+
+test("role-argv-exact: table argv reaches the agent unchanged", () => {
+  const argv = [fake, "a b", "'q'", "$HOME", ";x", "-y"];
+  writeTable({ impl: entry(argv) });
+  writeFileSync(claimFile(proj), roleClaim("impl"));
+  const r = run(proj);
+  expect(r.rc).toBe(0);
+  expect(r.json.argv).toEqual(["a b", "'q'", "$HOME", ";x", "-y", "hello"]);
+});
+
+test("role-inject-message-last, and after a trailing --", () => {
+  writeTable({ impl: entry([fake, "--flag", "--"]) });
+  writeFileSync(claimFile(proj), roleClaim("impl"));
+  writeFileSync(msg, "- looks like a flag\n");
+  expect(run(proj).json.argv).toEqual(["--flag", "--", "- looks like a flag\n"]);
+  expect(existsSync(msg)).toBe(false);
+});
+
+test("role-file-delivery-path: one argument naming a 200 KiB file", () => {
+  writeTable({ impl: entry([fake], "file") });
+  writeFileSync(claimFile(proj), roleClaim("impl"));
+  const big = "x".repeat(200 * 1024);
+  writeFileSync(msg, big);
+  const r = run(proj);
+  expect(r.rc).toBe(0);
+  expect(r.json.argv.length).toBe(1);
+  const m = r.json.argv[0].match(/^Read (.+) and follow it\.$/);
+  expect(m).not.toBeNull();
+  expect(m![1]).toBe(join(state, "briefs", "n2.md"));
+  expect(readFileSync(m![1], "utf8")).toBe(big);
+  expect((require("node:fs").statSync(m![1]).mode & 0o777)).toBe(0o600);
+  expect(existsSync(msg)).toBe(false);
+});
+
+test("role-inject keeps the size limit", () => {
+  writeTable({ impl: entry([fake]) });
+  writeFileSync(claimFile(proj), roleClaim("impl"));
+  writeFileSync(msg, "x".repeat(131072));
+  expect(run(proj).rc).toBe(78);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ toolong cwd /);
+});
+
+test("role-missing-in-table-refuses-norole", () => {
+  writeTable({ other: entry([fake]) });
+  writeFileSync(claimFile(proj), roleClaim("impl"));
+  const r = run(proj);
+  expect(r.rc).toBe(78);
+  expect(existsSync(ran)).toBe(false);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ norole cwd /);
+  expect(existsSync(msg)).toBe(true);
+});
+
+test("role refusals: noargv and notable", () => {
+  writeTable({ impl: entry([]) });
+  writeFileSync(claimFile(proj), roleClaim("impl"));
+  expect(run(proj).rc).toBe(78);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ noargv cwd /);
+  writeFileSync(claimFile(proj), "# baton n2\nBATON_ROLE=impl\nBATON_ROLE_TABLE=" + join(base, "missing.json") + "\n");
+  expect(run(proj).rc).toBe(78);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ notable cwd /);
+  writeFileSync(join(base, "bad.json"), "{not json");
+  writeFileSync(claimFile(proj), "# baton n2\nBATON_ROLE=impl\nBATON_ROLE_TABLE=" + join(base, "bad.json") + "\n");
+  expect(run(proj).rc).toBe(78);
+  expect(readFileSync(logFile(), "utf8").trim().split("\n").pop()).toMatch(/ notable cwd /);
+  expect(existsSync(ran)).toBe(false);
+});
+
+test("legacy-omp-claim-unchanged: no BATON_ROLE still execs omp-seat", () => {
+  writeFileSync(claimFile(proj), GOOD);
+  expect(run(proj).json.argv).toEqual(["worker", "--via", "/v/w", "hello"]);
+});

@@ -60,6 +60,14 @@ describe("validate", () => {
     }
   });
 
+  test("a stage env cannot carry the engine-set role keys", () => {
+    for (const k of ["BATON_ROLE", "BATON_ROLE_TABLE"]) {
+      const r = relay();
+      r.stages.work.env = { [k]: "x" };
+      expectError(r, `stages.work.env.${k}: reserved key`);
+    }
+  });
+
   test("an env key failing the pattern or on the denylist", () => {
     const r = relay();
     r.stages.work.env = { lower_key: "1" };

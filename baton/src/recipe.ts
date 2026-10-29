@@ -362,6 +362,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     else {
       for (const [k, v] of Object.entries(st.env)) {
         if (!ENV_KEY_RE.test(k) || ENV_DENYLIST.includes(k)) err(`${p}.env.${k}`, "denied key");
+        else if (k === "BATON_ROLE" || k === "BATON_ROLE_TABLE") err(`${p}.env.${k}`, "reserved key: set only by the engine");
         if (!isStr(v)) err(`${p}.env.${k}`, "must be a string");
       }
     }
