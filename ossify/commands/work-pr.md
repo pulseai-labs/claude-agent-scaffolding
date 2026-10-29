@@ -1,5 +1,5 @@
 ---
-description: Drive a pull request to merge — merge-bar's working-a-pr when that plugin is installed, else ossify's bundled review-fix-merge loop; every finding dispositioned, merge only on the operator's explicit ack, or a standing order's in the project's memory bank or `AGENTS.md` that binds this role
+description: Drive a pull request to merge — merge-bar's working-a-pr when that plugin is installed, else ossify's bundled review-fix-merge loop; every finding dispositioned, merge only on the operator's explicit ack, or a standing order's in the project's memory bank or `AGENTS.md` that binds this role; under working-a-pr a one-way door goes to the merge holder
 argument-hint: "<PR number or URL> [--repo-root DIR]"
 allowed-tools: Bash(bash:*), Bash(git:*), Bash(gh:*), Read, Write, Edit, Glob, Grep, Skill
 ---

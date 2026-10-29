@@ -1,6 +1,6 @@
 ---
 name: work-pr
-description: Use when driving a pull request to merge — merge-bar's working-a-pr if installed, else the bundled loop; every finding dispositioned, merge only on the operator's explicit ack, or a standing order's in the project's memory bank or `AGENTS.md` that binds this role
+description: Use when driving a pull request to merge — merge-bar's working-a-pr if installed, else the bundled loop; every finding dispositioned, merge only on the operator's explicit ack, or a standing order's in the project's memory bank or `AGENTS.md` that binds this role; under working-a-pr a one-way door goes to the merge holder
 ---
 
 **Pick the loop, and say in one line which one before round 1.**
@@ -31,8 +31,9 @@ Under the bundled loop, three rails survive any adaptation:
   binds this role and grants merge authority (lookup: `close/references/cumulative-demo.md` §3), treat a clean verdict as the ack (as `references/loop.md` §4 says).
   Never auto-merge.
 
-Whichever loop runs, the merge is the operator's, or a standing order's in the project's memory bank or `AGENTS.md` that binds this role,
-and requirements a caller states in the invocation bind it: spine close states its landing (a merge commit where the repo allows one,
+Whichever loop runs, the merge is the operator's, or a standing order's in the project's memory bank or `AGENTS.md` that binds this role
+(under `working-a-pr`, a two-way door's only: a one-way door, or a body with no `Door:` line, goes to the merge holder
+with `merge-bar/skills/working-a-pr/references/one-way-door.md`), and requirements a caller states in the invocation bind it: spine close states its landing (a merge commit where the repo allows one,
 else a squash or rebase of exactly the reviewed head) and no history rewrite.
 
 This is a generic utility: it needs no pairing manifest and works on any
