@@ -29,4 +29,9 @@ in `a1b2c3d`; round 2 fixed one in `d4e5f6a`. Round 3, Codex on the new head:
    order promise says nothing about a key listed twice, and `get_batch` returns that key's
    record once."
 
+The docstring of `cache.get_batch` states that the keys must be distinct, and every caller in
+the repo dedupes before calling; the Claim just does not repeat that precondition.
+
 Codex then hits its quota wall and cannot review again until 2026-10-22. CI is green.
+
+The body's Merge danger reads: "Door: two-way — reverting the merge restores per-key reads; nothing outlives it."

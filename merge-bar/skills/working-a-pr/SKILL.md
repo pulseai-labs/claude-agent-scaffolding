@@ -1,6 +1,6 @@
 ---
 name: working-a-pr
-description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges on the operator's explicit ack, or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority.
+description: Use when working, driving, babysitting or landing a PR, addressing review comments, or when handed a PR number to get merged — drives it to mergeable against the merge bar its own body declares; fixes only blocking findings in one push per round, answers the rest or records them as known limits, stops at round 3 when fixes generate the findings, merges a two-way door on the operator's explicit ack or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority, and hands a one-way door to the merge holder.
 ---
 
 # Working a pull request — against its merge bar
@@ -8,8 +8,8 @@ description: Use when working, driving, babysitting or landing a PR, addressing 
 Drive one PR to mergeable. The finish line is the **`## Merge bar`** in the PR's own body,
 written when it was opened (`opening-a-pr`). Every finding is judged against that bar, not
 against an ideal: the loop fixes what the bar says blocks, answers or records the rest, and
-merges on the operator's explicit ack, or under a standing order (see **Standing orders**) that binds this role and grants merge
-authority. The loop is judgment; the shell is only for
+merges a two-way door on the operator's explicit ack or under a standing order (see **Standing
+orders**) that binds this role and grants merge authority, and hands a one-way door to the merge holder. The loop is judgment; the shell is only for
 mechanical `git`/`gh` facts. Nothing here needs a manifest, a worktree, or any plugin state.
 
 **Standing orders.** A standing order is a written order in the project's memory bank
@@ -54,10 +54,10 @@ is such a bar: §3.5 decides when rounds stop, never the body.
 Each stop names what failed and what would unblock it. None of them is a
 refusal to work the PR — they are the order that keeps fixes attributable.
 
-## 2. Fetch the findings — both signals, always
+## 2. Fetch the findings — every signal, always
 
 Reviewers leave findings in two places, and each alone misses what the other
-carries:
+carries; a third is the report of the `reviewing-a-pr` reviewer:
 
 - the **review + conversation stream** — review summaries, CI rollup, top-level
   comments (`gh pr view --comments`, `gh pr checks`, review listings — the
@@ -66,10 +66,14 @@ carries:
 - the **inline line-level comments** — where review bots put nearly everything
   (`gh api --paginate repos/{owner}/{repo}/pulls/{n}/comments`, or the
   equivalent — paginated, because a second page of findings that never loads
-  is a ledger hole wearing a clean look).
+  is a ledger hole wearing a clean look);
+- the **review report** (`reviewing-a-pr`, in the shape of its `references/report.md`) — a
+  crew reviewer seat returns it; without crew, start it as a fresh-context subagent on a
+  checkout prepared at the PR head. Post the report as **one** PR comment, so round 2 can
+  name it.
 
-Read both, then build the **disposition ledger**: one line per finding, every
-line ending in exactly one of the five dispositions in §3. The ledger is the
+Read all three, then build the **disposition ledger**: one line per finding, naming its
+source (the report, or the reviewer or bot), every line ending in exactly one of the five dispositions in §3. The ledger is the
 loop's working memory and its terminus
 report; a finding missing from it was never dispositioned.
 
@@ -80,7 +84,8 @@ Independent fixes to overlapping prose re-anchor the sentences the next finding
 cites, and round N+1 arrives built out of round N's own fixes.
 
 So before each edit pass — the first one, and again after every re-review —
-collapse the ledger into **classes**. A class is one
+collapse the ledger into **classes**; the report's classes, with their sites, are the
+starting list. A class is one
 defect however many findings name it: the same mistake at several sites, two
 reviewers on one site, or several symptoms of one wrong condition. Fix a class
 in one commit, or record why it splits.
@@ -134,8 +139,8 @@ Every ledger line ends in exactly one of these five dispositions:
   against the tree, quoted — never "disagree". Applies to blocking and non-blocking alike.
 - **`answered — <condition it fails>`** — the default for a non-blocking finding. Reply in the
   review thread in one line naming which bar condition it does not meet. If it repeats a
-  Known limit, quote the body line. Reviewers such as Codex are not documented to read the PR
-  body, so repeats are expected: answer them, never fix them.
+  Known limit, quote the body line. A reviewer that does not read the PR body repeats
+  Known limits: answer them, never fix them.
 - **`limit — [KL]`** — a non-blocking finding that names a real edge case of this PR worth
   recording. Add a line to the body's `## Known limits` (`gh pr edit <PR> --body-file <file>`)
   and say so in the thread; §5 writes it to the ledger after the merge. A finding that meets condition 1 cannot be a limit, whatever it is labelled — by the reviewer, by the PR body, or by the operator.
@@ -153,10 +158,12 @@ surfaced it or who asks — "just merge it" included.
 - **Staleness:** a fix commit landing after a review makes that verdict stale. Re-fetch (§2)
   and re-review on the **new** head; the old verdict does not carry forward.
 - **Reviewer completeness:** green CI is not proof a reviewer ran; a skipped reviewer is not
-  approval; a queued reviewer is waited for or surfaced — never assumed. Confirm each expected
-  reviewer actually left something on the current head. Do not busy-wait a queued reviewer:
-  say it is pending, and let the operator decide — unless a standing order (see **Standing orders**) that binds this role
-  names the fallback reviewer: then replace it and say so in the ledger.
+  approval. Confirm the `reviewing-a-pr` report exists for the current head; never assume it.
+  If that reviewer cannot run, surface it — unless a standing order (see **Standing orders**) that
+  binds this role names the fallback reviewer: then replace it and say so in the ledger.
+- **Extra eyes:** CodeRabbit or any other bot or reviewer is never waited for, and its label
+  never decides what blocks; judge each of its findings against the bar like any other. Say
+  its state (pending, ran) in the report; it gates nothing.
 
 Sort by failure direction before acting: a finding that the boundary **refuses a valid input**
 is blocking — condition 1; a finding that it **correctly refuses an unsupported input** is
@@ -166,10 +173,12 @@ loses state is blocking. Incoherence this diff introduced is this diff's to fix.
 ## 3.5 Rounds
 
 A round is one pass of §2 → §2.5 → §3 ending in one push. Round 1 is the first review of the
-opened PR.
+opened PR. The re-review of a pushed round is a **fresh** reviewer, never you: start it on the
+new head with `--round <n> --previous <URL of the posted report comment>`, so it reviews the
+fix diff and each prior class's closure. Your own sweep is a pre-push check, not the re-review.
 
 - **One push per round.** Commit fixes class by class, then push once, after the sweep below.
-  Reviewers such as Codex review every push, so each extra push buys an extra review.
+  Every push triggers another review, so each extra push buys one.
 - **A fix touches only what its blocking finding needs** — the class §2.5 named, and nothing
   else. No cleanup, no rewording nearby, no fixing a non-blocking finding "while you are there".
   Every extra line is a new review target.
@@ -221,7 +230,14 @@ Then, in one place, give the operator:
   that only after the operator acks is the loop soliciting an impossible
   merge.
 
-Then **ask**: merge, wait, or leave open — or, under a standing order (see **Standing orders**) that binds this role
+A one-way door, or a body with no `Door:` line (counted as one-way), is never merged by this
+skill — not under a standing order, not on the operator's explicit ack; an ack is answered
+that the merge holder runs `references/one-way-door.md` and merges. Surface the terminus and
+hand it to the merge holder — the orchestrator where one runs, otherwise the operator — with
+the reviewed head OID, the ledger, the §5 lines and `references/one-way-door.md`. After the
+merge, whoever merged writes the §5 lines per §5, or prints them.
+
+Otherwise **ask**: merge, wait, or leave open — or, under a standing order (see **Standing orders**) that binds this role
 and grants merge authority, treat a clean verdict as the ack and say which order
 gave it. The ack covers **the head the ledger describes**: pass the reviewed OID
 (`gh pr merge --match-head-commit <oid>`, with the repo's merge convention —
@@ -230,7 +246,7 @@ a head that moved between the report and the answer refuses and re-enters §2
 instead of merging unreviewed commits. The pin guards **commits, not
 verdicts** — a blocking review or a red CI rerun can land on the *same* head
 while the operator considers the ask — so after the ack and immediately
-before merging, re-fetch both finding signals and the checks once more;
+before merging, re-fetch every finding signal and the checks once more;
 any new finding re-enters §2 instead of merging. On a branch governed
 by a merge queue, required checks must be **finished** before accepting the
 ack — with checks still pending, `gh pr merge` does not merge, it *enables
@@ -283,5 +299,5 @@ where they go.
   stop fires only when the reading says your fixes are generating the findings.
 - **Ack-to-merging a blocking finding**, or letting "just merge it" relabel one as a limit.
 - **Trusting a pre-fix verdict on a post-fix head.**
-- **Auto-merging.** The merge is the operator's explicit call, or a standing order's that binds this role; never a
-  merge queue's auto-merge.
+- **Auto-merging.** The merge of a two-way door is the operator's explicit call, or a standing
+  order's that binds this role; never a merge queue's auto-merge. A one-way door is never this skill's merge.

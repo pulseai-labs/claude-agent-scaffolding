@@ -1,0 +1,3 @@
+interface:
+  display_name: "Review a PR"
+  short_description: "Review a PR as classes against its merge bar"

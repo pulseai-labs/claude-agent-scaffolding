@@ -2,6 +2,26 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.6.0
+
+Our own reviewer: `reviewing-a-pr` reviews against the PR's merge bar, and `working-a-pr` reads its report.
+
+- New skill `reviewing-a-pr` and command `/merge-bar:review-pr` — every finding is a defect
+  class with every site in the repo, sorted against the body's merge bar (never a reviewer's
+  label); the standards axis and the Claim/spec axis run as parallel fresh-context subagents;
+  coverage is stated per file; round 2+ reviews only the fix diff plus each prior class's
+  closure. It reports and never posts, commits, edits or checks out. Standards come from
+  `CODING_STANDARDS.md` at the paired AI workspace root, else `references/baseline-standards.md`.
+- `working-a-pr` — reads the `reviewing-a-pr` report as a review signal (a crew reviewer seat
+  returns it; without crew, a fresh-context subagent); the re-review of a pushed round is a
+  fresh reviewer on the fix diff; every signal is counted and ledger lines carry their source;
+  CodeRabbit and other bots are extra eyes that never gate a round.
+- `working-a-pr` — a one-way door, or a body with no `Door:` line, is never merged by the
+  skill, under a standing order or on an ack: it goes to the merge holder with
+  `references/one-way-door.md`. A two-way door merges as before.
+- Evals: `reviewing-a-pr` fixtures R1–R12 with a rubric; `working-a-pr` fixtures W13 (one-way
+  door), W14 (extra eyes) and W15 (reviewer report and round 2, numbered W12 on its branch).
+
 ## 0.5.0
 
 Standing orders come from the project's memory bank or `AGENTS.md`, and bind only the role they name; the autopilot policy is gone.
