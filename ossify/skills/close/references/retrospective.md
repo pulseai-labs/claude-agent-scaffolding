@@ -53,7 +53,8 @@ not a restatement of the work items.
 
 The work items, by id and title, with what each actually delivered. Where the
 delivery differs from the plan, say so here rather than quietly matching the plan
-back to the code.
+back to the code. Give each item its `verifier:` line, copied from its
+`verify.md` (`work-item-close.md` §2), or say it has none.
 
 **An `abandoned` item shipped nothing and belongs here by name.** List it with
 the others and say it was withdrawn before dispatch: omitting it silently
@@ -162,7 +163,8 @@ what happened and what is owed, and stops.
 
 ### `## 1. What shipped`
 
-Spine id, release, and the work items by id and title with what each delivered.
+Spine id, release, and the work items by id and title with what each delivered
+and its `verifier:` line, as the bone set's §2.
 
 ### `## 2. Demo outcome`
 

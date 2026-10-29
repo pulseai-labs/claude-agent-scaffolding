@@ -2351,4 +2351,62 @@ pin "$_978_RO" 'halts `halt:dirty-worktree` too: never re-dispatch it, Gate 3 re
 pin "$_978_RO" 'instead, and §6'"'"'s *Recovering a staged item with no report* brings it here' \
   "#978 C1 RO §3: the close-finished recovery names the report-less case"
 
+
+# ---------------------------------------------------------------------------
+# 1.29.1 (#981, #980, #973 items 1-2). One verifier pass can return several
+# halting verdicts: every one is surfaced, recorded and named, and none hides
+# another. Every completed pass writes verify.md, zero findings too, carrying
+# the verifier line and the layer results, and the retro carries that line.
+# ---------------------------------------------------------------------------
+_981_IC="$SKILLS/close/references/impl-check.md"
+_981_WC="$SKILLS/close/references/work-item-close.md"
+_981_CR="$SKILLS/close/references/code-review.md"
+_981_RT="$SKILLS/close/references/retrospective.md"
+# absent <file> <needle> <label>: the old form is gone. The file must be
+# readable and non-empty, or a missing file would pass every absence.
+absent_981() {
+  if [ ! -s "$1" ]; then T_FAIL=$((T_FAIL+1)); echo "FAIL: $3 (empty or unreadable: $1)"; return 0; fi
+  if PIN_NEEDLE="$2" awk 'index($0, ENVIRON["PIN_NEEDLE"]) { f=1; exit } END { exit !f }' "$1"; then
+    T_FAIL=$((T_FAIL+1)); echo "FAIL: $3 (still in ${1##*/}: $2)"
+  else T_PASS=$((T_PASS+1)); fi
+}
+pin "$_981_IC" '**every halting verdict that pass returns is surfaced,' \
+  "#981 impl-check: every halting verdict of one pass is surfaced"
+pin "$_981_IC" 'the `[mutation]` row applies, with the fidelity claim attached' \
+  "#981 impl-check §6: [fidelity] and [mutation] on one test take the [mutation] row"
+pin "$_981_IC" 'verdict included — `[rule]`, `[fidelity]`, `[mutation]`.' \
+  "#981 impl-check §4b: verify.md records every halting verdict"
+pin "$_981_IC" 'verdicts and dropping the rest.** §1.' \
+  "#973.1 impl-check §7: the anti-pattern is dropping a verdict, not gathering them"
+absent_981 "$_981_IC" 'Gathering all failures before halting' "#973.1 impl-check: the gather-nothing anti-pattern is gone"
+absent_981 "$_981_IC" 'first failure in any layer' "#973.1 impl-check: the halt-on-first-in-any-layer sentence is gone"
+absent_981 "$_981_IC" 'deleted at zero findings' "#980 impl-check: verify.md is no longer deleted at zero findings"
+pin "$_981_WC" 'any one halts, and the halt names all' \
+  "#981 work-item-close §2: the halt names every verdict"
+absent_981 "$_981_WC" 'Apply the verdicts in order' "#981 work-item-close §2: in-order verdicts are gone"
+pin "$_981_WC" '`[rule]` included, the whole set is' \
+  "#973.1 work-item-close §2: a [rule] halt still records Layer 4 and mutation"
+pin "$_981_WC" '`[report cross-check]`, `[rule]`, `[fidelity]`, `[mutation]` (`impl-check.md`).' \
+  "#973.2 work-item-close §5: the halt step lists all five tags"
+pin "$_981_WC" '**Every completed verifier pass writes' \
+  "#980 work-item-close §2: every completed pass writes verify.md"
+pin "$_981_WC" 'line per layer (L1, L2, L3, L4, mutation; `not run` in an `--external-executor`' \
+  "#980 work-item-close §2: verify.md carries each layer's result, external lane included"
+pin "$_981_WC" 'Each halting verdict is one line that begins with its tag, or with `- `' \
+  "#981 C2 work-item-close §2: names the line shape _oss_inv_rejection anchors on"
+pin "$_981_WC" 'is tagged `[fidelity]`, a declared one is written as `fidelity`.' \
+  "#980 work-item-close §2: [fidelity] marks only a halting finding (the rejection record)"
+absent_981 "$_981_WC" 'delete the file rather than' "#980 work-item-close §2: zero findings no longer deletes verify.md"
+pin "$_981_CR" '**ossify dispatches no spine review to another agent**' \
+  "#973.1 code-review: the no-dispatch sentence is scoped to spine review"
+absent_981 "$_981_CR" 'Absent is a clean signal' "#980 code-review: absent verify.md is no longer read as clean-by-design"
+pin "$_981_RT" 'Give each item its `verifier:` line, copied from its' \
+  "#980 retrospective bone §2: each item's verifier line"
+pin "$_981_RT" 'and its `verifier:` line, as the bone set'"'"'s §2.' \
+  "#980 retrospective flesh §1: each item's verifier line"
+pin "$SKILLS/close/SKILL.md" '`report.md`, `verify.md` and the state' \
+  "#980 close SKILL.md §10: verify.md is a durable record"
+pin "$SKILLS/plan-spine/references/spec-authoring.md" '**An AC that diffs against a commit names a fixed sha**' \
+  "#981 spec-authoring: base-relative ACs pin a sha, never a moving ref"
+
 t_summary

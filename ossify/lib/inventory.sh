@@ -32,14 +32,18 @@ _oss_inv_ref() { # $1=root $2=full ref
 # match. `grep -qF` says 0 (found) and 1 (no finding) - but 2 means it could
 # not read the file at all, and that must not degrade to the benign "no
 # rejection" the merge arms act on: the record gates MERGES. A MISSING file is
-# not an error, though: every completed Layer 4 run overwrites or deletes
-# verify.md (work-item-close §2), so absence means no rejection stands. Only a
+# not an error, though: every completed verifier pass overwrites verify.md
+# (work-item-close §2; before 1.29.1 it deleted the file at zero findings), so
+# absence means no rejection stands. Only a
 # path that IS there and cannot be read is the halt case - and a broken
 # symlink counts as there: `-e` follows the link and fails, `-L` does not.
 _oss_inv_rejection() { # $1=verify.md ; rc 0 rejected · rc 1 no record · rc 2 unreadable
   local rc=0
   [ -e "$1" ] || [ -L "$1" ] || return 1
-  grep -qF '[fidelity]' "$1" 2>/dev/null || rc=$?
+  # Anchored to the line shape work-item-close §2 names for a halting verdict:
+  # the tag first, optionally after a `- ` list marker. A `[fidelity]` quoted
+  # mid-line (a [rule] claim, say) is not a rejection.
+  grep -qE '^(- )?\[fidelity\]' "$1" 2>/dev/null || rc=$?
   [ "$rc" -le 1 ] || rc=2
   return "$rc"
 }

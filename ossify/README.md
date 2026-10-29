@@ -1,4 +1,4 @@
-# ossify (v1.29.0)
+# ossify (v1.29.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -194,6 +194,14 @@ Write of a `report*.md` file. The implementer's `complete` return gains one opti
 A `complete` return with no report file and no `report_text` is a named halt, not a
 Layer 2 failure. `report.md` keeps its name, and an `--external-executor` result still
 carries the four keys. No `lib/` code, no state change.
+
+Since 1.29.1 (#981, #980, #973 items 1–2), one verifier pass can halt on several tags,
+and the close surfaces, records and names every one, so `[fidelity]` no longer hides
+`[mutation]`; when both name the same test the `[mutation]` recovery row applies. Every
+completed verifier pass writes `verify.md`, zero findings included, with the `verifier:`
+line and each layer's result, so the `--external-executor` lane's close leaves a durable
+record, and the spine retrospective carries each item's `verifier:` line. No `lib/`
+behaviour change, no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and

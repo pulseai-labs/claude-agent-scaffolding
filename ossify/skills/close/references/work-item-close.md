@@ -193,9 +193,9 @@ elif [ "$now" != "$before" ]; then echo "close: verifier left $wt changed - halt
 
 The agent returns one JSON object (`agents/verifier-agent.md`): `verified`,
 or `refused` with a reason. A `refused` return, or anything not in that shape,
-is a halt naming it. Apply the verdicts in order — `[rule]` (Layer 3),
-`[fidelity]` (§4b), `[mutation]` (§4c) — and print
-`verifier: ossify:verifier-agent on <model>` in the close summary.
+is a halt naming it. Apply every verdict the pass returns — `[rule]` (Layer 3),
+`[fidelity]` (§4b), `[mutation]` (§4c): any one halts, and the halt names all
+of them. Print `verifier: ossify:verifier-agent on <model>` in the close summary.
 
 **Where no agent can be dispatched, the close runs the pass itself** — Codex,
 OMP, a subagent context, a refused `Task` grant. Apply §4, §4b and §4c in this
@@ -207,27 +207,33 @@ session and no mutation check runs: the caller's verifier owns it
 `/close` is outside the lane, so it dispatches.
 
 Apply the §4b verdict rule to the findings: an undeclared `fidelity` finding
-fires the `[fidelity]` halt. **Every completed Layer 4 run writes its finding
-set, with any `stayed-green` or `undetermined` mutation result, to `<work-item-dir>/verify.md`** — `$(dirname "$report")` on Route A,
-`$wi_dir` on Route B — and echoes it in the close summary. When the run halts
-on `[fidelity]`, the set written INCLUDES that halting finding: **the rejection
-is recorded durably (#673 C2)**, because a staged worktree after a rejection is
-byte-identical to a `close-finished` result otherwise — a fresh session's
+fires the `[fidelity]` halt. **Every completed verifier pass writes
+`<work-item-dir>/verify.md`** — `$(dirname "$report")` on Route A, `$wi_dir` on
+Route B — and echoes it in the close summary: the `verifier:` line, one result
+line per layer (L1, L2, L3, L4, mutation; `not run` in an `--external-executor`
+lane), then the findings and any `stayed-green` or `undetermined` mutation
+result. Each halting verdict is one line that begins with its tag, or with `- `
+and then the tag (`[fidelity] <file>:<line> - <claim>`); only a halting finding
+is tagged `[fidelity]`, a declared one is written as `fidelity`. The summary is a message,
+and in an `--external-executor` lane it belongs to the lane's session, so this
+file is the item's durable gate record (#980). When the pass halts, on any tag,
+`[rule]` included, the whole set is written with every halting verdict in it.
+**A `[fidelity]` rejection is recorded durably (#673 C2)**, because a staged
+worktree after a rejection is byte-identical to a `close-finished` result otherwise — a fresh session's
 re-entry would hand the rejected result back to the gate, and a stochastic
 Layer 4 pass could accept it without the correction ever running. The re-entry
 inventory reads a `[fidelity]` line in `verify.md` as exactly that record
 (route `halt:close-rejected`).
 
-**Every completed Layer 4 run overwrites `verify.md`, even when there are zero
-findings — delete the file rather than leave a stale one.** A work
+**Every completed verifier pass overwrites `verify.md`, even when there are zero
+findings — never leave a stale one.** A work
 item can reach this step more than once: a `[fidelity]` halt sends it back to
 the recovery menu (§5), and Layer 4 runs again on the next attempt. If that
 retry is clean, an old `verify.md` from the halted attempt is still sitting
 there — code-review.md treats an existing file as current evidence and does
 not re-judge it (its own text says so), so a stale file would carry forward
-findings the retry already resolved. There is no "no run happened" state to
-distinguish from "this run found nothing": every completed Layer 4 run writes
-the current truth — which is also what clears the rejection record, so only a
+findings the retry already resolved. Every completed verifier pass writes the
+current truth — which is also what clears the rejection record, so only a
 re-verified result can read as recovered.
 
 Green → step 3. Anything else → step 5.
@@ -458,8 +464,8 @@ or rebase never makes the item's commit an ancestor.
 Terminal, at every layer. No later step runs, no status is written, nothing is
 recorded as closed.
 
-1. Surface the errors with their **source tags** — `[AC]`,
-   `[report cross-check]`, `[rule]`, `[fidelity]` (`impl-check.md`).
+1. Surface every error with its **source tag** — `[AC]`,
+   `[report cross-check]`, `[rule]`, `[fidelity]`, `[mutation]` (`impl-check.md`).
 2. Present the **recovery menu**.
 3. **Stop. No auto-select.** The user picks.
 

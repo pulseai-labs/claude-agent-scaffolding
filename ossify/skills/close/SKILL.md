@@ -480,7 +480,7 @@ The arguments are the id and, after a work-item id only, `--pr` (`/close <wi-id>
 **The close summary is this ceremony's final assistant message** — the last thing
 you emit when the scope's steps are done. It is a message, **not a file**: this
 release ships no close-summary artifact, the same non-wiring §6 records for handoff
-cleanup. The durable records are `retrospective.md`, `report.md`, and the state
+cleanup. The durable records are `retrospective.md`, `report.md`, `verify.md` and the state
 writes; the summary is how a human reads the run without opening them.
 
 It carries, in this order:
@@ -490,8 +490,8 @@ It carries, in this order:
 2. **Gate outcomes** — each blocking gate with its verdict, source-tagged the way
    the step reported it (`[AC]`, `[report cross-check]`, `[rule]`, `[fidelity]`,
    `[mutation]`), and the `verifier:` line (`work-item-close.md` §2).
-3. **Anything a step told you to record here.** Several steps route their output
-   to the summary rather than to a file: `harvest.md` §2's missing-report gaps,
+3. **Anything a step told you to record here.** Several steps route output
+   to the summary, not to a file: `harvest.md` §2's missing-report gaps,
    §5's rule-authoring referrals, and §8's harvest outcomes. If a step says "record it in the
    close summary," this is where it lands.
 4. **What the operator must do next**, if anything.
