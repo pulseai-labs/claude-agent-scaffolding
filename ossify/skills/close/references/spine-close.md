@@ -519,7 +519,8 @@ loop — is REPLACED here by unclaiming in a follow-up commit, because the recor
 lineage guard binds to the pushed tip and a rewritten head cannot be recorded;
 if a rewrite has already happened, re-land the PR from the pushed tip or
 record an operator decision. The merge is the operator's explicit call inside work-pr —
-this ceremony does not ack on anyone's behalf; a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority is the operator's ack, given in advance. **If the operator leaves any PR
+this ceremony does not ack on anyone's behalf; a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority is the operator's ack, given in advance. Under merge-bar's `working-a-pr` that ack merges a two-way door only: a
+one-way door, or a body with no `Door:` line, goes to the merge holder with `merge-bar/skills/working-a-pr/references/one-way-door.md`. **If any PR is left
 open, the close halts here, recording nothing**: surface the PR URLs, say which
 steps remain, and stop. That is the named halt state; re-invoke `/close
 <spine-id>` once the PR has merged.
@@ -533,8 +534,8 @@ landing — identity, lineage, base — against fetched refs, so a hand-driven l
 gets exactly the same verification a work-pr-driven one does.
 
 ```bash
-# SECOND PASS — record the PR-armed repos. work-pr has driven each PR to an
-# operator-acked merge; every guard binds to the PR's MERGED headRefOid from
+# SECOND PASS — record the PR-armed repos. work-pr has driven each PR to
+# its merge; every guard binds to the PR's MERGED headRefOid from
 # gh, evaluated against freshly fetched refs - never to a tip recorded at push
 # time. work-pr lands fix commits ON the spine branch during the loop, so the
 # merged head is a DESCENDANT of what this ceremony pushed, not the same
@@ -580,7 +581,7 @@ while IFS=: read -r repo pr_num; do
   pr_state="$(printf '%s\n' "$pr_json" | jq -r '.state')"
   case "$pr_state" in
     MERGED) ;;
-    OPEN) echo "close: $repo PR #$pr_num is still open - hand it to /ossify:work-pr and merge on the operator's ack, then re-invoke close - halt"; exit 1 ;;
+    OPEN) echo "close: $repo PR #$pr_num is still open - drive it through /ossify:work-pr to its merge (a one-way door is the merge holder's), then re-invoke close - halt"; exit 1 ;;
     *) echo "close: $repo PR #$pr_num is $pr_state, not MERGED - the spine's work never landed in $repo - halt"; exit 1 ;;
   esac
   # BASE IDENTITY - a PR merged into some OTHER branch is not this repo's

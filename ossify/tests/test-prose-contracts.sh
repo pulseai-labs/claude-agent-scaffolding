@@ -2172,6 +2172,18 @@ _MBB="$HERE/../skills/start/references/memory-bank-brief.md"
 pin "$_MBB" 'ships with an empty `## Standing orders`' \
   "memory-bank-brief.md does not seed 08-governance.md with an empty Standing orders section (1.27.0)"
 
+# 1.27.1 (#963) - under merge-bar 0.6.0's working-a-pr a one-way door is never merged on
+# the ack; it goes to the merge holder. Red on 1.27.0's text. The bundled loop's ack
+# sentence (the loop.md pin above) is the control: it must not change.
+pin "$_PRW_WP" '(under `working-a-pr`, a two-way door'"'"'s only: a one-way door, or a body with no `Door:` line, goes to the merge holder' \
+  "work-pr/SKILL.md's 'whichever loop runs' sentence promises an ack merge working-a-pr refuses a one-way door (#963)"
+pin "$_PRW_SC" 'one-way door, or a body with no `Door:` line, goes to the merge holder with `merge-bar/skills/working-a-pr/references/one-way-door.md`.' \
+  "spine-close.md's merge paragraph does not hand a one-way door to the merge holder (#963)"
+pin "$_PRW_SC" "(a one-way door is the merge holder's), then re-invoke close" \
+  "spine-close.md's open-PR halt still prints a remedy working-a-pr refuses a one-way door (#963)"
+pin "$HERE/../skills/patch/SKILL.md" 'Where `working-a-pr` runs, a patch is a one-way door (§6 tags it), so it goes to the merge holder' \
+  "patch/SKILL.md does not send its one-way PR to the merge holder (#963)"
+
 # PR #869 round 1 (disposition items 1-3, one class): the two sites the first pass
 # left operator-only, conditioned in one commit. The first two pins are red on
 # dceda637's text and green after the fix; the third is the loosening's adjacent
