@@ -48,7 +48,9 @@ describe("running-a-spine-on-baton", () => {
   test("the seat table is shown with the command, and written only after the yes", () => {
     const s = skill();
     expect(s).toContain("| Stage | Role | Agent | Command | Model | Effort | From |");
-    expect(s).toContain("--seats ~/baton-recipes/seats/<run>.json");
+    expect(s).toContain("--seats /home/<user>/baton-recipes/seats/<run>.json");
+    expect(s).not.toContain("--seats ~");
+    expect(s).toContain("never `~/…`");
     expect(s).toContain("Write the seat file only after the yes");
     // The write comes after the stop, never before it.
     expect(s.indexOf("Write the seat file only after the yes")).toBeGreaterThan(s.indexOf("wait for an explicit yes"));

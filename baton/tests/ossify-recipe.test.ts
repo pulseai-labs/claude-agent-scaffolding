@@ -397,11 +397,18 @@ describe("ossify-spine briefs", () => {
       "git -C <worktree> diff --cached", "<base SHA>..HEAD", "report §7", "never from §5",
       '"mode":"verified"', '"agent":"<your agent name from the message>"', '"work_item_id"', '"identity"',
       '"rule"', '"lenses"', '"mutation"', "red | stayed-green | undetermined",
-      "then restore it from that saved copy — never from git", "after every mutation is restored",
+      "Mutate and restore with the edit tools only", "Before the first mutation", "keep its output as `before`",
+      "cmp <OUT>/<name> <worktree file>", "never write a worktree file from the shell",
+      "it must equal `before`", "that is a stop, never a verdict", "never restore from git",
+      "after every mutation is restored",
       "temp name in the same directory, then `mv`",
       "never append to `$SPINE_LEDGER`", "decide nothing on the run's behalf", "a finding in the verdict",
     ]) {
       expect([pin, v.includes(pin)]).toEqual([pin, true]);
+    }
+    // the shell-restore route is gone
+    for (const gone of ["restore it from that saved copy", "Mutate in place, restore from a saved copy"]) {
+      expect([gone, v.includes(gone)]).toEqual([gone, false]);
     }
     // the exact fingerprint close recomputes (ossify work-item-close.md, --verdict)
     expect(v).toContain(

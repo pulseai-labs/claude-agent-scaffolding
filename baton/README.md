@@ -371,7 +371,7 @@ update moves the cache, and a run armed on the old path would lose its briefs.
       --param state_file=<output of: oss state_path, run in the AI workspace root> \
       --param oss=<absolute path of <ossify plugin root>/bin/oss> \
       --param briefs=$HOME/baton-recipes/ossify-spine/briefs \
-      --seats ~/baton-recipes/seats/r0-s6.json
+      --seats $HOME/baton-recipes/seats/r0-s6.json
 
 Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 

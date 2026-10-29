@@ -59,8 +59,9 @@ Work out every `--param` of the README's arm example:
   the AI workspace root.
 - The run id is the spine id with `.` as `-` (`r3.s7` → `r3-s7`). If that run dir exists,
   append `-2`, `-3`, … and say so.
-- The seat file is `--seats ~/baton-recipes/seats/<run>.json` (Seats, below). `baton arm`
-  copies it into the run as `seats.json`.
+- The seat file is `--seats /home/<user>/baton-recipes/seats/<run>.json` (Seats, below): an
+  absolute path with `$HOME` expanded by you, never `~/…`, because `baton arm` does no tilde
+  expansion and a quoted `~` stays literal. `baton arm` copies it into the run as `seats.json`.
 
 **Seats.** Read `.crew/roles.md` (walk up from this session's working directory; the first one
 found wins) and `~/.claude/crew/agents.md`. For each recipe stage with a `role` (the `triage`
@@ -105,7 +106,7 @@ approves a command they have seen. Show it once, short, and still wait.
 ## 3. Arm
 
 Write the seat file only after the yes: the approved seats as the README's JSON, at the
-`--seats` path (`mkdir -p ~/baton-recipes/seats`). Then run exactly the approved command.
+`--seats` path (`mkdir -p "$HOME/baton-recipes/seats"`). Then run exactly the approved command.
 Confirm `<state>/runs/<run>/run.json` has `status` `armed` and
 `systemctl --user is-active baton.timer` says `active`. Then tell the operator: questions come
 to the project's agent (or the default agent) on the phone, and this session may be closed now.
