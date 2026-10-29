@@ -2250,8 +2250,10 @@ pin "$BRIEFS_MD" 'A re-check is this brief sent again, refilled: judge the tree 
   "the item verifier brief says what a re-check is"
 pin "$LIFECYCLE_MD" 'verifier — its brief sent again, every slot refilled (`briefs.md`)' \
   "lifecycle step 7's re-check names the brief it sends" flat
-pin "$BRIEFS_MD" 'the full recheck — this file'"'"'s item-verifier brief, refilled — to the' \
-  "the spine's correct path names the re-check's brief" flat
+# 0.8.2 (#988 r1): the spine's correct path is a re-check too — a fresh report path in the
+# same report directory, which the retained verifier's SEAT_MODS_ALLOW holds from launch.
+pin "$BRIEFS_MD" 'the full recheck — this file'"'"'s item-verifier brief, refilled, a fresh `REPORT_PATH` in the same report directory — to the' \
+  "the spine's correct path names the re-check's brief and a fresh report path in the same directory" flat
 # 0.8.1 (#952): one diff form for a committed head and a staged tree, so no top edits the
 # diff command for a staged re-check; and an empty revert is named, not passed.
 pin "$GENERIC_BRIEFS_MD" '`git diff --cached <the item'"'"'s base sha>`, which covers a committed head and a staged tree.' \
@@ -2265,6 +2267,44 @@ pin "$LIFECYCLE_MD" 'seeded only by `git checkout <base> -- <path>` on a path th
   "a calibration fixture is seeded only by a base checkout of a reported path" flat
 pin "$SKILL_MD" 'worktree (a calibration fixture'"'"'s included, `lifecycle.md` step 7)' \
   "the delegation floor admits the calibration fixture's worktree" flat
+# 0.8.2 (#987): the 0.8.1 behaviours that had no pin a mutation kills — the fixture is a
+# detached worktree at the item head, re-checked blind — and the rule the fixture needs
+# beside "never edit product code", its expected fail and the real head's re-check after it.
+pin "$LIFECYCLE_MD" 'a detached worktree at the item head' \
+  "a calibration fixture is a detached worktree at the item head" flat
+pin "$LIFECYCLE_MD" 're-checked without saying what was seeded, then removed.' \
+  "a calibration fixture is re-checked without saying what was seeded" flat
+pin "$LIFECYCLE_MD" 'Its `fail` is the expected answer, never counted toward a second fail; the item passes only on a re-check of its real head after it.' \
+  "a calibration fixture's fail counts toward no second fail, and the real head is re-checked after it" flat
+pin "$SKILL_MD" 'edit product code (a calibration fixture'"'"'s base checkout is not an edit: it restores committed code in a worktree no branch receives)' \
+  "the never-edit-product-code rule names the calibration fixture's base checkout" flat
+# 0.8.2 (#987): claim 3's delete clause wins for a test-only item — reverting its
+# implementation edits changes no file, which the empty-revert clause would call
+# `cannot determine`.
+pin "$GENERIC_BRIEFS_MD" 'or the item changes only tests, delete this claim (never `cannot determine`); a test-only item is deleted here, never judged an empty revert.' \
+  "a test-only item deletes the mutation claim, never judged an empty revert" flat
+# 0.8.2 (#987): a re-check names the slots it changes; a new REPORT_PATH keeps the first
+# report, which reusing the path would replace. The spine's correct path and the eval
+# rubric carry the same re-check.
+pin "$GENERIC_BRIEFS_MD" 'Two slots change: this line names the tree to judge now, and a fresh `REPORT_PATH` in the same report directory, never the first report'"'"'s.' \
+  "the generic verifier's re-check names the two slots that change" flat
+pin "$BRIEFS_MD" 'Two slots change: ROLE'"'"'s `head_oid` and `tree_oid`, from the latest return, and a fresh `REPORT_PATH` in the same report directory, never the first report'"'"'s.' \
+  "the item verifier's re-check names the two slots that change"
+pin "$NESTED_MD" 'the full recheck — `ossify-briefs.md`'"'"'s item-verifier brief, refilled, a fresh `REPORT_PATH` in the same report directory — to the same verifier.' \
+  "nested-run's correct path names the re-check's brief and a new report path" flat
+pin "$EVAL_RUBRIC_MD" 'the same verifier'"'"'s full recheck — its item-verifier brief refilled, a fresh `REPORT_PATH` in the same report directory, never the first report'"'"'s' \
+  "the eval rubric's correct path names the re-check's brief and a new report path" flat
+# 0.8.2 (#987, #954's other half): every carrier row takes the rail tail, so a seat a
+# coordinator launches from a carried row records its rail, not "no guards"; and each
+# layer's model read runs the rail's check in place of the status line.
+RAIL_ROW='| host: <machine>[ | rail: <rail>]'
+n_eq "$BRIEFS_MD" "$RAIL_ROW" 2 "the SEATS rows carry the rail tail"
+n_eq "$PRBRIEFS_MD" "$RAIL_ROW" 2 "the work-PR reviewer and PR-fix rows carry the rail tail"
+pin "$CONFIG_MD" "$RAIL_ROW" "config.md's rendered row carries the rail tail"
+pin "$MECHANICS_MD" 'where the seat'"'"'s row names a `rail:`, that rail'"'"'s check runs in place of the status line.' \
+  "herdr's model read runs a named rail's check in place of the status line" flat
+pin "$ORCA_MD" 'where the seat'"'"'s row names a `rail:`, that rail'"'"'s check runs in place of the status line.' \
+  "orca's model read runs a named rail's check in place of the status line" flat
 
 section "the seat-mods guard reaches every launch site"
 

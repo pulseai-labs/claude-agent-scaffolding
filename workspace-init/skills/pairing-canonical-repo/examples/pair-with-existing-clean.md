@@ -169,12 +169,13 @@ Three sub-steps:
    "$wi_bin" trace_filter_install_pair "/Users/example/projects/foo-ai" "/Users/example/projects/foo"
    ```
 
-   Renders the hook template (substituting AI workspace path `/Users/example/projects/foo-ai`)
-   and installs to:
+   Renders the hook template (substituting the AI workspace reference — `self` for the
+   workspace's own hook, `sibling:foo-ai` for the canonical's) and installs to:
    - `/Users/example/projects/foo-ai/.git/hooks/commit-msg` (executable)
    - `/Users/example/projects/foo/git/hooks/commit-msg` (executable)
 
-   The hook at canonical-side embeds the AI workspace path so it can locate the manifest.
+   The canonical-side hook finds the manifest beside its own repo at commit time, so the pair
+   keeps its filter on any host where the two repos sit side by side.
 
    Init-log entries:
    - `HOOK /Users/example/projects/foo-ai/.git/hooks/commit-msg`

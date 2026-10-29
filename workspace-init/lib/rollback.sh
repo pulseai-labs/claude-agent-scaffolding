@@ -23,11 +23,11 @@ set -u
 
 if ! declare -F wi_log_op >/dev/null 2>&1; then
   # shellcheck disable=SC1091
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 if ! declare -F _wi_trace_filter_is_our_hook >/dev/null 2>&1; then
   # shellcheck disable=SC1091
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/trace-filter.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/trace-filter.sh"
 fi
 
 # ---------------------------------------------------------------------------

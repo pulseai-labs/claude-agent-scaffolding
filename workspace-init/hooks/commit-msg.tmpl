@@ -2,12 +2,18 @@
 # workspace-init: commit-msg AI-trace filter (auto-installed)
 # workspace-init:managed-hook
 # DO NOT EDIT — regenerated on workspace-init runs.
-# Embedded AI workspace path: __AI_WORKSPACE_PATH__
+# AI workspace reference: __AI_WORKSPACE_REF__
 
-# The AI workspace path is baked in shell-quoted form at install time, so any
-# character in the path (" $ ` ' & | \ space …) arrives here literally.
-AI_WORKSPACE_PATH=__AI_WORKSPACE_PATH__
-MANIFEST_PATH="${AI_WORKSPACE_PATH}/.workspace/pairing.json"
+# Where the AI workspace is, baked shell-quoted at install time in one of three
+# forms, so any character in a name or path arrives here literally (#983):
+#   self           this repo is the AI workspace
+#   sibling:<dir>  the AI workspace is <dir> beside this repo's main worktree
+#   abs:<path>     a fixed absolute path (a pair that is neither; host-bound)
+# self and sibling are resolved from the repo this hook runs in, so the hook
+# keeps working when both repos sit side by side under another parent on
+# another host. They are baked only when the install target's physical common
+# git dir is <target>/.git, which is what lets its parent name the worktree.
+AI_WORKSPACE_REF=__AI_WORKSPACE_REF__
 
 commit_msg_file="$1"
 if [[ ! -f "$commit_msg_file" ]]; then exit 0; fi
@@ -18,7 +24,7 @@ if [[ ! -f "$commit_msg_file" ]]; then exit 0; fi
 # CLOSED and states the reason (#458, #481). Repairs are prose, not computed
 # paths: see the Repair section of the workspace-init README.
 _wi_block() {
-  echo "       See Repair in the workspace-init README." >&2
+  echo "       See Repair in the workspace-init README. To commit before repairing, name the manifest for one commit: WI_TRACE_FILTER_MANIFEST=<ai-workspace>/.workspace/pairing.json git commit ..." >&2
   exit 1
 }
 
@@ -30,11 +36,52 @@ if ! command -v jq >/dev/null 2>&1; then
   _wi_block
 fi
 
-# Baked AI workspace path unreachable (workspace moved/deleted) → block,
-# naming the path itself rather than a JSON error.
-if [[ ! -d "$AI_WORKSPACE_PATH" ]]; then
-  echo "ERROR: workspace-init trace filter fails closed: AI workspace path is unreachable: $AI_WORKSPACE_PATH; commit blocked." >&2
-  _wi_block
+# WI_TRACE_FILTER_MANIFEST names the manifest for this commit, in place of the
+# baked reference: the escape for a workspace that moved, which keeps the
+# filter running where --no-verify would switch it off. It is announced, so an
+# override left set in a shell is never silent.
+if [[ -n "${WI_TRACE_FILTER_MANIFEST:-}" ]]; then
+  MANIFEST_PATH="$WI_TRACE_FILTER_MANIFEST"
+  echo "note: workspace-init trace filter reads the manifest named by WI_TRACE_FILTER_MANIFEST: $MANIFEST_PATH" >&2
+else
+  case "$AI_WORKSPACE_REF" in
+    self|sibling:*)
+      # The main worktree is the parent of the common git dir, from a linked
+      # worktree as well; a common dir not named .git has no such parent.
+      # CDPATH is cleared: git can print a relative .git, which an exported
+      # CDPATH would otherwise send to another directory (and cd would echo).
+      repo_root=""
+      if common_dir="$(git rev-parse --git-common-dir 2>/dev/null)" \
+          && common_dir="$(CDPATH= cd -- "$common_dir" 2>/dev/null && pwd -P)" \
+          && [[ "${common_dir##*/}" == ".git" ]]; then
+        repo_root="${common_dir%/.git}"
+      fi
+      if [[ -z "$repo_root" ]]; then
+        echo "ERROR: workspace-init trace filter fails closed: cannot locate this repository's main worktree to resolve the AI workspace ($AI_WORKSPACE_REF); commit blocked." >&2
+        _wi_block
+      fi
+      if [[ "$AI_WORKSPACE_REF" == self ]]; then
+        AI_WORKSPACE_PATH="$repo_root"
+      else
+        AI_WORKSPACE_PATH="${repo_root%/*}/${AI_WORKSPACE_REF#sibling:}"
+      fi
+      ;;
+    abs:*)
+      AI_WORKSPACE_PATH="${AI_WORKSPACE_REF#abs:}"
+      ;;
+    *)
+      echo "ERROR: workspace-init trace filter fails closed: unrecognised AI workspace reference: $AI_WORKSPACE_REF; commit blocked." >&2
+      _wi_block
+      ;;
+  esac
+  MANIFEST_PATH="${AI_WORKSPACE_PATH}/.workspace/pairing.json"
+
+  # Resolved AI workspace unreachable (workspace moved/deleted) → block,
+  # naming the path itself rather than a JSON error.
+  if [[ ! -d "$AI_WORKSPACE_PATH" ]]; then
+    echo "ERROR: workspace-init trace filter fails closed: AI workspace path is unreachable: $AI_WORKSPACE_PATH; commit blocked." >&2
+    _wi_block
+  fi
 fi
 
 # Missing manifest → block.

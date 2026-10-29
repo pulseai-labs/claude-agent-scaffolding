@@ -29,7 +29,7 @@ set -u
 # Source helpers if not already loaded (wi_log_* etc).
 if ! declare -F wi_log_info >/dev/null 2>&1; then
   # shellcheck disable=SC1091
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 
 # ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ _wi_manifest_path() {
 wi_plugin_version() {
   local libdir manifest ver="" src="${BASH_SOURCE[0]:-}"
   if [[ -n "$src" ]]; then
-    libdir="$(cd "$(dirname "$src")" && pwd)"
+    libdir="$(CDPATH= cd -- "$(dirname "$src")" && pwd)"
     manifest="$libdir/../.claude-plugin/plugin.json"
     ver="$(jq -r '.version // empty' "$manifest" 2>/dev/null)"
   fi

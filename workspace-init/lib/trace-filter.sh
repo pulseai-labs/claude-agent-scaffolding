@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# lib/trace-filter.sh — render + install commit-msg hook with baked AI workspace path.
+# lib/trace-filter.sh — render + install the commit-msg hook.
 #
 # The commit-msg hook (hooks/commit-msg.tmpl) reads the pairing manifest to
-# decide which patterns to block. The AI workspace absolute path is baked into
-# the hook at install time so canonical's hook (in canonical's .git/hooks/) can
-# find the sibling manifest without a walk-up search.
+# decide which patterns to block. A reference to the AI workspace is baked in
+# at install time — self, sibling:<dir> or abs:<path> (_wi_trace_filter_ref) —
+# and the hook resolves the first two from the repo it runs in, so a pair that
+# sits side by side keeps its filter on any host (#983).
 #
 # Requires: lib/_helpers.sh (wi_log_op, wi_log_error)
 
@@ -12,11 +13,11 @@ set -u
 
 if ! declare -F wi_log_op >/dev/null 2>&1; then
   # shellcheck disable=SC1091
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 if ! declare -F wi_git_is_linked_worktree >/dev/null 2>&1; then
   # shellcheck disable=SC1091
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skeleton.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/skeleton.sh"
 fi
 
 # Locate the hooks/commit-msg.tmpl. WI_HOOKS_DIR (set by tests/_helpers.sh) is
@@ -28,7 +29,7 @@ _wi_trace_filter_template() {
   if [[ -n "${WI_HOOKS_DIR:-}" ]]; then
     echo "${WI_HOOKS_DIR}/commit-msg.tmpl"
   else
-    echo "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/commit-msg.tmpl"
+    echo "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hooks/commit-msg.tmpl"
   fi
 }
 
@@ -75,11 +76,53 @@ _wi_trace_filter_check_ai_root() {
   return 0
 }
 
-# wi_trace_filter_render <ai-workspace-root>
-# Render the template substituting __AI_WORKSPACE_PATH__ with the given absolute path.
-# Output goes to stdout. Returns 1 if the template is missing or unreadable.
+# _wi_trace_filter_ref <ai-workspace-root> [<target-repo>]
+# Print the AI workspace reference the hook resolves at commit time (#983):
+#   self           target IS the AI workspace
+#   sibling:<dir>  target and AI workspace share a parent directory
+#   abs:<path>     anything else, or no target given (host-bound fallback)
+# self and sibling are baked only when the hook's own resolution will hold:
+# the hook takes its main worktree as the parent of the PHYSICAL common git
+# dir, and only when that dir is named .git. _wi_trace_filter_main_root
+# mirrors that, and also requires the parent to be the target itself, so a
+# .git FILE (separate git dir, submodule), a .git SYMLINK to a dir with
+# another name, or a .git dir that is not the target's own all get abs:
+# (#983 review C1, C5). Both roots are compared as physical paths.
+_wi_trace_filter_main_root() {
+  local target_phys="$1" common
+  common="$(git -C "$target_phys" rev-parse --git-common-dir 2>/dev/null)" || return 1
+  [[ "$common" == /* ]] || common="${target_phys}/${common}"
+  common="$(CDPATH= cd -- "$common" 2>/dev/null && pwd -P)" || return 1
+  [[ "$common" == "${target_phys}/.git" ]]
+}
+
+_wi_trace_filter_ref() {
+  local ai_root="$1" target_repo="${2:-}"
+  local ai_phys="" target_phys=""
+  if [[ -n "$target_repo" && -d "$target_repo" && -d "$ai_root" ]]; then
+    ai_phys="$(wi_realpath "$ai_root")"
+    target_phys="$(wi_realpath "$target_repo")"
+  fi
+  if [[ -n "$ai_phys" && -n "$target_phys" ]] \
+      && _wi_trace_filter_main_root "$target_phys"; then
+    if [[ -n "$ai_phys" && "$ai_phys" == "$target_phys" ]]; then
+      printf 'self\n'; return 0
+    fi
+    if [[ -n "$ai_phys" && -n "$target_phys" \
+          && "$(dirname "$ai_phys")" == "$(dirname "$target_phys")" ]]; then
+      printf 'sibling:%s\n' "$(basename "$ai_phys")"; return 0
+    fi
+  fi
+  printf 'abs:%s\n' "$ai_root"
+}
+
+# wi_trace_filter_render <ai-workspace-root> [<target-repo>]
+# Render the template substituting __AI_WORKSPACE_REF__ with the reference
+# _wi_trace_filter_ref picks for this target. With no target the reference is
+# abs:<ai-workspace-root>. Output goes to stdout. Returns 1 if the template is
+# missing or unreadable.
 wi_trace_filter_render() {
-  local ai_root="$1"
+  local ai_root="$1" target_repo="${2:-}"
   local tmpl
   tmpl="$(_wi_trace_filter_template)"
   if [[ ! -f "$tmpl" ]]; then
@@ -91,18 +134,18 @@ wi_trace_filter_render() {
     wi_log_error "wi_trace_filter_render: could not read template: $tmpl"
     return 1
   fi
-  # Bake the path shell-quoted (the template assigns it unquoted), so every
-  # byte — & | \ " $ ` ' space — survives literally into the generated bash.
-  # Splice left-to-right with %%/# ops, NOT ${var//…} or sed: under bash 5.2+
-  # patsub_replacement (and always under sed), '&' in the replacement expands
-  # to the matched text. Building a separate output accumulator also means a
-  # path that itself contains the placeholder text terminates cleanly.
+  # Bake the reference shell-quoted (the template assigns it unquoted), so
+  # every byte — & | \ " $ ` ' space — survives literally into the generated
+  # bash. Splice left-to-right with %%/# ops, NOT ${var//…} or sed: under bash
+  # 5.2+ patsub_replacement (and always under sed), '&' in the replacement
+  # expands to the matched text. Building a separate output accumulator also
+  # means a value that itself contains the placeholder text terminates cleanly.
   local quoted
-  quoted="$(printf '%q' "$ai_root")"
+  quoted="$(printf '%q' "$(_wi_trace_filter_ref "$ai_root" "$target_repo")")"
   local rendered="" rest="$content"
-  while [[ "$rest" == *__AI_WORKSPACE_PATH__* ]]; do
-    rendered+="${rest%%__AI_WORKSPACE_PATH__*}${quoted}"
-    rest="${rest#*__AI_WORKSPACE_PATH__}"
+  while [[ "$rest" == *__AI_WORKSPACE_REF__* ]]; do
+    rendered+="${rest%%__AI_WORKSPACE_REF__*}${quoted}"
+    rest="${rest#*__AI_WORKSPACE_REF__}"
   done
   printf '%s\n' "${rendered}${rest}"
 }
@@ -195,7 +238,7 @@ wi_trace_filter_install() {
     wi_log_error "wi_trace_filter_install: could not name a temp file beside $out"
     return 1
   fi
-  if ! wi_write_new "$tmp" "" wi_trace_filter_render "$ai_root" 2>/dev/null; then
+  if ! wi_write_new "$tmp" "" wi_trace_filter_render "$ai_root" "$target_repo" 2>/dev/null; then
     rm -f "$tmp"
     wi_log_error "wi_trace_filter_install: could not create $tmp, or render failed"
     return 1

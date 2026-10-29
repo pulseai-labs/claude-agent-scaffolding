@@ -12,11 +12,11 @@
 set -u
 
 if ! declare -F wi_log_op >/dev/null 2>&1; then
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_helpers.sh"
 fi
 
 if ! declare -F wi_manifest_read >/dev/null 2>&1; then
-  source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/manifest.sh"
+  source "$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/manifest.sh"
 fi
 
 # Internal: derive the init-log path from the AI workspace root.
@@ -40,8 +40,10 @@ _wi_stubs_log_once() {
 # wi_stub_agents_md <ai-root> [<project-name>]
 #
 # Renders AGENTS.md stub from template, substituting ${PROJECT_NAME} and
-# ${CANONICAL_ROOT}. If <project-name> is omitted, reads it from manifest
-# (ai_workspace.name). Logs WRITE_FILE to init-log.
+# ${CANONICAL_NAME}. If <project-name> is omitted, reads it from manifest
+# (ai_workspace.name). Logs WRITE_FILE to init-log. The canonical is named,
+# not located: an absolute root in an instruction file is true on one host
+# only (#983); the stub points at canonical.root in the manifest instead.
 #
 # Returns 0 on success, 1 on failure.
 wi_stub_agents_md() {
@@ -61,14 +63,14 @@ wi_stub_agents_md() {
     }
   fi
 
-  # Read canonical_root from manifest.
-  local canonical_root
-  canonical_root="$(wi_manifest_read "$ai_root" '.canonical.root' 2>/dev/null)" || {
-    wi_log_error "wi_stub_agents_md: failed to read canonical.root from manifest"
+  # Read canonical.name from manifest.
+  local canonical_name
+  canonical_name="$(wi_manifest_read "$ai_root" '.canonical.name' 2>/dev/null)" || {
+    wi_log_error "wi_stub_agents_md: failed to read canonical.name from manifest"
     return 1
   }
 
-  local tmpl="${WI_TEMPLATES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/AGENTS.md.stub.tmpl"
+  local tmpl="${WI_TEMPLATES_DIR:-$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/AGENTS.md.stub.tmpl"
   local out="${ai_root}/AGENTS.md"
 
   if [[ ! -f "$tmpl" ]]; then
@@ -79,7 +81,7 @@ wi_stub_agents_md() {
   # Render template with substitutions.
   if ! wi_render_template "$tmpl" "$out" \
       "PROJECT_NAME=$project_name" \
-      "CANONICAL_ROOT=$canonical_root"; then
+      "CANONICAL_NAME=$canonical_name"; then
     wi_log_error "wi_stub_agents_md: template render failed"
     return 1
   fi
@@ -95,7 +97,7 @@ wi_stub_agents_md() {
 # wi_stub_readme <ai-root> <project-name>
 #
 # Renders README.md stub from template, substituting ${PROJECT_NAME} and
-# ${CANONICAL_ROOT}. Reads canonical_root from manifest (assumes manifest
+# ${CANONICAL_NAME}. Reads canonical.name from manifest (assumes manifest
 # exists and is valid). Logs WRITE_FILE to init-log.
 #
 # Returns 0 on success, 1 on failure.
@@ -108,14 +110,14 @@ wi_stub_readme() {
     return 1
   fi
 
-  # Read canonical_root from manifest.
-  local canonical_root
-  canonical_root="$(wi_manifest_read "$ai_root" '.canonical.root' 2>/dev/null)" || {
-    wi_log_error "wi_stub_readme: failed to read canonical.root from manifest"
+  # Read canonical.name from manifest.
+  local canonical_name
+  canonical_name="$(wi_manifest_read "$ai_root" '.canonical.name' 2>/dev/null)" || {
+    wi_log_error "wi_stub_readme: failed to read canonical.name from manifest"
     return 1
   }
 
-  local tmpl="${WI_TEMPLATES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/README.md.tmpl"
+  local tmpl="${WI_TEMPLATES_DIR:-$(CDPATH= cd -- "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/templates}/README.md.tmpl"
   local out="${ai_root}/README.md"
 
   if [[ ! -f "$tmpl" ]]; then
@@ -126,7 +128,7 @@ wi_stub_readme() {
   # Render template with substitutions.
   if ! wi_render_template "$tmpl" "$out" \
       "PROJECT_NAME=$project_name" \
-      "CANONICAL_ROOT=$canonical_root"; then
+      "CANONICAL_NAME=$canonical_name"; then
     wi_log_error "wi_stub_readme: template render failed"
     return 1
   fi

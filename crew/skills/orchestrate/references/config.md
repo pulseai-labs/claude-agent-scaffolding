@@ -60,8 +60,8 @@ Each field exists because a measured case needs it:
   inspect the remote state before retrying, because a connection failure does not prove
   a mutation was not applied. The layer's Machines step says how to reach one.
 - `can:` — what the agent is able to run, comma-separated: `slash-commands`, `subagents` (the lane's `Agent`-tool workers), or `—`. The per-role requirement, and where it is checked, are stated below.
-- `rail:` — optional: the guard this agent runs under in place of seat-mods, and the one command
-  that checks it (`devin-seat guard — guard.py --selftest`); the model read takes it (`roles.md`).
+- `rail:` — optional, one line `<guard> — <check command>` holding no `|` (the row's separator): the guard
+  this agent runs under in place of seat-mods and the one command that checks it (`devin-seat guard — guard.py --selftest`); the model read takes it (`roles.md`).
 - `review:` — optional: the command a reviewer seat on this agent runs, `<PR>`, `<PR_URL>` and `<LEVEL>` filled at dispatch (`/review <PR_URL>` on OMP); absent, `/code-review <PR> <LEVEL>`.
 - `note:` — free prose the coordinator reads when it uses that agent.
 
@@ -101,9 +101,9 @@ carrying a profile conforms rather than restating a field list.
 
 A resolved profile renders as one row wherever it travels:
 
-`<agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>`, then ` | rail: <rail>` where the entry names one
+`<agent name> | <command> | model: <expected model> | effort: <effort> | model_shows: <banner|screen> | brief_delivery: <inject|file> | host: <machine>[ | rail: <rail>]`, the bracketed tail only where the entry names one
 
-The row names its agent first and its machine last, before any rail: a session that receives it neither
+The row names its agent first and its machine after every launch field, only a rail's tail after it: a session that receives it neither
 guesses a machine nor loses the name a resumed top re-resolves a carried seat by. Where the
 entry names no `host:`, the row names the resolver's own machine under the layer's Machines
 step's name for it — never the words `this machine`, which would mean a different host in

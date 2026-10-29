@@ -22,14 +22,14 @@ wi_log_error() { echo "ERROR: $*" >&2; }
 wi_realpath() {
   local target_path="$1"
   if [[ -d "$target_path" ]]; then
-    ( cd "$target_path" 2>/dev/null && pwd -P )
+    ( CDPATH= cd -- "$target_path" 2>/dev/null && pwd -P )
     return 0
   fi
   if [[ -e "$target_path" ]]; then
     local dir base
     dir="$(dirname "$target_path")"
     base="$(basename "$target_path")"
-    ( cd "$dir" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$base" )
+    ( CDPATH= cd -- "$dir" 2>/dev/null && printf '%s/%s\n' "$(pwd -P)" "$base" )
     return 0
   fi
   # Not yet existing — canonicalize parent if possible.
@@ -37,7 +37,7 @@ wi_realpath() {
   dir="$(dirname "$target_path")"
   base="$(basename "$target_path")"
   if [[ -d "$dir" ]]; then
-    printf '%s/%s\n' "$( cd "$dir" 2>/dev/null && pwd -P )" "$base"
+    printf '%s/%s\n' "$( CDPATH= cd -- "$dir" 2>/dev/null && pwd -P )" "$base"
   else
     printf '%s\n' "$target_path"
   fi

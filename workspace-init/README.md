@@ -108,7 +108,13 @@ Downstream plugins read the manifest via `wi_manifest_resolve` to find any artif
 
 ## The trace filter
 
-A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` with the AI workspace path **baked in at install time** (so the hook keeps working even if your shell's cwd is elsewhere). On every commit to the canonical:
+A `commit-msg` hook is installed into `<canonical>/.git/hooks/commit-msg` (and the AI workspace's own). The hook finds the AI workspace **from the repo it runs in**, not from an absolute path that holds on one host only (#983). At install time it records one of three references:
+
+- `self` — the hook is the AI workspace's own.
+- `sibling:<dir>` — the AI workspace is `<dir>` beside the canonical. `/init-workspace` always creates a side-by-side pair, and `/pair-workspace` does when the AI workspace goes in the canonical's parent (its default). The pair keeps its filter when both repos move together — to another parent, or another host.
+- `abs:<path>` — a pair that is not side by side (a `/pair-workspace` parent you chose elsewhere, or two existing repos paired by `/pair-existing-dual`), or a repo whose git directory is not physically `<repo>/.git` (a `.git` file from `--separate-git-dir`, or a `.git` symlink). This form is host-bound: on a host where `<path>` does not exist, the hook blocks.
+
+`self` and `sibling` resolve from the repository's main worktree, so commits from a linked worktree (`git worktree add`) use the same manifest. On every commit to the canonical:
 
 1. Reads `<ai-workspace>/.workspace/pairing.json`. If the manifest is missing, malformed, or its trace-filter policy is unreadable, the hook **blocks the commit** and names the repair — the filter fails closed, because a permanent trace leak into public history costs more than a blocked commit.
 2. If `git_policy.trace_filter.enforce: false`, exits clean.
@@ -127,7 +133,9 @@ The hook fails closed when it cannot evaluate its policy: the commit is blocked 
 
 **`jq is not installed or not on PATH`.** The hook needs `jq` to evaluate the manifest. Install it (`apt-get install jq`, `brew install jq`, or your package manager) and retry the commit.
 
-**`AI workspace path is unreachable: <path>`.** The workspace moved or was renamed; the hook's baked path is stale. Re-bake the hooks against the new location — from the workspace's new parent directory the arguments may be typed relative (they are canonicalised to absolute physical paths before baking):
+**Committing before you repair.** Every block names `WI_TRACE_FILTER_MANIFEST`. Set it to the manifest's current path for one commit — `WI_TRACE_FILTER_MANIFEST=<ai-workspace>/.workspace/pairing.json git commit …` — and the hook reads that manifest in place of its reference and still applies every check, announcing the override on stderr. Prefer it to `--no-verify`, which switches the filter off. It is an escape, not a repair: run the repair for your reason below.
+
+**`AI workspace path is unreachable: <path>`.** The workspace moved, was renamed, or no longer sits beside the canonical; the hook's reference is stale. A hook from workspace-init 0.10.0 or earlier carries an absolute path, so it reports this on any host other than the one it was installed on — and a hook from before 0.5.1 does not block at all: it prints `trace filter disabled` and lets every commit through. The repair below rewrites both kinds to the current form. Re-bake the hooks against the new location — from the workspace's new parent directory the arguments may be typed relative (they are canonicalised to absolute physical paths before baking):
 
 ```
 <plugin dir>/bin/wi trace_filter_install_pair <ai-workspace> <canonical-repo>
@@ -142,6 +150,8 @@ Re-baking updates the hooks only. The roots recorded inside `pairing.json` — w
 ```
 
 It rewrites `ai_workspace.root` and `ai_workspace.name` to the workspace's current location — and, only with `--canonical-root`, `canonical.root` and `canonical.name` for a canonical that moved too. Every other field (`project_type`, the remotes, `default_branch`, any customised `git_policy`) is kept. It refuses without changing anything if the manifest is missing or corrupt; repair that first (below).
+
+**`cannot locate this repository's main worktree`.** The hook carries `self` or `sibling:<dir>`, but the repo's git directory is no longer `<repo>/.git` — `.git` became a file (`git init --separate-git-dir`, a move into a submodule) or a symlink to a directory with another name — so its main worktree cannot be found from its git directory. Re-run the install above; it checks the git directory the same way the hook does and records the `abs:` form for such a repo. **`unrecognised AI workspace reference`.** The hook was hand-edited; re-run the install above.
 
 **`manifest not found`, `not a single JSON object`, `enforce missing or not a boolean`, or `cannot read … blocked_patterns`.** The manifest at `<ai-workspace>/.workspace/pairing.json` is missing or corrupt. Repair it without losing canonical metadata — `project_type`, `canonical.git_remote`, `canonical.default_branch`, and any customised `git_policy` are the fields to keep. If the file still parses, read them first:
 
