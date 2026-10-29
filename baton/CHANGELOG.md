@@ -25,11 +25,12 @@ The follow-ups triaged on 2026-10-29: #920, #906, #930, #908, #969 and three ite
   the last 12 lines, for the pickers `parsePicker` reads.
 - **Changed: the park event leaves `questions` off when the list is empty (#899).** A test pins that a
   plain `unpark` keeps a unit's triaged request ids.
-- **Changed: the example recipe (#908, #899).** `correct.md`, `spine-work.md` and `lane.md` end with a numbered
-  step that writes their done file with the exact command.
-- **Fixed: `baton-seat` refuses a message file that vanished after its checks** (`nomsg`), instead of
-  launching the seat with an empty prompt (a disarm's message cleanup could race a launch). The spine PR's ack notice names the
-  phone's Merge button.
+- **Changed: the example recipe (#908, #899).** `correct.md`, `spine-work.md` and `lane.md` end
+  with a numbered step that writes their done file with the exact command. The spine PR's ack
+  notice names the phone's Merge button.
+- **Fixed: `baton-seat` refuses a message it cannot read after its checks (#930)** (`nomsg`),
+  instead of launching the seat with an empty prompt: a disarm's message cleanup could race a
+  launch.
 - **Changed: `running-a-spine-on-baton` (#969).** The bridge check reads baton's `notify` argv and the
   bridge version; the agent check reads `agents[<repo>]` first; `oss` comes from the project's
   install entry; roots fall back to `oss repo_root`; the preflight checks one `target_repo`, the
@@ -37,7 +38,7 @@ The follow-ups triaged on 2026-10-29: #920, #906, #930, #908, #969 and three ite
   shows the command again; the arm is confirmed from `run.json`.
 - **Added: `tests/skill.test.ts`** pins the skill's approval stop and no-watch rule and the done-file
   briefs' last step.
-- Known limits: per-hook labels are not offered (index and argv only); the question is kept only for
+- Known limits: per-hook labels are not offered (index and program only); the question is kept only for
   pickers `parsePicker` reads; `{pending.questions}` still renders `[]` for an empty list.
 
 ## 0.8.0 - 2026-10-29
