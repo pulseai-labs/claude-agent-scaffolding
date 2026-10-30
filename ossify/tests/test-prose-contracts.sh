@@ -2425,5 +2425,11 @@ pin "$SKILLS/close/SKILL.md" '`--verdict <file>`' \
   "#993 close SKILL.md §9: the argument grammar names --verdict"
 pin "$_981_WC" 'Not under `--verdict`: there the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched.' \
   "#993 work-item-close §2: the inline pass is excluded under --verdict"
+pin "$_981_WC" 'close: $wi is already committed; a verdict written before the commit cannot match' \
+  "#993 work-item-close §2: a --pr resume under --verdict names its own halt"
+pin "$_981_WC" 'identity` that is not a hex digest' \
+  "#993 work-item-close §2: a non-hex identity halts before it reaches the shell"
+pin "$_981_WC" '**Without `--verdict`, after Layers 1 and 2, the close dispatches `ossify:verifier-agent`' \
+  "#993 work-item-close §2: the dispatch sentence is conditional on no --verdict"
 
 t_summary

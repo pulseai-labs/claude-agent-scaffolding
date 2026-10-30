@@ -168,7 +168,7 @@ result from a pass that never opened the file. Skipping this check does not
 fail loudly: a read that never happened still produces a clean-looking
 findings list, and the gate reports green having verified nothing.
 
-**After Layers 1 and 2, the close dispatches `ossify:verifier-agent` for Layers 3 and 4 and the §4c mutation check**
+**Without `--verdict`, after Layers 1 and 2, the close dispatches `ossify:verifier-agent` for Layers 3 and 4 and the §4c mutation check**
 (`references/impl-check.md`), through the host's agent tool. Its prompt names
 absolute `$spec`, `$report`, `$wt`, the `handoff.md` path, the patterns file
 (`03-code-patterns.md`, resolved as Layer 3 resolves it, or `absent`) and the
@@ -202,7 +202,8 @@ A baton `verify` stage has already run the pass in a seat of the operator's choo
 Run Layers 1 and 2 as above; dispatch no `ossify:verifier-agent` and run no
 before/after fingerprint. Read the file: it is one JSON object with `mode: verified`
 and the keys `model`, `agent`, `work_item_id`, `identity`, `rule`, `lenses`,
-`mutation`. Anything else, or a missing key, is a halt naming the key. A
+`mutation`. Anything else, or a missing key, is a halt naming the key, and
+so is an `identity` that is not a hex digest — it is pasted into the shell below. A
 `work_item_id` other than `$wi` is `close: verdict is for <id>, not $wi - halt`.
 Then recompute the worktree identity with the same three commands, now that no
 mutation is pending:
@@ -215,7 +216,11 @@ now="$(printf '%s\n%s\n%s\n' "$t" "$s" "$d" | git hash-object --stdin)"
 [ "$now" = "$vid" ] || { echo "close: verdict identity $vid does not match $wt now ($now) - the item changed after verify - halt"; exit 1; }
 ```
 
-A mismatch is a halt: the item changed after the verdict was written. Otherwise apply
+A mismatch is a halt: the item changed after the verdict was written. On a `--pr`
+resume (§4a: empty index, HEAD already past `$base_sha`) the commit itself moved the
+tree, so a verdict written before it always lands here; say so:
+`close: $wi is already committed; a verdict written before the commit cannot match - re-run /close $wi --pr without --verdict, or with a verdict written against the committed tree - halt`.
+Otherwise apply
 `rule`, `lenses` and `mutation` exactly as the agent's return is applied (the same
 tags, the same `verify.md`, the same correction packet), and print
 `verifier: <agent> on <model>` from the file. Without `--verdict` nothing in this
@@ -228,7 +233,7 @@ session, from the diff and never from report §5, and print
 `--external-executor` lane closing its own items** Layers 3 and 4 run in this
 session and no mutation check runs: the caller's verifier owns it
 (`work-item/references/external-executor.md` §6). A `--detach` caller's later
-`/close` is outside the lane, so it dispatches.
+`/close` is outside the lane, so it dispatches unless it passes `--verdict`.
 
 Apply the §4b verdict rule to the findings: an undeclared `fidelity` finding
 fires the `[fidelity]` halt. **Every completed verifier pass writes
@@ -464,7 +469,7 @@ the item stays `active`, with its commit past base on `$wi_branch`, pushed, and
 
 **Resuming** a halt after the commit is re-running `/close <wi-id> --pr`. Steps
 1 and 2 run again — the gate reads the committed diff (`$base_sha..HEAD`) in
-place of the staged one — and the block above skips the commit, pushes again
+place of the staged one; under `--verdict`, a verdict written against it (§2) — and the block above skips the commit, pushes again
 (a no-op when already pushed), reuses the open PR for `$wi_branch` when one
 exists, and records it. Until that records `pr_url`, the item is `active`, clean
 and past base with no PR recorded — the shape re-entry reads as `finish-merge`,
