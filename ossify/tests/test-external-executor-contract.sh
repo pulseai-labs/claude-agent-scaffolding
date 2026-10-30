@@ -218,6 +218,8 @@ pin "$EXT" 'mutation check in this mode (`impl-check.md` §4c): the caller' \
   "external-executor.md says close runs no mutation check in this mode (#951 D3)"
 pin "$EXT" 'runs Layer 4 inline' \
   "external-executor.md still names the inline Layer 4 route under its mode"
+pin "$WIC" 'dispatch no `ossify:verifier-agent` and run no' \
+  "work-item-close.md: --verdict dispatches no verifier and fingerprints nothing (#993)"
 
 # There is no route to choose any more: the contract is that no second engine
 # exists. The absence half of that contract is test-layer4-residue.sh's —
