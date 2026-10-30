@@ -8,13 +8,14 @@ import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.t
 import { hostKind, makeHost } from "./hosts/select.ts";
 import { notifyOnce } from "./notify.ts";
 import { CONTROL_BYTE, keysFor, parsePicker, textKeys } from "./picker.ts";
-import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, validate, type Recipe } from "./recipe.ts";
+import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, recipeRoles, validate, type Recipe } from "./recipe.ts";
+import { validateRoleTable } from "./roles.ts";
 import { openStore, replaceFileSync, type KeptThread, type RunState, type UnitState } from "./state.ts";
 import { installTimer, removeTimer } from "./timer.ts";
 
 const USAGE = [
   "usage: baton validate <recipe.json>",
-  "       baton arm <recipe.json> --run <id> [--param k=v]... [--no-timer]",
+  "       baton arm <recipe.json> --run <id> [--param k=v]... [--seats <file>] [--no-timer]",
   "       baton status [<run>]",
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
@@ -90,6 +91,7 @@ async function armCmd(args: string[]): Promise<number> {
   let file: string | undefined;
   let runId: string | undefined;
   let noTimer = false;
+  let seatsFile: string | undefined;
   // Null prototype, own-property reads: a param named constructor or __proto__ is a param like any other.
   const given: Record<string, string> = Object.create(null);
   for (let i = 0; i < args.length; i++) {
@@ -100,6 +102,9 @@ async function armCmd(args: string[]): Promise<number> {
       const eq = kv === undefined ? -1 : kv.indexOf("=");
       if (eq < 1) return usage();
       given[kv.slice(0, eq)] = kv.slice(eq + 1);
+    } else if (a === "--seats") {
+      seatsFile = args[++i];
+      if (seatsFile === undefined) return usage();
     } else if (a === "--no-timer") noTimer = true;
     else if (a.startsWith("--") || file !== undefined) return usage();
     else file = a;
@@ -136,6 +141,30 @@ async function armCmd(args: string[]): Promise<number> {
   if (missing.length) return fail(`missing param: ${missing.join(", ")}`);
   if (extra.length) return fail(`undeclared param: ${extra.join(", ")}`);
 
+  // Every role a stage names needs an entry, checked before a run directory exists.
+  const roles = recipeRoles(recipe);
+  let seatBytes: Buffer | undefined;
+  if (seatsFile !== undefined) {
+    try {
+      seatBytes = readFileSync(seatsFile);
+    } catch (e) {
+      return fail(`${seatsFile}: ${(e as Error).message}`);
+    }
+    let seatRaw: unknown;
+    try {
+      seatRaw = JSON.parse(seatBytes.toString("utf8"));
+    } catch (e) {
+      return fail(`${seatsFile}: ${(e as Error).message}`);
+    }
+    const sv = validateRoleTable(seatRaw);
+    if (!sv.ok) return fail(sv.errors.map((m) => `${seatsFile}: ${m}`).join("\n"));
+    for (const [role, stages] of roles) {
+      if (!own(sv.table, role)) return fail(`role table has no role "${role}" (stage ${stages[0]})`);
+    }
+  } else if (roles.size > 0) {
+    return fail(`recipe names roles (${[...roles.keys()].join(", ")}); pass --seats <file>`);
+  }
+
   const rc = await locked(async () => {
     const store = openStore();
     const dir = store.runDir(runId);
@@ -144,6 +173,7 @@ async function armCmd(args: string[]): Promise<number> {
     try {
       mkdirSync(dir, { recursive: true, mode: 0o700 });
       replaceFileSync(join(dir, `recipe.json.${process.pid}.tmp`), join(dir, "recipe.json"), bytes);
+      if (seatBytes !== undefined) replaceFileSync(join(dir, `seats.json.${process.pid}.tmp`), join(dir, "seats.json"), seatBytes);
       const now = new Date().toISOString();
       const units: Record<string, UnitState> = {};
       recipe.seed.forEach((s, index) => {
@@ -155,6 +185,7 @@ async function armCmd(args: string[]): Promise<number> {
         id: runId,
         dir,
         recipe_sha256: createHash("sha256").update(bytes).digest("hex"),
+        ...(seatBytes !== undefined ? { seats_sha256: createHash("sha256").update(seatBytes).digest("hex") } : {}),
         params: given,
         armed_at: now,
         status: "armed",

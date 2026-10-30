@@ -37,6 +37,40 @@ describe("running-a-spine-on-baton", () => {
     expect(s).toContain("wait for an explicit yes");
   });
 
+  // #993: seats come from crew's two files, resolved at arm time and approved with the command.
+  test("the seat step reads crew's two files and stops on a role with no row", () => {
+    const s = skill();
+    expect(s).toContain("`.crew/roles.md`");
+    expect(s).toContain("`~/.claude/crew/agents.md`");
+    expect(s).toContain("A role with no row is one question, and arms nothing");
+  });
+
+  test("the seat table is shown with the command, and written only after the yes", () => {
+    const s = skill();
+    expect(s).toContain("| Stage | Role | Agent | Command | Model | Effort | From |");
+    expect(s).toContain("--seats /home/<user>/baton-recipes/seats/<run>.json");
+    expect(s).not.toContain("--seats ~");
+    expect(s).toContain("never `~/…`");
+    expect(s).toContain("Write the seat file only after the yes");
+    // The write comes after the stop, never before it.
+    expect(s.indexOf("Write the seat file only after the yes")).toBeGreaterThan(s.indexOf("wait for an explicit yes"));
+  });
+
+  test("an argv is built only from a plain program, Devin's ends with --, review drops its PR placeholder", () => {
+    const s = skill();
+    expect(s).toContain("a shell function or an alias");
+    expect(s).toContain("End a Devin agent's argv with `--`");
+    expect(s).toContain("drop a trailing `<PR_URL>` or `<PR>`");
+  });
+
+  test("via is gone from the skill and the README's arm example", () => {
+    expect(skill()).not.toMatch(/\bvia\b/);
+    const readme = readFileSync(join(import.meta.dir, "..", "README.md"), "utf8");
+    expect(readme).not.toContain("--param via=");
+    expect(readme).toContain("--seats <file>");
+    expect("--param via=x").toContain("--param via="); // control: the probe matches the old line
+  });
+
   test("after arming, a watch request runs no command and the close is baton's", () => {
     const s = skill();
     expect(s).toContain('"Keep an eye on it" is not a status request');

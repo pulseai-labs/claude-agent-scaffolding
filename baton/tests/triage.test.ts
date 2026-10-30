@@ -1,7 +1,7 @@
 // The engine waits on a seat's pending request, triages it once, and acts on the result.
 
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { claimKey, liveClaim } from "../src/claims.ts";
@@ -784,4 +784,56 @@ test("a second request seen as the triage ends records its questions", async () 
   const e = lastPark();
   expect(e.reason).toBe("second prompt");
   expect(JSON.parse(e.questions)).toEqual(OTHER.questions);
+});
+
+// ---- role ------------------------------------------------------------------------------------
+
+const TRIAGE_ROLE = {
+  triage: { agent: "agent-t", argv: ["run-t"], brief_delivery: "inject", expected_model: "model-t", effort: "medium", env: { TK: "table", Y: "2" } },
+};
+
+async function armRoles(rec: unknown, table: unknown = TRIAGE_ROLE) {
+  const seats = join(root, "r1.roles.json");
+  writeFileSync(seats, JSON.stringify(table));
+  const file = join(root, "r1.recipe.json");
+  writeFileSync(file, JSON.stringify(rec));
+  for (const s of (rec as { seed: { id: string }[] }).seed) {
+    mkdirSync(seatCwd(s.id), { recursive: true });
+    mkdirSync(triageCwd(s.id), { recursive: true });
+  }
+  expect(await main(["arm", file, "--run", "r1", "--param", `root=${root}`, "--seats", seats, "--no-timer"])).toBe(0);
+}
+
+function roleTriage() {
+  const { instance: _i, model: _m, ...rest } = triageStage({ role: "triage", message: "{agent.name} answers {pending.request}" });
+  return rest;
+}
+
+test("a triage with a role launches on the table's agent, with the merged claim env", async () => {
+  await armRoles(recipe({ work: sess() }, ["a"], roleTriage()));
+  host = new FakeHost({ work: pendingSeat(), triage: TRIAGE });
+  await doTick();
+  at(1);
+  await doTick();
+  const l = triageLaunches()[0];
+  expect(l.request.instance).toBe("agent-t");
+  expect(l.request.model).toBe("model-t");
+  expect(l.request.message).toBe("agent-t answers req-1");
+  expect(l.claim).toEqual({
+    nonce: "r1/a/triage/1",
+    env: { TK: "t-a", Y: "2", BATON_ROLE: "triage", BATON_ROLE_TABLE: join(runDir(), "seats.json") },
+  });
+});
+
+test("a triage with a role and no seats.json parks launch failed, with no triage claim", async () => {
+  await armRoles(recipe({ work: sess() }, ["a"], roleTriage()));
+  rmSync(join(runDir(), "seats.json"));
+  host = new FakeHost({ work: pendingSeat(), triage: TRIAGE });
+  await doTick();
+  at(1);
+  await doTick();
+  expect(triageLaunches().length).toBe(0);
+  expect(liveClaim(claimKey(triageCwd()))).toBeNull();
+  expect(runState().units.a.parked?.reason).toBe("launch failed");
+  expect(String(events().find((e) => e.kind === "launch failed")?.reason)).toContain("seats.json");
 });

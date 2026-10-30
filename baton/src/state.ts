@@ -130,6 +130,7 @@ export type RunState = {
   id: string;
   dir: string;
   recipe_sha256: string;
+  seats_sha256?: string;
   params: Record<string, string>;
   armed_at: string;
   status: "armed" | "parked" | "disarmed" | "done";

@@ -25,6 +25,7 @@ import {
   type DriverStage, type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type TriageStage, type WaitStage,
 } from "./recipe.ts";
 import { mergeUnit, type HookFailure, type ParkPr } from "./merge.ts";
+import { validateRoleTable, type RoleAgent, type RoleTable } from "./roles.ts";
 import { parsePicker } from "./picker.ts";
 import { runSummary } from "./summary.ts";
 import { evaluate, Exit0Error, runArgv, type EvalCtx } from "./signals.ts";
@@ -235,12 +236,25 @@ async function tickLocked(opts: TickOpts, report: TickReport): Promise<void> {
 
 type Ctx = { stage: Stage; scope: Scope };
 
+/** The role table `baton arm --seats` copies into the run directory. */
+const ROLE_TABLE_FILE = "seats.json";
+
+/** A role stage's agent could not be found: the run's role table is missing, invalid, or lacks the role. */
+class RoleError extends Error {}
+
+/** The launch fields a session, triage or driver stage shares that pick its agent and claim env. */
+type AgentFields = { role?: string; instance?: string; model?: string; env: Record<string, string> };
+/** What a stage launches on, with the scope its message renders with. */
+type Agent = { scope: Scope; instance: string; model: string; env: Record<string, string> };
+
 class RunTick {
   private saved: string;
   private held = new Set<string>();
   private prViews = new Map<string, PrView>();
   /** Units that entered a stage this tick: steps 4 and 5 read them again next tick, not now. */
   private entered = new Set<string>();
+  /** The run's role table, read at most once per tick. */
+  private roles: { table: RoleTable } | { error: string } | undefined;
 
   constructor(
     private opts: TickOpts,
@@ -282,6 +296,50 @@ class RunTick {
 
   private scope(u: UnitState, extra: Partial<Scope> = {}): Scope {
     return unitScope(this.run, u, extra);
+  }
+
+  private roleTablePath(): string {
+    return join(this.run.dir, ROLE_TABLE_FILE);
+  }
+
+  /** The role's row in the run's role table; throws RoleError naming the file or the role. */
+  private roleAgent(role: string): RoleAgent {
+    const path = this.roleTablePath();
+    if (this.roles === undefined) {
+      try {
+        const v = validateRoleTable(JSON.parse(readFileSync(path, "utf8")));
+        this.roles = v.ok ? { table: v.table } : { error: `${path}: ${v.errors.join("; ")}` };
+      } catch (e) {
+        this.roles = { error: `${path}: ${message(e)}` };
+      }
+    }
+    if ("error" in this.roles) throw new RoleError(this.roles.error);
+    const a = own(this.roles.table, role);
+    if (!a) throw new RoleError(`${path}: no role "${role}"`);
+    return a;
+  }
+
+  /**
+   * The agent a stage launches on and its claim env, rendered. A stage without a role launches
+   * on its own instance and model with its own env. A role stage launches on its role's agent and
+   * expected model; its claim env is the role's env with the stage's over it (the stage wins),
+   * then BATON_ROLE and BATON_ROLE_TABLE; its message may use {agent.name} and {agent.review}.
+   */
+  private agent(st: AgentFields, scope: Scope): Agent {
+    const env: Record<string, string> = {};
+    if (st.role === undefined) {
+      for (const [k, v] of Object.entries(st.env)) env[k] = render(v, scope);
+      return { scope, env, instance: render(st.instance ?? "", scope), model: render(st.model ?? "", scope) };
+    }
+    const a = this.roleAgent(st.role);
+    Object.assign(env, a.env);
+    for (const [k, v] of Object.entries(st.env)) env[k] = render(v, scope);
+    env.BATON_ROLE = st.role;
+    env.BATON_ROLE_TABLE = this.roleTablePath();
+    return {
+      scope: { ...scope, agent: { name: a.agent, ...(a.review !== undefined ? { review: a.review } : {}) } },
+      env, instance: a.agent, model: a.expected_model,
+    };
   }
 
   private ctx(u: UnitState): Ctx {
@@ -480,6 +538,12 @@ class RunTick {
       if (e instanceof Exit0Error) {
         this.ev("exit0 error", { unit: u.id, reason: e.message });
         await this.park(u, "exit0 error");
+        return;
+      }
+      if (e instanceof RoleError) {
+        // Thrown before any bind or claim: nothing to undo, and no relaunch would find the agent.
+        this.ev("launch failed", { unit: u.id, reason: e.message });
+        await this.park(u, "launch failed");
         return;
       }
       this.report.errors.push(`${this.run.id}/${u.id}: ${message(e)}`);
@@ -983,12 +1047,9 @@ class RunTick {
     // Every field renders before any side effect.
     const project = render(triage.project, scope);
     const cwd = render(triage.cwd, scope);
-    const env: Record<string, string> = {};
-    for (const [k, v] of Object.entries(triage.env)) env[k] = render(v, scope);
+    const { env, instance, model, scope: agentScope } = this.agent(triage, scope);
     const title = render(triage.title, scope);
-    const instance = render(triage.instance, scope);
-    const model = render(triage.model, scope);
-    const text = render(triage.message, scope);
+    const text = render(triage.message, agentScope);
     const note = render(triage.note_file, this.scope(u));
 
     u.triaged = [...(u.triaged ?? []), p.id];
@@ -1070,19 +1131,24 @@ class RunTick {
   }
 
   private async successor(u: UnitState, stage: SessionStage, old: Session, path: string): Promise<void> {
+    const scope = this.scope(u, { handoff_path: path });
+    // The successor keeps the parent's claim, so its env is unused here; the agent is found
+    // before anything closes, so a missing one parks with the parent's session still to end.
+    const { instance, model, scope: agentScope } = this.agent(stage, scope);
+    const title = render(stage.title, scope);
+    const text = render(stage.handoff!.message, agentScope);
     await this.endTriage(u, { interrupt: true });
     // The parent's terminal closes; its claim and directory pass to the successor, unreleased.
     if (this.host.close && old.thread_id) await this.host.close(old.thread_id);
     const n = this.mint(u);
-    const scope = this.scope(u, { handoff_path: path });
     const req: LaunchRequest = {
       nonce: n,
-      title: threadTitle(render(stage.title, scope), n),
+      title: threadTitle(title, n),
       project: this.launchedWith(stage, scope, old).project,
-      instance: render(stage.instance, scope),
-      model: render(stage.model, scope),
+      instance,
+      model,
       cwd: old.launch_dir,
-      message: render(stage.handoff!.message, scope),
+      message: text,
     };
     const now = this.nowIso();
     const s: Session = {
@@ -1208,14 +1274,11 @@ class RunTick {
     const scope = this.scope(u, { attempt });
     const cwd = render(stage.cwd, scope);
     const project = render(stage.project, scope);
-    const env: Record<string, string> = {};
-    for (const [k, v] of Object.entries(stage.env)) env[k] = render(v, scope);
-    // Every request field renders before any side effect: a render failure parks with nothing
-    // bound and no claim written.
+    // Every request field renders, and a role stage's agent is found, before any side effect: a
+    // render failure or a missing agent parks with nothing bound and no claim written.
+    const { env, instance, model, scope: agentScope } = this.agent(stage, scope);
     const title = render(stage.title, scope);
-    const instance = render(stage.instance, scope);
-    const model = render(stage.model, scope);
-    const text = render(stage.message, scope);
+    const text = render(stage.message, agentScope);
 
     const holder = this.cwdHolder(cwd);
     if (holder !== null) {
@@ -1434,12 +1497,11 @@ class RunTick {
       text: string; stateFile: string; resultFile: string; ledger: string; stopFile?: string };
     try {
       // Every field renders before any side effect.
-      const env: Record<string, string> = {};
-      for (const [k, v] of Object.entries(drv.env)) env[k] = render(v, scope);
+      const { env, instance, model, scope: agentScope } = this.agent(drv, scope);
       f = {
         project: render(drv.project, scope), cwd: render(drv.cwd, scope), env,
-        title: render(drv.title, scope), instance: render(drv.instance, scope), model: render(drv.model, scope),
-        text: render(drv.message, scope), stateFile: render(drv.state_file, scope),
+        title: render(drv.title, scope), instance, model,
+        text: render(drv.message, agentScope), stateFile: render(drv.state_file, scope),
         resultFile: render(drv.result_file, scope), ledger: render(drv.ledger, scope),
       };
     } catch (e) {
