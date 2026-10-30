@@ -1,4 +1,4 @@
-# ossify (v1.29.1)
+# ossify (v1.30.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -202,6 +202,16 @@ completed verifier pass writes `verify.md`, zero findings included, with the `ve
 line and each layer's result, so the `--external-executor` lane's close leaves a durable
 record, and the spine retrospective carries each item's `verifier:` line. No `lib/`
 behaviour change, no state change.
+
+Since 1.30.0 (#993), `/close <wi> --pr --verdict <file>` closes on a verifier verdict a
+caller already produced (baton's `verify` stage), in place of dispatching
+`ossify:verifier-agent`. The file is one JSON object, `mode: verified` with `model`,
+`agent`, `work_item_id`, `identity`, `rule`, `lenses` and `mutation`; `identity` is the
+worktree fingerprint (`write-tree`, `status --porcelain`, `diff --binary`, hashed) taken
+after the verifier restored everything. Close recomputes it and halts on a mismatch, so
+an item that changed after verify is never closed on a stale verdict, then applies the
+verdicts as it would the agent's and prints `verifier: <agent> on <model>`. Without the
+flag nothing changes. No `lib/` behaviour change, no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and

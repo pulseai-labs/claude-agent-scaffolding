@@ -263,6 +263,25 @@ cp "$TMP/vi-g" "$VI_WT/g"; : > "$VI_WT/stray"; _vi_run
 t_assert_rc 1 "verifier identity: a stray file left in the worktree halts"
 rm -f "$VI_WT/stray"
 
+# #993: with --verdict the close recomputes the identity and compares it to the
+# verdict's. Executed from the shipped block: a verdict written for this exact
+# worktree passes; any change after the verdict (edit, stray file) halts, and the
+# halt names both hashes.
+VD_BLOCK="$TMP/vd-block.sh"
+_extract_block "$VI_WIC" 'close: verdict identity' "$VD_BLOCK"
+t_capture bash -c "set -uo pipefail; wt='$VI_WT'; . '$VI_BLOCK'"
+VD_ID="${T_OUT#verifier identity: }"
+t_capture bash -c "set -uo pipefail; wt='$VI_WT'; . '$VD_BLOCK'"
+t_assert_rc 1 "verdict identity: a verdict carrying no identity halts"
+_vd_run() { sed "s/^vid=\"\"/vid=\"${1}\"/" "$VD_BLOCK" > "$TMP/vd-cmp.sh"; t_capture bash -c "set -uo pipefail; wt='$VI_WT'; . '$TMP/vd-cmp.sh'"; }
+_vd_run "$VD_ID"; t_assert_rc 0 "verdict identity: a verdict for this exact worktree passes"
+_vd_run "deadbeef"; t_assert_rc 1 "verdict identity: a verdict for another state halts"
+t_assert_contains "$T_OUT" "close: verdict identity deadbeef does not match" "...naming the verdict's identity"
+printf 'x\n' > "$VI_WT/stray"; _vd_run "$VD_ID"
+t_assert_rc 1 "verdict identity: a file added after the verdict halts"
+rm -f "$VI_WT/stray"
+_vd_run "$VD_ID"; t_assert_rc 0 "verdict identity: removing it restores the match"
+
 # Layer 2 - report cross-check. Assert the LIB's real message; the
 # `[report cross-check]` prefix is the skill's surfacing convention and appears
 # in no lib, so a ceremony grepping for it would find nothing forever.
