@@ -13,7 +13,8 @@
 # | norole | noargv | notable.
 # A claim with BATON_ROLE and BATON_ROLE_TABLE (a role stage) execs the table's argv for that
 # role instead of omp-seat, with the message as the LAST argument (brief_delivery inject) or
-# "Read <state>/briefs/<nonce>.md and follow it." (file). Nothing else is added to the argv.
+# "Read <state>/briefs/<nonce>.md and follow it." (file; "/" in the nonce is written "%2F").
+# Nothing else is added to the argv.
 # The claim keys keep the OMP_T3_ names from the retired T3 launcher, so staged recipes still run.
 
 set -u
@@ -23,7 +24,7 @@ omp_seat_bin="${BATON_OMP_SEAT:-$HOME/.local/bin/omp-seat}"
 state="${BATON_STATE_DIR:-$HOME/.local/state/baton}"
 msgfile="${1-}"
 # Role-path locals start empty so nothing inherited from the environment reaches the legacy path.
-role="" delivery="" table="" brief="" briefs=""
+role="" delivery="" table="" brief="" briefs="" brief_name=""
 argv=()
 
 # Linux MAX_ARG_STRLEN is 131072 bytes and counts the terminating NUL.
@@ -134,7 +135,10 @@ if [ -n "$role" ]; then
     inject|file) ;;
     *) refuse noargv ;;
   esac
-  if [ "$delivery" = file ] && ! [[ "$nonce" =~ ^[A-Za-z0-9._-]+$ ]]; then
+  # A nonce is <run>/<unit>/<stage>/<n>; the brief's name is the nonce with "/" as "%2F" (what the
+  # Orca host does with encodeURIComponent), so a nonce can never name a path outside briefs/.
+  brief_name="${nonce//\//%2F}"
+  if [ "$delivery" = file ] && ! [[ "$brief_name" =~ ^[A-Za-z0-9._%-]+$ ]]; then
     refuse "invalid 1"
   fi
 elif [ ! -f "$omp_seat_bin" ] || [ ! -x "$omp_seat_bin" ]; then
@@ -144,7 +148,7 @@ fi
 if [ -n "$role" ] && [ "$delivery" = file ]; then
   # The message moves to a file the agent reads: no argument-size limit applies.
   briefs="$state/briefs"
-  brief="$briefs/$nonce.md"
+  brief="$briefs/$brief_name.md"
   mkdir -p -- "$briefs" 2>/dev/null && (umask 077 && cp -- "$msgfile" "$brief") 2>/dev/null \
     && chmod 600 -- "$brief" 2>/dev/null || refuse nomsg
   rm -f -- "$msgfile"

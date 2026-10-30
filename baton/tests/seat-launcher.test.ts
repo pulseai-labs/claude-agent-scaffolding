@@ -304,6 +304,28 @@ test("role-file-delivery-path: one argument naming a 200 KiB file", () => {
   expect(existsSync(msg)).toBe(false);
 });
 
+test("role-file-delivery with the engine's nonce shape <run>/<unit>/<stage>/<n>", () => {
+  writeTable({ impl: entry([fake], "file") });
+  writeFileSync(claimFile(proj), roleClaim("impl").replace("n2", "r1/U-1.2/verify/3"));
+  const r = run(proj);
+  expect(r.rc).toBe(0);
+  const want = join(state, "briefs", "r1%2FU-1.2%2Fverify%2F3.md");
+  expect(r.json.argv).toEqual([`Read ${want} and follow it.`]);
+  expect(readFileSync(want, "utf8")).toBe("hello");
+});
+
+test("role-file-delivery refuses a nonce outside the closed alphabet (control for the nonce shape)", () => {
+  writeTable({ impl: entry([fake], "file") });
+  for (const bad of ["r1/u 1/s/1", "r1/u$1/s/1", "r1/u;1/s/1"]) {
+    writeFileSync(claimFile(proj), roleClaim("impl").replace("n2", bad));
+    writeFileSync(msg, "hello");
+    expect(run(proj).rc).toBe(78);
+    expect(existsSync(msg)).toBe(true);
+  }
+  expect(existsSync(ran)).toBe(false);
+  expect(readFileSync(logFile(), "utf8")).toMatch(/ invalid 1 cwd /);
+});
+
 test("role-inject keeps the size limit", () => {
   writeTable({ impl: entry([fake]) });
   writeFileSync(claimFile(proj), roleClaim("impl"));

@@ -21,7 +21,7 @@ Seats from crew's config, any harness, a `verify` stage (#993).
   unit `launch failed` (a driver escalates); no attempt is counted.
 - **Changed: `bin/baton-seat` execs the table's argv** with no shell: the message as the last
   argument (`inject`, at most 131071 bytes) or `Read <state>/briefs/<nonce>.md and follow it.`
-  (`file`). New refusals `norole`, `noargv`, `notable`. A claim without `BATON_ROLE` still execs
+  (`file`; `/` in the nonce is written `%2F`). New refusals `norole`, `noargv`, `notable`. A claim without `BATON_ROLE` still execs
   `omp-seat` from `OMP_T3_SEAT` and `OMP_T3_VIA`, so staged recipes run unchanged.
 - **Changed: the example recipe.** Every session stage, `triage` and `driver` names its crew role;
   `instance`, `model`, the `OMP_T3_` keys and the `via` param are gone. The item flow is

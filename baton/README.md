@@ -47,7 +47,7 @@ inherits orca-serve's environment, not the timer's); only those paths reach a sh
 file. A role stage's claim carries `BATON_ROLE` and `BATON_ROLE_TABLE` (see Seats): it execs that
 role's `argv` with no shell, the message as the last argument (`brief_delivery` `inject`) or, for
 `file`, the message copied to `<state>/briefs/<nonce>.md` and the last argument
-`Read <state>/briefs/<nonce>.md and follow it.`. A claim without `BATON_ROLE` (a staged recipe's)
+`Read <state>/briefs/<nonce>.md and follow it.` (`/` in the nonce is written `%2F`). A claim without `BATON_ROLE` (a staged recipe's)
 execs `omp-seat <seat> --via <via> <message>` from its `OMP_T3_SEAT` and `OMP_T3_VIA` keys (see
 Known limits). It refuses with exit 78, one line on stderr and one in `<state>/claims/seat.log`, on
 no claim, a bad claim line, a claim with neither a role nor a seat and via, a role table that is
