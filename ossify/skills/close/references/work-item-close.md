@@ -220,13 +220,13 @@ A mismatch is a halt: the item changed after the verdict was written. On a `--pr
 resume (§4a: empty index, HEAD already past `$base_sha`) the commit itself moved the
 tree, so a verdict written before it always lands here; say so:
 `close: $wi is already committed; a verdict written before the commit cannot match - re-run /close $wi --pr without --verdict, or with a verdict written against the committed tree - halt`.
-Otherwise apply
+If the identities match, apply
 `rule`, `lenses` and `mutation` exactly as the agent's return is applied (the same
 tags, the same `verify.md`, the same correction packet), and print
 `verifier: <agent> on <model>` from the file. Without `--verdict` nothing in this
 section changes.
 
-Not under `--verdict`: there the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched. **Where no agent can be dispatched, the close runs the pass itself** — Codex,
+Under `--verdict` the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched. Without it, **where no agent can be dispatched, the close runs the pass itself** — Codex,
 OMP, a subagent context, a refused `Task` grant. Apply §4, §4b and §4c in this
 session, from the diff and never from report §5, and print
 `verifier: inline — <host or why>` in the close summary. Not a halt. **Inside an
@@ -469,9 +469,10 @@ the item stays `active`, with its commit past base on `$wi_branch`, pushed, and
 
 **Resuming** a halt after the commit is re-running `/close <wi-id> --pr`. Steps
 1 and 2 run again — the gate reads the committed diff (`$base_sha..HEAD`) in
-place of the staged one; under `--verdict`, a verdict written against it (§2) — and the block above skips the commit, pushes again
+place of the staged one — and the block above skips the commit, pushes again
 (a no-op when already pushed), reuses the open PR for `$wi_branch` when one
-exists, and records it. Until that records `pr_url`, the item is `active`, clean
+exists, and records it. Under `--verdict` the gate needs a verdict written against the
+committed tree (§2). Until that records `pr_url`, the item is `active`, clean
 and past base with no PR recorded — the shape re-entry reads as `finish-merge`,
 whose repair is a **local** merge (`round-orchestration.md` §2b step 4). A
 `--detach` lane only reports that row (`external-executor.md` §2b). A lane that

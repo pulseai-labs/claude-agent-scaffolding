@@ -2423,7 +2423,7 @@ pin "$SKILLS/../commands/close.md" '[--verdict <file>]' \
   "#993 commands/close.md: the argument hint carries --verdict"
 pin "$SKILLS/close/SKILL.md" '`--verdict <file>`' \
   "#993 close SKILL.md §9: the argument grammar names --verdict"
-pin "$_981_WC" 'Not under `--verdict`: there the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched.' \
+pin "$_981_WC" 'Under `--verdict` the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched. Without it,' \
   "#993 work-item-close §2: the inline pass is excluded under --verdict"
 pin "$_981_WC" 'close: $wi is already committed; a verdict written before the commit cannot match' \
   "#993 work-item-close §2: a --pr resume under --verdict names its own halt"
