@@ -167,6 +167,11 @@ section "budget"
 # control pads the REAL file to REF_BUDGET+1 rather than using a fixed count, because a fixture
 # with a fixed line count goes valid the moment the constant moves — the bound
 # test-layer-herdr.sh states for its own control.
+# 0.9.0 (#993, D4): baton's two seats join the shipped list, which crew's own runs never launch.
+pin "$CONFIG_MD" '`triage` (answers' "the shipped role list names triage" flat
+pin "$CONFIG_MD" '`driver` (settles' "the shipped role list names driver" flat
+pin "$CONFIG_MD" 'baton reads these two files through running-a-spine-on-baton' \
+  "the role list says baton reads the two config files" flat
 config_over_budget() { # <file> -> "<lines> <over>", rc 0 when over budget
   [ -f "$1" ] || return 1
   _n="$(wc -l < "$1" | tr -d ' ')"

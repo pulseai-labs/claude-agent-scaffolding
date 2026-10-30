@@ -2,6 +2,15 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.9.0
+
+**Two new built-in roles, for baton (#993).**
+
+- **`triage` and `driver` join the shipped role list** (`config.md`). `triage` answers a stuck
+  seat's prompt only when the brief decides it, else stops; `driver` settles the parks its brief
+  names and escalates the rest. A project's setup asks for them, and baton reads the two config
+  files through `running-a-spine-on-baton`. Crew's own orchestrate runs launch neither.
+
 ## 0.8.2
 
 **Text only — the follow-ons from the 0.8.1 review (#987), closing #954.**
