@@ -1,11 +1,11 @@
 ---
 scenario_id: RT10-no-workspace
 expected_outcome: entries-printed-and-operator-asked-where-and-nothing-created
-expected_reason: Section A has no paired workspace, so the accepted entry is printed, the operator is asked where it goes, nothing is written into `pixels/` and no file is created anywhere (no log either, since there is no workspace to hold it). Section B has a paired workspace without a `CODING_STANDARDS.md`, so the accepted entry is printed and the operator is asked where it goes; the skill does not create a standards file and says a reviewer-home run owns the stub. Only `retro-log.md` in `bolts-ai/.claude/memory-bank/` may be written there, with its run line and the `accepted` line, and nothing is committed
+expected_reason: Section A has no paired workspace, so the accepted entry is printed, the operator is asked where it goes, nothing is written into `pixels/` and no file is created anywhere (no log either, since there is no workspace to hold it). Section B has a paired workspace without a `CODING_STANDARDS.md`, so the accepted entry is printed and the operator is asked where it goes; the skill does not create a standards file and says a reviewer-home run owns the stub. Only `retro-log.md` in `bolts-ai/.claude/memory-bank/` may be written there, with its run line and an `accepted` line whose final field is `not written: no standards file`, and nothing is committed
 ---
 Two sections, today 2026-10-31; score each, then give one result. In both, `gh` works, the
 operator is present and runs `/merge-bar:retro --last 10`, and the operator replies "P1: accept"
-to the only proposal shown, a class seen in two PRs.
+to the only proposal shown, an entry (not a check) for a class seen in two PRs.
 
 **Section A: `/home/dev/projects/pixels`, repo `acme/pixels`.** Merged PRs #21 to #30. Its parent
 directory holds `pixels/` and an unrelated `notes/`; no directory there has a

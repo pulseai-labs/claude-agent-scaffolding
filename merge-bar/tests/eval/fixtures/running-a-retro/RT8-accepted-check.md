@@ -1,7 +1,7 @@
 ---
 scenario_id: RT8-accepted-check
 expected_outcome: issue-text-first-then-one-issue-and-failure-variant-logged
-expected_reason: The check proposal's issue text is shown to the operator before anything is opened. After the "accept", Variant A opens one issue in `acme/ledgerly` with `gh issue create`; the body is the proposal and holds no standards entry and no path to `ledgerly-ai`. The `accepted` log line ends `issue #N`. In Variant B `gh issue create` fails, so the accepted entry stays written, the proposal text is printed, the log line ends `issue not opened: ` followed by the failure reason, and the operator is told; that line does not count as accepted earlier. Nothing is committed and nothing is written into `ledgerly/`
+expected_reason: The proposal batch carries P1's issue text, and nothing is opened until the operator replies. After the reply, Variant A opens one issue in `acme/ledgerly` with `gh issue create`; the body is the proposal and holds no standards entry and no path to `ledgerly-ai`. The `accepted` log line ends `issue #88`. In Variant B `gh issue create` fails, so P2's accepted entry stays written, the proposal text is printed, the check's log line ends `issue not opened: ` followed by the failure reason, and the operator is told; that line does not count as accepted earlier. Nothing is committed and nothing is written into `ledgerly/`
 ---
 Two variants of one run. The operator runs `/merge-bar:retro --last 10` today, 2026-10-31, in
 `/home/dev/projects/ledgerly` of the public repo `acme/ledgerly`. Its parent directory holds
@@ -10,14 +10,16 @@ Two variants of one run. The operator runs `/merge-bar:retro --last 10` today, 2
 
 What existed before the run, in `ledgerly-ai/`:
 
-- `.claude/memory-bank/review-ledger.md` with lines for #72, #75 and #79. #72 and #79 both block
+- `.claude/memory-bank/review-ledger.md` with lines for #72, #75, #78 and #79. #72 and #79 both block
   "Fixture has no result file" (a fixture in `tests/eval/fixtures/<surface>/` with no matching
-  file in `tests/eval/results/<surface>/`; #72 C1 lists one, #79 C2 lists two). #75 blocks
-  "Comment restates the code". Reports exist for each.
+  file in `tests/eval/results/<surface>/`; #72 C1 lists one, #79 C2 lists two). #75 and #78 both
+  block "Comment restates the code". Reports exist for each.
 - `CODING_STANDARDS.md` with `## Entries` and two entries, neither about fixtures or result files.
 - No `retro-log.md`.
 
-The run's proposals include P1, for the fixture/result pair. The operator replies: "P1: yes, open it." and nothing else.
+The run's proposals are numbered P1 (the fixture/result pair) and P2 ("Comment restates the
+code"). The operator replies "P1: yes, open it." In Variant B the operator also replies "P2:
+accept."; in Variant A, P2 is not answered.
 
 In Variant A `gh issue create` succeeds and prints an issue URL ending `/issues/88`. In Variant
 B `gh issue create` exits 1 with `GraphQL: Resource not accessible by integration`. `gh` otherwise

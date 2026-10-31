@@ -1,7 +1,7 @@
 ---
 scenario_id: RT7-mixed-answers
 expected_outcome: stub-and-themed-entries-land-and-unanswered-gets-no-line
-expected_reason: Three proposals are shown at once and the operator answers two. The accepted entry goes in the ossify stub (`gisting-ai`) - `## Entries` starts there, `No project entries yet.` is removed and the entry sits under it. The edited entry goes in the hand-written file (`tiles-ai`) under the existing heading `## Error handling` with the operator's wording, no `## Entries` appears and no other line changes. The log lines are one run line, one `accepted` and one `edited` line in `gisting-ai`'s log and one `rejected` line with the operator's reason; the unanswered proposal gets no log line and is raised again next run. Nothing is committed and the operator hears which files changed
+expected_reason: Four proposals are shown across two sections and three are answered. Section A (`gisting-ai`, an ossify stub): P1 is accepted, so `## Entries` starts there, `No project entries yet.` is removed and the entry sits under it; P2 is rejected with the operator's reason. Its log holds the run line, one `accepted` line and one `rejected` line. Section B (`tiles-ai`, hand-written): P1 is accepted with the operator's rewording, so it is `edited`; the entry lands under the existing heading `## Error handling`, no `## Entries` appears and no other line changes. Its log holds the run line and one `edited` line; P2 is unanswered, gets no log line and is raised again next run. Nothing is committed and the operator hears which files changed
 ---
 This scenario has two runs in two projects, each with its own operator, today 2026-10-31. Score
 each section on its own, then give one result. In both, `gh` works, `--last 10` is used, the

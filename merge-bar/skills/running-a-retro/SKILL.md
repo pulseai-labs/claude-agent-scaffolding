@@ -86,25 +86,27 @@ A source needs a PR number; add a class ID when a report has one.
 
 ## 4. Acceptance
 
-Show all proposals at once; the operator answers each: accept, edit or reject. Leave workspace
-files uncommitted and name them to the operator. Act on answered ones only. An unanswered proposal gets no action and no log line, and is raised on the next run.
+Show all proposals at once, each check with its issue text (a public repository's issue is
+public); the operator answers each: accept, edit or reject. Act on answered ones only: an
+unanswered proposal gets no action and no log line, and is raised on the next run. Leave workspace
+files uncommitted and name them to the operator.
 
 - **Entry** (accepted, or edited to the operator's wording): insert one line under the named
   existing heading of the workspace's `CODING_STANDARDS.md`, in the file's own entry shape, with its
-  Why and source PRs. Change no other line. A hand-written file with themed headings and no
-  `## Entries` keeps them: the entry goes under the named heading and no `## Entries` is added.
-  Only a file carrying the verbatim `No project entries yet.` is an ossify stub: the first entry removes
-  that sentence and starts `## Entries`.
-- **Check** (accepted): show the issue text first, since a public repository's issue is public, then
-  open one issue in the reviewed repository with `gh issue create`. The body is the proposal, with
-  no standards entry and no private path. This is accepted work, so `working-a-pr`'s "no issue per
-  finding" rule does not apply. If the command fails, accepted entries stay, print the proposal
+  Why and source PRs. Change no other line. A hand-written file with themed headings keeps them: the
+  entry goes under the named heading and no `## Entries` is added. A file with no themed headings
+  gets `## Entries`. Only a file carrying the verbatim `No project entries yet.` is an ossify stub:
+  the first entry removes that sentence and starts `## Entries`.
+- **Check** (accepted, or edited to the operator's wording): only after the reply, open one issue in
+  the reviewed repository with `gh issue create`. The body is the issue text shown: the proposal,
+  with no standards entry and no private path. This is accepted work, so `working-a-pr`'s "no issue
+  per finding" rule does not apply. If the command fails, accepted entries stay, print the proposal
   text, end its log line `issue not opened: <why>`, and tell the operator. That line is not
   "accepted earlier" in §3.
 - **No reply:** print the proposals, write the run line (§5) and nothing else.
 - **No paired workspace, or no standards file:** print accepted entries and ask where they go. Never
   write them into the reviewed repository or create a standards file; a `reviewer-home.md` run owns
-  the stub. With no workspace there is no log.
+  the stub. Their log line ends `not written: no standards file`; with no workspace there is no log.
 
 ## 5. The retro log
 
