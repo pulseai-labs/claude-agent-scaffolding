@@ -30,6 +30,8 @@ jobs:
         with:
           # No step pushes/fetches with the token, so don't leave it in .git/config (#84).
           persist-credentials: false
+          # Two commits: a PR's merge commit and its base, for the added-fixture check (#1013).
+          fetch-depth: 2
 
       - name: Install Claude Code 2.1.289
         run: npm install --global @anthropic-ai/claude-code@2.1.289
@@ -59,6 +61,14 @@ jobs:
 
       - name: ossify suite
         run: bash ossify/tests/run-all.sh
+
+      - name: added eval fixtures have results
+        # A PR's checkout is its merge commit, so HEAD^1 is the base it merges into (#1013).
+        if: github.event_name == 'pull_request'
+        run: bash tests/check-added-fixture-results.sh HEAD^1 HEAD
+
+      - name: added-fixture check's own tests
+        run: bash tests/test-added-fixture-results.sh
 
       - name: claude-security-audit suite
         # Skip the wall-clock perf benchmark on shared runners (flaky vs the homelab
