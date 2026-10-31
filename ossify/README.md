@@ -1,4 +1,4 @@
-# ossify (v1.32.0)
+# ossify (v1.32.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -220,6 +220,12 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.32.1 (#922), the gate stops two wrong greens. `oss_verify_zero_tests_guard` now reads
+`node --test` as a command word, so a bare run of zero tests no longer passes `exit 0`. A plain `output contains` row whose
+last command is a named test runner now fails when the runner exits nonzero; to expect that exit, write
+`exit <n> and output contains <str>`. Other commands keep the plain row. One `lib/` file changes,
+no state change.
 
 Since 1.32.0 (#970), an OMP work-item close dispatches omp-roles 0.10.0's `verifier` agent
 (`task` with `agent: "verifier"`) and prints `verifier: ossify:verifier-agent on <model>`. OMP's

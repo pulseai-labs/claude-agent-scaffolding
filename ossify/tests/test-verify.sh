@@ -62,6 +62,26 @@ t_capture oss_verify_auto_step "$TMP" "true"                  "exit 0 and output
 t_capture oss_verify_auto_step "$TMP" "echo needle; exit 127" "output contains needle"; t_assert_rc 1 "output contains: rc 127 after printing the needle -> fail"
 t_capture oss_verify_auto_step "$TMP" "echo needle; exit 126" "output contains needle"; t_assert_rc 1 "output contains: rc 126 -> fail"
 t_capture oss_verify_auto_step "$TMP" "echo needle; exit 1"   "output contains needle"; t_assert_rc 0 "control: output contains still passes a refusal that exits 1"
+# A plain row on a named test runner reads the exit: one target's `test result: ok`
+# prints beside another's failure. A shell function stands in for the runner.
+FAKEC="cargo() { echo 'test result: ok'; exit 101; }"
+t_capture oss_verify_auto_step "$TMP" "$FAKEC; cargo test" "output contains test result: ok"; t_assert_rc 1 "plain row: cargo test exiting 101 with the needle -> fail"
+t_assert_contains "$T_OUT" "exit 101 and output contains" "plain row: the failure names the combined form"
+t_capture oss_verify_auto_step "$TMP" "node() { echo needle; exit 1; }; node --import tsx --test x.js" "output contains needle"; t_assert_rc 1 "plain row: node --test exiting 1 with the needle -> fail"
+t_capture oss_verify_auto_step "$TMP" "npx() { echo needle; exit 1; }; FOO=1 npx vitest run" "output contains needle"; t_assert_rc 1 "plain row: an env assignment and launcher still name the runner"
+t_capture oss_verify_auto_step "$TMP" "cargo() { echo 'test result: ok'; }; cargo test" "output contains test result: ok"; t_assert_rc 0 "control: a runner exiting 0 with the needle still passes"
+t_capture oss_verify_auto_step "$TMP" "cargo() { echo refused; exit 3; }; cargo test" "exit 3 and output contains refused"; t_assert_rc 0 "control: a runner's named nonzero exit still passes"
+t_capture oss_verify_auto_step "$TMP" "printf 'pytest refused\\n'; exit 1" "output contains refused"; t_assert_rc 0 "control: a printed runner name is not a runner"
+t_capture oss_verify_auto_step "$TMP" "mongo() { echo refused; exit 1; }; mongo test-db" "output contains refused"; t_assert_rc 0 "control: mongo test-db is not go test"
+t_capture oss_verify_auto_step "$TMP" "grep() { echo refused; exit 1; }; grep -r jest package.json" "output contains refused"; t_assert_rc 0 "control: a runner name as an argument is not a runner"
+t_capture oss_verify_auto_step "$TMP" "node() { echo refused; exit 1; }; node lint.js --testing-mode" "output contains refused"; t_assert_rc 0 "control: node with --testing-mode is not node --test"
+t_capture oss_verify_auto_step "$TMP" "node() { echo refused; exit 1; }; node cli.js --test" "output contains refused"; t_assert_rc 0 "control: --test after the script is the script's argument"
+t_capture oss_verify_auto_step "$TMP" "echo 'x; npm test refused'; exit 1" "output contains refused"; t_assert_rc 0 "control: a runner name inside quotes is not a runner"
+t_capture oss_verify_auto_step "$TMP" "pytest() { :; }; app() { echo refused; exit 2; }; pytest tests && app" "output contains refused"; t_assert_rc 0 "control: a later command's exit is not the runner's"
+t_capture oss_verify_auto_step "$TMP" "$FAKEC; cargo test --lib 2>&1" "output contains test result: ok"; t_assert_rc 1 "plain row: a fd redirect after the runner still names it"
+t_capture oss_verify_auto_step "$TMP" "$FAKEC; (cargo test)" "output contains test result: ok"; t_assert_rc 1 "plain row: a subshell runner as the last command still names it"
+t_capture oss_verify_auto_step "$TMP" "echo refused; bash test-x.sh; exit 1" "output contains refused"; t_assert_rc 0 "control: a repo's own bash test script may be a refusal AC"
+t_capture oss_verify_redgate "$TMP" "cargo() { echo needle; exit 101; }; cargo test" "output contains needle"; t_assert_rc 0 "redgate: a failing runner that prints the needle is RED, not already-GREEN"
 # Round 1 (#772): the 126/127 stop exists only because a PLAIN `output contains`
 # row reads no exit status. A row that names the exit has read one, and 126/127
 # are ordinary statuses there - the exit half decides.
@@ -680,5 +700,28 @@ t_assert_rc 1 "#496-R4 control: genuinely-run TAP records still count as executi
 printf 'ok 1 - real\nok 2 - skipped one # SKIP\n# pass 1\n# skip 1\n' > "$TMP/tap-mixed.out"
 t_capture bash "$OSSB" zero_tests_guard "npm test" < "$TMP/tap-mixed.out"
 t_assert_rc 1 "#496-R4 control: a real pass beside a SKIP still rescues"
+
+# #922: `node --test` is in the runner gate, so its zero marker can fire.
+printf '1..0\n# tests 0\n# suites 0\n# pass 0\n# fail 0\n' | oss_verify_zero_tests_guard "node --test"
+t_assert_eq "0" "$?" "#922: node --test TAP '# pass 0' is vacuous"
+printf 'ℹ tests 0\nℹ pass 0\nℹ fail 0\n' | oss_verify_zero_tests_guard "node --import tsx --test tests/"
+t_assert_eq "0" "$?" "#922: node --test spec reporter 'pass 0', flags before --test, is vacuous"
+printf '1..2\n# tests 2\n# pass 2\n# fail 0\n' | oss_verify_zero_tests_guard "node --test"
+t_assert_eq "1" "$?" "#922 control: a node --test run with passes is not vacuous"
+printf '1..1\n# tests 1\n# pass 0\n# fail 1\n' | oss_verify_zero_tests_guard "node --test"
+t_assert_eq "1" "$?" "#922 control: a node --test run that failed a test executed it"
+printf '# pass 0\n' | oss_verify_zero_tests_guard "node app.js"
+t_assert_eq "1" "$?" "#922 control: a plain node command is not a runner"
+printf '# pass 0\n' | oss_verify_zero_tests_guard "node lint.js --testing-mode"
+t_assert_eq "1" "$?" "#922 control: --testing-mode is not --test"
+printf '# pass 0\n' | oss_verify_zero_tests_guard "node cli.js --test"
+t_assert_eq "1" "$?" "#922 control: a script's own --test is not node --test"
+printf '# pass 0\n' | oss_verify_zero_tests_guard "node -e 'console.log(1) // --test'"
+t_assert_eq "1" "$?" "#922 control: quoted --test is not node --test"
+for c in "node --test; echo done" "(cd x && node --test)" "node --test|tee o" "node --test-reporter=tap --test x.js"; do
+  printf '# pass 0\n' | oss_verify_zero_tests_guard "$c"
+  t_assert_eq "0" "$?" "#922: '$c' reads as a zero-test node --test run"
+done
+t_capture oss_verify_auto_step "$TMP" "node() { printf '# pass 0\n'; }; node --test" "exit 0"; t_assert_rc 1 "#922: exit 0 on a zero-test node --test run fails as vacuous"
 
 rm -rf "$TMP"; t_summary
