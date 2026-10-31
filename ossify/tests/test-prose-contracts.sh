@@ -1836,6 +1836,9 @@ pin "$_WC951" 'When `OSSIFY_VERIFIER_MODEL` is set' "work-item-close §2 reads O
 pin "$_WC951" '`model: inherit` applies; print `verifier model: inherited (same as this' "work-item-close §2 prints the inherited-model notice (#951 D6)"
 pin "$_WC951" '`verifier: inline — <host or why>`' "work-item-close §2 names the inline fallback line (#951 D7)"
 pin "$_WC951" '`verifier: ossify:verifier-agent on <model>`' "work-item-close §2 names the dispatched-verifier summary line (#951 D4)"
+pin "$_WC951" '`agent: "verifier"` (omp-roles 0.10.0+), not the default `task` agent.' "work-item-close §2 dispatches the OMP verifier by agent name (#970)"
+pin "$_WC951" 'OMP with no `verifier` in `task`'"'"'s agent list' "work-item-close §2 keeps the inline route for an OMP without the agent (#970)"
+pin "$_WC951" '`task.agentModelOverrides.verifier`, else the session' "work-item-close §2 names OMP's model source (#970)"
 t_assert_eq 1 "$(awk '/^allowed-tools:/ && /, Task$/ {n++} END{print n+0}' "$HERE/../commands/close.md")" \
   "commands/close.md grants Task so a standalone /close can dispatch the verifier (#951)"
 pin "$SKILLS/close/SKILL.md" '`[mutation]`), and the `verifier:` line' "close SKILL.md §10's summary names the [mutation] tag and the verifier line (#951)"

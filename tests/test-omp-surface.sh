@@ -118,9 +118,27 @@ check_module() { # $1=root $2=plugins (spec B §5.1 check 6)
   done
 }
 
+check_verifier() { # $1=root $2=plugins; the verifier agent (#970): no task/ask/write, no hardcoded model, ossify's procedure and return
+  local r=$1 f="$1/omp-roles/agents/verifier.md" k tools p found=false va="$1/ossify/agents/verifier-agent.md"
+  [ -f "$f" ] || return 0
+  tools=$(fm_value "$f" tools | tr '[:upper:]' '[:lower:]')
+  for k in task ask write; do
+    printf '%s\n' "$tools" | tr ',[]\"\047' '     ' | awk -v k="$k" '{for (i=1;i<=NF;i++) if ($i==k) found=1} END {exit !found}' \
+      && echo "agent: omp-roles/agents/verifier.md grants $k"
+  done
+  [ -z "$(fm_value "$f" model)" ] || echo "agent: omp-roles/agents/verifier.md sets a model; it comes from config"
+  grep -Fq 'skill://close/references/impl-check.md' "$f" || echo "agent: omp-roles/agents/verifier.md does not point at skill://close/references/impl-check.md"
+  for p in $2; do [ -f "$r/$p/skills/close/references/impl-check.md" ] && found=true; done
+  $found || echo "agent: omp-roles/agents/verifier.md points at impl-check.md, which no gated plugin ships"
+  # One return contract in two files: the JSON lines must match ossify's verifier-agent.md exactly.
+  [ -f "$va" ] || { echo "agent: ossify/agents/verifier-agent.md missing"; return 0; }
+  [ -n "$(grep '^{"mode": "verified"' "$f")" ] && [ "$(grep '^{"mode":' "$f" | sort)" = "$(grep '^{"mode":' "$va" | sort)" ] \
+    || echo "agent: omp-roles/agents/verifier.md return shape differs from ossify/agents/verifier-agent.md"
+}
+
 check_agents() { # $1=root $2=plugins whose skills may be autoloaded
   local r=$1 f k tools skill p found
-  for k in implementer seat-reviewer; do
+  for k in implementer seat-reviewer verifier; do
     [ -f "$r/omp-roles/agents/$k.md" ] || echo "agent: omp-roles/agents/$k.md missing"
   done
   for f in "$r/omp-roles"/agents/*.md; do
@@ -129,6 +147,7 @@ check_agents() { # $1=root $2=plugins whose skills may be autoloaded
       [ -n "$(fm_value "$f" "$k")" ] || echo "agent: ${f#"$r"/} lacks frontmatter $k"
     done
   done
+  check_verifier "$r" "$2"
   f="$r/omp-roles/agents/implementer.md"
   [ -f "$f" ] || return 0
   tools=$(fm_value "$f" tools | tr '[:upper:]' '[:lower:]')
@@ -178,6 +197,10 @@ make_fixture() { # $1=dir
   mkdir -p "$d/omp-roles/agents"
   printf -- '---\nname: implementer\ndescription: Execute one work item.\ntools: read, write, bash\nautoloadSkills: [ossify-s]\n---\nBody.\n' > "$d/omp-roles/agents/implementer.md"
   printf -- '---\nname: seat-reviewer\ndescription: Review a diff.\ntools: read, grep, glob, bash, write\n---\nBody.\n' > "$d/omp-roles/agents/seat-reviewer.md"
+  mkdir -p "$d/ossify/agents" "$d/ossify/skills/close/references"
+  printf 'impl-check\n' > "$d/ossify/skills/close/references/impl-check.md"
+  printf -- '---\nname: verifier-agent\n---\n{"mode": "verified", "model": "m"}\n{"mode": "refused", "reason": "r"}\n' > "$d/ossify/agents/verifier-agent.md"
+  printf -- '---\nname: verifier\ndescription: Judge a work item.\ntools: read, edit, bash, glob, grep\n---\nread skill://close/references/impl-check.md\n{"mode": "verified", "model": "m"}\n{"mode": "refused", "reason": "r"}\n' > "$d/omp-roles/agents/verifier.md"
 }
 findings() { # $1=root $2=plugins -> all findings of all checks
   check_catalog "$1"; check_wrappers "$1" "$2"; check_descriptions "$1" "$2"; check_names "$1" "$2"; check_paths "$1" "$2"; check_module "$1" "$2"
@@ -219,6 +242,16 @@ control agent-missing-seat-reviewer "agent: omp-roles/agents/seat-reviewer.md mi
 for key in name description tools; do
   control "agent-frontmatter-$key" "agent: omp-roles/agents/seat-reviewer.md lacks frontmatter $key" "sed -i.bak '/^$key:/d' omp-roles/agents/seat-reviewer.md && rm omp-roles/agents/seat-reviewer.md.bak"
 done
+control agent-missing-verifier "agent: omp-roles/agents/verifier.md missing" 'rm omp-roles/agents/verifier.md'
+for tool in task ask write; do
+  control "verifier-grants-$tool" "agent: omp-roles/agents/verifier.md grants $tool" "sed -i.bak 's/^tools: .*/tools: read, edit, $tool/' omp-roles/agents/verifier.md && rm omp-roles/agents/verifier.md.bak"
+done
+control verifier-grants-Task "agent: omp-roles/agents/verifier.md grants task" 'sed -i.bak "s/^tools: .*/tools: read, edit, Task/" omp-roles/agents/verifier.md && rm omp-roles/agents/verifier.md.bak'
+control verifier-hardcoded-model "agent: omp-roles/agents/verifier.md sets a model" 'sed -i.bak "s/^tools: /model: some\/model\ntools: /" omp-roles/agents/verifier.md && rm omp-roles/agents/verifier.md.bak'
+control verifier-no-pointer "does not point at skill://close/references/impl-check.md" 'sed -i.bak "s|skill://close/references/impl-check.md|nowhere|" omp-roles/agents/verifier.md && rm omp-roles/agents/verifier.md.bak'
+control verifier-dangling-pointer "points at impl-check.md, which no gated plugin ships" 'rm ossify/skills/close/references/impl-check.md'
+control verifier-return-drift "return shape differs" 'sed -i.bak "s/\"reason\": \"r\"/\"reason\": \"x\"/" omp-roles/agents/verifier.md && rm omp-roles/agents/verifier.md.bak'
+control verifier-return-gone "return shape differs" 'sed -i.bak "/^{\"mode\"/d" omp-roles/agents/verifier.md && rm omp-roles/agents/verifier.md.bak'
 for tool in task ask; do
   control "agent-tool-$tool" "agent: omp-roles/agents/implementer.md grants $tool" "sed -i.bak 's/^tools: .*/tools: read, $tool, write/' omp-roles/agents/implementer.md && rm omp-roles/agents/implementer.md.bak"
 done
