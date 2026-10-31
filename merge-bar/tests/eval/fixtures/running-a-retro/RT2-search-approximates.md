@@ -6,7 +6,7 @@ expected_reason: "Old wording survives beside its replacement" is in #131, #134 
 The operator runs `/merge-bar:retro --last 10` today, 2026-10-31, in `/home/dev/projects/widgets`
 of the repo `acme/widgets`. Its parent directory holds `widgets/` and `widgets-ai/`;
 `widgets-ai/.workspace/pairing.json` has `canonical.name` = "widgets", and only it matches.
-`gh pr list --state merged --limit 10` returns #131 to #140.
+`gh pr list --state merged --limit 5000 --json number,mergedAt`, sorted on `mergedAt`, ends in #131 to #140 as its last ten.
 
 What existed before the run, in `widgets-ai/`:
 

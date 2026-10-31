@@ -13,15 +13,17 @@ Retro: repeated review findings become proposed rules, written only when the ope
   mechanical one, every proposal citing its PRs. A proposal is never a rule until the operator
   replies to it in the session; the skill writes no code and builds no check. Accepted entries go
   to the paired workspace's standards file, and each answer is recorded in `retro-log.md` beside
-  the review ledger so a later retro does not raise a rejected class again. (#985)
+  the review ledger, so a later retro does not raise a rejected class again unless a newer PR shows
+  it; with no paired workspace there is no log. (#985)
 - The skill quotes the skill-first headline verbatim for its check test; `docs/conventions/skill-first.md`
-  now lists that quote among the sanctioned copies, because repo-root docs do not ship with a plugin.
+  now names it as the one exception, because repo-root docs do not ship with a plugin.
 - Evals: `running-a-retro` fixtures RT1-RT11 with a rubric, and two baselines. The behaviour evals
   are in `tests/eval/` and are session-driven: CI does not run them.
-- Agent-loaded bytes, `skills/**` against 0.7.0 (`wc -c`). The skill is 131 lines against a 120
+- Agent-loaded bytes, `skills/**` against 0.7.0 (`wc -c`). The skill is 135 lines against a 120
   target because the check test's two arms and the acceptance cases each need their own paragraph:
-  - `skills/running-a-retro/SKILL.md` — 0 → 8578 (+8578)
-  - `skills/running-a-retro/agents/openai.yaml` — 0 → 139 (+139)
+  - `skills/running-a-retro/SKILL.md` — 0 → 8951 (+8951)
+  - `skills/running-a-retro/agents/openai.yaml` — 0 → 157 (+157)
+  - `commands/retro.md` — 0 → 622 (+622)
   - the other skills are unchanged.
 
 ## 0.7.0

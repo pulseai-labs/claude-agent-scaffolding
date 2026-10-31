@@ -1,10 +1,10 @@
 ---
 scenario_id: RT5-sources-thin-or-foreign
 expected_outcome: continue-and-name-the-cause
-expected_reason: three variants, each answered on its own. A) the ledger names a report file that is not on disk: the run continues from the ledger and the other report, says the file is missing, and still proposes the class that two PRs show. B) `--reports` holds two reports whose PR header names another repository, one with the template header and one file with no `PR:` header at all: all four are skipped and counted (4 skipped), and the two reports for acme/widgets are read. C) `gh` is unavailable and the ledger is empty: zero proposals, and the read-out names those two causes, not "no history". In every variant nothing is written without a reply
+expected_reason: four variants, each answered on its own. A) the ledger names a report file that is not on disk: the run continues from the ledger and the other report, says the file is missing, and still proposes the class that two PRs show. B) `--reports` holds two reports whose PR header names another repository, one with the template header and one file with no `PR:` header at all: all four are skipped and counted (4 skipped), and the two reports for acme/widgets are read. C) `gh` is unavailable and the ledger is empty: zero proposals, and the read-out names those two causes, not "no history". D) `gh` is unavailable and the ledger is populated: the window is undetermined and the read-out says so, every ledger line counts, and the class that #184 and #188 show is proposed. In every variant nothing is written without a reply
 ---
-Three separate runs, each with its own state; answer each as its own run and label the
-answers A, B and C. All run today, 2026-10-31, from `/home/dev/projects/widgets` of the repo
+Four separate runs, each with its own state; answer each as its own run and label the
+answers A, B, C and D. All run today, 2026-10-31, from `/home/dev/projects/widgets` of the repo
 `acme/widgets`; its parent directory holds `widgets/` and `widgets-ai/`, and
 `widgets-ai/.workspace/pairing.json` has `canonical.name` = "widgets" (only that directory
 matches). In every variant `CODING_STANDARDS.md` in `widgets-ai/` has `## Entries` with one
@@ -31,3 +31,8 @@ and which has no `PR:` line anywhere.
 **Variant C.** Command: `/merge-bar:retro`. `gh` is not available in this environment: `gh`
 exits with "command not found". `review-ledger.md` exists, headed `# Review ledger — widgets`,
 with no lines. There is no `--reports` flag. No other review ledger exists in `widgets-ai/`.
+
+**Variant D.** Command: `/merge-bar:retro --last 10`. `gh` is not available: it exits with
+"command not found". `review-ledger.md` has lines for #184 and #188, both blocking "Timeout
+swallowed and reported as success", with reports on disk that hold the class as C3 and C1. There
+is no `--reports` flag.

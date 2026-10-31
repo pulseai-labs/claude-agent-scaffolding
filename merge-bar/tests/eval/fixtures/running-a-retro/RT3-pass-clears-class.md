@@ -6,7 +6,7 @@ expected_reason: "New environment variable is undocumented" is in #141, #146 and
 The operator runs `/merge-bar:retro --last 10` today, 2026-10-31, in `/home/dev/projects/widgets`
 of the repo `acme/widgets`. Its parent directory holds `widgets/` and `widgets-ai/`;
 `widgets-ai/.workspace/pairing.json` has `canonical.name` = "widgets", and only it matches.
-`gh pr list --state merged --limit 10` returns #141 to #150.
+`gh pr list --state merged --limit 5000 --json number,mergedAt`, sorted on `mergedAt`, ends in #141 to #150 as its last ten.
 
 What existed before the run, in `widgets-ai/`:
 

@@ -11,9 +11,10 @@ Pass = all ≥ 4.
    is by meaning, not wording; every proposal's Sources line names PR numbers.
 2. **sort_outcome** — each candidate lands in exactly one outcome: a check only when the check
    test passes; a standards entry when it is judgment and no existing entry covers it; a covered
-   judgment class gives one read-out line and no duplicate entry; a covered class a check could
-   decide is a check proposal; a class the log rejected earlier (no newer PR shows it) or accepted
-   earlier gives one read-out line and no proposal; one proposal per class, in the proposal
+   judgment class (an accepted entry in the log and file counts) gives one read-out line and no
+   duplicate entry; a covered class a check could
+   decide is a check proposal; a class the log rejected earlier (no newer PR shows it) or a check it
+   accepted or edited earlier gives one read-out line and no proposal; one proposal per class, in the proposal
    shape's field names.
 3. **check_test** — mechanical first: a class whose detection needs meaning, or that a search can
    only approximate, is an entry, not a check; a check whose pass would mark a class clear for the
