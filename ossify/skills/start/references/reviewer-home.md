@@ -21,8 +21,12 @@ Nothing here lands in a declared repo.
   `close/references/harvest.md`, "Where the bank is". No other path logic.
 - **Never overwrite.** An occupied destination is named and asked about, per
   `occupied-destinations.md`. A kept file is left as it is.
-- **Refuse and write nothing** when posture marks the AI workspace root as public, or when
-  `oss repo_root ai_workspace` equals the root of a declared repo. Say why, and stop.
+- **Refuse and write nothing** when posture marks the AI workspace as public, or when the AI
+  workspace root or the resolved memory bank is a declared repo's root or inside one. The memory
+  bank can route into a repo (`harvest.md`), and an AI workspace can sit inside a repo's tree, so
+  comparing workspace roots alone lets the ledger and `## Review` land in a declared repo. Say why.
+  The refusal stops these three outputs only: the rest of the ceremony continues, and the hand-off
+  names what was not seeded.
 
 ## 2. The standards stub
 
@@ -38,7 +42,8 @@ Three parts and nothing else. No fill-in markers, no `TODO`, no empty rule headi
    `03-code-patterns.md`. The `03-code-patterns.md` line is written whenever that file exists, even
    when this run authored it with an empty machine-checkable rules section, because crew's
    verifier stops at the first standards file and so reads the stub instead of `03-code-patterns.md`.
-   Every other pointer needs its file to exist and carry rules. Pointers only. Never copy a
+   Every other pointer needs its file to exist and carry rules. Write each pointer as a resolved path,
+   relative to the AI workspace root or naming the repo, never a `<placeholder>`. Pointers only. Never copy a
    project doc or merge-bar's baseline into the stub. When no pointer can be written, keep the
    heading and say in one sentence that the project has no such docs yet.
 3. **One sentence of current state**, verbatim: `No project entries yet. Entries come from review findings that recur, accepted by the operator.`
@@ -78,10 +83,13 @@ A finding becomes a proposal only when it recurs in two or more PRs. Each propos
 the rule, the **Why** and the source PRs. The operator accepts, edits or rejects each one.
 Only accepted entries are written. They go under `## Entries` in `CODING_STANDARDS.md`. In a stub
 this run wrote, the first accepted entry removes the stub's `No project entries yet.` sentence, which
-the entry makes false. Never edit a pre-existing standards file.
+the entry makes false. A `CODING_STANDARDS.md` that still carries the verbatim
+`No project entries yet.` sentence is an ossify stub: it takes accepted entries like a stub this run
+wrote, and the first one removes the sentence. Only a file without that sentence counts as an
+existing standards file, which is never edited.
 
 When `CODING_STANDARDS.md` already exists, write nothing to it. List the proposals in `ADOPTION.md`
-for the operator to place. `<m>` counts entries written to the file, so it is 0 here, and the result
+for the operator to place; with no `ADOPTION.md` (§6), list them directly below the result line. `<m>` counts entries written to the file, so it is 0 here, and the result
 line says where the proposals went (below).
 
 Adopt never overwrites: on an adopted project `08-governance.md` is occupied, so append its
@@ -99,7 +107,7 @@ For a project ossify already started or adopted. Follow §1–§5 as written, wi
 
 - Run no adopt station. Append the `## Review` section with no provenance trailer: adopt's
   `source: adoption` and `r0 baseline` do not apply to a project it did not adopt.
-- `ADOPTION.md` may not exist. Record the result line as a fifth line in the `## Review` section
-  of `08-governance.md`, the section that holds the four lines of §4.
+- `ADOPTION.md` may not exist. Record the result line as the last line of the `## Review` section
+  of `08-governance.md`; with an existing standards file, list the proposals directly below it.
 - When `08-governance.md` has no `## Review` section, add it, as part of seeding the project.
   Never edit any other part of the file.

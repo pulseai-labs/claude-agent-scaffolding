@@ -1,7 +1,7 @@
 ---
 scenario_id: W9-pairing-roots-from-another-machine
 expected_outcome: locate-workspace-by-name-write-there
-expected_reason: the sibling widgets-ai directory is this repo's pairing workspace by name and location, so the [KL] line goes to its .claude/memory-bank/tech-debt.md; the manifest's /Users/draco/... roots belong to another machine and are never followed, and nothing is written into the reviewed widgets repository
+expected_reason: the sibling widgets-ai directory is this repo's pairing workspace by name and location, so the [KL] line goes to its .claude/memory-bank/tech-debt.md; the manifest's /Users/draco/... roots belong to another machine and are never followed, and nothing is written into the reviewed widgets repository; the review-ledger line is also written to that workspace
 ---
 PR #41 in the repo `acme/widgets` has just merged on the operator's ack. Its final body's
 Known limits lists one line: "- Symlinks that point outside the export root are refused —
