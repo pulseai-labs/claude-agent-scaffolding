@@ -124,8 +124,10 @@ oss_cmd_feature_add() { # $1=name $2=value $3=class-guess $4=source [$5=intake-i
     echo "oss: feature_add takes at most 5 arguments - usage: oss feature_add <name> <value> <class-guess> <source> [intake-issue]; quote a value that contains spaces" >&2; return 2; }
   local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_add_feature "$sf" "$1" "$2" "$3" "$4" "${5:-}"
 }
+# The state could not be found, so nothing was checked: rc 2, whatever the resolver
+# returned. Its refusal is rc 1, and rc 1 here means "clean" (#872).
 oss_cmd_touch_check() { # $@=paths
-  local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_touch_check "$sf" "$@"
+  local sf; sf="$(_oss_resolve_state)" || return 2; oss_reg_touch_check "$sf" "$@"
 }
 oss_cmd_ledger_add_auto() { # $1=spine $2=text $3=command $4=expected [$5=planned|active]
   _oss_need 4 ledger_add_auto "<spine> <text> <command> <expected> [planned|active]" "$@" || return 2;
@@ -152,10 +154,11 @@ oss_cmd_fake_status()          { _oss_need 3 fake_status "<boundary> <active|rep
 # The two release-close blocking gates (§6.2 steps 3 and 4). Both are rc 0 =
 # CLEAN / 1 = BLOCKING / 2 = could-not-check - the OPPOSITE polarity to
 # `touch_check`, which is 0 = hit. Read-only selectors: no mutation, no op.
-oss_cmd_expired_fakes()        { _oss_need 1 expired_fakes "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_reg_expired_fakes "$sf" "$1"; }
-oss_cmd_expired_quarantines()  { _oss_need 1 expired_quarantines "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_expired_quarantines "$sf" "$1"; }
+# A state that cannot be found is rc 2 here too, never a bare rc 1 that reads as blocking (#872).
+oss_cmd_expired_fakes()        { _oss_need 1 expired_fakes "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return 2; oss_reg_expired_fakes "$sf" "$1"; }
+oss_cmd_expired_quarantines()  { _oss_need 1 expired_quarantines "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return 2; oss_ledger_expired_quarantines "$sf" "$1"; }
 oss_cmd_ledger_defer()      { _oss_need 4 ledger_defer "<line> <spine> <operator-reason> <release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_defer "$sf" "$1" "$2" "$3" "$4"; }
-oss_cmd_expired_deferrals() { _oss_need 1 expired_deferrals "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_expired_deferrals "$sf" "$1"; }
+oss_cmd_expired_deferrals() { _oss_need 1 expired_deferrals "<release>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return 2; oss_ledger_expired_deferrals "$sf" "$1"; }
 oss_cmd_ledger_escape() { _oss_need 4 ledger_escape "<line> <spine> <escape-clause> <operator-reason>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_ledger_escape "$sf" "$1" "$2" "$3" "$4"; }
 oss_cmd_patch_add() { # $1=commit $2=text [$3=repo-key]
   _oss_need 2 patch_add "<commit-sha> <text> [repo-key]" "$@" || return 2;

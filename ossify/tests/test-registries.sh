@@ -671,5 +671,18 @@ t_assert_rc 0 "631: a pre-1.23.0 add_feature (no issue key) replays clean"
 t_assert_eq "false" "$(jq -c '.feature_map[0] | has("issue")' "$SL")" "631: ...and gains no issue key"
 rm -rf "$TF" "$TL"
 
+# #872: no topology on the walk-up path is "could not check". The resolver's refusal
+# is rc 1, which is touch_check's "clean" and the expired gates' "blocking".
+mkdir -p "$TMP/no-topology"
+for verb in "touch_check src/x.rs" "expired_fakes r0" "expired_quarantines r0" "expired_deferrals r0"; do
+  # shellcheck disable=SC2086
+  t_capture env -u OSS_STATE_FILE bash -c 'cd "$1" && shift && exec bash "$@"' _ "$TMP/no-topology" "$OSS" $verb
+  t_assert_rc 2 "#872: $verb with no topology is rc 2, could not check"
+  t_assert_contains "$T_OUT" "topology declaration" "#872: $verb still prints the refusal"
+done
+printf '{"bones":[],"risk_gates":[]}\n' > "$TMP/empty-reg.json"
+t_capture env OSS_STATE_FILE="$TMP/empty-reg.json" bash "$OSS" touch_check src/x.rs
+t_assert_rc 1 "#872 control: a readable state with no match is still rc 1, clean"
+
 rm -rf "$TMP"
 t_summary
