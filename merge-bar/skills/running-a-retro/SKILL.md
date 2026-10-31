@@ -13,34 +13,30 @@ is not a reply. You write no code and build no check.
 
 ## 1. Window
 
-Default: the last 30 merged PRs of the current repository, ordered by merge date.
-`--last N` or `--since <PR or date>` replaces it; resolve a date with `gh pr list --state
-merged --json number,mergedAt`, sorted on `mergedAt` (the listing does not sort by merge date).
-The read-out states the first PR, the last PR and the count; without `gh` it says the window
-could not be determined.
+Default: the last 30 merged PRs of the current repository. `--last N` or `--since <PR or date>`
+replaces it. List with `gh pr list --state merged --limit 500 --json number,mergedAt`, sort on
+`mergedAt` and take the last N (or those since the PR or date); the default listing is 30, ordered
+by creation, not merge date. The read-out states the first PR, the last PR and the count; without
+`gh` it says the window could not be determined.
 
 ## 2. Sources
 
-Find the paired workspace as `../working-a-pr/SKILL.md` §5 does (a directory next to this
-repository whose `.workspace/pairing.json` has `canonical.name` equal to this repository's name,
-or through `.ossify/topology.json`; match by name and location). **Several directories match
-(worktrees of one workspace): ask which one before you read anything.** Read and write only
-that checkout; the read-out names it.
+Find the paired workspace as `../working-a-pr/SKILL.md` §5 does (match by name and location).
+**Several directories match (worktrees of one workspace): ask which one before you read
+anything.** Read and write only that checkout; the read-out names it.
 
-Every source is optional; the read-out names what you read and what you did not find. Cheapest
-first:
+Every source is optional; the read-out names what you read and what you did not find. Cheapest first:
 
 1. The workspace's `.claude/memory-bank/review-ledger.md`: class names, rulings, report paths.
    Its line format is owned by `working-a-pr` §5.
-2. An older review ledger in the workspace, read by meaning and only for PRs in the window: find
-   the window's PR numbers first, never read a large file whole.
+2. An older review ledger in the workspace, read by meaning for PRs in the window only; never
+   read a large file whole.
 3. Review reports: the paths the ledger names, plus every report under `--reports <dir>` whose
-   `PR:` header names this repository and a PR in the window. The shape is owned by
-   `../reviewing-a-pr/references/report.md`. A header naming another repository, or the template
+   `PR:` header names this repository and a PR in the window (shape owned by
+   `../reviewing-a-pr/references/report.md`). A header naming another repository, or the template
    header, is skipped and counted. A missing path is a read-out line, never a stop.
 4. `[KL]` and `[TD]` lines in `tech-debt.md` that name a PR in the window.
-5. PR comments and review bodies through `gh` for PRs in the window. If `gh` is unavailable, say
-   so.
+5. PR comments and review bodies through `gh` for PRs in the window; say so if `gh` is unavailable.
 
 Read headings and `Rule:` lines first; open site lists only for candidate classes.
 
@@ -49,22 +45,21 @@ Read headings and `Rule:` lines first; open site lists only for candidate classe
 1. **Group** findings by defect, by meaning, not wording.
 2. **Count.** A group is a candidate only with **two or more distinct PRs**. Rounds of one PR
    count once; a ruling counts as a finding. A class a report refuted, or a disposition marked
-   invalid, is not evidence of a defect: when it repeats, give it one reviewer-noise line in the
-   read-out and no proposal.
+   invalid, is no evidence of a defect: when it repeats, give it one reviewer-noise line and no
+   proposal.
 3. **Sort** each candidate into one outcome, one proposal per class:
-   - **Check** — the check test below passes. A judgment class never becomes a check.
+   - **Check** — the check test below passes. A judgment class never becomes one.
    - **Standards entry** — judgment, and no existing entry in the workspace's
      `CODING_STANDARDS.md` covers it.
    - **Covered, still recurring** — an entry covers a judgment class: one read-out line, no
      duplicate entry. A covered class a check could decide is a **check** proposal.
    - **Rejected earlier** / **Accepted earlier** — per the retro log, when it exists: one read-out
      line (naming the issue, if any), no proposal, unless a PR merged after a rejection shows the
-     class again.
+     class again; the proposal then says so.
 
 **The check test.** It applies even where a project exempts test or CI tooling. The rule, verbatim:
 "Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when it is a mechanical check that can only add a stop."
-A project's own `docs/conventions/skill-first.md`, when it exists, supplies the question number to
-cite; it does not change the test.
+A project's `docs/conventions/skill-first.md`, if any, supplies the question number to cite.
 
 1. **Mechanical first.** Can a check decide the class without reading meaning? A search that only
    approximates the class fails here, and so does a check whose pass would mark a class clear for
@@ -87,22 +82,45 @@ Misses: <what it leaves to the reviewer>              ← check
 False stops: <what it wrongly stops | none>           ← check, stop only
 ```
 
-A source needs a PR number; add a class ID when a report supplies it.
+A source needs a PR number; add a class ID when a report has one.
 
 ## 4. Acceptance
 
-Not yet written. This version prints the proposals and writes nothing: no standards entry, no
-issue, no log.
+Show all proposals at once; the operator answers each: accept, edit or reject. Leave workspace
+files uncommitted and name them to the operator. Act on answered ones only. An unanswered proposal gets no action and no log line, and is raised on the next run.
+
+- **Entry** (accepted, or edited to the operator's wording): insert one line under the named
+  existing heading of the workspace's `CODING_STANDARDS.md`, in the file's own entry shape, with its
+  Why and source PRs. Change no other line. A hand-written file with themed headings and no
+  `## Entries` keeps them: the entry goes under the named heading and no `## Entries` is added.
+  Only a file carrying the verbatim `No project entries yet.` is an ossify stub: the first entry removes
+  that sentence and starts `## Entries`.
+- **Check** (accepted): show the issue text first, since a public repository's issue is public, then
+  open one issue in the reviewed repository with `gh issue create`. The body is the proposal, with
+  no standards entry and no private path. This is accepted work, so `working-a-pr`'s "no issue per
+  finding" rule does not apply. If the command fails, accepted entries stay, print the proposal
+  text, end its log line `issue not opened: <why>`, and tell the operator. That line is not
+  "accepted earlier" in §3.
+- **No reply:** print the proposals, write the run line (§5) and nothing else.
+- **No paired workspace, or no standards file:** print accepted entries and ask where they go. Never
+  write them into the reviewed repository or create a standards file; a `reviewer-home.md` run owns
+  the stub. With no workspace there is no log.
 
 ## 5. The retro log
 
-Not yet written. This version creates no log.
+`retro-log.md` beside the review ledger, created with `# Retro log — <repo>` when absent. Write
+it once, at the end of the run, uncommitted: one run line, then one line per answered proposal.
+
+```
+- <YYYY-MM-DD> — run — window #first–#last, <n> PRs — read: <sources> — missing: <sources | none>
+- <YYYY-MM-DD> — accepted | edited | rejected — entry | check — <class> — PRs #a, #b — <heading | issue #N | reason>
+```
 
 ## 6. The read-out
 
 End with: the window (first PR, last PR, count); the checkout you read; sources read and sources
 missing or unavailable, each with its cause; reports skipped (another repository, template
-header, or outside the window), counted; proposal counts by outcome; the files changed
-(none in this version). Give the covered-still-recurring and reviewer-noise lines here. Zero
-proposals is a correct result when the history is thin: the read-out names every cause that applies (too few
-PRs, nothing repeats, a source missing, `gh` unavailable), never just "no history".
+header, or outside the window), counted; proposal counts by outcome; the files changed. Give the
+covered-still-recurring and reviewer-noise lines here. Zero proposals is a correct result when
+the history is thin: name every cause that applies (too few PRs, nothing repeats, a source
+missing, `gh` unavailable), never just "no history".
