@@ -5,14 +5,16 @@ Executed by Claude Code in an interactive session. No API runner, and nothing in
 
 ## Procedure
 
-For each surface in `[opening-a-pr, working-a-pr, setting-up-reviewers, reviewing-a-pr]`,
+For each surface in `[opening-a-pr, working-a-pr, setting-up-reviewers, reviewing-a-pr, running-a-retro]`,
 for each `fixtures/<surface>/*.md`:
 
 1. **Apply the skill.** Dispatch a fresh general-purpose agent: "Read
    `merge-bar/skills/<surface>/SKILL.md` and every file under its `references/` end to end
    (for working-a-pr also `merge-bar/skills/opening-a-pr/references/pr-body.md`; for
    reviewing-a-pr every file under `merge-bar/skills/reviewing-a-pr/`, and that same
-   `pr-body.md`). Apply ONLY that skill's documented procedure to this scenario. Output what
+   `pr-body.md`; for running-a-retro every file under `merge-bar/skills/running-a-retro/`, plus
+   `merge-bar/skills/working-a-pr/SKILL.md` and
+   `merge-bar/skills/reviewing-a-pr/references/report.md`, which it points at). Apply ONLY that skill's documented procedure to this scenario. Output what
    the skill would do and produce, in order. Do not improvise beyond the skill body. Read
    nothing under `merge-bar/tests/eval/` — the fixtures, rubrics and results there are the
    answer key.
@@ -35,11 +37,12 @@ whole surface is re-run.
 
 **Baseline runs** write to `results/baseline/` and use the same judge with a different step 1.
 They establish that a fixture discriminates, by running it against the behaviour the skill
-replaces. Five fixtures carry baselines, each judged with its own surface's rubric:
+replaces. Seven fixtures carry baselines, each judged with its own surface's rubric:
 
 - `W1` and `W6` — the invoke agent reads `ossify/skills/work-pr/references/loop.md` end to end instead
   of any merge-bar skill, and is told to apply only that loop's documented procedure.
-- `O1` — the invoke agent gets no skill: "You are a coding agent. Do what the operator asks."
+- `O1`, `RT2` and `RT7` — the invoke agent gets no skill: "You are a coding agent. Do what the operator asks."
+  Expected: RT2 fails at least one criterion.
 - `R1` and `R3` — the invoke agent reads OMP's stock reviewer prompts at tag `v18.11.3`,
   `packages/coding-agent/src/prompts/agents/reviewer.md` and
   `packages/coding-agent/src/prompts/review-request.md`

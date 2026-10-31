@@ -2,6 +2,30 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.8.0
+
+Retro: repeated review findings become proposed rules, written only when the operator accepts.
+
+- New skill `running-a-retro` and command `/merge-bar:retro [--last N | --since <PR or date>] [--reports <dir>]`
+  — reads one project's review record (review ledger, review reports, tech-debt lines, PR
+  comments) over a window of merged PRs, finds defect classes that repeat across two or more PRs,
+  and proposes a coding-standards entry for a judgment class no entry covers and a deterministic
+  check for a class that passes its check test, every proposal citing its PRs. A proposal is never a rule until the operator
+  replies to it in the session; the skill writes no code and builds no check. Accepted entries go
+  to the paired workspace's standards file, and each answer is recorded in `retro-log.md` beside
+  the review ledger, so a later retro does not raise a rejected class again unless a newer PR shows
+  it; with no paired workspace there is no log. (#985)
+- The skill quotes the skill-first headline verbatim for its check test; `docs/conventions/skill-first.md`
+  now names it as the one exception, because repo-root docs do not ship with a plugin.
+- Evals: `running-a-retro` fixtures RT1-RT11 with a rubric, and two baselines. The behaviour evals
+  are in `tests/eval/` and are session-driven: CI does not run them.
+- Agent-loaded bytes, `skills/**` against 0.7.0 (`wc -c`). The skill is 137 lines against a 120
+  target because the check test's two arms and the acceptance cases each need their own paragraph:
+  - `skills/running-a-retro/SKILL.md` — 0 → 9151 (+9151)
+  - `skills/running-a-retro/agents/openai.yaml` — 0 → 157 (+157)
+  - `commands/retro.md` — 0 → 622 (+622)
+  - the other skills are unchanged.
+
 ## 0.7.0
 
 Review ledger: every merged PR leaves one line in the paired workspace's review ledger.
