@@ -59,10 +59,13 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
 # Run one AC in $1 and check it. EVERY arm fails closed: an unrecognized or
 # malformed expectation is rc 2, never a pass. This is the ledger.sh lesson -
 # a `case` with no default arm counted an unknown expectation as green.
-# The real runners only. `bash .*test` stays out: a repo's own `test-*.sh` script
-# can be the subject of a refusal AC.
+# The real runners only, as a command word: at the start of the text or after a
+# shell separator, past env assignments and a launcher. Text that merely mentions
+# one (`mongo test-db`, `grep -r jest package.json`, a printed message) is not a
+# runner. `bash .*test` stays out: a repo's own `test-*.sh` script can be the
+# subject of a refusal AC. A form this misses keeps the plain row.
 _oss_verify_names_runner() { # $1=command
-  grep -Eq 'pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|ctest|dotnet test|node .*--test' <<<"$1"
+  grep -Eq '(^|[;&|(])[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*((npx|uv run|poetry run|pipenv run|python3? -m)[[:space:]]+)?(pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|ctest|dotnet test|node( [^;&|]*)? --test)([[:space:]=;&|)]|$)' <<<"$1"
 }
 
 oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail, 2 malformed
@@ -183,7 +186,7 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
 # pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
 oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   local out; out="$(cat)"
-  grep -Eq 'pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test|node .*--test' <<<"$1" || return 1
+  grep -Eq 'pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test|node( [^;&|]*)? --test([ =]|$)' <<<"$1" || return 1
   # Zero markers are the runners' real exit-0 nothing-ran phrases, swept in PR
   # #496 round 1: nextest's `Starting 0 tests`/`0 tests run`, go's `? pkg
   # [no test files]`, ctest's `No tests were found`, VSTest's `No test is
