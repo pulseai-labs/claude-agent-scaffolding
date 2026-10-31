@@ -24,6 +24,7 @@ Everything else is non-blocking.
 | `opening-a-pr` | `/merge-bar:open-pr` | Writes the seven-field body (Claim, Scope, Known limits, Merge danger, Merge bar, Evidence, Closes) and opens the PR |
 | `working-a-pr` | `/merge-bar:work-pr <PR>` | Works the PR to mergeable against its own bar; merges a two-way door on your ack, or under a standing order in the project's memory bank or `AGENTS.md` that binds this role and grants merge authority; a one-way door goes to the merge holder |
 | `reviewing-a-pr` | `/merge-bar:review-pr <PR>` | Reviews the PR as defect classes with every site, each sorted against its own bar, in two fresh-context axes (standards, and the Claim or spec); round 2+ reviews only the fix diff and each prior class's closure. Reports only |
+| `running-a-retro` | `/merge-bar:retro [--last N \| --since <PR or date>]` | Reads the project's review record over a window of merged PRs; proposes a coding-standards entry or a deterministic check for each class that repeats across two or more PRs, each citing its PRs. Writes only what you accept |
 | `setting-up-reviewers` | `/merge-bar:setup-reviewers` | Once per repository: `AGENTS.md` review rules, and `.coderabbit.yaml` if public |
 
 On Codex, invoke the skills by name.
@@ -41,6 +42,8 @@ out-of-scope issue as a `[TD]` line, to the paired AI workspace's
 `.claude/memory-bank/tech-debt.md`. With no paired workspace it prints them and asks. It never
 writes them into the reviewed repository. It also appends one line per merged PR to the same
 workspace's `.claude/memory-bank/review-ledger.md`, found the same way and left uncommitted.
+`running-a-retro` records each accepted and rejected proposal in the same workspace's
+`.claude/memory-bank/retro-log.md`, so a later retro does not raise a rejected class again.
 
 ## Tests
 
