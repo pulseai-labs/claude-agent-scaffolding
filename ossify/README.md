@@ -1,4 +1,4 @@
-# ossify (v1.31.1)
+# ossify (v1.32.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -183,7 +183,7 @@ in a `settings.json` env block to run it on another model; unset, it inherits th
 and the close says so. The close fingerprints the worktree before the dispatch and halts if
 the verifier leaves it changed. A test that stays green under a mutation whose evidence holds
 all three conditions halts as a fifth tag, `[mutation]`. Where no agent can be dispatched
-(Codex, OMP, a subagent context) the close runs the same checks itself and prints
+(Codex, OMP without omp-roles' `verifier` agent, a subagent context) the close runs the same checks itself and prints
 `verifier: inline`; inside an `--external-executor` lane Layers 3 and 4 stay in the closing
 session and the caller's verifier owns mutation. No `lib/` code, no state change.
 
@@ -220,6 +220,11 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.32.0 (#970), an OMP work-item close dispatches omp-roles 0.10.0's `verifier` agent
+(`task` with `agent: "verifier"`) and prints `verifier: ossify:verifier-agent on <model>`. OMP's
+`task` takes no model, so the model is `task.agentModelOverrides.verifier` in omp's config, else
+the session's; `OSSIFY_VERIFIER_MODEL` does not apply there. No `lib/` code, no state change.
 
 Since 1.31.1 (#971), a `[rule]` or `[mutation]` halt in `verify.md` is a durable rejection on
 re-entry, as `[fidelity]` already was: the inventory routes the item `halt:close-rejected`, so a
