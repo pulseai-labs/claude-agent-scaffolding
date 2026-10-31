@@ -2,6 +2,10 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.9.1
+
+**The status block's fields can run for several lines (#994, with seat-mods 0.13.0).** `SKILL.md` §8 says so, and several decisions go one numbered item each. Text only.
+
 ## 0.9.0
 
 **Two new built-in roles, for baton (#993).**

@@ -12,7 +12,7 @@ export const STATUS_LABELS: readonly string[] = [
   'Waiting on operator:',
 ]
 
-export const STATUS_CONTEXT = 'seat-mods (orchestrator): this is a status turn — no operator typed it. Use tool calls only and write no narration. End the turn with only the status block, these five fields, one per line, in this order (a blank line between fields is allowed): **What I ruled:** / **What the PR(s) will carry:** / **Next steps:** / **Waiting on (seats live):** / **Waiting on operator:** — each with content ("none" is content) and nothing before or after. **Waiting on operator:** takes "none", "decision: <question>" or "action: <what the operator must do>". A block that waits on no seat and no operator decision or action while its Next steps names work is not a turn end: do that work first.'
+export const STATUS_CONTEXT = 'seat-mods (orchestrator): this is a status turn — no operator typed it. Use tool calls only and write no narration. End the turn with only the status block: these five labels in this order, each at the start of a line: **What I ruled:** / **What the PR(s) will carry:** / **Next steps:** / **Waiting on (seats live):** / **Waiting on operator:** — each with content ("none" is content) and nothing before or after the block. A field holds the lines up to the next label, so use bullets, a short table or numbered items where they read better. **Waiting on operator:** takes "none", "decision: <question>" or "action: <what the operator must do>"; several decisions go one numbered item each, with the question, the options and the recommendation marked. A block that waits on no seat and no operator decision or action while its Next steps names work is not a turn end: do that work first.'
 
 export function rewriteReason(failed: string): string {
   return `seat-mods (orchestrator): a status turn ends with only the five-field status block. ${failed}. Rewrite your reply as the block and nothing else.`
@@ -81,39 +81,6 @@ const ESCAPED_LABELS = STATUS_LABELS.map(label => label.replace(/[.*+?^${}()|[\]
 // `What I ruled:** a` are malformed, not labels (AI PR #180 round 3).
 const LABEL_AT_START = ESCAPED_LABELS.map(label => new RegExp(`^\\s*(?:\\*\\*${label}\\*\\*|${label}(?!\\*\\*))`))
 
-// The five fields a status block check reads, in order: the reply's non-blank
-// lines, so a blank (whitespace-only) line between fields is skipped (#879),
-// and the lines past the fifth field apart in `rest`. One home for the
-// blank-line rule, read by both checkBlock and isIdleStop.
-function readBlock(reply: string): { fields: string[]; rest: string[] } {
-  const lines = reply.trim().split('\n').filter(line => line.trim() !== '')
-  return { fields: lines.slice(0, STATUS_LABELS.length), rest: lines.slice(STATUS_LABELS.length) }
-}
-
-export function checkBlock(reply: string): { ok: true } | { ok: false; failed: string } {
-  const trimmed = reply.trim()
-  if (trimmed === '') return { ok: false, failed: 'The reply is empty' }
-  const { fields, rest } = readBlock(reply)
-  // All five labels take the same path: the field at the label's position must
-  // start with it and carry content after it — the first field included.
-  for (let i = 0; i < STATUS_LABELS.length; i++) {
-    const label = STATUS_LABELS[i] ?? ''
-    const line = fields[i]
-    const match = line === undefined ? null : LABEL_AT_START[i]?.exec(line) ?? null
-    if (match === null) {
-      // Only the first label's absence reads differently: the plan's copy names
-      // text before the block, while a later label is missing or out of order.
-      if (i === 0) return { ok: false, failed: 'Text comes before **What I ruled:**' }
-      const later = fields.slice(i + 1).concat(rest).some(candidate => LABEL_AT_START[i]?.test(candidate) === true)
-      return { ok: false, failed: `**${label}** is ${later ? 'out of order' : 'missing'}` }
-    }
-    if (line.slice(match[0].length).trim() === '') return { ok: false, failed: `**${label}** has no content` }
-  }
-  if (rest.length > 0)
-    return { ok: false, failed: 'Text comes after **Waiting on operator:**' }
-  return { ok: true }
-}
-
 // A field's content reads as `none` when it starts with the whole word, any
 // case (the plan's call): `none.`, `None — the run is closed` and
 // `none on #867. …` count, `nonetheless` does not. Lenient on purpose: a false
@@ -121,20 +88,60 @@ export function checkBlock(reply: string): { ok: true } | { ok: false; failed: s
 // skips the nudge, which is today's behaviour.
 const NONE_AT_START = /^none\b/i
 
+// The five fields a status block check reads (#994): each label starts a field,
+// and the field holds the lines up to the next label, so a list, a table or
+// numbered decisions fit. Blank lines are skipped (#879). One home for the rule,
+// read by both checkBlock and isIdleStop.
+function readBlock(reply: string): { fields: string[] } | { failed: string } {
+  const lines = reply.trim().split('\n').filter(line => line.trim() !== '')
+  const labelAt = (line: string): number => LABEL_AT_START.findIndex(re => re.test(line))
+  const fields: string[] = []
+  const firstEmpty = (): string | undefined => {
+    const i = fields.findIndex(field => field === '')
+    return i === -1 ? undefined : `**${STATUS_LABELS[i]}** has no content`
+  }
+  for (const [n, line] of lines.entries()) {
+    const at = labelAt(line)
+    if (n === 0 && at !== 0) return { failed: 'Text comes before **What I ruled:**' }
+    if (at === -1) { fields[fields.length - 1] += `${fields[fields.length - 1] === '' ? '' : '\n'}${line.trim()}`; continue }
+    if (at !== fields.length) {
+      const failed = firstEmpty()
+      if (failed !== undefined) return { failed }
+      if (at < fields.length) return { failed: `**${STATUS_LABELS[at]}** is out of order` }
+      const later = lines.slice(n + 1).some(candidate => labelAt(candidate) === fields.length)
+      return { failed: `**${STATUS_LABELS[fields.length]}** is ${later ? 'out of order' : 'missing'}` }
+    }
+    fields.push(line.replace(LABEL_AT_START[at] as RegExp, '').trim())
+  }
+  const failed = firstEmpty()
+  if (failed !== undefined) return { failed }
+  if (fields.length < STATUS_LABELS.length) return { failed: `**${STATUS_LABELS[fields.length]}** is missing` }
+  // The last field has no next label to end it. `none` takes no list, so a line
+  // after it is still text after the block. Past a decision or action nothing
+  // can tell a numbered item from narration: the model judges that (skill-first
+  // question 3: this check only adds a stop).
+  const last = fields[fields.length - 1] ?? ''
+  if (NONE_AT_START.test(last) && last.includes('\n')) return { failed: 'Text comes after **Waiting on operator:**' }
+  return { fields }
+}
+
+export function checkBlock(reply: string): { ok: true } | { ok: false; failed: string } {
+  if (reply.trim() === '') return { ok: false, failed: 'The reply is empty' }
+  const block = readBlock(reply)
+  return 'failed' in block ? { ok: false, failed: block.failed } : { ok: true }
+}
+
 // The idle-stop contradiction (#876): a valid block whose two wait fields —
 // Waiting on (seats live) and Waiting on operator — both read `none` while
 // Next steps names work. Defined only for a block checkBlock accepts; false
 // otherwise.
 export function isIdleStop(reply: string): boolean {
-  if (!checkBlock(reply).ok) return false
-  const { fields } = readBlock(reply)
-  const content = (index: number): string => {
-    const line = fields[index] ?? ''
-    const match = LABEL_AT_START[index]?.exec(line) ?? null
-    return match === null ? '' : line.slice(match[0].length).trim()
-  }
+  const block = readBlock(reply)
+  if ('failed' in block) return false
+  // A list marker before the word (`- none`, `1. none`) still reads as `none`.
+  const none = (index: number): boolean => NONE_AT_START.test((block.fields[index] ?? '').replace(/^(?:[-*+]|\d+[.)])\s+/, ''))
   // Next steps is label 2, Waiting on (seats live) 3, Waiting on operator 4.
-  return NONE_AT_START.test(content(3)) && NONE_AT_START.test(content(4)) && !NONE_AT_START.test(content(2))
+  return none(3) && none(4) && !none(2)
 }
 
 // True only when the reply's last non-empty line is the handoff line. It is

@@ -2,6 +2,14 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.13.0 — 2026-10-31
+
+The status block's fields can run for several lines (#994). Each label starts a field, and the
+field holds the lines up to the next label: bullets, a short table, numbered decisions. Labels stay
+five and in order, and each needs content. The idle check reads each field's first line. Text
+after a last field of `none` still fails; text after a decision or action no longer can, because
+it reads as part of the field. On both hosts.
+
 ## 0.12.0 — 2026-10-28
 
 The autonomic plugin is retired (#948). seat-mods read its session record for one feature only,

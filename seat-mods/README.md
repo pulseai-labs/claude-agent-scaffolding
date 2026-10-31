@@ -215,10 +215,13 @@ operator did not start by typing — must end with only the five-field status bl
 **Waiting on operator:** …
 ```
 
-One field per line, in that order; each label bold or plain, followed on the same line by its
-content ("none" is content), nothing before the first label or after the fifth; a blank
-(whitespace-only) line between fields is skipped. Waiting on operator takes `none`,
-`decision: <question>` or `action: <what the operator must do>`. Two hooks carry it, and no
+The labels come in that order, each at the start of a line, bold or plain, and each field has
+content ("none" is content). A field holds the lines up to the next label, so a list, a table or
+numbered decisions fit. Nothing comes before the first label; a line after a last field of `none`
+fails. Blank lines are skipped. Waiting on operator takes `none`, `decision: <question>` or
+`action: <what the operator must do>`; several decisions go one numbered item each: the question,
+the options, the recommendation marked. Past a decision or action the check cannot tell a list
+from narration, so that stays the model's job. Two hooks carry it, and no
 `classic.*` hook does: Claude Code skips a plugin's `classic.*` hooks on an org account, with no
 error (#929):
 
