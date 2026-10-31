@@ -43,6 +43,14 @@ expect "a non-ASCII fixture with no result stops" 1 "ossify/tests/eval/results/s
 add "ossify/tests/eval/results/s/04-café.json"; commit non-ascii-result
 expect "control: a non-ASCII fixture with its result passes" 0 ""
 
+nl=$'\n'
+add "ossify/tests/eval/fixtures/s/05-a${nl}b.md"; commit newline
+expect "a fixture name holding a newline stops" 1 "05-a"
+add "ossify/tests/eval/results/s/05-a${nl}b.json"; commit newline-result
+expect "control: that fixture with its result passes" 0 ""
+add "docs/junk${nl}ossify/tests/eval/fixtures/s/ghost.md"; commit split
+expect "control: a non-fixture name holding a fixture path on a second line is out of scope" 0 ""
+
 add crew/tests/eval/fixtures/z/01-e.md; add ossify/tests/eval/fixtures/s/notes.txt; add ossify/tests/eval/fixtures/s/deep/01-f.md; commit out
 expect "control: crew, non-markdown and deeper files are out of scope" 0 ""
 

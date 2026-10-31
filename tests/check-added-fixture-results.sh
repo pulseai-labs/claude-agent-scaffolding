@@ -14,15 +14,15 @@ set -u
 base="$1" head="$2"
 
 # --no-renames: a moved fixture needs a result at its new path too. -z: git otherwise
-# prints a non-ASCII path quoted, and a quoted path would match no fixture below.
-set -o pipefail
-if ! added="$(git diff -z --name-only --no-renames --diff-filter=A "$base" "$head" | tr '\0' '\n')"; then
+# quotes an odd path, and a quoted or split path would match no fixture below.
+added="$(mktemp)"; trap 'rm -f "$added"' EXIT
+if ! git diff -z --name-only --no-renames --diff-filter=A "$base" "$head" >"$added"; then
   echo "cannot diff $base..$head; added fixtures are NOT checked" >&2
   exit 2
 fi
 
 missing=0
-while IFS= read -r path; do
+while IFS= read -r -d '' path; do
   case "$path" in
     ossify/tests/eval/fixtures/*/*.md|merge-bar/tests/eval/fixtures/*/*.md) ;;
     *) continue ;;
@@ -35,5 +35,5 @@ while IFS= read -r path; do
     echo "added fixture has no result: $path (wanted $result)"
     missing=1
   fi
-done <<<"$added"
+done <"$added"
 exit "$missing"
