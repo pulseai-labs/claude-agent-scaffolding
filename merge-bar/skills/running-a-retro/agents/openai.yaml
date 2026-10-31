@@ -1,0 +1,3 @@
+interface:
+  display_name: "Run a retro"
+  short_description: "Read a project's PR review record and propose standards entries and checks"
