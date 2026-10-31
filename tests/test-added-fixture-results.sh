@@ -38,6 +38,11 @@ commit moved
 expect "a moved fixture needs a result at its new path" 1 "ossify/tests/eval/results/u/02-b.json"
 add ossify/tests/eval/results/u/02-b.json; commit moved-result
 
+add "ossify/tests/eval/fixtures/s/04-café.md"; commit non-ascii
+expect "a non-ASCII fixture with no result stops" 1 "ossify/tests/eval/results/s/04-café.json"
+add "ossify/tests/eval/results/s/04-café.json"; commit non-ascii-result
+expect "control: a non-ASCII fixture with its result passes" 0 ""
+
 add crew/tests/eval/fixtures/z/01-e.md; add ossify/tests/eval/fixtures/s/notes.txt; add ossify/tests/eval/fixtures/s/deep/01-f.md; commit out
 expect "control: crew, non-markdown and deeper files are out of scope" 0 ""
 

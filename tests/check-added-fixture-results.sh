@@ -13,8 +13,10 @@ set -u
 [ "$#" -eq 2 ] || { echo "usage: $0 <base-rev> <head-rev>" >&2; exit 2; }
 base="$1" head="$2"
 
-# --no-renames: a moved fixture needs a result at its new path too.
-if ! added="$(git diff --name-only --no-renames --diff-filter=A "$base" "$head")"; then
+# --no-renames: a moved fixture needs a result at its new path too. -z: git otherwise
+# prints a non-ASCII path quoted, and a quoted path would match no fixture below.
+set -o pipefail
+if ! added="$(git diff -z --name-only --no-renames --diff-filter=A "$base" "$head" | tr '\0' '\n')"; then
   echo "cannot diff $base..$head; added fixtures are NOT checked" >&2
   exit 2
 fi
