@@ -16,8 +16,8 @@ Pass = all ≥ 4.
    decide is a check proposal; a class the log rejected earlier (no newer PR shows it) or a check it
    accepted or edited earlier gives one read-out line and no proposal; one proposal per class, in the proposal
    shape's field names.
-3. **check_test** — mechanical first: a class whose detection needs meaning, or that a search can
-   only approximate, is an entry, not a check; a check whose pass would mark a class clear for the
+3. **check_test** — mechanical first: a class whose detection needs meaning, or that has no literal
+   form (a path, a missing file) for a search to find, is an entry, not a check; a check whose pass would mark a class clear for the
    reviewer fails the test and becomes an entry; a check proposal names one arm (closed input, or
    stop only with its false stops), where it runs, and what it misses; a project's own exemption of
    test or CI tooling does not change the test; no check is built.

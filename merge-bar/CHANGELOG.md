@@ -21,7 +21,7 @@ Retro: repeated review findings become proposed rules, written only when the ope
   are in `tests/eval/` and are session-driven: CI does not run them.
 - Agent-loaded bytes, `skills/**` against 0.7.0 (`wc -c`). The skill is 135 lines against a 120
   target because the check test's two arms and the acceptance cases each need their own paragraph:
-  - `skills/running-a-retro/SKILL.md` — 0 → 8951 (+8951)
+  - `skills/running-a-retro/SKILL.md` — 0 → 8963 (+8963)
   - `skills/running-a-retro/agents/openai.yaml` — 0 → 157 (+157)
   - `commands/retro.md` — 0 → 622 (+622)
   - the other skills are unchanged.

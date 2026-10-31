@@ -63,14 +63,14 @@ Read headings, `Rule:` and `Refuted:` lines first; open site lists only for cand
 **The check test.** It applies even where a project exempts test or CI tooling. The rule, verbatim:
 "Prose is the default. Code is allowed when the work is mechanical and its inputs are closed, or when it is a mechanical check that can only add a stop."
 A project's `docs/conventions/skill-first.md`, if any, supplies the question number to cite.
-1. **Mechanical first.** Can a check decide the class without reading meaning? A search that only
-   approximates the class fails here, and so does a check whose pass would mark a class clear for
-   the reviewer. Then it is a standards entry.
+1. **Mechanical first.** Can a check decide the class without reading meaning? A search fails here
+   when the class has no literal form (a path, a missing file) for it to find, and so does a check
+   whose pass would mark a class clear for the reviewer. Then it is a standards entry.
 2. **Then one arm**, named in the proposal: **closed input** (a small, known set of shapes that
    tests can cover fully) or **stop only** (it can only add a stop; a pass clears nothing; what it
-   misses goes on to the reviewer as if the check were absent; state its false stops). Stop only
-   is for input the check cannot close, not for a class it cannot decide: the class must still pass
-   "mechanical first" as a decision over what the check reads.
+   misses goes on to the reviewer as if the check were absent; state its false stops). Stop only may
+   over-report: a class that always has a literal form can stop on a harmless hit, which the
+   proposal states as a false stop.
 
 Print each proposal in this shape, one per class:
 
