@@ -19,9 +19,9 @@ Retro: repeated review findings become proposed rules, written only when the ope
   now names it as the one exception, because repo-root docs do not ship with a plugin.
 - Evals: `running-a-retro` fixtures RT1-RT11 with a rubric, and two baselines. The behaviour evals
   are in `tests/eval/` and are session-driven: CI does not run them.
-- Agent-loaded bytes, `skills/**` against 0.7.0 (`wc -c`). The skill is 136 lines against a 120
+- Agent-loaded bytes, `skills/**` against 0.7.0 (`wc -c`). The skill is 137 lines against a 120
   target because the check test's two arms and the acceptance cases each need their own paragraph:
-  - `skills/running-a-retro/SKILL.md` — 0 → 9043 (+9043)
+  - `skills/running-a-retro/SKILL.md` — 0 → 9151 (+9151)
   - `skills/running-a-retro/agents/openai.yaml` — 0 → 157 (+157)
   - `commands/retro.md` — 0 → 622 (+622)
   - the other skills are unchanged.

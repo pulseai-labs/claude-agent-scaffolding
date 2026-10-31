@@ -103,8 +103,9 @@ uncommitted and name them to the operator; committing is the workspace's own ses
   one) gets `## Entries`. Only a file with the verbatim `No project entries yet.` is an ossify stub:
   the first entry removes that sentence and starts `## Entries`.
 - **Check** (accepted, or edited to the operator's wording): only after the reply, open one issue in
-  the reviewed repository with `gh issue create --body-file <file>`, never an inline body, because the
-  text comes from review comments. Title: the class line. Body: Rule, Why, Sources
+  the reviewed repository. Its text comes from review comments, so write the title and body to temp
+  files outside both repos and run `gh issue create --title "$(cat <title-file>)" --body-file
+  <body-file>`; never type either into the command. Title: the class line. Body: Rule, Why, Sources
   (PR numbers only), Arm, Runs, Misses, False stops if any; no report path, class ID or standards
   text. This is accepted work, not the per-finding issue `working-a-pr` warns against. If
   the command fails, accepted entries stay, print the proposal text, end its log line `issue not
