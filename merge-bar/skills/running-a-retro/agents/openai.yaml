@@ -1,0 +1,5 @@
+interface:
+  display_name: "Run a retro"
+  short_description: "Turn repeated review findings into proposed rules"
+policy:
+  allow_implicit_invocation: false
