@@ -1,1 +1,1 @@
-{"scores":{"placement":5,"no_overwrite":5,"stub":4,"no_model_name":5},"pass":true,"notes":"All outputs land in the AI workspace with nothing asked and no model named, but the stub adds an intro paragraph and a prose line beyond header, pointers and current state."}
+{"scores":{"placement":5,"no_overwrite":5,"stub":5,"no_model_name":5},"pass":true,"notes":"All three outputs seeded in the AI workspace with resolved paths, correct pointers (canonical Testing section and 03-code-patterns.md), no entries or placeholders, and no model named."}
