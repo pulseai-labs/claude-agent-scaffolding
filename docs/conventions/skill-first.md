@@ -4,7 +4,7 @@
 > (`docs/conventions/skill-first.md`) and imported by every instruction file that needs it,
 > including the paired private AI workspace's. Edit here.
 >
-> **One copy is sanctioned: the headline sentence, inline above each import.** `@` expansion
+> **One copy is sanctioned: the headline sentence, inline above each import.** The one exception is the same sentence quoted in merge-bar's `running-a-retro` skill, because repo-root docs do not ship with a plugin. `@` expansion
 > is a Claude Code feature, not a property of a file — Codex, `cat`, the GitHub web view, and
 > any session whose external import was silently declined all receive a bare path and no rule.
 > Those headlines exist for those readers. **Do not delete them, and do not extend them past
