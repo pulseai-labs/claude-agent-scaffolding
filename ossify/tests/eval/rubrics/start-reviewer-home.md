@@ -3,7 +3,8 @@
 Score each 1-5 (4 criteria). Pass = all ≥4. `expected_outcome` vocabulary:
 `seed` (every output whose destination is free is written, in the AI workspace) |
 `ask-occupied` (an occupied destination is named and asked about, and the free ones are seeded) |
-`refuse` (the AI workspace is public or is a declared repo root: nothing is written).
+`refuse` (the AI workspace is public, or the workspace root is a declared repo's root or inside one: nothing is written) |
+`withhold-bank` (only the memory bank is in a declared repo: the stub is seeded at the workspace root, the ledger and `## Review` are withheld).
 
 **Every criterion is scored on every fixture.** A criterion that names a stop is scored, on a
 fixture where it should not fire, on whether the skill correctly held off. There is no N/A.

@@ -21,12 +21,16 @@ Nothing here lands in a declared repo.
   `close/references/harvest.md`, "Where the bank is". No other path logic.
 - **Never overwrite.** An occupied destination is named and asked about, per
   `occupied-destinations.md`. A kept file is left as it is.
-- **Refuse and write nothing** when posture marks the AI workspace as public, or when the AI
-  workspace root or the resolved memory bank is a declared repo's root or inside one. The memory
-  bank can route into a repo (`harvest.md`), and an AI workspace can sit inside a repo's tree, so
-  comparing workspace roots alone lets the ledger and `## Review` land in a declared repo. Say why.
-  The refusal stops these three outputs only: the rest of the ceremony continues, and the hand-off
-  names what was not seeded.
+- **Refuse** in two arms. Take repo roots from `oss repo_root <name>` and compare resolved paths; a
+  match is on a whole path component, so `/work/app` does not match `/work/app-ai`.
+  - Posture marks the AI workspace as public, or the AI workspace root is a declared repo's root or
+    inside one: write none of the three outputs.
+  - Only the resolved memory bank is a declared repo's root or inside one (it can route there,
+    `harvest.md`): write the stub, which lands at the workspace root and in no repo, and withhold
+    the ledger and the `## Review` section, which would land in the repo.
+
+  Either way say why. The rest of the ceremony continues, and the hand-off names what was not
+  seeded.
 
 ## 2. The standards stub
 
