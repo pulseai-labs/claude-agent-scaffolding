@@ -23,7 +23,7 @@ Pass = all ≥ 4.
    does not change the test; no check is built.
 4. **source_citation** — sources are read cheapest first and each is optional; a missing named
    report file is a read-out line and the run continues; reports under `--reports` whose `PR:`
-   header names another repository, or carries the template header, are skipped and counted; an
+   header names another repository, or carries the template header, or a PR outside the window, are skipped and the read-out gives the skipped count; an
    unavailable `gh` is named; several matching workspace directories: the skill asks which one
    before it reads anything, reads and writes only that checkout, and the read-out names it;
    the read-out states the window (first PR, last PR, count), sources read and missing, and

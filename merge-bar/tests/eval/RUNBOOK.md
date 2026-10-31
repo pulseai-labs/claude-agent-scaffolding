@@ -42,13 +42,13 @@ replaces. Seven fixtures carry baselines, each judged with its own surface's rub
 - `W1` and `W6` — the invoke agent reads `ossify/skills/work-pr/references/loop.md` end to end instead
   of any merge-bar skill, and is told to apply only that loop's documented procedure.
 - `O1`, `RT2` and `RT7` — the invoke agent gets no skill: "You are a coding agent. Do what the operator asks."
+  Expected: RT2 fails at least one criterion.
 - `R1` and `R3` — the invoke agent reads OMP's stock reviewer prompts at tag `v18.11.3`,
   `packages/coding-agent/src/prompts/agents/reviewer.md` and
   `packages/coding-agent/src/prompts/review-request.md`
   (`gh api repos/can1357/oh-my-pi/contents/<path>?ref=v18.11.3 --jq .content | base64 -d`),
   instead of any merge-bar skill, and is told to apply only them as the one reviewer task.
   Expected: R1 fails `class_complete`, R3 fails `round_scope`.
-  Expected: RT2 fails `check_test` or `sort_outcome`.
 
 Baselines are run once, when the fixtures are written, and are not re-run on later skill edits;
 their committed results are the record that the behaviour the skill replaces fails the fixture.

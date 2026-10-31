@@ -32,7 +32,7 @@ The ledger lines:
 The report files all exist. #105 C2 and #112 C4 are the config-key class, each with a `Rule:` of
 "a new config key states its default and its reader". #107's report has the line `Refuted:
 unused import in the generated client — the file is generated and excluded by the lint config`.
-#118's round 1 report lists "Retry loop without a bound" as C3 and its round 2 report lists the
+#118's round 1 report is at `~/.cache/runs/118/r1/report.md` (the ledger names only round 2's) and lists "Retry loop without a bound" as C3 and its round 2 report lists the
 same class as `Still open` under C1; no other PR's report names it. #121 C1 is the
 error-message class.
 

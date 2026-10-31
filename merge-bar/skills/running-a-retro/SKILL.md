@@ -15,7 +15,9 @@ is not a reply. You write no code and build no check.
 
 Default: the last 30 merged PRs of the current repository, ordered by merge date.
 `--last N` or `--since <PR or date>` replaces it; resolve a date with `gh pr list --state
-merged`. The read-out states the first PR, the last PR and the count.
+merged --json number,mergedAt`, sorted on `mergedAt` (the listing does not sort by merge date).
+The read-out states the first PR, the last PR and the count; without `gh` it says the window
+could not be determined.
 
 ## 2. Sources
 
@@ -99,7 +101,8 @@ Not yet written. This version creates no log.
 ## 6. The read-out
 
 End with: the window (first PR, last PR, count); the checkout you read; sources read and sources
-missing or unavailable, each with its cause; proposal counts by outcome; the files changed
+missing or unavailable, each with its cause; reports skipped (another repository, template
+header, or outside the window), counted; proposal counts by outcome; the files changed
 (none in this version). Give the covered-still-recurring and reviewer-noise lines here. Zero
-proposals is a correct result when the history is thin: the read-out says which cause (too few
-PRs, a source missing, `gh` unavailable), never just "no history".
+proposals is a correct result when the history is thin: the read-out names every cause that applies (too few
+PRs, nothing repeats, a source missing, `gh` unavailable), never just "no history".
