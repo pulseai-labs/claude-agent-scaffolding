@@ -180,7 +180,7 @@ When `OSSIFY_VERIFIER_MODEL` is set (a `settings.json` env block, as with
 session) — set OSSIFY_VERIFIER_MODEL to separate it`. A value the agent tool
 refuses is a halt that names the value, never a quiet fallback.
 
-On OMP, `task` takes no model: the model is the config's `task.agentModelOverrides.verifier`, else the session's. Print
+On OMP, instead of the model steps above, because `task` takes no model: the model is the config's `task.agentModelOverrides.verifier`, else the session's. Print
 `verifier model: from omp config (task.agentModelOverrides.verifier), else this session's`, and say so if `OSSIFY_VERIFIER_MODEL` is set, since it does not apply there.
 
 The agent mutates in place, so record the worktree before the dispatch and
