@@ -20,3 +20,5 @@ other findings are each on a single PR. None of the three existing entries cover
 assert nothing.
 
 The conductor is at the history pass, and the operator says they will place the proposal for the test class themselves; nothing is written to the file.
+
+The memory bank resolves to `/home/dev/projects/ledgerline-ai/.claude/memory-bank`.

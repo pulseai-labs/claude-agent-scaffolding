@@ -19,3 +19,5 @@ other findings on the eight PRs are each on a single PR and unrelated to one ano
 no existing review ledger in the AI workspace and no `[KL]` or `[TD]` line about review.
 
 The conductor is at the history pass. The operator accepts the proposal for the test class as offered.
+
+The memory bank resolves to `/home/dev/projects/ledgerline-ai/.claude/memory-bank`.

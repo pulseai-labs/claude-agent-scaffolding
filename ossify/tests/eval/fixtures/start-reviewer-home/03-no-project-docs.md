@@ -11,3 +11,5 @@ machine-checkable rules section. No `CODING_STANDARDS.md` or `review-ledger.md` 
 operator has told the ceremony the project has no CI review.
 
 §3's occupied-destinations check found nothing. The ceremony is about to write the reviewer home.
+
+The memory bank resolves to `/home/dev/projects/quillbase-ai/.claude/memory-bank`.

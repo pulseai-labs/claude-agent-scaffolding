@@ -13,3 +13,5 @@ occupied; the memory bank held nothing. Earlier in §13, this `/start` run autho
 including `08-governance.md` and `03-code-patterns.md`; those files are this run's own writes, not
 existing files. There is no `review-ledger.md`. The ceremony is now at the reviewer home, and the
 operator has not yet answered about `CODING_STANDARDS.md`.
+
+The memory bank resolves to `/home/dev/projects/tallyport-ai/.claude/memory-bank`.

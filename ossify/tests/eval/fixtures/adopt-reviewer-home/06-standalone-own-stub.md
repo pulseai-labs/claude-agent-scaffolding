@@ -18,3 +18,5 @@ The operator says: "Follow reviewer-home.md on its own for this project."
 comments say: on #5, "this fixture shares state with the previous test, so order changes the
 result"; on #9, "the two tests share one global fixture, so they pass only in this order". The
 other findings are each on a single PR. The operator accepts the proposal when it is offered.
+
+The memory bank resolves to `/home/dev/projects/quillpad-ai/.claude/memory-bank`.

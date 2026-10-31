@@ -61,8 +61,8 @@ read it. The file holds no line of its own at creation, and this file states no 
 and never append to the kept file; name it in the hand-off so the operator can add it by hand.
 The four lines:
 
-- the standards file path;
-- the review ledger path, and `tech-debt.md` for the `[KL]`/`[TD]` lines;
+- the standards file path, as a resolved path relative to the AI workspace root, never a `<placeholder>`;
+- the review ledger path, resolved the same way, and `tech-debt.md` for the `[KL]`/`[TD]` lines;
 - the reviewer: merge-bar `reviewing-a-pr`, at the seat the project's crew file or standing orders
   name, or the operator's choice per PR when neither does. Name no model;
 - CodeRabbit or any CI review, when the project has one, as an extra that gates nothing. Omit this

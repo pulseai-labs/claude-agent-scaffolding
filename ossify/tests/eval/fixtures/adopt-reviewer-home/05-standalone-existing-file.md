@@ -18,3 +18,5 @@ comments say: on #34, "this error is swallowed, the caller never learns the writ
 "swallowed error again, the retry loop hides the failure"; on #49, "this catch drops the error
 silently". The other findings are each on a single PR. The operator says they will place the
 proposal in the standards file themselves.
+
+The memory bank resolves to `/home/dev/projects/tallyho-ai/.claude/memory-bank`.

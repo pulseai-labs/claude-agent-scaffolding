@@ -18,3 +18,5 @@ a clearer error message. No two comments, on any PR, describe the same kind of d
 no existing review ledger in the AI workspace and no `[KL]` or `[TD]` line about review.
 
 The conductor is at the history pass.
+
+The memory bank resolves to `/home/dev/projects/ledgerline-ai/.claude/memory-bank`.

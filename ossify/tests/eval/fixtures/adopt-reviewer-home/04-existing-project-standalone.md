@@ -18,3 +18,5 @@ comments say: on #12, "this test never asserts anything, it passes if the functi
 on #19, "the new test has no assertion on the result"; on #23, "this test asserts nothing about
 the behaviour it names". The other findings are each on a single PR. The operator accepts a
 proposal for that class when it is offered.
+
+The memory bank resolves to `/home/dev/projects/ledgerline-ai/.claude/memory-bank`.
