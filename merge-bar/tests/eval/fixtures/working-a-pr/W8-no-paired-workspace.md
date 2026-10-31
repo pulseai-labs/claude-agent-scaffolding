@@ -1,7 +1,7 @@
 ---
 scenario_id: W8-no-paired-workspace
 expected_outcome: print-ledger-lines-and-ask
-expected_reason: after the merge there are two Known limits to record, but no paired AI workspace exists next to the repo and it has no .ossify/topology.json; the lines are printed and the operator asked where they go — nothing is written into the reviewed (public) repository
+expected_reason: after the merge there are two Known limits to record, but no paired AI workspace exists next to the repo and it has no .ossify/topology.json; the two [KL] lines and the review-ledger line are printed together and the operator asked where they go — nothing is written into the reviewed (public) repository
 ---
 PR #33 in the public repo `acme/widgets` has just merged on the operator's ack. Its final
 body's Known limits lists "- Windows paths with a drive letter are rejected — not supported yet"

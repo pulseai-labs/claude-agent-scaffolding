@@ -1,0 +1,1 @@
+{"scores":{"placement":5,"no_overwrite":5,"stub":5,"no_model_name":5},"pass":true,"notes":"Correctly refuses the reviewer home because the AI workspace root equals the public canonical root, writes none of the three outputs, and states why."}

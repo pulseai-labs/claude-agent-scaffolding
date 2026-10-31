@@ -2,7 +2,7 @@
 
 Depth for SKILL.md §13. This is **ossify's own** derivation brief — the memory
 bank and `AGENTS.md` are authored here, from the lean spec sections, not by
-calling scaffold-onboard. The 14-file structure and the harvest mechanics carry
+calling scaffold-onboard. The 15-file structure and the harvest mechanics carry
 over unchanged; only the *derivation source* is re-anchored.
 
 You author these files yourself, in conversation, reading the lean MASTER-SPEC
@@ -24,10 +24,11 @@ slot-fill.
 | `05-active-context.md` | **Tier 0 · LIVE** | Current position: "spec-core closed; Release 0 not yet planned" |
 | `06-progress.md` | branch · LIVE | One dated entry: spec-core close |
 | `07-constraints.md` | branch | Risk gates + bones categories 5, 9 (trust boundaries; cross-cutting constraints) |
-| `08-governance.md` | branch | Pointers: bones ADR dir, `PUBLIC_BOUNDARY.md`, private inventory, `project-state.json` + the **standing orders** section (seeded empty) |
+| `08-governance.md` | branch | Pointers: bones ADR dir, `PUBLIC_BOUNDARY.md`, private inventory, `project-state.json` + the **standing orders** section (seeded empty); also a `## Review` section per `reviewer-home.md` §4 |
 | `09-known-issues.md` | **Tier 0 · LIVE** | **Unverified claims** from the smoke-test pass; any spike `inconclusive` result |
 | `10-decisions-log.md` | on-demand · LIVE | Bones-registry index (one line per bone, with its revisit trigger) |
 | `tech-debt.md` | branch · LIVE | Empty index. ossify adds no lines — merge-bar's `working-a-pr` writes `[KL]`/`[TD]` after a merge; `plan-spine` and `/ossify:patch` read it and delete only a line retired because its code is gone (`plan-spine/references/intake-and-ledger.md` §2) |
+| `review-ledger.md` | on-demand · LIVE | Empty heading + paragraph; merge-bar `working-a-pr` §5 appends; see `reviewer-home.md` §3 |
 | `WORKFLOW.md` | branch · STATIC | The ossify loop: `start` → `plan-release` → `plan-spine` → `close` |
 
 Two files earn special attention at bootstrap:
@@ -96,6 +97,8 @@ them.
 
 - **Memory bank + `AGENTS.md`** → the **AI workspace** (they are agent
   scaffolding, not product code).
+- **`CODING_STANDARDS.md`** and **`review-ledger.md`** → the **AI workspace**, per
+  `reviewer-home.md` §1.
 - **`PUBLIC_BOUNDARY.md`** → each **public repo root**.
 - **Lean MASTER-SPEC** → AI workspace. **EXECUTIVE-SUMMARY** → per the project's
   manifest routing.

@@ -281,6 +281,20 @@ If the file is absent, create it with the heading `# Tech debt — <repo>`. Appe
 leave them **uncommitted**: tell the operator which file changed, and that committing it
 belongs to that workspace's own session.
 
+**The review-ledger line.** Every merged PR also gets one line in the paired workspace's
+`.claude/memory-bank/review-ledger.md`, found exactly as above (same match, same
+none-or-several rule, uncommitted):
+
+```
+- PR #N (<YYYY-MM-DD>) — rounds <n> — blocking: <class names | none> — answered: <class names | none> — rulings: <bar overrides, each with its reason | none> — report: <path | none>
+```
+
+Rounds come from §3.5, class names from the §2.5 set. A ruling is a class you dispositioned
+differently from the reviewer's `Bar:` line, with the reason. Report is the last round's
+report path if it is on disk. If the file is absent, create it with the heading
+`# Review ledger — <repo>`; tell the operator which files changed. Not merged, or no
+workspace: print this line with the others.
+
 Never write the ledger into the reviewed repository — it may be public, and the ledger is
 process record. If no paired workspace can be found, print the lines and ask the operator
 where they go.

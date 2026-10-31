@@ -404,7 +404,7 @@ Full minima in `references/lean-spec-schema.md`.
 |---|---|
 | Lean MASTER-SPEC (7 sections) | AI workspace |
 | EXECUTIVE-SUMMARY | per manifest routing |
-| Memory bank (14 files) + `AGENTS.md` | AI workspace |
+| Memory bank (15 files) + `AGENTS.md` + `CODING_STANDARDS.md` | AI workspace, per `references/reviewer-home.md` |
 | Bones-registry ADRs | the project's ADR directory |
 | Seed feature map | `project-state.json` (already written via `oss feature_add`) |
 | `PUBLIC_BOUNDARY.md` | **each public repo root** |

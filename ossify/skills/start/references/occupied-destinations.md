@@ -23,7 +23,7 @@ Resolve the path of every output in §13's table (`memory-bank-brief.md` §4 —
 never reaches it) and check whether a file already exists there: the
 MASTER-SPEC at `oss spec_path`, the EXECUTIVE-SUMMARY, each memory-bank
 file where the bank lives (`close/references/harvest.md`, "Where the bank is"),
-`AGENTS.md`, each `PUBLIC_BOUNDARY.md`, and the private boundary inventory —
+`AGENTS.md`, `CODING_STANDARDS.md` and `review-ledger.md` (`reviewer-home.md` §1), each `PUBLIC_BOUNDARY.md`, and the private boundary inventory —
 checked **both** at `posture-block.md` §7's convention,
 `<ai-workspace>/docs/private-boundary-inventory.md`, **and** for any other
 `docs/*inventor*.md` beneath the `ai_workspace` root (a case-insensitive glob:

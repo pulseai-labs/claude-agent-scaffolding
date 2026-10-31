@@ -1,0 +1,1 @@
+{"scores": {"recurrence": 5, "acceptance": 5, "result_line": 5, "placement": 5}, "pass": true, "notes": "Runs the standalone path with no ADOPTION.md and no adopt station. It proposes the three-PR class, writes the accepted entry, and appends the result line as the last line of the new ## Review section. No provenance trailer, no other edits to 08-governance.md."}

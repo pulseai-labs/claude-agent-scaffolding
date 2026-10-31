@@ -39,7 +39,8 @@ On Codex, invoke the skills by name.
 After a merge, `working-a-pr` writes the PR's known limits as `[KL]` lines, and its one
 out-of-scope issue as a `[TD]` line, to the paired AI workspace's
 `.claude/memory-bank/tech-debt.md`. With no paired workspace it prints them and asks. It never
-writes them into the reviewed repository.
+writes them into the reviewed repository. It also appends one line per merged PR to the same
+workspace's `.claude/memory-bank/review-ledger.md`, found the same way and left uncommitted.
 
 ## Tests
 

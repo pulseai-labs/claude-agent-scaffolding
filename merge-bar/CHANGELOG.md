@@ -2,6 +2,22 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.7.0
+
+Review ledger: every merged PR leaves one line in the paired workspace's review ledger.
+
+- `working-a-pr` §5 — after a merge, appends one review-ledger line (PR, date, rounds, blocking and
+  answered classes, bar rulings, report path) to the paired AI workspace's
+  `.claude/memory-bank/review-ledger.md`, creating it with its heading when absent. The write is
+  uncommitted and the operator is told which file changed. A PR that is not merged, or a PR with no
+  paired workspace, gets the line printed instead. The ledger is never written into the reviewed
+  repository. (#984)
+- Evals: rubric criterion 6 (the ledger line) added to `working-a-pr`; fixture W16 (review-ledger
+  line) is new and W8 (no paired workspace) is updated. Known limit: the other 14 `working-a-pr`
+  result files were scored on the five-criterion rubric and were not re-judged.
+- Agent-loaded bytes, `skills/**` against 0.6.0 (`wc -c`):
+  - `skills/working-a-pr/SKILL.md` — 20371 → 21174 (+803)
+
 ## 0.6.0
 
 Our own reviewer: `reviewing-a-pr` reviews against the PR's merge bar, and `working-a-pr` reads its report.

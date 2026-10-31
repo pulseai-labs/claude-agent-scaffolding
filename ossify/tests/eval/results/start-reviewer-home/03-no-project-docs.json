@@ -1,0 +1,1 @@
+{"scores":{"placement":5,"no_overwrite":5,"stub":5,"no_model_name":5},"pass":true,"notes":"Seeds all three outputs in the AI workspace without any stop, with a stub carrying only the header, the single 03-code-patterns.md pointer and the current-state sentence, and a Review section with no model and no CI line."}
