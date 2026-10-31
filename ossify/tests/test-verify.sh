@@ -75,6 +75,11 @@ t_capture oss_verify_auto_step "$TMP" "printf 'pytest refused\\n'; exit 1" "outp
 t_capture oss_verify_auto_step "$TMP" "mongo() { echo refused; exit 1; }; mongo test-db" "output contains refused"; t_assert_rc 0 "control: mongo test-db is not go test"
 t_capture oss_verify_auto_step "$TMP" "grep() { echo refused; exit 1; }; grep -r jest package.json" "output contains refused"; t_assert_rc 0 "control: a runner name as an argument is not a runner"
 t_capture oss_verify_auto_step "$TMP" "node() { echo refused; exit 1; }; node lint.js --testing-mode" "output contains refused"; t_assert_rc 0 "control: node with --testing-mode is not node --test"
+t_capture oss_verify_auto_step "$TMP" "node() { echo refused; exit 1; }; node cli.js --test" "output contains refused"; t_assert_rc 0 "control: --test after the script is the script's argument"
+t_capture oss_verify_auto_step "$TMP" "echo 'x; npm test refused'; exit 1" "output contains refused"; t_assert_rc 0 "control: a runner name inside quotes is not a runner"
+t_capture oss_verify_auto_step "$TMP" "pytest() { :; }; app() { echo refused; exit 2; }; pytest tests && app" "output contains refused"; t_assert_rc 0 "control: a later command's exit is not the runner's"
+t_capture oss_verify_auto_step "$TMP" "$FAKEC; cargo test --lib 2>&1" "output contains test result: ok"; t_assert_rc 1 "plain row: a fd redirect after the runner still names it"
+t_capture oss_verify_auto_step "$TMP" "$FAKEC; (cargo test)" "output contains test result: ok"; t_assert_rc 1 "plain row: a subshell runner as the last command still names it"
 t_capture oss_verify_auto_step "$TMP" "echo refused; bash test-x.sh; exit 1" "output contains refused"; t_assert_rc 0 "control: a repo's own bash test script may be a refusal AC"
 t_capture oss_verify_redgate "$TMP" "cargo() { echo needle; exit 101; }; cargo test" "output contains needle"; t_assert_rc 0 "redgate: a failing runner that prints the needle is RED, not already-GREEN"
 # Round 1 (#772): the 126/127 stop exists only because a PLAIN `output contains`
@@ -709,6 +714,14 @@ printf '# pass 0\n' | oss_verify_zero_tests_guard "node app.js"
 t_assert_eq "1" "$?" "#922 control: a plain node command is not a runner"
 printf '# pass 0\n' | oss_verify_zero_tests_guard "node lint.js --testing-mode"
 t_assert_eq "1" "$?" "#922 control: --testing-mode is not --test"
+printf '# pass 0\n' | oss_verify_zero_tests_guard "node cli.js --test"
+t_assert_eq "1" "$?" "#922 control: a script's own --test is not node --test"
+printf '# pass 0\n' | oss_verify_zero_tests_guard "node -e 'console.log(1) // --test'"
+t_assert_eq "1" "$?" "#922 control: quoted --test is not node --test"
+for c in "node --test; echo done" "(cd x && node --test)" "node --test|tee o" "node --test-reporter=tap --test x.js"; do
+  printf '# pass 0\n' | oss_verify_zero_tests_guard "$c"
+  t_assert_eq "0" "$?" "#922: '$c' reads as a zero-test node --test run"
+done
 t_capture oss_verify_auto_step "$TMP" "node() { printf '# pass 0\n'; }; node --test" "exit 0"; t_assert_rc 1 "#922: exit 0 on a zero-test node --test run fails as vacuous"
 
 rm -rf "$TMP"; t_summary
