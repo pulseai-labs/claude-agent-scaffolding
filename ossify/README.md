@@ -222,8 +222,8 @@ can be followed alone by an existing ossify project. merge-bar's `working-a-pr` 
 review-ledger line per merged PR. No `lib/` code, no state change.
 
 Since 1.32.1 (#922), the gate stops two wrong greens. `oss_verify_zero_tests_guard` now reads
-`node --test`, so a run of zero tests no longer passes `exit 0`. A plain `output contains` row on
-a named test runner now fails when the runner exits nonzero; to expect that exit, write
+`node --test` as a command word, so a bare run of zero tests no longer passes `exit 0`. A plain `output contains` row whose
+last command is a named test runner now fails when the runner exits nonzero; to expect that exit, write
 `exit <n> and output contains <str>`. Other commands keep the plain row. One `lib/` file changes,
 no state change.
 
