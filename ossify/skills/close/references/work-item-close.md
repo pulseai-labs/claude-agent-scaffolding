@@ -169,7 +169,8 @@ fail loudly: a read that never happened still produces a clean-looking
 findings list, and the gate reports green having verified nothing.
 
 **Without `--verdict`, after Layers 1 and 2, the close dispatches `ossify:verifier-agent` for Layers 3 and 4 and the §4c mutation check**
-(`references/impl-check.md`), through the host's agent tool. Its prompt names
+(`references/impl-check.md`), through the host's agent tool; on OMP, `task` with
+`agent: "verifier"` (omp-roles 0.10.0+), not the default `task` agent. Its prompt names
 absolute `$spec`, `$report`, `$wt`, the `handoff.md` path, the patterns file
 (`03-code-patterns.md`, resolved as Layer 3 resolves it, or `absent`) and the
 diff mode: `staged`, or `committed <base_sha>..HEAD` on a `--pr` resume (§4a).
@@ -178,6 +179,9 @@ When `OSSIFY_VERIFIER_MODEL` is set (a `settings.json` env block, as with
 `model: inherit` applies; print `verifier model: inherited (same as this
 session) — set OSSIFY_VERIFIER_MODEL to separate it`. A value the agent tool
 refuses is a halt that names the value, never a quiet fallback.
+
+On OMP, `task` takes no model: the model is the config's `task.agentModelOverrides.verifier`, else the session's. Print
+`verifier model: from omp config (task.agentModelOverrides.verifier), else this session's`, and say so if `OSSIFY_VERIFIER_MODEL` is set, since it does not apply there.
 
 The agent mutates in place, so record the worktree before the dispatch and
 compare after the return. The reference value is yours, never the agent's:
@@ -227,7 +231,7 @@ tags, the same `verify.md`, the same correction packet), and print
 section changes.
 
 Under `--verdict` the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched. Without it, **where no agent can be dispatched, the close runs the pass itself** — Codex,
-OMP, a subagent context, a refused `Task` grant. Apply §4, §4b and §4c in this
+OMP with no `verifier` in `task`'s agent list (omp-roles not installed or older than 0.10.0), a subagent context, a refused `Task` grant. Apply §4, §4b and §4c in this
 session, from the diff and never from report §5, and print
 `verifier: inline — <host or why>` in the close summary. Not a halt. **Inside an
 `--external-executor` lane closing its own items** Layers 3 and 4 run in this
