@@ -642,7 +642,8 @@ test("a red close at any layer routes through the correction packet", async () =
   expect(host.of(W1, "close")).toHaveLength(2); // routed on the first close, no no-result relaunch; the second lands
   expect(host.of(W1, "correct")[0].request.message).toContain(`Correction packet: ${out(W1, "correction.txt")}.`);
   expect(packetAtCorrect).toBe(true);
-  expect(existsSync(out(W1, "correction.txt"))).toBe(false); // cleared on the way to verify
+  expect(existsSync(out(W1, "correction.txt"))).toBe(false); // moved aside on the way to verify
+  expect(readFileSync(out(W1, "correction-1.txt"), "utf8")).toContain("[AC] AC1 fails: exit 1"); // the first round's packet stays (#1005)
   expect(item(W1).dispatches).toBe(2);
 });
 
@@ -668,5 +669,9 @@ test("a halting verdict runs verify, close, correct, then verify and close again
   expect(host.of(W1, "close")).toHaveLength(2);
   expect(host.of(W1, "correct")).toHaveLength(1);
   expect(verdictAtVerify2).toBe(false);
+  // Each round's verdict stays (#1005): the first holds the stayed-green result that sent it back.
+  expect(JSON.parse(readFileSync(out(W1, "verdict-1.json"), "utf8")).mutation).toEqual(STAYED_GREEN);
+  expect(JSON.parse(readFileSync(out(W1, "verdict.json"), "utf8")).mutation).toEqual([]);
+  expect(existsSync(out(W1, "verdict-2.json"))).toBe(false);
   expect(item(W1).dispatches).toBe(2); // implement and correct; verify is no dispatch
 });

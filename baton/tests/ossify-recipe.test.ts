@@ -2,7 +2,8 @@
 // structurally: the claim every seat carries, the roles, where each stage launches, the
 // dispatch count and cap, the R7 gap re-entry, the land order, and the build slot.
 import { describe, expect, test } from "bun:test";
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { render, validate, type MergeStage, type Recipe, type SessionStage, type WaitStage } from "../src/recipe.ts";
@@ -198,8 +199,10 @@ describe("ossify-spine recipe", () => {
     const v = r.stages.verify;
     expect([v.kind, v.cwd, v.launch_dir, v.project]).toEqual(["session", "{unit.vars.worktree_path}", "worktree", "{param.project}"]);
     expect(v.outcomes).toEqual([{ when: [{ file: VERDICT }], to: "close" }]);
-    // a verdict from the last pass never routes this one: it goes before every launch
-    expect(v.before).toEqual([["mkdir", "-p", OUT], ["rm", "-f", VERDICT]]);
+    // a verdict from the last pass never routes this one: it moves aside before every launch,
+    // and stays as verdict-<n>.json for whoever asks why the item took two rounds (#1005)
+    expect(v.before[0]).toEqual(["mkdir", "-p", OUT]);
+    expect(v.before[1].slice(3)).toEqual(["sh", OUT, "verdict", ".json"]);
     // the mutation check runs tests, so verify holds the build slot
     expect(v.slots).toEqual(["session", "build"]);
     expect(v.env.OSSIFY_VERIFY_WORKTREE).toBe("{unit.vars.worktree_path}");
@@ -210,6 +213,22 @@ describe("ossify-spine recipe", () => {
       expect([field, v.message.includes(field)]).toEqual([field, true]);
     }
     expect(r.stages.close.message).toContain(`Verdict file: ${VERDICT}.`);
+  });
+
+  test("the verdict and packet archive takes the next free number and needs no file", () => {
+    const argv: string[] = raw().stages.verify.before[1];
+    const dir = mkdtempSync(join(tmpdir(), "baton-archive-"));
+    const run = () => spawnSync(argv[0], [argv[1], argv[2], argv[3], dir, "verdict", ".json"]).status;
+    expect(run()).toBe(0); // nothing to keep yet: the first pass
+    expect(readdirSync(dir)).toEqual([]);
+    writeFileSync(join(dir, "verdict.json"), "one");
+    expect(run()).toBe(0);
+    writeFileSync(join(dir, "verdict.json"), "two");
+    expect(run()).toBe(0);
+    expect(readdirSync(dir).sort()).toEqual(["verdict-1.json", "verdict-2.json"]);
+    expect(readFileSync(join(dir, "verdict-1.json"), "utf8")).toBe("one"); // never overwritten
+    expect(readFileSync(join(dir, "verdict-2.json"), "utf8")).toBe("two");
+    rmSync(dir, { recursive: true });
   });
 
   test("correct-returns-to-verify", () => {

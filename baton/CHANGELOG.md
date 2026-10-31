@@ -2,6 +2,13 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.10.1 - 2026-11-01
+
+Each verify round leaves its record (#1005). `examples/ossify-spine` moves the last verdict to
+`out/<unit>/verdict-<n>.json` before the next verify, and a used packet to
+`correction-<n>.txt` on the way back to verify. An operator can read what the verifier said in
+round 1. `verify.md` still holds only the last pass.
+
 ## 0.10.0 - 2026-10-30
 
 Seats from crew's config, any harness, a `verify` stage (#993).
