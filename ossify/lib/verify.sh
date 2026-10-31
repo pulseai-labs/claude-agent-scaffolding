@@ -59,6 +59,12 @@ oss_verify_parse_acs() { # $1=spec-file ; TSV label \t command \t expectation
 # Run one AC in $1 and check it. EVERY arm fails closed: an unrecognized or
 # malformed expectation is rc 2, never a pass. This is the ledger.sh lesson -
 # a `case` with no default arm counted an unknown expectation as green.
+# The real runners only. `bash .*test` stays out: a repo's own `test-*.sh` script
+# can be the subject of a refusal AC.
+_oss_verify_names_runner() { # $1=command
+  grep -Eq 'pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|ctest|dotnet test|node .*--test' <<<"$1"
+}
+
 oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail, 2 malformed
   local dir="$1" cmd="$2" exp="$3" out rc want="" needle="" mag
   # THREE forms, and the combined one is matched FIRST: `?*` demands at least one
@@ -123,6 +129,15 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
         printf '%s\n' "$out" | tail -5
         return 1 ;;
       esac
+      # A test runner that exits nonzero reported a failure, even when its output
+      # holds the needle: one passing target's `test result: ok` prints beside a
+      # failing target's. A refusal AC from any other command stays a plain row,
+      # so this stop is scoped to the named runners.
+      if [ "$rc" -ne 0 ] && _oss_verify_names_runner "$cmd"; then
+        echo "oss: '$cmd' is a test runner and exited $rc; a plain output check never passes it (to expect this exit, write 'exit $rc and output contains ...')" >&2
+        printf '%s\n' "$out" | tail -5
+        return 1
+      fi
     fi
     # `if ! grep -Fq … <<<"$out"` — NOT `pipeline | { … return 1; }`. See the
     # idiom note below: a `return` inside the brace group would exit only the
@@ -168,7 +183,7 @@ oss_verify_auto_step() { # $1=workdir $2=command $3=expectation ; 0 pass, 1 fail
 # pipeline reports 141 — a TRUE match read as no match past ~64 KiB.
 oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
   local out; out="$(cat)"
-  grep -Eq 'pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test' <<<"$1" || return 1
+  grep -Eq 'pytest|cargo test|cargo nextest|npm test|npm run test|go test|jest|vitest|bash .*test|ctest|dotnet test|node .*--test' <<<"$1" || return 1
   # Zero markers are the runners' real exit-0 nothing-ran phrases, swept in PR
   # #496 round 1: nextest's `Starting 0 tests`/`0 tests run`, go's `? pkg
   # [no test files]`, ctest's `No tests were found`, VSTest's `No test is

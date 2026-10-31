@@ -137,8 +137,9 @@ different grammars read by different parsers:
 | Arrow | `→` required | no arrow |
 | Checkbox + label | required | none |
 
-A plain `output contains` row reads no exit status (only a command that cannot
-run, rc 126 or 127, fails it); when the exit matters, name it:
+A plain `output contains` row reads no exit status, with two exceptions that fail
+it: a command that cannot run (rc 126 or 127), and a named test runner that exits
+nonzero. When the exit matters, or a runner should fail, name it:
 `exit 0 and output contains <str>`. The combined form is a spec-AC form only —
 the ledger's `contains:` has no exit half (a follow-up issue tracks it).
 
