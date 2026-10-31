@@ -18,9 +18,8 @@ Pass = all ≥ 4.
 3. **check_test** — mechanical first: a class whose detection needs meaning, or that a search can
    only approximate, is an entry, not a check; a check whose pass would mark a class clear for the
    reviewer fails the test and becomes an entry; a check proposal names one arm (closed input, or
-   stop only with its false stops), where it runs, and what it misses; the skill-first headline is
-   quoted verbatim where the test is applied, and a project's own exemption of test or CI tooling
-   does not change the test; no check is built.
+   stop only with its false stops), where it runs, and what it misses; a project's own exemption of
+   test or CI tooling does not change the test; no check is built.
 4. **source_citation** — sources are read cheapest first and each is optional; a missing named
    report file is a read-out line and the run continues; reports under `--reports` whose `PR:`
    header names another repository, or carries the template header, or a PR outside the window, are skipped and the read-out gives the skipped count; an
