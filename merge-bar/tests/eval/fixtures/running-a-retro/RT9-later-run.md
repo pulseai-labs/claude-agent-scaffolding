@@ -9,8 +9,8 @@ of the repo `acme/ledgerly`. Only `ledgerly-ai/` matches by `canonical.name` = "
 
 What existed before the run, in `ledgerly-ai/`:
 
-- `.claude/memory-bank/review-ledger.md` with dated lines. PRs #121 (2026-10-17) and #131
-  (2026-10-24) both block "Fixture has no result file". #119 (2026-10-12) and #122 (2026-10-16)
+- `.claude/memory-bank/review-ledger.md` with dated lines. PRs #121 (2026-10-16) and #131
+  (2026-10-24) both block "Fixture has no result file". #119 (2026-10-12) and #122 (2026-10-17)
   both block "Unbounded cache". #135 (2026-10-29) and #138 (2026-10-30) both block "Date parsed
   with local timezone". Reports exist for each.
 - `CODING_STANDARDS.md` with `## Entries` and two entries, neither about caches, dates or
@@ -21,7 +21,7 @@ What existed before the run, in `ledgerly-ai/`:
 - 2026-10-20 — run — window #110–#124, 15 PRs — read: review-ledger — missing: none
 - 2026-10-20 — rejected — entry — Unbounded cache — PRs #112, #118 — operator: sized by the platform, not us
 - 2026-10-20 — rejected — entry — Date parsed with local timezone — PRs #114, #120 — operator: not worth a rule yet
-- 2026-10-20 — accepted — check — Fixture has no result file — PRs #113, #119 — issue #88
+- 2026-10-20 — accepted — check — Fixture has no result file — PRs #113, #117 — issue #88
 ```
 
 `gh` works. The operator's only message is the command; no proposal has been answered. The run
