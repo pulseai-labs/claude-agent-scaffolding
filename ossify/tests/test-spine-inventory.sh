@@ -388,12 +388,32 @@ F="$TMP/s28b"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
 echo a > "$WT/a"; git -C "$WT" add a
 V28B="$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"; mkdir -p "$V28B"
 echo r > "$V28B/report.md"
-printf 'verifier: inline - test\n- [rule] src/x.ts:3 - the claim quotes [fidelity] mid-line\n' > "$V28B/verify.md"
+printf 'verifier: inline - test\n- [pattern] src/x.ts:3 - the claim quotes [fidelity] mid-line\n' > "$V28B/verify.md"
 inv "$F"
 t_assert_eq "close-finished" "$(route r0.s1.w1)" "S28b: a [fidelity] quoted mid-line is not a rejection"
 printf -- '- [fidelity] src/x.ts:3 - the diff deviates from spec.md\n' >> "$V28B/verify.md"
 inv "$F"
 t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S28b: a line-start '- [fidelity]' halting finding is a rejection"
+
+# S28c (#971): a halt on any tag is the rejection record. Every pass overwrites
+# verify.md (1.29.1), so a [rule] or [mutation] halt that re-entry did not read
+# would hand the rejected result back to a stochastic gate. The controls are the
+# non-halting lines a passing pass writes: a declared `fidelity`, a layer result,
+# an advisory [pattern], and a tag quoted mid-line.
+F="$TMP/s28c"; fx "$F" 1; WT="$(spawn "$F" r0.s1.w1 one)"
+echo a > "$WT/a"; git -C "$WT" add a
+V28C="$F/ws/docs/specs/r0/r0.s1-demo/work-r0.s1.w1"; mkdir -p "$V28C"
+echo r > "$V28C/report.md"
+printf 'verifier: inline - test\n- L3: pass\n- mutation: 2 red, 0 stayed-green\n- fidelity L4-1 src/x.ts:3 - declared in report 7\n- [pattern] src/x.ts:3 - quotes [rule] and [mutation] mid-line\n' > "$V28C/verify.md"
+inv "$F"
+t_assert_eq "close-finished" "$(route r0.s1.w1)" "S28c control: non-halting lines and mid-line tags stay close-finished"
+for halt in '[rule] src/x.ts:3 - a documented pattern' '- [rule] src/x.ts:3 - a documented pattern' \
+            '[mutation] t_x - stayed green' '- [mutation] t_x - stayed green'; do
+  printf 'verifier: inline - test\n%s\n' "$halt" > "$V28C/verify.md"
+  inv "$F"
+  t_assert_eq "halt:close-rejected" "$(route r0.s1.w1)" "S28c: '$halt' is a rejection"
+  t_assert_rc 3 "S28c: '$halt' ...rc 3"
+done
 
 # S29 (#673 G3): a RECORDED base that no longer resolves halts the read-out -
 # a repo row naming it - instead of classifying `cut-missing` and failing

@@ -290,13 +290,13 @@ Advisory means advisory: no pattern or absence finding halts, delays, or re-runs
 this close (D5).
 
 **A halting run's finding set is written to `verify.md` too, every halting
-verdict included — `[rule]`, `[fidelity]`, `[mutation]`. The `[fidelity]` line is
-the durable rejection record (#673 C2).**
+verdict included — `[rule]`, `[fidelity]`, `[mutation]`. Each line is
+the durable rejection record (#673 C2, #971).**
 Without it, a staged worktree after a rejection is byte-identical to a
 `close-finished` result: a fresh session's re-entry re-verifies and returns the
-very result the gate rejected, and a stochastic Layer 4 pass can accept it
+very result the gate rejected, and a stochastic pass can accept it
 without the correction. `work-item-close.md` §2 owns the write; the re-entry
-inventory reads a `[fidelity]` line there as route `halt:close-rejected`; the
+inventory reads any of those lines there as route `halt:close-rejected`; the
 next completed verifier pass overwrites the file, which is what clears the
 record.
 
