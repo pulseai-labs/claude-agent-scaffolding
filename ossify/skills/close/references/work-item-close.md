@@ -247,12 +247,12 @@ is tagged `[fidelity]`, a declared one is written as `fidelity`. The summary is 
 and in an `--external-executor` lane it belongs to the lane's session, so this
 file is the item's durable gate record (#980). When the pass halts, on any tag,
 `[rule]` included, the whole set is written with every halting verdict in it.
-**A `[fidelity]` rejection is recorded durably (#673 C2)**, because a staged
+**A rejection is recorded durably (#673 C2, #971)**, because a staged
 worktree after a rejection is byte-identical to a `close-finished` result otherwise — a fresh session's
 re-entry would hand the rejected result back to the gate, and a stochastic
-Layer 4 pass could accept it without the correction ever running. The re-entry
-inventory reads a `[fidelity]` line in `verify.md` as exactly that record
-(route `halt:close-rejected`).
+pass could accept it without the correction ever running. The re-entry
+inventory reads a `[rule]`, `[fidelity]` or `[mutation]` line in `verify.md` as
+exactly that record (route `halt:close-rejected`).
 
 **Every completed verifier pass overwrites `verify.md`, even when there are zero
 findings — never leave a stale one.** A work
