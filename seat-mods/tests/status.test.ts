@@ -42,9 +42,24 @@ describe('checkBlock', () => {
     expect(checkBlock('**What I ruled: a')).toEqual({ ok: false, failed: 'Text comes before **What I ruled:**' })
     expect(checkBlock('What I ruled:** a')).toEqual({ ok: false, failed: 'Text comes before **What I ruled:**' })
   })
-  test('a line after the block fails; trailing whitespace passes', () => {
+  test('a line after `none` in the last field fails; trailing whitespace passes', () => {
     expect(checkBlock(BLOCK + '\n\nAlso, I checked the logs.')).toEqual({ ok: false, failed: 'Text comes after **Waiting on operator:**' })
     expect(checkBlock(BLOCK + '\n\n')).toEqual({ ok: true })
+  })
+  test('a field holds the lines up to the next label (#994)', () => {
+    const multi = BLOCK
+      .replace('**What I ruled:** a', '**What I ruled:**\n- one\n- two')
+      .replace('**Next steps:** b', '**Next steps:** first\n| a | b |\n|---|---|\n| 1 | 2 |')
+      .replace('**Waiting on operator:** none', '**Waiting on operator:** decision:\n1. Merge? Options: yes, no. Recommended: yes.\n2. Tag? Options: yes, no. Recommended: no.')
+    expect(checkBlock(multi)).toEqual({ ok: true })
+  })
+  test('a label alone with lines under it has content; a label with none does not (#994)', () => {
+    expect(checkBlock(BLOCK.replace('**Next steps:** b', '**Next steps:**\n- b'))).toEqual({ ok: true })
+    expect(checkBlock(BLOCK.replace('**Next steps:** b', '**Next steps:**\n\n'))).toEqual({ ok: false, failed: '**Next steps:** has no content' })
+  })
+  test('controls: a repeated label is out of order, text before the block still fails (#994)', () => {
+    expect(checkBlock(BLOCK + '\n**Next steps:** again')).toEqual({ ok: false, failed: '**Next steps:** is out of order' })
+    expect(checkBlock('- a list\n' + BLOCK)).toEqual({ ok: false, failed: 'Text comes before **What I ruled:**' })
   })
 })
 
@@ -94,6 +109,14 @@ test('rotation resumes are status', () => {
 })
 
 describe('isIdleStop (#876)', () => {
+  test('reads the first line of a multi-line field (#994)', () => {
+    const build = (next: string, seats: string, op: string): string =>
+      `**What I ruled:** a\n**What the PR(s) will carry:** none\n**Next steps:** ${next}\n**Waiting on (seats live):** ${seats}\n**Waiting on operator:** ${op}`
+    expect(isIdleStop(build('merge\n- then tag', 'none', 'none'))).toBe(true)
+    expect(isIdleStop(build('merge', 'none\n- none live', 'none'))).toBe(true)
+    expect(isIdleStop(build('merge', 'none', 'decision:\n1. Merge?'))).toBe(false)
+    expect(isIdleStop(build('merge', '- seat a\n- seat b', 'none'))).toBe(false)
+  })
   // Blocks built from the five labels with given contents; the plain variant
   // strips the markers, since a label counts bold or plain.
   const fb = (next: string, waiting: string, operator: string) =>

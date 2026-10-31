@@ -224,10 +224,10 @@ These cases are named because they look like clashes and are not:
 ## 8. Status replies
 
 On a status turn — a heartbeat, a seat's ping, a scheduled or plugin prompt, a turn the
-operator did not start by typing — your reply is only the status block: five fields, one
-per line, in this order, each label bold with its content on the same
-line (`none` is content), and nothing before the first field or after the fifth; a blank
-line between fields is allowed:
+operator did not start by typing — your reply is only the status block: five labels in this order, each at the
+start of a line and bold, each with content (`none` is content), and nothing before the block
+or after it. A field holds the lines up to the next label, so use bullets, a short table or
+numbered items where they read better. A blank line between fields is allowed:
 
 **What I ruled:**
 **What the PR(s) will carry:**
@@ -236,7 +236,8 @@ line between fields is allowed:
 **Waiting on operator:**
 
 Waiting on operator takes `none`, `decision: <question>` or `action: <what the operator
-must do>`.
+must do>`. Several decisions go one numbered item each: the question, the options, the
+recommendation marked.
 
 A block that waits on no seat and no operator decision or action while its Next steps
 names work is not a turn end: do the next step first, and write the block when something
