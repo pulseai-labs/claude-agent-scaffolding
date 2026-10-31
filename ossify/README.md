@@ -1,4 +1,4 @@
-# ossify (v1.31.0)
+# ossify (v1.31.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -220,6 +220,11 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.31.1 (#971), a `[rule]` or `[mutation]` halt in `verify.md` is a durable rejection on
+re-entry, as `[fidelity]` already was: the inventory routes the item `halt:close-rejected`, so a
+fresh session cannot hand a rejected result back to a stochastic gate. One `lib/` reader changes,
+no state change.
 
 Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and

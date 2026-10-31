@@ -41,9 +41,9 @@ _oss_inv_rejection() { # $1=verify.md ; rc 0 rejected · rc 1 no record · rc 2 
   local rc=0
   [ -e "$1" ] || [ -L "$1" ] || return 1
   # Anchored to the line shape work-item-close §2 names for a halting verdict:
-  # the tag first, optionally after a `- ` list marker. A `[fidelity]` quoted
-  # mid-line (a [rule] claim, say) is not a rejection.
-  grep -qE '^(- )?\[fidelity\]' "$1" 2>/dev/null || rc=$?
+  # the tag first, optionally after a `- ` list marker. Any tag the verifier
+  # pass halts on is a rejection (#971). A tag quoted mid-line is not.
+  grep -qE '^(- )?\[(rule|fidelity|mutation)\]' "$1" 2>/dev/null || rc=$?
   [ "$rc" -le 1 ] || rc=2
   return "$rc"
 }
@@ -418,7 +418,7 @@ HOLD
           # not contain them: the merge the state claims is missing. Re-land it
           # through close's §4 merge-onward (the owning repair for this shape)
           # - but only when the durable rejection record does not bar it
-          # (#673 J1): a recorded [fidelity] rejection means the correction
+          # (#673 J1): a recorded rejection means the correction
           # must complete first, and an unreadable record halts rather than
           # reading as clear. The row itself re-runs close §2's gate on the
           # committed tree before it merges (#673 K1).
@@ -498,7 +498,7 @@ HOLD
               # from its recorded base - a rewrite is never merge-repairable.
               elif [ "$descends" != yes ]; then route=halt:unclassified
               else
-                # #673 J1: the durable [fidelity] rejection record gates THIS
+                # #673 J1: the durable rejection record gates THIS
                 # merge arm too, not just close-finished (C2). A stage-never-
                 # commit violation after a recorded rejection leaves exactly
                 # this shape, and merging it would land gate-rejected work on
@@ -517,7 +517,7 @@ HOLD
             elif [ "$hab" = yes ] && [ "$report" = yes ] \
                  && printf '%s\n' "$por" | awk 'substr($0,1,2)=="??" || substr($0,1,1)==" " || substr($0,2,1)!=" " {bad=1} END{exit bad}'; then
               # #673 C2: a staged result whose LAST COMPLETED gate run recorded
-              # a [fidelity] finding is a rejected result or a correction in
+              # a halting verdict is a rejected result or a correction in
               # flight - durable evidence the close wrote at rejection time
               # (impl-check §4b). Byte-identical to a close-finished result
               # otherwise, and re-entry must not hand the rejected result back
