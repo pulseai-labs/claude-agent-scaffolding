@@ -260,7 +260,9 @@ describe("ossify-spine recipe", () => {
     const c = r.stages.correct;
     expect(c.message).toContain(`Correction packet: ${PACKET}.`);
     // cleared on the way to verify, never before a launch: a relaunched correction still reads it
-    expect(c.outcomes[0].run).toEqual([["rm", "-f", `${OUT}/corrected`, PACKET]]);
+    // the used packet stays as correction-<n>.txt, and no packet remains to route a later close (#1005)
+    expect(c.outcomes[0].run[0]).toEqual(["rm", "-f", `${OUT}/corrected`]);
+    expect(c.outcomes[0].run[1].slice(3)).toEqual(["sh", OUT, "correction", ".txt"]);
     expect(c.before.flat()).not.toContain(PACKET);
   });
 
