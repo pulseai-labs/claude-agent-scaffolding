@@ -138,7 +138,8 @@ export function checkBlock(reply: string): { ok: true } | { ok: false; failed: s
 export function isIdleStop(reply: string): boolean {
   const block = readBlock(reply)
   if ('failed' in block) return false
-  const none = (index: number): boolean => NONE_AT_START.test(block.fields[index] ?? '')
+  // A list marker before the word (`- none`, `1. none`) still reads as `none`.
+  const none = (index: number): boolean => NONE_AT_START.test((block.fields[index] ?? '').replace(/^(?:[-*+]|\d+[.)])\s+/, ''))
   // Next steps is label 2, Waiting on (seats live) 3, Waiting on operator 4.
   return none(3) && none(4) && !none(2)
 }

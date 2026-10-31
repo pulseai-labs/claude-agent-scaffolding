@@ -166,7 +166,7 @@ Don't run `/grill-me` and `/council` in the same session — different interacti
 ├── molt/                              # molt plugin (v0.5.0)
 ├── baton/                             # baton plugin (v0.10.0, CLI + timer + 1 skill)
 ├── bot-on-openbot/                    # bot-on-openbot plugin (v0.2.2, CLI + systemd service, no skill)
-├── omp-roles/                         # OMP role pack: omp-seat launcher, agents and coordinator roles including orchestrator (v0.9.0, OMP only)
+├── omp-roles/                         # OMP role pack: omp-seat launcher, agents and coordinator roles including orchestrator (v0.9.1, OMP only)
 ├── docs/
 │   ├── SPEC-ai-mentor.md              # ai-mentor spec (v1.1 amendments)
 │   └── archive/SPEC-v1.md             # historical 5-plugin design (pre-pivot)

@@ -116,6 +116,13 @@ describe('isIdleStop (#876)', () => {
     expect(isIdleStop(build('merge', 'none\n- none live', 'none'))).toBe(true)
     expect(isIdleStop(build('merge', 'none', 'decision:\n1. Merge?'))).toBe(false)
     expect(isIdleStop(build('merge', '- seat a\n- seat b', 'none'))).toBe(false)
+    // A list marker before `none` still reads as none (the idle check is not dodged by a bullet);
+    // controls: a marker before other text, and `none` as a word prefix, do not.
+    expect(isIdleStop(build('merge', '- none', '1. none'))).toBe(true)
+    expect(isIdleStop(build('merge', 'none', '- None'))).toBe(true)
+    expect(isIdleStop(build('- none', 'none', 'none'))).toBe(false)
+    expect(isIdleStop(build('merge', '- nonetheless a seat', 'none'))).toBe(false)
+    expect(isIdleStop(build('merge', '- seat none', 'none'))).toBe(false)
   })
   // Blocks built from the five labels with given contents; the plain variant
   // strips the markers, since a label counts bold or plain.
