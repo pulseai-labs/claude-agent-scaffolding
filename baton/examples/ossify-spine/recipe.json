@@ -186,7 +186,7 @@
         "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
       },
       "slots": ["session", "build"],
-      "before": [["mkdir", "-p", "{run.dir}/out/{unit.id}"], ["rm", "-f", "{run.dir}/out/{unit.id}/verdict.json"]],
+      "before": [["mkdir", "-p", "{run.dir}/out/{unit.id}"], ["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "verdict", ".json"]],
       "stop_file": "{run.dir}/out/{unit.id}/stop",
       "handoff": null,
       "outcomes": [
@@ -251,7 +251,7 @@
         {
           "when": [{ "file": "{run.dir}/out/{unit.id}/corrected" }],
           "to": "verify",
-          "run": [["rm", "-f", "{run.dir}/out/{unit.id}/corrected", "{run.dir}/out/{unit.id}/correction.txt"]]
+          "run": [["rm", "-f", "{run.dir}/out/{unit.id}/corrected"], ["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "correction", ".txt"]]
         }
       ]
     },
