@@ -26,7 +26,7 @@ the only match. Merged PRs #101 to #110. Before the run, in `tiles-ai/`:
 
 - `.claude/memory-bank/review-ledger.md` with lines for #103 and #108, both blocking
   "Error swallowed in a catch block". #105 and #109 both block "Magic number in layout code".
-- `CODING_STANDARDS.md`, hand-written, with the headings `## Naming`, `## Error handling`,
+- `CODING_STANDARDS.md`, hand-written, starting with the title `# Tiles coding standards` and then the headings `## Naming`, `## Error handling`,
   `## Layout`, each holding three or four entries, and no `## Entries` heading.
 - No `retro-log.md`.
 

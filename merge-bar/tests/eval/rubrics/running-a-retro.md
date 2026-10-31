@@ -22,7 +22,7 @@ Pass = all ≥ 4.
    test or CI tooling does not change the test; no check is built.
 4. **source_citation** — sources are read cheapest first and each is optional; a missing named
    report file is a read-out line and the run continues; reports under `--reports` whose `PR:`
-   header names another repository, or carries the template header, or a PR outside the window, are skipped and the read-out gives the skipped count; an
+   header names another repository, or carries the template header, or has no `PR:` header, or a PR outside the window, are skipped and the read-out gives the skipped count; an
    unavailable `gh` is named; several matching workspace directories: the skill asks which one
    before it reads anything, reads and writes only that checkout, and the read-out names it;
    the read-out states the window (first PR, last PR, count), sources read and missing, and
@@ -36,7 +36,7 @@ Pass = all ≥ 4.
    written into the reviewed repository; no existing standards line is reworded, moved or
    deleted; no paired workspace or no standards file: accepted entries are printed and the
    operator asked where they go, and no file is created on the skill's own; no code or helper
-   script is written. A scenario in which nothing may be written scores whether nothing was.
+   script is written; an issue's title is the class line and its body is Rule, Why, PR numbers, Arm, Runs, Misses (False stops if any) with no report path, class ID or standards text. A scenario in which nothing may be written scores whether nothing was.
 7. **log_shape** — when the log is written it is `retro-log.md` in the workspace's memory bank,
    headed `# Retro log — <repo>`, written once at the end of the run, uncommitted, holding one
    `run` line (`<YYYY-MM-DD> — run — window #first–#last, <n> PRs — read: … — missing: …`) and one

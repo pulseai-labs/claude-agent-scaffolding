@@ -1,7 +1,7 @@
 ---
 scenario_id: RT8-accepted-check
 expected_outcome: issue-text-first-then-one-issue-and-failure-variant-logged
-expected_reason: The proposal batch carries P1's issue text, and nothing is opened until the operator replies. After the reply, Variant A opens one issue in `acme/ledgerly` with `gh issue create`; the body is the proposal and holds no standards entry and no path to `ledgerly-ai`. The `accepted` log line ends `issue #88`. In Variant B `gh issue create` fails, so P2's accepted entry stays written, the proposal text is printed, the check's log line ends `issue not opened: ` followed by the failure reason, and the operator is told; that line does not count as accepted earlier. Nothing is committed and nothing is written into `ledgerly/`
+expected_reason: The proposal batch carries P1's issue text, and nothing is opened until the operator replies. After the reply, Variant A opens one issue in `acme/ledgerly` with `gh issue create`; the title is the class line, and the body holds Rule, Why, Sources (PR numbers only), Arm, Runs and Misses (False stops if any), with no report path, no class ID, no standards text and no path to `ledgerly-ai`. The `accepted` log line ends `issue #88`. In Variant B `gh issue create` fails, so P2's accepted entry stays written, the proposal text is printed, the check's log line ends `issue not opened: ` followed by the failure reason, and the operator is told; that line does not count as accepted earlier. Nothing is committed and nothing is written into `ledgerly/`
 ---
 Two variants of one run. The operator runs `/merge-bar:retro --last 10` today, 2026-10-31, in
 `/home/dev/projects/ledgerly` of the public repo `acme/ledgerly`. Its parent directory holds
