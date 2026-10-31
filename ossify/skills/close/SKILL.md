@@ -471,7 +471,7 @@ token in the invocation/request text. **Parse `$ARGUMENTS` in bash; never
 reference `$1` / `$2` / `$N`** — Claude Code substitutes positional tokens in
 command bodies at template-render time and silently corrupts them.
 
-The arguments are the id and, after a work-item id only, `--pr` (`/close <wi-id> --pr`). `--pr` applies to a work-item close only: on a spine or release id, twice, before the id, or with any other token, refuse with that sentence before §3's pre-flight. With no id, emit one line, list what is open, and stop (§2).
+The arguments are the id and, after a work-item id only, `--pr` (`/close <wi-id> --pr`) and `--verdict <file>` (`/close <wi-id> --pr --verdict <file>`: a caller's verifier verdict replaces the close's own dispatch, `references/work-item-close.md` §2). Both apply to a work-item close only: on a spine or release id, twice, before the id, with `--verdict` and no file, or with any other token, refuse with that sentence before §3's pre-flight. With no id, emit one line, list what is open, and stop (§2).
 
 ---
 

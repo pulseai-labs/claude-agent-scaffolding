@@ -1,7 +1,7 @@
 // Step 7: a parked unit gets one driver session; its result resumes, escalates, or stops the run.
 
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { claimKey, liveClaim } from "../src/claims.ts";
@@ -660,4 +660,61 @@ test("done leaves the ledger out when it cannot render", async () => {
   expect(n.length).toBe(1);
   expect(n[0]).toContain("baton r1 done — ");
   expect(n[0]).not.toContain("ledger");
+});
+
+// ---- role ------------------------------------------------------------------------------------
+
+const DRIVER_ROLE = {
+  driver: { agent: "agent-d", argv: ["run-d"], brief_delivery: "file", expected_model: "model-d", effort: "high", env: { Z: "3" } },
+};
+
+async function armRoles(rec: unknown, table: unknown = DRIVER_ROLE) {
+  const seats = join(root, "r1.roles.json");
+  writeFileSync(seats, JSON.stringify(table));
+  const file = join(root, "r1.recipe.json");
+  writeFileSync(file, JSON.stringify(rec));
+  for (const s of (rec as { seed: { id: string }[] }).seed) {
+    mkdirSync(seatCwd(s.id), { recursive: true });
+    mkdirSync(driverCwd(s.id), { recursive: true });
+  }
+  expect(await main(["arm", file, "--run", "r1", "--param", `root=${root}`, "--seats", seats, "--no-timer"])).toBe(0);
+}
+
+function roleDriver() {
+  const { instance: _i, model: _m, ...rest } = driverStage({ role: "driver", message: "{agent.name} settles {unit.id}" });
+  return rest;
+}
+
+test("a driver with a role launches on the table's agent, with the merged claim env", async () => {
+  await armRoles(recipe(["a"], roleDriver()));
+  host = new FakeHost({ work: SEAT, fix: SEAT, driver: { ticks: 100, end: "completed" } });
+  await doTick();
+  put(stop());
+  at(1);
+  await doTick();
+  const l = driverLaunches()[0];
+  expect(l.request.instance).toBe("agent-d");
+  expect(l.request.model).toBe("model-d");
+  expect(l.request.message).toBe("agent-d settles a");
+  expect(l.claim).toEqual({
+    nonce: "r1/a/driver/1",
+    env: { Z: "3", DK: "d-a", BATON_ROLE: "driver", BATON_ROLE_TABLE: join(runDir(), "seats.json") },
+  });
+});
+
+test("a driver with a role and no seats.json escalates naming it, with no driver claim", async () => {
+  await armRoles(recipe(["a"], roleDriver()));
+  host = new FakeHost({ work: SEAT, fix: SEAT, driver: { ticks: 100, end: "completed" } });
+  await doTick();
+  rmSync(join(runDir(), "seats.json"));
+  put(stop());
+  at(1);
+  await doTick();
+  expect(driverLaunches().length).toBe(0);
+  expect(liveClaim(claimKey(driverCwd()))).toBeNull();
+  expect(runState().units.a.parked?.escalated).toBe(true);
+  const n = notices();
+  expect(n.length).toBe(1);
+  expect(n[0]).toContain("driver could not launch");
+  expect(n[0]).toContain("seats.json");
 });

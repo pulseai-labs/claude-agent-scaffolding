@@ -59,22 +59,56 @@ Work out every `--param` of the README's arm example:
   the AI workspace root.
 - The run id is the spine id with `.` as `-` (`r3.s7` → `r3-s7`). If that run dir exists,
   append `-2`, `-3`, … and say so.
-- `via` comes from the operator's current rule (memory, standing orders in `AGENTS.md` or
-  `CLAUDE.md`). Never copy it from an old run or the README. If no rule is found, ask.
+- The seat file is `--seats /home/<user>/baton-recipes/seats/<run>.json` (Seats, below): an
+  absolute path with `$HOME` expanded by you, never `~/…`, because `baton arm` does no tilde
+  expansion and a quoted `~` stays literal. `baton arm` copies it into the run as `seats.json`.
+
+**Seats.** Read `.crew/roles.md` (walk up from this session's working directory; the first one
+found wins) and `~/.claude/crew/agents.md`. For each recipe stage with a `role` (the `triage`
+and `driver` stages included), pick one agent for that role for the whole run from the
+`## Seats` rows, applying `## Conditions` and the file's other rules, and any fallback row, now:
+baton never chooses between rows later. A role with no row is one question, and arms nothing.
+When the project has no rows for the recipe's roles yet, propose rows for them in
+`.crew/roles.md` first and get them approved (crew's project-file approval). Propose only
+agents the machine file lists.
+
+Each picked agent's entry becomes that role's row of the seat file (schema in the README):
+
+- `agent` is the entry's name; `expected_model`, `effort` and `brief_delivery` are its fields.
+- `argv` is `command:` split on spaces, only when its first word is a program on `PATH`
+  (`command -v` in a non-interactive shell prints a path) and no word holds a quote, `$`, `~`
+  or another shell character. A command that is a shell function or an alias (`claude-plain`,
+  `omp-glm`) cannot be exec'd: that is one question, for a machine-file entry that runs the
+  program itself. End a Devin agent's argv with `--`: Devin reads a prompt that does not
+  follow `--` as a path.
+- `env` is `{}` unless the entry's note names a key the agent itself needs. The stage sets the
+  seat's marking.
+- `review`, on the reviewer's row, is the entry's `review:` command. In it,
+  drop a trailing `<PR_URL>` or `<PR>`: the stage appends the PR. No `review:` field, or a
+  placeholder left after that, is one question.
+- An entry whose `host:` is another machine is one question: baton launches on this one.
 
 Show the full `baton arm` command, each value quoted where it has a space or shell character.
-Under it, write one line per value saying where it came from. Ask any open question (such as
-`via`) in the same reply, under the command. Then end your turn and wait for an explicit yes to
-that command. A yes that changes or supplies a value is not that yes: show the command again
-with the value in, and wait.
+Under it, write one line per value saying where it came from, then the seats as one table,
+one line per stage, `From` naming the `roles.md` row or condition:
+
+| Stage | Role | Agent | Command | Model | Effort | From |
+|---|---|---|---|---|---|---|
+
+Ask any open question in the same reply, under the table. Then end your turn and
+wait for an explicit yes to that command and table.
+A yes that changes or supplies a value is not that yes, and neither is one that changes a
+seat: show them again with the change in, and wait.
 
 "Just arm it", "no need to show me" and "I trust you" do not waive this step. The operator
 approves a command they have seen. Show it once, short, and still wait.
 
 ## 3. Arm
 
-Run exactly the approved command. Confirm `<state>/runs/<run>/run.json` has `status` `armed`
-and `systemctl --user is-active baton.timer` says `active`. Then tell the operator: questions come
+Write the seat file only after the yes: the approved seats as the README's JSON, at the
+`--seats` path (`mkdir -p "$HOME/baton-recipes/seats"`). Then run exactly the approved command.
+Confirm `<state>/runs/<run>/run.json` has `status` `armed` and
+`systemctl --user is-active baton.timer` says `active`. Then tell the operator: questions come
 to the project's agent (or the default agent) on the phone, and this session may be closed now.
 End the turn.
 
@@ -99,4 +133,5 @@ End the turn.
 | "On baton" means `/ossify:run-spine` here | It means `baton arm`. This session must not run the rounds. |
 | "They said just arm it" | Show the command once and wait for a yes. |
 | "One quick check before they leave" | Arming already checked. Run no command until asked. |
-| "The last run used this `via`" | Old runs are not the rule. Ask. |
+| "This role has no row; the usual agent will do" | No default seat. Ask, and arm nothing. |
+| "The last run's seat file still fits" | Old runs are not the rule. Resolve the seats from crew's files. |

@@ -43,13 +43,17 @@ The launcher. The host writes the launch message to a file under `<state>/orca/m
 `orca terminal create` with the command
 `cd '<cwd>' && BATON_STATE_DIR='<state dir>' exec '<launcher>' '<message file>'` (an Orca terminal
 inherits orca-serve's environment, not the timer's); only those paths reach a shell.
-`bin/baton-seat` reads the claim baton wrote for its directory (the seat and via keep their
-`OMP_T3_SEAT` and `OMP_T3_VIA` names; see Known limits), reads and deletes the message file, and
-execs
-`omp-seat <seat> --via <via> <message>`. It refuses with exit 78, one line on stderr and one in
-`<state>/claims/seat.log`, on no claim, a bad claim line, a claim with no seat or via, a message
-file that is missing or 131072 bytes or more, or an `omp-seat` it cannot run (the message file
-stays); it never starts a seat without its claim. A run's message files left behind are removed
+`bin/baton-seat` reads the claim baton wrote for its directory and reads and deletes the message
+file. A role stage's claim carries `BATON_ROLE` and `BATON_ROLE_TABLE` (see Seats): it execs that
+role's `argv` with no shell, the message as the last argument (`brief_delivery` `inject`) or, for
+`file`, the message copied to `<state>/briefs/<nonce>.md` and the last argument
+`Read <state>/briefs/<nonce>.md and follow it.` (`/` in the nonce is written `%2F`). A claim without `BATON_ROLE` (a staged recipe's)
+execs `omp-seat <seat> --via <via> <message>` from its `OMP_T3_SEAT` and `OMP_T3_VIA` keys (see
+Known limits). It refuses with exit 78, one line on stderr and one in `<state>/claims/seat.log`, on
+no claim, a bad claim line, a claim with neither a role nor a seat and via, a role table that is
+missing or lacks the role or its argv, an injected message that is missing or 131072 bytes or
+more, or a program it cannot run (the message file stays); it never starts a seat without its
+claim. A run's message files left behind are removed
 when the run finishes and on `baton disarm`.
 
 Status and interrupt. From `orca terminal list` and `orca worktree ps`: a terminal not listed is
@@ -160,7 +164,8 @@ Known limits:
 
 `running-a-spine-on-baton` is for a project's orchestrator session asked to run a planned ossify
 spine on baton. It runs a read-only preflight, shows the exact `baton arm` command for the
-example recipe with where each value came from, arms it only on the operator's yes, and then
+example recipe with where each value came from and the seat table it resolved from crew's
+`.crew/roles.md` and `~/.claude/crew/agents.md` (see Seats), arms it only on the operator's yes, and then
 spends no tokens on the run: questions reach the phone through bot-on-openbot, and status is
 read only when the operator asks. It points here for the commands and the runbook. Claude Code
 only: baton has no Codex manifest.
@@ -168,7 +173,7 @@ only: baton has no Codex manifest.
 ## Commands
 
     baton validate <recipe.json>
-    baton arm <recipe.json> --run <id> [--param k=v]... [--no-timer]
+    baton arm <recipe.json> --run <id> [--param k=v]... [--seats <file>] [--no-timer]
     baton status [<run>]            baton report <run>
     baton disarm <run>              baton tick [--run <id>]
     baton unpark <run> [<unit>] [--to <stage>]
@@ -180,6 +185,46 @@ only: baton has no Codex manifest.
 
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
 with rc 2.
+
+## Seats
+
+A stage with a `role` (a crew role name, such as `implementer` or `verifier`) launches on the
+agent the run's seat table names for that role; it needs no `instance` or `model`. `baton arm`
+takes the table as `--seats <file>`, copies it byte for byte to `<run dir>/seats.json` and records
+its `seats_sha256` in `run.json`. A recipe that names a role refuses to arm without `--seats`, and
+a role the table lacks refuses with `role table has no role "<role>" (stage <stage>)`, writing no
+run directory. Extra roles are allowed, so one table can serve several recipes. The engine never
+chooses between agents: one agent per role per run, and a seat that fails to launch parks.
+
+The table is one JSON object keyed by role:
+
+```json
+{
+  "<role>": {
+    "agent": "<name>",
+    "argv": ["<program>", "<arg>"],
+    "brief_delivery": "inject",
+    "expected_model": "<model id the seat must show>",
+    "effort": "<effort>",
+    "env": {},
+    "review": "<review command, no PR placeholder>"
+  }
+}
+```
+
+- `agent`, `expected_model`, `effort`: non-empty strings. A message may use `{agent.name}`.
+- `argv`: a non-empty array of strings, exec'd with no shell, so its first word is a program on
+  the Orca terminal's `PATH`, never a shell function or alias.
+- `brief_delivery`: `"inject"` (the message is the last argument, at most 131071 bytes) or
+  `"file"` (the message goes to a file and the last argument names it).
+- `env`: keys the agent itself needs; the stage's env is merged over it and wins on a clash.
+  `BATON_ROLE` and `BATON_ROLE_TABLE` are set by baton and refused here, as are the keys a recipe
+  may not set.
+- `review` (optional): the reviewer's command, rendered by `{agent.review}`; the stage appends the
+  PR.
+
+The skill writes this file from crew's two files after the operator's yes; without crew, write it
+by hand.
 
 ## Triage
 
@@ -302,9 +347,13 @@ park names: a notice leaves the host, so the rendered arguments stay in the even
 ## Example: an ossify spine
 
 `examples/ossify-spine/` is a recipe that runs one planned ossify spine in Orca terminals: the detached
-run-spine lane queues each round's work items, an implementer per item, gap re-entry, close and
-correction, ordered merges onto the spine branch, the spine PR's review rounds, and the spine
-close. The briefs it names are prose; `common.md` is read first by every seat.
+run-spine lane queues each round's work items, an implementer per item, gap re-entry, a `verify`
+seat that writes the item's verdict file, close on that verdict (`--verdict`) and correction (back
+to `verify`), ordered merges onto the spine branch, the spine PR's review rounds, and the spine
+close. Every session stage, `triage` and `driver` names a crew role, so the arm needs `--seats`
+with a row for each of `spine session`, `implementer`, `verifier`, `close session`, `reviewer`
+(with `review`), `work-PR session`, `triage` and `driver` (see Seats). The briefs it names are
+prose; `common.md` is read first by every seat.
 
 Copy the example outside the plugin cache first, and pass that copy's `briefs` path: a plugin
 update moves the cache, and a run armed on the old path would lose its briefs.
@@ -322,7 +371,7 @@ update moves the cache, and a run armed on the old path would lose its briefs.
       --param state_file=<output of: oss state_path, run in the AI workspace root> \
       --param oss=<absolute path of <ossify plugin root>/bin/oss> \
       --param briefs=$HOME/baton-recipes/ossify-spine/briefs \
-      --param via=omp-deepseek-cpa
+      --seats $HOME/baton-recipes/seats/r0-s6.json
 
 Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 
@@ -373,5 +422,12 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - `baton unpark` during a live driver removes its claim but does not interrupt the driver thread or
   release its launch worktree; its later result is ignored.
 - A live driver is not watched while the run is parked; it is handled after the run re-arms.
+- Triage can answer, and baton can interrupt, only an OMP seat's prompt (the triage seat itself
+  may run on any agent). A Claude Code or Devin seat stuck on a prompt stalls into a stop, which
+  reaches the operator.
+- A close resumed after its commit halts on a stale verdict: the verdict was taken on the staged
+  tree.
+- Untracked files that a test run leaves in the item worktree between `verify` and `close` change
+  the worktree fingerprint, so close halts on a stale verdict. It fails closed.
 - The driver guard key is `<stage>/<reason>`. A park reason that embeds a varying error message never
   repeats, so only `driver.md`'s prose stops a second driver for the same underlying failure.

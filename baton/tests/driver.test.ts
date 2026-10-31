@@ -11,7 +11,7 @@ beforeEach(() => { dir = realpathSync(mkdtempSync(join(tmpdir(), "baton-driver-"
 afterEach(() => {});
 
 const L = { q: "q", a: "a", why: "w", rejected: "r" };
-const d = { clearing: ["rebase", "retry"], resume_to: { correct: ["reclose"] } } as unknown as DriverStage;
+const d = { clearing: ["rebase", "retry"], resume_to: { correct: ["verify"] } } as unknown as DriverStage;
 const put = (name: string, body: unknown) => {
   const p = join(dir, name);
   writeFileSync(p, typeof body === "string" ? body : JSON.stringify(body));
@@ -20,7 +20,7 @@ const put = (name: string, body: unknown) => {
 const inv = (body: unknown, park = "correct") => readDriverResult(put("r.json", body), d, park);
 
 test("reads each result shape", () => {
-  const a = { result: "resume", to: "reclose", cleared: "rebase", ledger: L };
+  const a = { result: "resume", to: "verify", cleared: "rebase", ledger: L };
   const b = { result: "escalate", action: "do x", ledger: L };
   const c = { result: "stop", reason: "done", ledger: L };
   expect(inv(a)).toEqual(a as never);
@@ -39,8 +39,8 @@ test("refusals", () => {
     .toEqual({ invalid: 'resume to "close" is not allowed from "correct"' });
   expect(inv({ result: "resume", cleared: "rebase", to: "done", ledger: L }))
     .toEqual({ invalid: 'resume to "done" is not allowed from "correct"' });
-  expect(inv({ result: "resume", cleared: "rebase", to: "reclose", ledger: L }, "other"))
-    .toEqual({ invalid: 'resume to "reclose" is not allowed from "other"' });
+  expect(inv({ result: "resume", cleared: "rebase", to: "verify", ledger: L }, "other"))
+    .toEqual({ invalid: 'resume to "verify" is not allowed from "other"' });
   expect(inv({ result: "escalate", action: "", ledger: L })).toEqual({ invalid: "escalate needs an action" });
   expect(inv({ result: "stop", reason: "", ledger: L })).toEqual({ invalid: "stop needs a reason" });
   expect(inv({ result: "stop", reason: "x", ledger: { a: "a", why: "w", rejected: "r" } }))

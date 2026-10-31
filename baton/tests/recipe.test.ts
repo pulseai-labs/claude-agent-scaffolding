@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  nonce, own, render, threadTitle, validate, RUN_ID_RE, type Scope,
+  nonce, own, recipeRoles, render, threadTitle, validate, RUN_ID_RE, type Scope,
 } from "../src/recipe.ts";
 
 const FIX = join(import.meta.dir, "fixtures", "recipes");
@@ -57,6 +57,14 @@ describe("validate", () => {
       const ok = relay();
       ok.stages.work.outcomes[0].to = t;
       expect(validate(ok).ok).toBe(true);
+    }
+  });
+
+  test("a stage env cannot carry the engine-set role keys", () => {
+    for (const k of ["BATON_ROLE", "BATON_ROLE_TABLE"]) {
+      const r = relay();
+      r.stages.work.env = { [k]: "x" };
+      expectError(r, `stages.work.env.${k}: reserved key`);
     }
   });
 
@@ -482,5 +490,92 @@ describe("render", () => {
     expect(() => render("{driver.launch}", scope)).toThrow("no driver in scope");
     expect(() => render("{driver.reason}", scope)).toThrow("no driver in scope");
     expect(() => render("{driver.stage}", scope)).toThrow("no driver in scope");
+  });
+});
+
+describe("stage role", () => {
+  const roled = (role: string) => {
+    const r = relay();
+    delete r.stages.planner.instance;
+    delete r.stages.planner.model;
+    r.stages.planner.role = role;
+    return r;
+  };
+  test("role-replaces-instance-and-model", () => {
+    expect(validate(roled("implementer")).ok).toBe(true);
+  });
+  test("role-name-shape", () => {
+    expectError(roled("bad_role"), "role must match ^[A-Za-z][A-Za-z0-9 -]*$");
+  });
+  test("role names with a space and capitals validate", () => {
+    expect(validate(roled("work-PR session")).ok).toBe(true);
+    expect(validate(roled("spine session")).ok).toBe(true);
+  });
+  test("no-role-still-needs-instance", () => {
+    const r = relay();
+    delete r.stages.planner.instance;
+    expectError(r, "stages.planner.instance: must be a string");
+  });
+  test("role on triage and driver", () => {
+    const r = relay();
+    r.triage = { kind: "triage", role: "triage", project: "/p", cwd: "/p", title: "t", message: "m", env: {}, note_file: "{run.dir}/n" };
+    expect(errorsOf({ ...r, triage: { ...r.triage, role: "x!" } }).some((e) => e.includes("triage.role"))).toBe(true);
+    const res = validate(r);
+    expect(res.ok).toBe(true);
+  });
+  test("recipe-roles-map", () => {
+    const r = relay();
+    r.stages.implement = { ...r.stages.planner, role: "implementer" };
+    r.stages.correct = { ...r.stages.planner, role: "implementer" };
+    for (const n of ["implement", "correct"]) { delete r.stages[n].instance; delete r.stages[n].model; }
+    const res = validate(r);
+    if (!res.ok) throw new Error(res.errors.join("; "));
+    const m = recipeRoles(res.recipe);
+    expect(Object.fromEntries(m)).toEqual({ implementer: ["implement", "correct"] });
+  });
+});
+
+describe("agent placeholders", () => {
+  const roled = () => {
+    const r = relay();
+    delete r.stages.planner.instance;
+    delete r.stages.planner.model;
+    r.stages.planner.role = "implementer";
+    return r;
+  };
+  test("{agent.name} and {agent.review} validate in a role stage's message and handoff message", () => {
+    const r = roled();
+    r.stages.planner.message = "{agent.name} {agent.review}";
+    r.stages.planner.handoff = { file: "{run.dir}/h", token: "x", message: "{agent.name}" };
+    const res = validate(r);
+    if (!res.ok) throw new Error(res.errors.join("; "));
+  });
+  test("refused in a stage without a role", () => {
+    const r = relay();
+    r.stages.planner.message = "{agent.review}";
+    expectError(r, "stages.planner.message: {agent.review} is allowed only in the message of a stage with a role");
+  });
+  test("refused outside the message of a role stage", () => {
+    const r = roled();
+    r.stages.planner.title = "{agent.name}";
+    expectError(r, "stages.planner.title: {agent.name} is allowed only");
+    const r2 = roled();
+    r2.stages.planner.env = { A: "{agent.name}" };
+    expectError(r2, "stages.planner.env.A: {agent.name} is allowed only");
+  });
+  test("triage and driver messages with a role", () => {
+    const r = relay();
+    r.triage = { kind: "triage", role: "triage", project: "/p", cwd: "/p", title: "t", message: "{agent.name}", env: {}, note_file: "{run.dir}/n" };
+    expect(validate(r).ok).toBe(true);
+    const r2 = relay();
+    r2.triage = { ...r.triage, role: undefined, instance: "i", model: "m" };
+    delete r2.triage.role;
+    expectError(r2, "triage.message: {agent.name} is allowed only");
+  });
+  test("render: agent names render from scope; an absent review is a render failure", () => {
+    expect(render("{agent.name} {agent.review}", { ...scope, agent: { name: "a", review: "/r <PR_URL>" } })).toBe("a /r <PR_URL>");
+    expect(() => render("{agent.review}", { ...scope, agent: { name: "a" } })).toThrow("no agent.review in scope");
+    expect(() => render("{agent.name}", scope)).toThrow("no agent in scope");
+    expect(render("{agent.name}", { ...scope, agent: { name: "a" } })).toBe("a");
   });
 });

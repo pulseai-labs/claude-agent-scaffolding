@@ -1,4 +1,4 @@
-# ossify (v1.30.0)
+# ossify (v1.31.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -203,7 +203,17 @@ line and each layer's result, so the `--external-executor` lane's close leaves a
 record, and the spine retrospective carries each item's `verifier:` line. No `lib/`
 behaviour change, no state change.
 
-Since 1.30.0 (#984), `/ossify:start` and `/ossify:adopt` seed the reviewer's project home in
+Since 1.30.0 (#993), `/close <wi> --pr --verdict <file>` closes on a verifier verdict a
+caller already produced (baton's `verify` stage), in place of dispatching
+`ossify:verifier-agent`. The file is one JSON object, `mode: verified` with `model`,
+`agent`, `work_item_id`, `identity`, `rule`, `lenses` and `mutation`; `identity` is the
+worktree fingerprint (`write-tree`, `status --porcelain`, `diff --binary`, hashed) taken
+after the verifier restored everything. Close recomputes it and halts on a mismatch, so
+an item that changed after verify is never closed on a stale verdict, then applies the
+verdicts as it would the agent's and prints `verifier: <agent> on <model>`. Without the
+flag nothing changes. No `lib/` behaviour change, no state change.
+
+Since 1.31.0 (#984), `/ossify:start` and `/ossify:adopt` seed the reviewer's project home in
 the AI workspace only, never overwriting an existing file: `CODING_STANDARDS.md`,
 `review-ledger.md`, and a `## Review` section in `08-governance.md`. `/ossify:adopt` also runs a
 history pass that drafts standards entries from review history: a class that recurs in two or

@@ -164,7 +164,7 @@ class SeatHost extends FakeHost {
   }
 }
 
-const SESSION_STAGES = ["lane", "implement", "regap", "close", "reclose", "correct", "spine_open", "spine_review", "spine_work", "spine_finish"];
+const SESSION_STAGES = ["lane", "implement", "regap", "verify", "close", "correct", "spine_open", "spine_review", "spine_work", "spine_finish"];
 const oneTick = (): Behaviour => ({ ticks: 1, end: "completed" });
 
 const out = (unit: string, name: string) => join(runDir, "out", unit, name);
@@ -194,8 +194,13 @@ function queue(wi: string, round: number, order: number, issuedAt = new Date(clo
 function seats(): Record<string, Effect> {
   return {
     implement: (u) => put(workFile(u, "report.md"), "report"),
-    close: (u) => oss("work_item_pr", u, prUrl(u)),
-    reclose: (u) => oss("work_item_pr", u, prUrl(u)),
+    verify: (u) => put(out(u, "verdict.json"), verdict(u, [])),
+    // close on the verdict: a halting one (a stayed-green mutation) is a red gate, so the packet
+    close: (u) => {
+      const v = JSON.parse(readFileSync(out(u, "verdict.json"), "utf8")) as { mutation: { result: string }[] };
+      if (v.mutation.some((m) => m.result === "stayed-green")) put(out(u, "correction.txt"), packet(u, "[mutation] t1 stayed green"));
+      else oss("work_item_pr", u, prUrl(u));
+    },
     correct: (u) => put(out(u, "corrected"), "x"),
     regap: (u) => {
       const rec = JSON.parse(readFileSync(join(runDir, "queue", `${u}.json`), "utf8"));
@@ -212,6 +217,13 @@ function seats(): Record<string, Effect> {
     },
   };
 }
+
+/** The verify seat's verdict file: Task 1's shape, one JSON object. */
+function verdict(wi: string, mutation: { test: string; mutation: string; result: string; evidence: string }[]): string {
+  return JSON.stringify({ mode: "verified", model: "m-1", agent: "verifier-agent-x", work_item_id: wi, identity: "c".repeat(40),
+    rule: [], lenses: [], mutation });
+}
+const STAYED_GREEN = [{ test: "t1", mutation: "x -> y", result: "stayed-green", evidence: "pass" }];
 
 /** What close writes on a red gate: ossify's correction packet (correction-continuation.md §2). */
 function packet(wi: string, failure: string): string {
@@ -231,13 +243,23 @@ function newHost(lane: Effect, extra: Record<string, Effect> = {}): SeatHost {
   return host;
 }
 
+/** The run's role table: one agent per D2 role, as `running-a-spine-on-baton` writes it. */
+const SEATS = Object.fromEntries(
+  ["spine session", "implementer", "verifier", "close session", "reviewer", "work-PR session", "triage", "driver"].map((role) => [role, {
+    agent: `${role.replaceAll(" ", "-").toLowerCase()}-agent`, argv: ["seat-bin", role], brief_delivery: "inject",
+    expected_model: `${role}-model`, effort: "high", env: {}, ...(role === "reviewer" ? { review: "/review" } : {}),
+  }]),
+);
+
 async function arm(): Promise<void> {
   loadRecipe(); // throws with baton's errors if the example does not validate
   const params: Record<string, string> = {
     spine: SPINE, spine_branch: BRANCH, spine_dir: spineDir, ai_root: aiRoot, ai_project: "demo-ai",
-    repo, project: "demo", state_file: stateFile, oss: FAKE_OSS, briefs: BRIEFS, via: "omp-glm-flash",
+    repo, project: "demo", state_file: stateFile, oss: FAKE_OSS, briefs: BRIEFS,
   };
-  const args = ["arm", RECIPE_PATH, "--run", "r1", "--no-timer"];
+  const seatsFile = join(root, "seats.json");
+  writeFileSync(seatsFile, JSON.stringify(SEATS));
+  const args = ["arm", RECIPE_PATH, "--run", "r1", "--seats", seatsFile, "--no-timer"];
   for (const [k, v] of Object.entries(params)) args.push("--param", `${k}=${v}`);
   expect(await main(args)).toBe(0);
 }
@@ -314,7 +336,14 @@ test("a two-item round runs to the second spine close", async () => {
     expect(seen[wi]).toEqual({ repo: r.forge.landedTip.get(prUrl(wi))!, head: BRANCH, status: "complete", dispatches: 1 });
   }
   expect(repoTip()).toBe(originTip());
-  for (const wi of [W1, W2]) expect(moves(wi)).toEqual(["implement>close", "close>land", "land>done"]);
+  for (const wi of [W1, W2]) expect(moves(wi)).toEqual(["implement>verify", "verify>close", "close>land", "land>done"]);
+  // verify launched in the item worktree on the verifier's agent, told its name and the verdict file
+  const v = host.of(W1, "verify")[0];
+  expect([v.request.instance, v.request.model]).toEqual(["verifier-agent", "verifier-model"]);
+  expect(v.request.message).toContain("verifier-agent");
+  expect(v.request.message).toContain(`Verdict file: ${out(W1, "verdict.json")}.`);
+  expect(v.claim?.env).toMatchObject({ BATON_ROLE: "verifier", OSSIFY_VERIFY_WORKTREE: join(root, "wt", W1), SEAT_MODS_ROLE: "verifier" });
+  expect(host.of(SPINE_UNIT, "spine_review")[0].request.message.startsWith(`/review ${prUrl(SPINE_UNIT)} Then read`)).toBe(true);
   expect(moves("lane")).toEqual(["lane>lane_wait", "lane_wait>lane", "lane>spine_open", "spine_open>done"]);
   expect(moves(SPINE_UNIT)).toEqual(["spine_review>spine_wait", "spine_wait>spine_ack", "spine_ack>spine_finish", "spine_finish>done"]);
   expect(host.of("lane", "lane")).toHaveLength(2);
@@ -343,7 +372,7 @@ test("a gap waits for a live sibling", async () => {
   });
 
   // w1 sat in gap_wait while w2's implementer was live; regap launched only after w2's session ended.
-  const w2Ended = moved(W2, "implement", "close");
+  const w2Ended = moved(W2, "implement", "verify");
   expect(held).toBeGreaterThanOrEqual(2);
   expect(moved(W1, "implement", "gap_wait")).toBeLessThan(w2Ended);
   expect(launchedEv(W1, "regap")).toBeGreaterThan(w2Ended);
@@ -365,11 +394,11 @@ test("two gaps in a round re-enter one at a time", async () => {
 
   // w2's re-entry launched only after w1 re-entered, relaunched its implementer, and left implement:
   // never in the tick w1's regap ended, when w1 sat in implement with no session yet.
-  const w1Closed = moved(W1, "implement", "close");
+  const w1Closed = moved(W1, "implement", "verify");
   expect(w1Closed).toBeGreaterThan(-1); // -1 (never) would make the next comparison vacuous
   expect(launchedEv(W2, "regap")).toBeGreaterThan(w1Closed);
   expect(launchedEv(W1, "implement", 2)).toBeGreaterThan(moved(W1, "regap", "implement"));
-  expect(moves(W1).slice(0, 4)).toEqual(["implement>gap_wait", "gap_wait>regap", "regap>implement", "implement>close"]);
+  expect(moves(W1).slice(0, 4)).toEqual(["implement>gap_wait", "gap_wait>regap", "regap>implement", "implement>verify"]);
   expect(moves(W2)).toEqual(["implement>gap_wait", "gap_wait>regap"]);
 });
 
@@ -397,7 +426,7 @@ test("a gap waits while a sibling is in correction", async () => {
     if (n === 1) { queue(W2, 1, 1); queue(W1, 1, 2); put(out("lane", "lane.done"), "x"); }
   }, {
     implement: (u, n) => (u === W1 && n === 1 ? put(out(u, "gaps.json"), "{}") : put(workFile(u, "report.md"), "r")),
-    close: fidelityRed,
+    close: (u, n) => (n === 1 ? fidelityRed(u) : oss("work_item_pr", u, prUrl(u))),
     correct: (u, n) => put(out(u, n === 1 ? "stop" : "corrected"), "x"),
   });
   const r = rig(host);
@@ -419,8 +448,8 @@ test("a gap waits while a sibling is in correction", async () => {
     if (!w2AtRegap && host.of(W1, "regap").length) w2AtRegap = unit(W2).stage;
   });
   expect(w2AtRegap).toBe("land");
-  expect(moves(W2)).toEqual(["implement>close", "close>correct", "correct>reclose", "reclose>land"]);
-  expect(launchedEv(W1, "regap")).toBeGreaterThan(moved(W2, "reclose", "land"));
+  expect(moves(W2)).toEqual(["implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", "close>land"]);
+  expect(launchedEv(W1, "regap")).toBeGreaterThan(moved(W2, "close", "land"));
 });
 
 test("an item at the dispatch cap parks before a fourth execution", async () => {
@@ -561,7 +590,7 @@ test("a molt successor gets the handoff path and is not a dispatch", async () =>
     },
   });
   const r = rig(host);
-  await drive(r, 30, () => unit(W1)?.stage === "close");
+  await drive(r, 30, () => unit(W1)?.stage === "verify");
 
   const launches = host.of(W1, "implement");
   expect(launches).toHaveLength(2);
@@ -599,7 +628,7 @@ test("a red close at any layer routes through the correction packet", async () =
     if (n === 1) { queue(W1, 1, 1); put(out("lane", "lane.done"), "x"); }
   }, {
     // A Layer 1 red: impl-check halts before Layer 4, so there is no verify.md, only the packet.
-    close: (u) => put(out(u, "correction.txt"), packet(u, "[AC] AC1 fails: exit 1")),
+    close: (u, n) => (n === 1 ? put(out(u, "correction.txt"), packet(u, "[AC] AC1 fails: exit 1")) : oss("work_item_pr", u, prUrl(u))),
     correct: (u) => {
       packetAtCorrect = existsSync(out(u, "correction.txt"));
       put(out(u, "corrected"), "x");
@@ -609,10 +638,35 @@ test("a red close at any layer routes through the correction packet", async () =
   await drive(r, 40, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined);
 
   expect(existsSync(workFile(W1, "verify.md"))).toBe(false);
-  expect(moves(W1)).toEqual(["implement>close", "close>correct", "correct>reclose", "reclose>land", "land>done"]);
-  expect(host.of(W1, "close")).toHaveLength(1); // routed on the first close, no no-result relaunch
+  expect(moves(W1)).toEqual(["implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", "close>land", "land>done"]);
+  expect(host.of(W1, "close")).toHaveLength(2); // routed on the first close, no no-result relaunch; the second lands
   expect(host.of(W1, "correct")[0].request.message).toContain(`Correction packet: ${out(W1, "correction.txt")}.`);
   expect(packetAtCorrect).toBe(true);
-  expect(existsSync(out(W1, "correction.txt"))).toBe(false); // cleared on the way to reclose
+  expect(existsSync(out(W1, "correction.txt"))).toBe(false); // cleared on the way to verify
   expect(item(W1).dispatches).toBe(2);
+});
+
+test("a halting verdict runs verify, close, correct, then verify and close again", async () => {
+  await arm();
+  let verdictAtVerify2: boolean | undefined;
+  const host = newHost((_u, n) => {
+    if (n === 1) { queue(W1, 1, 1); put(out("lane", "lane.done"), "x"); }
+  }, {
+    verify: (u, n) => {
+      // the second pass: the first verdict went before its launch, so it cannot route this pass
+      if (n === 2) verdictAtVerify2 = existsSync(out(u, "verdict.json"));
+      put(out(u, "verdict.json"), verdict(u, n === 1 ? STAYED_GREEN : []));
+    },
+  });
+  const r = rig(host);
+  await drive(r, 50, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined);
+
+  expect(moves(W1)).toEqual([
+    "implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", "close>land", "land>done",
+  ]);
+  expect(host.of(W1, "verify")).toHaveLength(2);
+  expect(host.of(W1, "close")).toHaveLength(2);
+  expect(host.of(W1, "correct")).toHaveLength(1);
+  expect(verdictAtVerify2).toBe(false);
+  expect(item(W1).dispatches).toBe(2); // implement and correct; verify is no dispatch
 });

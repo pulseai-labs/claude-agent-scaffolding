@@ -2066,7 +2066,7 @@ _AS="$_OSSR/skills/adopt/SKILL.md"
 _MARK='<!-- workspace-init stub: ossify:start replaces this file -->'
 _r=1; grep -Fq '## 3. `AGENTS.md`' "$_MB" && ! grep -Fq '## 3. `CLAUDE.md`' "$_MB" && grep -Fq '| Memory bank (15 files) + `AGENTS.md` + `CODING_STANDARDS.md` | AI workspace, per `references/reviewer-home.md` |' "$_SS" && _r=0
 _pin "$_r" "start authors CLAUDE.md - a new workspace gets the file Codex and OMP never read"
-# 1.30.0 (#984) - the reviewer project home: start seeds a standards stub, a review ledger and a
+# 1.31.0 (#984) - the reviewer project home: start seeds a standards stub, a review ledger and a
 # governance Review section, all in the AI workspace. Behaviour is judged by start-reviewer-home.
 _RH="$_OSSR/skills/start/references/reviewer-home.md"
 pin "$_SS" '| Memory bank (15 files) + `AGENTS.md` + `CODING_STANDARDS.md` | AI workspace, per `references/reviewer-home.md` |' "start §13 routes the reviewer home"
@@ -2246,7 +2246,7 @@ _CLP="$HERE/../skills/close/SKILL.md"
 _CMD="$HERE/../commands/close.md"
 pin "$_WCP" 'git -C "$repo_root" merge --no-ff "$wi_branch" -m "merge $wi" || { echo "close: merge conflict - halt"; exit 1; }' \
   "control: close section 4's local merge line is unchanged (default /close <id> behaves as before)"
-pin "$_CLP" '`--pr` applies to a work-item close only' "close grammar: --pr on a spine or release id refuses"
+pin "$_CLP" 'Both apply to a work-item close only' "close grammar: --pr on a spine or release id refuses"
 pin "$_CLP" '`/close <wi-id> --pr`' "close grammar: the work-item --pr shape is named"
 pin "$_WCP" '## 4a. PR mode' "work-item-close.md has section 4a"
 pin "$_WCP" 'never a local merge' "4a: a missing remote leg halts, never a local merge (the #339 rule)"
@@ -2312,7 +2312,7 @@ _pin "$_r" "EXT 2b: still says 'runs §2 through §4 unchanged' instead of namin
 # close-finished item yields to section 2b under --detach (no request; the caller closes).
 pin "$_RO" '`--detach`, where it gets no request and the caller closes it (§2b)' "RO 3 N2: close-finished under --detach gets no request, matching EXT 2b"
 _ah="$(awk 'NR==1 && $0!="---" {exit} NR>1 && $0=="---" {exit} NR>1 && /^argument-hint: / {sub(/^argument-hint: /,""); print; exit}' "$_CMD")"
-t_assert_eq '"<id> [--pr]"' "$_ah" "close.md argument-hint declares the optional flag"
+t_assert_eq '"<id> [--pr] [--verdict <file>]"' "$_ah" "close.md argument-hint declares the optional flag"
 
 # #978: Claude Code refuses a subagent's Write of a `report*.md` file, so the
 # dispatched implementer returns its report as `report_text` and the lane writes
@@ -2418,5 +2418,28 @@ pin "$SKILLS/close/SKILL.md" '`report.md`, `verify.md` and the state' \
   "#980 close SKILL.md §10: verify.md is a durable record"
 pin "$SKILLS/plan-spine/references/spec-authoring.md" '**An AC that diffs against a commit names a fixed sha**' \
   "#981 spec-authoring: base-relative ACs pin a sha, never a moving ref"
+
+# ---------------------------------------------------------------------------
+# 1.30.0 (#993). /close <wi> --pr --verdict <file>: a caller's verifier verdict
+# replaces the close's own dispatch, bound to the worktree by an identity hash.
+# ---------------------------------------------------------------------------
+pin "$_981_WC" '--verdict <file>' \
+  "#993 work-item-close §2: the --verdict arm exists"
+pin "$_981_WC" 'close: verdict identity' \
+  "#993 work-item-close §2: a stale verdict halts on its identity"
+pin "$_981_WC" 'verifier: <agent> on <model>' \
+  "#993 work-item-close §2: the verdict arm prints the verifier line from the file"
+pin "$SKILLS/../commands/close.md" '[--verdict <file>]' \
+  "#993 commands/close.md: the argument hint carries --verdict"
+pin "$SKILLS/close/SKILL.md" '`--verdict <file>`' \
+  "#993 close SKILL.md §9: the argument grammar names --verdict"
+pin "$_981_WC" 'Under `--verdict` the verdict is the pass, and the close runs none of §4, §4b or §4c itself, inline or dispatched. Without it,' \
+  "#993 work-item-close §2: the inline pass is excluded under --verdict"
+pin "$_981_WC" 'close: $wi is already committed; a verdict written before the commit cannot match' \
+  "#993 work-item-close §2: a --pr resume under --verdict names its own halt"
+pin "$_981_WC" 'identity` that is not a hex digest' \
+  "#993 work-item-close §2: a non-hex identity halts before it reaches the shell"
+pin "$_981_WC" '**Without `--verdict`, after Layers 1 and 2, the close dispatches `ossify:verifier-agent`' \
+  "#993 work-item-close §2: the dispatch sentence is conditional on no --verdict"
 
 t_summary

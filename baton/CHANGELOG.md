@@ -2,6 +2,44 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.10.0 - 2026-10-30
+
+Seats from crew's config, any harness, a `verify` stage (#993).
+
+- **Added: a stage `role` (crew role names verbatim).** A session stage, `triage` or `driver` with a
+  `role` needs no `instance` or `model`; `recipeRoles` lists a recipe's roles.
+- **Added: the role table and `baton arm --seats <file>`.** One JSON object keyed by role (`agent`,
+  `argv`, `brief_delivery`, `expected_model`, `effort`, `env`, optional `review`; schema in the
+  README). `arm` validates it, copies it byte for byte to `<run dir>/seats.json` and records
+  `seats_sha256`. A recipe that names roles refuses to arm without `--seats`, and a role the table
+  lacks refuses with `role table has no role "<role>" (stage <stage>)`, writing no run directory.
+  Extra roles are allowed. `BATON_ROLE` and `BATON_ROLE_TABLE` are refused in a table's and a
+  stage's env.
+- **Changed: the engine launches a role stage on its role's agent.** The claim gets the role's env
+  with the stage env over it (the stage wins), plus `BATON_ROLE` and `BATON_ROLE_TABLE`; a message may
+  use `{agent.name}` and `{agent.review}`. A missing or invalid table, or a missing role, parks the
+  unit `launch failed` (a driver escalates); no attempt is counted.
+- **Changed: `bin/baton-seat` execs the table's argv** with no shell: the message as the last
+  argument (`inject`, at most 131071 bytes) or `Read <state>/briefs/<nonce>.md and follow it.`
+  (`file`; `/` in the nonce is written `%2F`). New refusals `norole`, `noargv`, `notable`. A claim without `BATON_ROLE` still execs
+  `omp-seat` from `OMP_T3_SEAT` and `OMP_T3_VIA`, so staged recipes run unchanged.
+- **Changed: the example recipe.** Every session stage, `triage` and `driver` names its crew role;
+  `instance`, `model`, the `OMP_T3_` keys and the `via` param are gone. The item flow is
+  implement → verify → close → land, and correct → verify (`reclose` is removed). `verify`
+  (role `verifier`, `build` slot) writes `out/<unit>/verdict.json` (new `briefs/verify.md`), and close
+  runs with `--verdict`. `spine_review` runs `{agent.review}`. The briefs name each skill for both
+  harnesses (`/<plugin>:<skill>` on Claude Code, `skill://<skill>` on OMP).
+- **Changed: `running-a-spine-on-baton`.** A seat step reads `.crew/roles.md` and
+  `~/.claude/crew/agents.md`, picks one agent per role, turns a plain-program `command:` into an
+  argv (a shell function or alias is a question; a Devin argv ends with `--`), drops the PR
+  placeholder from `review:`, and shows a stage/role/agent/command/model/effort table with the arm
+  command. A role with no row is one question and arms nothing. The seat file is written only after
+  the yes. `via` is gone.
+- Known limits: triage can answer, and baton can interrupt, only an OMP seat's prompt, so a stuck
+  Claude Code or Devin seat stalls into a stop; a close resumed after its commit halts on a stale
+  verdict; untracked files left between `verify` and `close` halt close on a stale verdict (fails
+  closed).
+
 ## 0.9.0 - 2026-10-29
 
 The follow-ups triaged on 2026-10-29: #920, #906, #930, #908, #969 and three items of #899.
