@@ -167,7 +167,7 @@ async function deliver(key: string, raw: string, note: string | undefined, agent
   const message = withNote(note, raw);
   const run = n.kind === "plain" ? "" : n.run;
   // A unit park's card says why: a stop file's text. (A driver's escalate action is in the notice already.)
-  const why = n.kind === "unit-park" ? whyLines(newestPark(n.run, n.unit), n.at, { action: false }) : [];
+  const why = n.kind === "unit-park" ? whyLines(newestPark(n.run, n.unit, n.at), { action: false }) : [];
   const offer = offerFor(n, [message, ...why].join("\n"), run);
   if (!offer) {
     const { deliveryId } = await bot.run(messageTask(message), key);

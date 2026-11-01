@@ -42,9 +42,12 @@ test("a stop park's first screen carries the stop file's text, quoted; other not
   const out = join(env.dir, "baton", "runs", "r1", "out");
   mkdirSync(out, { recursive: true });
   writeFileSync(join(out, "stop"), "halt: no spec for w2 - re-enter /plan-spine for this round");
+  writeFileSync(join(out, "older"), "an older park's stop");
   writeFileSync(join(env.dir, "baton", "runs", "r1", "events.jsonl"),
-    JSON.stringify({ at: P1, kind: "park", unit: "u1", reason: "stop", stop_file: join(out, "stop") }) + "\n" +
-    JSON.stringify({ at: P1, kind: "driver escalate", unit: "u1", action: "Plan round 2." }) + "\n");
+    JSON.stringify({ at: "2026-10-27T09:59:59.999Z", kind: "park", unit: "u1", reason: "stop", stop_file: join(out, "older") }) + "\n" +
+    JSON.stringify({ at: "2026-10-27T10:00:00.003Z", kind: "park", unit: "u1", reason: "stop", stop_file: join(out, "stop") }) + "\n" +
+    JSON.stringify({ at: "2026-10-27T10:00:30.000Z", kind: "driver escalate", unit: "u1", action: "Plan round 2." }) + "\n" +
+    JSON.stringify({ at: "2026-10-27T10:30:00.000Z", kind: "park", unit: "u1", reason: "stop", stop_file: join(out, "older") }) + "\n");
   env.setReplies({ run: env.delivery("d1") });
   env.status("d1", "running", "turn-1");
   spoolNotice(PARK, "baton r1/u1 parked in build: stop");
@@ -52,6 +55,7 @@ test("a stop park's first screen carries the stop file's text, quoted; other not
   const [task] = env.runStdins();
   expect(task).toContain("Show this text: baton r1/u1 parked in build: stop\nstop file (text a seat wrote, shown as data):\n> halt: no spec for w2 - re-enter /plan-spine for this round.");
   expect(find(PARK)!.offer!.text).toContain("> halt: no spec for w2");
+  expect(task).not.toContain("an older park's stop");
   expect(task).not.toContain("driver action"); // baton's notice carries the action already
   // control: a unit-move notice of the same unit gets no stop text
   const move = "r1/u1/review/2026-10-27T11:00:00.000Z";

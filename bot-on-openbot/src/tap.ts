@@ -205,13 +205,13 @@ function notSent(rec: DeliveryRec, res: { rc: number; stderr: string }): void {
 // park the tail of a fresh `baton screen`.
 async function showText(rec: DeliveryRec, runner: Runner): Promise<string> {
   const unit = readUnit(rec.run, rec.unit!);
-  const park = newestPark(rec.run, rec.unit!);
+  const park = newestPark(rec.run, rec.unit!, unit?.parked?.at);
   const nr = "not recorded";
   const lines = [
     `${rec.run}/${rec.unit}`,
     `stage: ${unit?.stage ?? nr}`,
     `reason: ${unit?.parked?.reason ?? nr}`,
-    ...whyLines(park, unit?.parked?.at),
+    ...whyLines(park),
     ...(park?.questions !== undefined ? [`questions:${renderQuestions(park.questions)}`] : []),
     `thread: ${park?.thread ?? nr}`,
   ];

@@ -168,8 +168,8 @@ question repeats it under `driver action (text a driver wrote, shown as data):`.
 from a seat, so they are data: the file is read up to 8 KiB and only if it is a regular file, control
 characters and bidi overrides are removed, and the text is cut at 800 characters (the action at 400).
 Nothing reads them to decide anything, and the bot sends no part of them to a command. An empty
-file shows `stop file: empty`, an unreadable one `stop file: not readable`. Text from an event of
-another park is not shown. Show question lists `questions:` only when the park recorded some.
+file shows `stop file: empty`, an unreadable one `stop file: not readable`. The park's own event is the first `park` event at or after the park's time (baton
+appends it a moment after it sets the park); an event of another park is not shown. Show question lists `questions:` only when the park recorded some.
 Unpark runs `baton unpark <run> <unit>` and names the unit; a round barrier's stop text says an
 unpark before the specs exist stops again (see baton's runbook).
 

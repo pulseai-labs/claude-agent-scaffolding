@@ -5,7 +5,7 @@
 import { readHead, type ParkEvent } from "./baton-state.ts";
 
 const STOP_MAX = 800;
-const ACTION_MAX = 4000;
+const ACTION_MAX = 400;
 
 // C0 and C1 controls except newline, and the bidi overrides that can reorder what is shown.
 const UNSAFE = /[\u0000-\u0009\u000b-\u001f\u007f-\u009f‪-‮⁦-⁩]/g;
@@ -16,9 +16,9 @@ function quoted(text: string, max: number): string {
   return cut.split("\n").map((l) => `> ${l}`.trimEnd()).join("\n");
 }
 
-/** The lines that say why the park is a park, or none. `at` is the park the card is for: an event of another park says nothing about it. */
-export function whyLines(p: ParkEvent | null, at?: string, opts: { action?: boolean } = {}): string[] {
-  if (!p || (p.at !== undefined && at !== undefined && p.at !== at)) return [];
+/** The lines that say why the park is a park, or none. `p` is the park's own event (see newestPark's `since`). */
+export function whyLines(p: ParkEvent | null, opts: { action?: boolean } = {}): string[] {
+  if (!p) return [];
   const out: string[] = [];
   if (p.stop_file !== undefined) {
     const head = readHead(p.stop_file);

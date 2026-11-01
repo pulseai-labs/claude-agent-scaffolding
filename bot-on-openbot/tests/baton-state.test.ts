@@ -127,3 +127,29 @@ test("readHead reads at most 8 KiB of a regular file and nothing else", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("newestPark(since) is the park's own event: the first one at or after since, a later park's ends the search", () => {
+  const root = mkdtempSync(join(tmpdir(), "bot-since-"));
+  try {
+    process.env.BATON_STATE_DIR = root;
+    mkdirSync(join(root, "runs", "a"), { recursive: true });
+    const ev = (...lines: unknown[]) => writeFileSync(join(root, "runs", "a", "events.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    // parked.at is T2.000; baton appends its event a ms later
+    ev({ at: "T1.002", kind: "park", unit: "u", reason: "first" },
+      { at: "T1.500", kind: "driver escalate", unit: "u", action: "first action" },
+      { at: "T2.001", kind: "park", unit: "u", reason: "second" },
+      { at: "T2.500", kind: "driver escalate", unit: "u", action: "second action" },
+      { at: "T3.001", kind: "park", unit: "u", reason: "third" },
+      { at: "T3.500", kind: "driver escalate", unit: "u", action: "third action" });
+    expect(newestPark("a", "u", "T2.000")).toEqual({ at: "T2.001", reason: "second", action: "second action" });
+    expect(newestPark("a", "u", "T1.000")).toMatchObject({ reason: "first", action: "first action" });
+    // control: without since it is the newest
+    expect(newestPark("a", "u")).toMatchObject({ reason: "third", action: "third action" });
+    // no event at or after since, or an event with no `at`, is no event
+    expect(newestPark("a", "u", "T9")).toBeNull();
+    ev({ kind: "park", unit: "u", reason: "no at" });
+    expect(newestPark("a", "u", "T0")).toBeNull();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

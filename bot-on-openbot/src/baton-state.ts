@@ -73,9 +73,13 @@ export function reviewedHead(run: string, unit: string): string | null {
 
 export type ParkEvent = { at?: string; reason?: string; thread?: string; questions?: string; stop_file?: string; action?: string };
 
-// The unit's newest `park` event, with the `driver escalate` action recorded after it, if any (an
-// escalate belongs to the park before it; a newer park drops it).
-export function newestPark(run: string, unit: string): ParkEvent | null {
+// The unit's `park` event, with the `driver escalate` action recorded after it, if any (an escalate
+// belongs to the park before it). Without `since`: the newest park event. With `since`, a park's `at`
+// (its notice key's last part, or run.json's `parked.at`): the park's own event. baton reads the clock
+// for `parked.at`, saves, and only then appends the event, which takes its own later reading, so the
+// two differ by a few ms and an earlier park's event is always before `since`. The park's event is
+// therefore the first one at or after `since`; a later park's event ends the search.
+export function newestPark(run: string, unit: string, since?: string): ParkEvent | null {
   let text: string;
   try {
     text = readFileSync(join(runDir(run), "events.jsonl"), "utf8");
@@ -83,6 +87,7 @@ export function newestPark(run: string, unit: string): ParkEvent | null {
     return null;
   }
   let found: ParkEvent | null = null;
+  let locked = false; // `since` found its event: a later park event is another park's
   for (const line of text.split("\n")) {
     let ev: unknown;
     try {
@@ -96,6 +101,11 @@ export function newestPark(run: string, unit: string): ParkEvent | null {
       continue;
     }
     if (ev.kind !== "park") continue;
+    if (since !== undefined) {
+      if (locked) break;
+      if (typeof ev.at !== "string" || ev.at < since) continue;
+      locked = true;
+    }
     const p: ParkEvent = {};
     if (typeof ev.at === "string") p.at = ev.at;
     if (typeof ev.reason === "string") p.reason = ev.reason;
