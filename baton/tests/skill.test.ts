@@ -75,9 +75,12 @@ describe("running-a-spine-on-baton", () => {
   test("the preflight reads the user: lines and the orders, and warns in the proposal rather than failing", () => {
     const s = skill();
     const bullet = s.split("\n- **").find((b) => b.startsWith("Who walks the `user:` lines."))?.replace(/\s+/g, " ") ?? "";
-    expect(bullet).toContain("`oss demo_user_lines <spine>`");
+    // planned lines count: `oss demo_user_lines` is active-only, and a spine's lines are still planned before the arm
+    expect(bullet).toContain(".type == \"user\"")
+    expect(bullet).toContain("planned ones included");
+    expect(bullet).not.toContain("demo_user_lines");
     expect(bullet).toContain("as the base branch has them");
-    expect(bullet).toContain("no order naming the `spine_finish` seat's role");
+    expect(bullet).toContain("no order that gives the demo walk to the `spine_finish` seat's role");
     expect(bullet).toContain("is not a failed check: say in the proposal that the run parks after the merge");
     // it sits in the preflight, before the proposal step that shows the command
     expect(s.indexOf("Who walks the `user:` lines.")).toBeGreaterThan(s.indexOf("## 1. Preflight"));
