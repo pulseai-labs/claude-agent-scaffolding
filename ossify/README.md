@@ -1,4 +1,4 @@
-# ossify (v1.32.4)
+# ossify (v1.32.5)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -220,6 +220,9 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.32.5 (#946, #1025), `work-item`'s verification runs a new git-running test once more with no
+host git identity, and its rc 2 text no longer calls a missing test file the usual cause. Prose only.
 
 Since 1.32.4 (#859), spine close reads `Bones this spine registers` at any heading level and ends it
 at the next heading of its level or higher. A nested section with a prose bone used to report "no

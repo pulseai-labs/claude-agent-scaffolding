@@ -265,8 +265,8 @@ oss_verify_zero_tests_guard() { # $1=command ; output on STDIN
 }
 
 # rc 0 RED (proceed) | rc 1 already-GREEN (the ONLY hard block) | rc 2 errored
-# (ADVISORY - usually the test file is not authored yet, which is the expected
-# starting state, so blocking on it would make the gate unusable).
+# (ADVISORY - the command is not invocable yet, rc 126 or 127, or its expectation
+# is malformed; blocking on a script the item creates would make the gate unusable).
 oss_verify_redgate() { # $1=workdir $2=command $3=expectation
   local dir="$1" cmd="$2" exp="$3" rc
   # Same errexit guard, same reason — a RED gate probe expects failure, so the

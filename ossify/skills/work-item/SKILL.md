@@ -186,10 +186,10 @@ oss redgate "<worktree-abs>" "<command>" "<expectation>"
 | **1** | Already GREEN before any work | **The only hard block** — unless the handoff's §4 records an override for that AC (below). Otherwise stop and return gaps-mode. |
 | **2** | Errored / uninvocable | **Advisory.** Record it and proceed. |
 
-rc 2 is advisory on purpose: most often the test file simply is not authored yet,
-which is the *expected* starting state for a work item — blocking on it would make
-the gate unusable. Record each rc 2 in the report's blockers-and-advisories
-section and carry on. (If you classified that AC as one whose test *should*
+rc 2 is advisory on purpose: the command cannot run here yet (it exits 126 or 127, say a script
+this item creates) or its expectation is malformed. A missing test file usually reads RED (rc 0),
+and already GREEN (rc 1) under `node --test` beside an existing file. Record each rc 2 in the report's
+blockers-and-advisories section and carry on. (If you classified that AC as one whose test *should*
 already exist, say so prominently in the report — then still proceed; §5's per-AC
 run resurfaces a genuinely broken runner within seconds.)
 
@@ -264,6 +264,11 @@ oss verify_step "<worktree-abs>" "<command>" "<expectation>"   # 0 pass | 1 fail
 ```
 
 Capture, per command: exit code, a short output excerpt, and pass/fail.
+
+**A test this item adds or changes that runs git runs once more with no host identity:**
+`GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 oss verify_step "<worktree-abs>" "<command>" "<expectation>"`.
+A host may have a git identity where CI has none, so such a test can pass here and exit 128 there
+(#946). `HOME` stays, so caches stay warm. A fail here is recorded like any other below.
 
 **Explicitly NOT halt-on-first-fail** — the deliberate opposite of the
 orchestrator-side gate in `close`. Run all of them even after one fails. The
