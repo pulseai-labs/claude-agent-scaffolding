@@ -2,7 +2,7 @@
 
 All notable changes to the `baton` plugin.
 
-## 0.14.0 - 2026-11-01
+## 0.14.0 - 2026-11-02
 
 A seat's question always reaches the operator: triage is removed (#1023).
 
