@@ -40,7 +40,7 @@ RETIRED="$AUTO_NAME $CRITIC_NAME"
 pattern_for() {
   case "$1" in
     "$AUTO_NAME") printf '%s' "$AUTO_NAME" ;;
-    "$CRITIC_NAME") printf '%s' "architect"'[-_ ]?critic|critiquing'"-spec" ;;
+    "$CRITIC_NAME") printf '%s' "architect"'[-_ ]?critic([^[:alnum:]_]|$)|critiquing'"-spec([^[:alnum:]_]|$)" ;; # bounded: "critically" is valid text
     *) printf '%s' "$1" ;;
   esac
 }
