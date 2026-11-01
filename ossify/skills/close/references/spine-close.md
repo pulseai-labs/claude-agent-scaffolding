@@ -814,12 +814,15 @@ spine_md="$spine_dirs/SPINE.md"
 [ -f "$spine_md" ] \
   || { echo "close: no SPINE.md at $spine_md - the plan's bones section is unreadable there, and so is the base-branch cross-check §3 reads - halt"; exit 1; }
 
-# THE SECTION'S TABLE BODY, AND WHAT ELSE THE SECTION MAY SAY. Inside
-# `## Bones this spine registers` (any case: the heading is matched case-folded,
-# because `## Bones This Spine Registers` is the same section; and at any level: a
-# plan that nests it as `### ...` under `## Spine context` declares the same section,
-# and read as absent it would report "no bones". It ends at the next heading of its
-# level or higher, #859) a PRESENT section is
+# THE HEADING (#859). `## Bones this spine registers` is matched case-folded and at any
+# level: `## Bones This Spine Registers`, or `### ...` nested under `## Spine context`, is
+# the same section, and read as absent it would report "no bones". The section ends at the next `##`-or-deeper
+# heading of its level or higher. A `#` line ends nothing and halts as a stray line. A
+# second matching heading also halts: one of the two may be an example in a code fence,
+# and this step will not pick.
+#
+# THE SECTION'S TABLE BODY, AND WHAT ELSE THE SECTION MAY SAY. Inside the section,
+# a PRESENT section is
 # either the single line `None.` or a table: `F` marks it found, `N` is that line,
 # `X` is any other non-blank line (which HALTS, below - reading only `|` lines made
 # `TBD`, a placeholder, or a table written without its outer pipes report "declares
@@ -836,8 +839,11 @@ spine_md="$spine_dirs/SPINE.md"
 # one slot left, into a slot the loop's own guards then read as present.
 recs="$(awk '
   { low = tolower($0) }
-  low ~ /^#+ bones this spine registers[[:space:]]*$/ { match($0, /^#+/); lvl = RLENGTH; insec = 1; found = 1; next }
-  insec && /^#+[^#]/ { match($0, /^#+/); if (RLENGTH <= lvl) exit }
+  low ~ /^#+ bones this spine registers[[:space:]]*$/ {
+    if (found) { printf "X\t%s\n", $0; insec = 0; next }
+    match($0, /^#+/); lvl = RLENGTH; insec = 1; found = 1; next
+  }
+  insec && /^##+([[:space:]]|$)/ { match($0, /^#+/); if (RLENGTH <= lvl) { insec = 0; next } }
   insec && /^[[:space:]]*$/ { next }
   insec && /^[[:space:]]*None\.[[:space:]]*$/ { printf "N\n"; next }
   insec && /^[[:space:]]*\|/ {

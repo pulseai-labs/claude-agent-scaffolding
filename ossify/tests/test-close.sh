@@ -2557,6 +2557,38 @@ printf '# %s - registers its bones\n\n## Bones this spine registers\n\nNone.\n\n
   "$B4SP" > "$B4DIR/SPINE.md"
 t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
 t_assert_rc 1 "A4e: a deeper heading stays inside a ## section, and its lines still halt"
+t_assert_contains "$T_OUT" "### Notes" "A4e: ...naming the first stray line"
+
+# A4f. A `#` line between rows is no section end, with or without a space: rows below
+# it must not go unread. It halts, naming the line (#1026 C1).
+for _a4f in '#859 note' '# a comment'; do
+  printf '# %s - registers its bones\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n%s\n| ADR-0603 | a row below it | src/below/** | |\n' \
+    "$B4SP" "$_a4f" > "$B4DIR/SPINE.md"
+  t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+  t_assert_rc 1 "A4f: '$_a4f' between rows halts"
+  t_assert_contains "$T_OUT" "$_a4f" "A4f: ...naming '$_a4f'"
+done
+
+# A4g. A fenced example of the heading above the real section: two matches, so it
+# halts and registers neither, instead of reading the example as the plan's answer
+# (#1026, CodeRabbit).
+printf '# %s - registers its bones\n\n## Spine context\n\n```\n### Bones this spine registers\n\nNone.\n\n### Risk posture\n```\n\n## Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0603 | the real row | src/real/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+t_assert_rc 1 "A4g: two matching headings halt"
+t_assert_contains "$T_OUT" "## Bones this spine registers" "A4g: ...naming the second"
+case "$T_OUT" in
+  *"declares no bones"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: A4g: an example was read as the plan's answer";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+
+# A4h. CONTROL, and the PR's stated limit: a heading with other text on its line is
+# not the section, so it stays the legacy no-op.
+printf '# %s - registers its bones\n\n### Bones this spine registers:\n\n| ADR-0603 | a row | src/x/** | |\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+t_assert_rc 0 "A4h: a heading with a trailing colon is not the section"
+t_assert_contains "$T_OUT" "declares no bones" "A4h: ...and stays the legacy no-op"
 
 # A5. `None.` AND a table: `None.` is the whole answer, so one of the two is wrong
 # and neither the step nor the registry may pick one silently.
