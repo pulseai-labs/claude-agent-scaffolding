@@ -1,6 +1,6 @@
 // Puts the bin/ of this marketplace's installed plugins on PATH for OMP sessions.
-// OMP has no plugin bin/ mechanism (spec B, F4), so skills that call `oss`, `wi`
-// or `arc` through `command -v` fail without this. The install path always comes
+// OMP has no plugin bin/ mechanism (spec B, F4), so skills that call `oss` or `wi`
+// through `command -v` fail without this. The install path always comes
 // from a record, never from "newest in cache" (see ~/.local/bin/oss). It writes
 // no file and never searches the filesystem.
 //

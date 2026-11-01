@@ -86,7 +86,7 @@ user extension folder; OMP loads it in every session:
 If you set `PI_CODING_AGENT_DIR`, the folder is `$PI_CODING_AGENT_DIR/extensions/` instead; change the `-o` path to match.
 
 The file is a small loader: the logic ships inside the plugins, so `omp plugin upgrade` keeps it current,
-and the loader warns with this command if it ever needs a new download. Without it, `oss`, `wi` and `arc`
+and the loader warns with this command if it ever needs a new download. Without it, `oss` and `wi`
 are not found and the skills that need them say so. A session started
 with `--no-extensions` needs `-e <that file>`.
 

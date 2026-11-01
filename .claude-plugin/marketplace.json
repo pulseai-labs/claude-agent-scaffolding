@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-agent-scaffolding",
-  "description": "Personal plugin marketplace for agent-assisted development: dual-repo workspace bootstrap, a skeleton-first delivery lifecycle, anti-sycophancy design critique, strict code-quality and architecture review, configuration security auditing, and decision-making mentor surfaces. Described by capability rather than by plugin name, so it does not go stale as plugins land.",
+  "description": "Personal plugin marketplace for agent-assisted development: dual-repo workspace bootstrap, a skeleton-first delivery lifecycle, adversarial design critique, strict code-quality and architecture review, configuration security auditing, and decision-making mentor surfaces. Described by capability rather than by plugin name, so it does not go stale as plugins land.",
   "owner": {
     "name": "Pras"
   },

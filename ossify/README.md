@@ -580,7 +580,7 @@ Dispatcher: `bin/oss`. Tests: `bash tests/run-all.sh`.
 
 ## OMP
 
-Install per the root README (the plugin, plus the one-time `PATH` extension for `oss`, `wi` and `arc`).
+Install per the root README (the plugin, plus the one-time `PATH` extension for `oss` and `wi`).
 Skill names are bare in OMP, with no `ossify:` prefix. The standalone skills `handoff`, `handoff-resume`,
 `work-pr` and `run-spine` are reachable as `skill://<name>`. The `implementer-agent` file is Claude
 Code-only for now: OMP discovers it, but its tool names are not yet translated, so round execution's

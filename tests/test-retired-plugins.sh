@@ -64,8 +64,8 @@ is_survivor() {
         ossify/lib/commands.sh) return 0 ;;                   # oss critic_detect is kept unchanged: its own comment says removing it is a major release, and it answers absent once the plugin is gone
         ossify/tests/test-dispatcher-ops.sh) return 0 ;;      # critic_detect's tests, kept with the verb
         ossify/README.md) return 0 ;;                         # released "Since 1.14.4" paragraph names the wrapper's override variable; the 1.33.1 note records the retirement and the kept critic_detect verb
-        ossify/skills/challenge/references/adversaries.md) return 0 ;; # lineage line: its recipes are the retired plugin's proven invocations (being changed on another branch)
-        ossify/skills/challenge/references/audit.md) return 0 ;;       # lineage line: the audit was absorbed from the retired plugin's skill (being changed on another branch)
+        ossify/skills/challenge/references/adversaries.md) return 0 ;; # lineage line: its recipes are the retired plugin's proven invocations
+        ossify/skills/challenge/references/audit.md) return 0 ;;       # lineage line: the audit was absorbed from the retired plugin's skill
         ossify/tests/eval/evidence/*) return 0 ;;             # recorded eval evidence: a run's output is history and is never edited
         workspace-init/lib/_helpers.sh) return 0 ;;           # ported-from lineage comments: the helpers mirror the retired plugin's
         claude-security-audit/tests/_helpers.sh) return 0 ;;  # ported-from lineage comments: the harness mirrors the retired plugin's
