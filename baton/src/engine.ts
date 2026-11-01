@@ -13,6 +13,7 @@ import {
   appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { dirname, join, basename } from "node:path";
+import { CLONED_PARK } from "./clone.ts";
 import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claims.ts";
 import { ledgerLine, readDriverResult, renderDriverState } from "./driver.ts";
 import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
@@ -555,6 +556,8 @@ class RunTick {
   // ---- the tick ---------------------------------------------------------------------------
 
   async tick(): Promise<void> {
+    // A clone does nothing, not even a source read or a merge, until `baton unpark` ends its park.
+    if (this.run.status === "parked" && this.run.parked?.reason === CLONED_PARK) return;
     try {
       await this.closeKept();
       await this.orphans();

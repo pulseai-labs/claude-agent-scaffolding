@@ -2,6 +2,29 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.12.0 - 2026-11-01
+
+A supported way to clone a run (#974).
+
+- **Added: `baton clone <run> <new-id>`.** It replaces the hand copy of a run directory, which went
+  wrong three ways: `units` written as an array, `spine/` copied so a closed unit's seat launched
+  again, and a live session or request record carried into the copy. A clone holds `run.json`,
+  `recipe.json`, `seats.json` when the source has one, one `cloned` event and empty `queue` and
+  `out`. Units stay an object. Each unit is rebuilt from an allowlist of fields (identity, stage,
+  file digests) and starts a fresh visit to its stage, so a field added to a unit later is dropped
+  from a clone until someone lists it. The recipe digest is taken from the bytes the clone holds.
+  Flags: `--recipe` (re-pin), `--param`, `--reset <unit>[=<stage>]`, `--fresh`.
+- **Added: a clone starts parked for `cloned`, and the tick does nothing for such a run.** A park
+  only stops launches, so a parked run would still read sources and merge. A clone could otherwise
+  start work the operator did not ask for. `baton unpark <new-id>` starts it. Clone never installs
+  the timer.
+- **Changed: `baton report` counts a `cloned` event as the start of the run.**
+- Skill-first question 2: mechanical work on baton's own closed state (`run.json`, `recipe.json`,
+  `seats.json`). Clone reads no open input and judges nothing. The new-id check is `arm`'s, shared.
+- Known limits: clone does not refuse a clone alongside an armed run of the same project. Baton has
+  no such rule in code (`arm` does not check; the skill's preflight does), and which param names
+  the project is recipe-specific. The clone is parked, so the check is made before `unpark`.
+
 ## 0.11.0 - 2026-11-01
 
 A stop park says where its reason is (#1018).

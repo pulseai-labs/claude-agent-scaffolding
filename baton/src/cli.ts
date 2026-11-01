@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { removeClaim } from "./claims.ts";
+import { CloneError, cloneRunState } from "./clone.ts";
 import { exitCode, tick, unparkUnit } from "./engine.ts";
 import { GhForge } from "./forge.ts";
 import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.ts";
@@ -16,6 +17,7 @@ import { installTimer, removeTimer } from "./timer.ts";
 const USAGE = [
   "usage: baton validate <recipe.json>",
   "       baton arm <recipe.json> --run <id> [--param k=v]... [--seats <file>] [--no-timer]",
+  "       baton clone <run> <new-id> [--recipe <file>] [--param k=v]... [--reset <unit>[=<stage>]]... [--fresh]",
   "       baton status [<run>]",
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
@@ -43,6 +45,7 @@ export async function main(argv: string[]): Promise<number> {
   switch (cmd) {
     case "validate": return validateCmd(rest);
     case "arm": return armCmd(rest);
+    case "clone": return cloneCmd(rest);
     case "status": return statusCmd(rest);
     case "disarm": return disarmCmd(rest);
     case "unpark": return unparkCmd(rest);
@@ -83,6 +86,13 @@ async function locked(fn: () => Promise<number>): Promise<number> {
   return r;
 }
 
+/** Why `id` cannot name a new run, or undefined. The one check `arm` and `clone` share. */
+function runIdError(id: string): string | undefined {
+  if (!RUN_ID_RE.test(id)) return `run id "${id}" must match ^[a-z0-9_-]+$`;
+  if (isProtoName(id)) return `run id "${id}" ${PROTO_NAME_ERROR}`;
+  return undefined;
+}
+
 function loadRecipe(runDir: string): Recipe {
   return JSON.parse(readFileSync(join(runDir, "recipe.json"), "utf8")) as Recipe;
 }
@@ -110,8 +120,8 @@ async function armCmd(args: string[]): Promise<number> {
     else file = a;
   }
   if (file === undefined || runId === undefined) return usage();
-  if (!RUN_ID_RE.test(runId)) return fail(`run id "${runId}" must match ^[a-z0-9_-]+$`);
-  if (isProtoName(runId)) return fail(`run id "${runId}" ${PROTO_NAME_ERROR}`);
+  const idErr = runIdError(runId);
+  if (idErr) return fail(idErr);
   // A host key the tick would refuse fails here, before a run exists for the timer to tick.
   try {
     hostKind();
@@ -208,6 +218,139 @@ async function armCmd(args: string[]): Promise<number> {
     }
   }
   return 0;
+}
+
+// ---- clone ----------------------------------------------------------------------------
+// A new run from another run's state, for a rerun or a test that used to be a hand copy. It writes
+// the six things a run directory holds and nothing else: no source-record directory or any other
+// file, no events, no session. The clone starts parked (reason `cloned`) and the tick does nothing for it until
+// `baton unpark <new-id>`. It never touches the timer and never changes the source.
+
+async function cloneCmd(args: string[]): Promise<number> {
+  const pos: string[] = [];
+  let recipeFile: string | undefined;
+  let fresh = false;
+  const given: Record<string, string> = Object.create(null);
+  const reset = new Map<string, string | undefined>();
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    if (a === "--recipe") {
+      recipeFile = args[++i];
+      if (recipeFile === undefined) return usage();
+    } else if (a === "--param") {
+      const kv = args[++i];
+      const eq = kv === undefined ? -1 : kv.indexOf("=");
+      if (eq < 1) return usage();
+      given[kv.slice(0, eq)] = kv.slice(eq + 1);
+    } else if (a === "--reset") {
+      const v = args[++i];
+      if (v === undefined || v === "") return usage();
+      const eq = v.indexOf("=");
+      const unit = eq < 0 ? v : v.slice(0, eq);
+      const stage = eq < 0 ? undefined : v.slice(eq + 1);
+      if (unit === "" || stage === "") return usage();
+      if (isProtoName(unit)) return fail(`unit "${unit}" ${PROTO_NAME_ERROR}`);
+      if (stage !== undefined && isProtoName(stage)) return fail(`stage "${stage}" ${PROTO_NAME_ERROR}`);
+      reset.set(unit, stage);
+    } else if (a === "--fresh") fresh = true;
+    else if (a.startsWith("--")) return usage();
+    else pos.push(a);
+  }
+  if (pos.length !== 2 || (fresh && reset.size > 0)) return usage();
+  const [srcId, newId] = pos;
+  const idErr = runIdError(newId);
+  if (idErr) return fail(idErr);
+  // A source id that could not have been armed is no such run (and never a path out of runs/).
+  if (!RUN_ID_RE.test(srcId) || isProtoName(srcId)) return fail(`no such run: ${srcId}`);
+
+  let overrideBytes: Buffer | undefined;
+  if (recipeFile !== undefined) {
+    try {
+      overrideBytes = readFileSync(recipeFile);
+    } catch (e) {
+      return fail(`${recipeFile}: ${(e as Error).message}`);
+    }
+  }
+
+  return locked(async () => {
+    const store = openStore();
+    let src: RunState;
+    try {
+      src = store.readRun(srcId);
+    } catch (e) {
+      return fail(runError(e, srcId));
+    }
+    const dir = store.runDir(newId);
+    if (existsSync(dir)) return fail(`run "${newId}" already exists`);
+
+    const srcDir = store.runDir(srcId);
+    let recipeBytes: Buffer;
+    try {
+      recipeBytes = overrideBytes ?? readFileSync(join(srcDir, "recipe.json"));
+    } catch (e) {
+      return fail(`run ${srcId}: recipe.json: ${(e as Error).message}`);
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(recipeBytes.toString("utf8"));
+    } catch (e) {
+      return fail(`${recipeFile ?? `run ${srcId}: recipe.json`}: ${(e as Error).message}`);
+    }
+    const res = validate(raw);
+    if (!res.ok) return fail(res.errors.join("\n"));
+    const recipe = res.recipe;
+
+    // The source's role table goes along as it is; the recipe's roles must all be in it.
+    let seatBytes: Buffer | undefined;
+    try {
+      seatBytes = readFileSync(join(srcDir, "seats.json"));
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") return fail(`run ${srcId}: seats.json: ${(e as Error).message}`);
+    }
+    const roles = recipeRoles(recipe);
+    if (seatBytes === undefined) {
+      if (roles.size > 0) return fail(`recipe names roles (${[...roles.keys()].join(", ")}); run ${srcId} has no seats.json`);
+    } else {
+      let seatRaw: unknown;
+      try {
+        seatRaw = JSON.parse(seatBytes.toString("utf8"));
+      } catch (e) {
+        return fail(`run ${srcId}: seats.json: ${(e as Error).message}`);
+      }
+      const sv = validateRoleTable(seatRaw);
+      if (!sv.ok) return fail(sv.errors.map((m) => `run ${srcId}: seats.json: ${m}`).join("\n"));
+      for (const [role, stages] of roles) {
+        if (!own(sv.table, role)) return fail(`role table has no role "${role}" (stage ${stages[0]})`);
+      }
+    }
+
+    let next: RunState;
+    try {
+      next = cloneRunState(src, {
+        newId, newDir: dir, recipe, recipeBytes, seatBytes, params: given, reset, fresh,
+        srcDirs: [...new Set([src.dir, srcDir])], now: new Date().toISOString(),
+      });
+    } catch (e) {
+      if (e instanceof CloneError) return fail(e.message);
+      throw e;
+    }
+
+    // All or nothing, as at arm: a failed write leaves no run directory behind to block a retry.
+    try {
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      mkdirSync(join(dir, "queue"), { mode: 0o700 });
+      mkdirSync(join(dir, "out"), { mode: 0o700 });
+      replaceFileSync(join(dir, `recipe.json.${process.pid}.tmp`), join(dir, "recipe.json"), recipeBytes);
+      if (seatBytes !== undefined) replaceFileSync(join(dir, `seats.json.${process.pid}.tmp`), join(dir, "seats.json"), seatBytes);
+      store.writeRun(next);
+      store.event(newId, { kind: "cloned", from: srcId, recipe: recipe.name, parked: next.parked!.reason });
+    } catch (e) {
+      rmSync(dir, { recursive: true, force: true });
+      return fail(`clone ${newId} failed: ${(e as Error).message.split("\n")[0]}`);
+    }
+    process.stdout.write(`cloned ${srcId} to ${newId}, parked; nothing runs until: baton unpark ${newId}\n`);
+    return 0;
+  });
 }
 
 function statusCmd(args: string[]): number {
@@ -573,7 +716,7 @@ function reportCmd(args: string[]): number {
     if (Object.prototype.hasOwnProperty.call(counts, kind)) counts[kind]++;
     const t = ev.at ? Date.parse(ev.at) : NaN;
     if (Number.isNaN(t)) continue;
-    if (kind === "armed" && armed === undefined) armed = t;
+    if ((kind === "armed" || kind === "cloned") && armed === undefined) armed = t;
     if (kind === "merged" || kind === "done") last = t;
   }
   const out = Object.entries(counts).map(([k, v]) => `${k} ${v}`);
