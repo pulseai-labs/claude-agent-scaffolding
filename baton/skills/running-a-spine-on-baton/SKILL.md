@@ -70,8 +70,8 @@ Work out every `--param` of the README's arm example:
   expansion and a quoted `~` stays literal. `baton arm` copies it into the run as `seats.json`.
 
 **Seats.** Read `.crew/roles.md` (walk up from this session's working directory; the first one
-found wins) and `~/.claude/crew/agents.md`. For each recipe stage with a `role` (the `triage`
-and `driver` stages included), pick one agent for that role for the whole run from the
+found wins) and `~/.claude/crew/agents.md`. For each recipe stage with a `role` (the `driver`
+stage included), pick one agent for that role for the whole run from the
 `## Seats` rows, applying `## Conditions` and the file's other rules, and any fallback row, now:
 baton never chooses between rows later. A role with no row is one question, and arms nothing.
 When the project has no rows for the recipe's roles yet, propose rows for them in

@@ -69,12 +69,6 @@ function sess(over: Record<string, unknown> = {}) {
   };
 }
 
-const TRIAGE_STAGE = {
-  kind: "triage", instance: "tinst", model: "tmod", project: "proj",
-  cwd: "{param.root}/w/{unit.id}", title: "triage {unit.id}", message: "answer {pending.request}",
-  env: { TK: "t-{unit.id}" }, note_file: "{run.dir}/notes/{unit.id}.md",
-};
-
 const DRIVER_STAGE = {
   kind: "driver", instance: "dinst", model: "dmod", project: "proj",
   cwd: "{param.root}/d/{unit.id}", title: "driver {unit.id}",
@@ -104,7 +98,6 @@ async function arm(rec: unknown) {
 }
 
 const SEAT = { ticks: 1000, end: "completed" as const };
-const REQ = { id: "req-1", questions: [{ id: "q1", header: "Pick", question: "Which way?", options: [{ label: "left" }] }] };
 
 /** Each launch in its own directory, so a release is visible by the directory it names. */
 function ownDirs(h: FakeHost): void {
@@ -118,7 +111,7 @@ function ownDirs(h: FakeHost): void {
 /** Arm, launch thread-1 at minute 0, block it, and tick at minute 1: the blocked park. */
 async function blockedAt1(o: { rec?: unknown; withOptional?: boolean; screen?: string } = {}): Promise<void> {
   await arm(o.rec ?? recipe());
-  host = new FakeHost({ work: SEAT, implement: SEAT, triage: SEAT, driver: SEAT }, { withOptional: o.withOptional ?? true });
+  host = new FakeHost({ work: SEAT, implement: SEAT, driver: SEAT }, { withOptional: o.withOptional ?? true });
   ownDirs(host);
   await doTick();
   expect(host.launches.length).toBe(1);
@@ -128,7 +121,7 @@ async function blockedAt1(o: { rec?: unknown; withOptional?: boolean; screen?: s
   await doTick();
 }
 
-test("waiting with no pending parks blocked at once", async () => {
+test("waiting parks blocked at once", async () => {
   await blockedAt1();
   const u = unit();
   expect(u.parked?.reason).toBe("blocked");
@@ -155,51 +148,23 @@ test("waiting with no pending parks blocked at once", async () => {
   expect(notices.length).toBe(1);
 });
 
-test("waiting with pending goes to triage, not blocked", async () => {
-  await arm(recipe({ triage: TRIAGE_STAGE }));
-  host = new FakeHost({ work: SEAT, triage: SEAT }, { withOptional: true });
-  ownDirs(host);
-  await doTick();
-  host.block("thread-1");
-  host.raise("thread-1", REQ);
-  expect((await host.status("thread-1"))).toMatchObject({ state: "waiting", pending: { id: "req-1" } });
-  at(1);
-  await doTick();
+// The live recipe's triage stage (baton 0.13.0 and earlier), whose message uses {pending.*}: kept as
+// the legacy input a run armed before 0.14.0 still carries. It is never launched.
+const LEGACY_TRIAGE_STAGE = {
+  kind: "triage", role: "triage", project: "proj", cwd: "{param.root}/w/{unit.id}", launch_dir: "worktree",
+  title: "triage {unit.id}",
+  message: "Stuck thread: {pending.thread}. Stage: {pending.stage}. Request: {pending.request}. Questions: {pending.questions}.",
+  env: { TK: "t-{unit.id}" }, stall_minutes: 10, note_file: "{run.dir}/out/{unit.id}/triage-note.md",
+};
+
+test("a legacy triage stage in the recipe changes nothing: the waiting seat parks blocked, no triage launches", async () => {
+  await blockedAt1({ rec: recipe({ triage: LEGACY_TRIAGE_STAGE }) });
   const u = unit();
-  expect(host.launches.map((l) => l.request.nonce)).toEqual(["r/u1/work/1", "r/u1/triage/1"]);
-  expect(u.parked).toBeUndefined();
-  expect(notices).toEqual([]);
-});
-
-test("waiting with pending and no triage stage is not blocked (the 0.4.0 path)", async () => {
-  await arm(recipe());
-  host = new FakeHost({ work: SEAT }, { withOptional: true });
-  await doTick();
-  host.block("thread-1");
-  host.raise("thread-1", REQ);
-  at(1);
-  await doTick();
-  expect(unit().parked).toBeUndefined();
-  expect(count("pending")).toBe(1);
-  expect(notices).toEqual([]);
-});
-
-test("waiting while its triage is out is not blocked", async () => {
-  await arm(recipe({ triage: TRIAGE_STAGE }));
-  host = new FakeHost({ work: SEAT, triage: SEAT }, { withOptional: true });
-  ownDirs(host);
-  await doTick();
-  host.raise("thread-1", REQ);
-  at(1);
-  await doTick(); // triage thread-2 launches
-  expect(unit().triage?.request_id).toBe("req-1");
-  host.answer("thread-1"); // the request clears, the worker still waits
-  host.block("thread-1");
-  at(2);
-  await doTick();
-  expect(unit().triage).toBeDefined();
-  expect(unit().parked).toBeUndefined();
-  expect(notices).toEqual([]);
+  expect(u.parked?.reason).toBe("blocked");
+  expect(host.launches.map((l) => l.request.nonce)).toEqual(["r/u1/work/1"]);
+  expect(count("triage")).toBe(0);
+  expect(count("pending")).toBe(0);
+  expect(notices.length).toBe(1);
 });
 
 test("worker moves on: the park clears by itself", async () => {
@@ -411,18 +376,6 @@ test("a host error at the screen read marks nothing: the next tick parks and not
   await doTick();
   expect(unit().parked?.reason).toBe("blocked");
   expect(notices.map((n) => n.text.split(" — screen: ")[1])).toEqual(["q?"]);
-});
-
-test("a request the host can read ends the blocked park: triage takes it", async () => {
-  await blockedAt1({ rec: recipe({ triage: TRIAGE_STAGE }) });
-  host.raise("thread-1", REQ); // still waiting, now with a request
-  at(2);
-  await doTick();
-  const u = unit();
-  expect(u.parked).toBeUndefined();
-  expect(count("unblocked")).toBe(1);
-  expect(u.triage?.request_id).toBe("req-1");
-  expect(host.launches.map((l) => l.request.nonce)).toEqual(["r/u1/work/1", "r/u1/triage/1"]);
 });
 
 async function capture(fn: () => Promise<number>): Promise<{ rc: number; err: string }> {

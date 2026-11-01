@@ -72,6 +72,7 @@ async function source(id = "r1") {
     ...r.units.planner, stage: "planner_wait", launches: { planner: 2, work: 1 }, stalls: 1, seq: { planner: 4 },
     session: session("r1/planner/planner/4"), parked: { reason: "stalled", at: "t", blocked: { thread: "T-LIVE" } },
     driver: { key: "k", session: session("d"), result_file: "/tmp/r" }, drivers: ["planner/stall"],
+    // triage and triaged: state armed before baton 0.14.0 removed triage; a clone still leaves them behind
     triage: { request_id: "REQ-9", session: session("t") }, triaged: ["REQ-9"], cwd_busy: "n", quiet_since: "t",
     merge_failures: 2, forge_failures: 2, kept: [{ thread: "T-KEPT", project: "p", cwd: "/c", dir: "/d", until: "unpark" }],
     record_seen: "sha-seen", record_at_entry: "sha-entry", vars: { note: `${d}/note.md` },

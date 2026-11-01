@@ -264,78 +264,56 @@ describe("validate", () => {
   });
 });
 
-describe("triage stage", () => {
-  const triage = () => ({
-    kind: "triage", instance: "triager", model: "small", project: "{param.project}", cwd: "{param.project}",
-    title: "triage {pending.stage}",
-    message: "Thread {pending.thread} request {pending.request}: {pending.questions}. Write {run.dir}/note.",
-    env: { TRIAGE_ROLE: "triage" }, note_file: "{run.dir}/note", stall_minutes: 5,
-    stop_file: "{run.dir}/stop/triage", watch: ["{run.dir}/out"], before: [["true"]], after_launch: [["true"]],
-    launch_dir: "root",
+describe("legacy triage key (baton 0.14.0 removed the stage; older recipes still carry it)", () => {
+  // The shape of the live recipe's triage stage: a role, {pending.*} placeholders, a note file.
+  const legacy = () => ({
+    kind: "triage", role: "triage", project: "{param.project}", cwd: "{param.project}", launch_dir: "worktree",
+    title: "triage {unit.id}",
+    message: "Stuck thread: {pending.thread}. Stage: {pending.stage}. Request: {pending.request}. Questions: {pending.questions}.",
+    env: { SPINE_STOP_FILE: "{run.dir}/out/{unit.id}/stop" }, stall_minutes: 10,
+    note_file: "{run.dir}/out/{unit.id}/triage-note.md",
   });
-  const withTriage = (t: unknown = triage()) => ({ ...relay(), triage: t });
+  const withLegacy = (t: unknown = legacy()) => ({ ...relay(), triage: t });
 
-  test("a recipe with a triage stage validates", () => {
-    const res = validate(withTriage());
+  test("a recipe with the legacy triage key validates; its {pending.*} placeholders are not walked", () => {
+    const res = validate(withLegacy());
+    if (!res.ok) throw new Error(res.errors.join("; "));
     expect(res.ok).toBe(true);
   });
 
-  test("a recipe without triage still validates", () => {
-    const res = validate(relay());
-    expect(res.ok).toBe(true);
-    if (res.ok) expect(res.recipe.triage).toBeUndefined();
-  });
-
-  test("triage stage rejects outcomes, handoff, slots, max_launches and settle_minutes", () => {
-    const extra: Record<string, unknown> = {
-      outcomes: [], handoff: null, slots: ["session"], max_launches: 2, settle_minutes: 1,
-    };
-    for (const [k, v] of Object.entries(extra)) {
-      expectError(withTriage({ ...triage(), [k]: v }), `triage.${k}: not allowed on a triage stage`);
+  test("the key is ignored whole: a shape the stage never allowed validates too", () => {
+    for (const t of [{ ...legacy(), kind: "session" }, { ...legacy(), outcomes: [] }, { ...legacy(), env: { PATH: "x" } },
+      { ...legacy(), note_file: 3 }, "not an object", null, []]) {
+      expect([t, validate(withLegacy(t)).ok]).toEqual([t, true]);
     }
   });
 
-  test("triage stage needs note_file and kind triage", () => {
-    const t: Record<string, unknown> = triage();
-    delete t.note_file;
-    expectError(withTriage(t), "triage.note_file: must be a string");
-    expectError(withTriage({ ...triage(), kind: "session" }), 'triage.kind: must be "triage"');
-  });
-
-  test("triage launch fields validate as a session stage's do", () => {
-    expectError(withTriage({ ...triage(), env: { PATH: "x" } }), "triage.env.PATH: denied key");
-    expectError(withTriage({ ...triage(), stall_minutes: 0 }), "triage.stall_minutes: must be a positive number");
-    expectError(withTriage({ ...triage(), watch: "x" }), "triage.watch: must be a list of strings");
-    expectError(withTriage({ ...triage(), cwd: 3 }), "triage.cwd: must be a string");
-  });
-
-  test("pending placeholders are valid in triage only", () => {
-    expectError(withTriage({ ...triage(), message: "{pending.nope}" }), 'unknown placeholder "{pending.nope}"');
+  test("control: {pending.*} is refused wherever the recipe still reads it", () => {
     const r = relay();
     r.stages.work.message = "{pending.thread}";
     expectError(r, 'stages.work.message: unknown placeholder "{pending.thread}"');
+    // and a legacy key beside the broken stage does not hide it
+    expectError({ ...withLegacy(), stages: r.stages }, 'stages.work.message: unknown placeholder "{pending.thread}"');
   });
 
-  test("pending placeholders are refused in note_file", () => {
-    // note_file renders with the unit's own scope, which has no pending request
-    expectError(withTriage({ ...triage(), note_file: "{pending.thread}/x" }),
-      'triage.note_file: unknown placeholder "{pending.thread}"');
+  test("control: the other top-level stage keys are still validated beside a legacy key", () => {
+    expectError({ ...withLegacy(), driver: { kind: "driver" } }, "driver.state_file: must be a string");
   });
 
-  test("a stage named triage is refused when the recipe has a triage stage", () => {
+  test("a stage may be named triage, with or without the legacy key", () => {
     for (const from of ["work", "planner_wait", "land"]) {
-      const r = withTriage();
-      r.stages.triage = r.stages[from];
-      expectError(r, "stages.triage: ");
-      const plain = relay();
-      plain.stages.triage = plain.stages[from];
-      expect(validate(plain).ok).toBe(true);
+      for (const r of [withLegacy(), relay()]) {
+        r.stages.triage = r.stages[from];
+        expect([from, validate(r).ok]).toEqual([from, true]);
+      }
     }
   });
-});
 
-const triageBase = () => ({
-  kind: "triage", instance: "t", model: "m", project: "/p", cwd: "/p", title: "t", message: "m", env: {}, note_file: "n",
+  test("the legacy stage's role is not a role the recipe needs", () => {
+    const res = validate(withLegacy());
+    if (!res.ok) throw new Error(res.errors.join("; "));
+    expect([...recipeRoles(res.recipe).keys()]).toEqual([]);
+  });
 });
 
 describe("driver stage", () => {
@@ -393,8 +371,6 @@ describe("driver stage", () => {
     const r = relay();
     r.stages.work.message = "{driver.reason}";
     expectError(r, 'stages.work.message: unknown placeholder "{driver.reason}"');
-    expectError({ ...relay(), triage: { ...triageBase(), message: "{driver.stage}" } },
-      'triage.message: unknown placeholder "{driver.stage}"');
   });
 
   test("driver files are per unit, and the result file per launch", () => {
@@ -476,12 +452,10 @@ describe("render", () => {
     expect(() => render("{pr.head}", rest as Scope)).toThrow("no pr in scope");
   });
 
-  test("pending placeholders render in a triage scope and throw outside it", () => {
-    const pending = { thread: "th-1", request: "rq-9", questions: '[{"q":"ok?"}]', stage: "work" };
-    const tpl = "{pending.thread}|{pending.request}|{pending.questions}|{pending.stage}";
-    expect(render(tpl, { ...scope, pending })).toBe('th-1|rq-9|[{"q":"ok?"}]|work');
-    expect(() => render("{pending.thread}", scope)).toThrow("no pending in scope");
-    expect(() => render("{pending.stage}", scope)).toThrow("no pending in scope");
+  test("pending placeholders no longer render (removed in 0.14.0)", () => {
+    for (const name of ["thread", "request", "questions", "stage"]) {
+      expect(() => render(`{pending.${name}}`, scope)).toThrow(`unknown placeholder "{pending.${name}}"`);
+    }
   });
 
   test("driver placeholders render in a driver scope and throw outside it", () => {
@@ -492,6 +466,12 @@ describe("render", () => {
     expect(() => render("{driver.stage}", scope)).toThrow("no driver in scope");
   });
 });
+
+const DRIVER_WITH_ROLE = {
+  kind: "driver", role: "driver", project: "/p", cwd: "/p", title: "d {unit.id}", message: "m", env: {},
+  state_file: "{run.dir}/{unit.id}/state", result_file: "{run.dir}/{unit.id}/result-{driver.launch}",
+  ledger: "{run.dir}/ledger", clearing: ["remove-file"], resume_to: { work: ["land"] },
+};
 
 describe("stage role", () => {
   const roled = (role: string) => {
@@ -516,12 +496,13 @@ describe("stage role", () => {
     delete r.stages.planner.instance;
     expectError(r, "stages.planner.instance: must be a string");
   });
-  test("role on triage and driver", () => {
+  test("role on the driver", () => {
     const r = relay();
-    r.triage = { kind: "triage", role: "triage", project: "/p", cwd: "/p", title: "t", message: "m", env: {}, note_file: "{run.dir}/n" };
-    expect(errorsOf({ ...r, triage: { ...r.triage, role: "x!" } }).some((e) => e.includes("triage.role"))).toBe(true);
+    r.driver = { ...DRIVER_WITH_ROLE };
     const res = validate(r);
-    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error(res.errors.join("; "));
+    expect([...recipeRoles(res.recipe)]).toEqual([["driver", ["driver"]]]);
+    expect(errorsOf({ ...r, driver: { ...r.driver, role: "x!" } }).some((e) => e.includes("driver.role"))).toBe(true);
   });
   test("recipe-roles-map", () => {
     const r = relay();
@@ -563,14 +544,16 @@ describe("agent placeholders", () => {
     r2.stages.planner.env = { A: "{agent.name}" };
     expectError(r2, "stages.planner.env.A: {agent.name} is allowed only");
   });
-  test("triage and driver messages with a role", () => {
+  test("the driver message with a role", () => {
     const r = relay();
-    r.triage = { kind: "triage", role: "triage", project: "/p", cwd: "/p", title: "t", message: "{agent.name}", env: {}, note_file: "{run.dir}/n" };
+    r.driver = { ...DRIVER_WITH_ROLE, message: "{agent.name}" };
     expect(validate(r).ok).toBe(true);
     const r2 = relay();
-    r2.triage = { ...r.triage, role: undefined, instance: "i", model: "m" };
-    delete r2.triage.role;
-    expectError(r2, "triage.message: {agent.name} is allowed only");
+    r2.driver = { ...DRIVER_WITH_ROLE, message: "{agent.name}" };
+    delete r2.driver.role;
+    r2.driver.instance = "i";
+    r2.driver.model = "m";
+    expectError(r2, "driver.message: {agent.name} is allowed only");
   });
   test("render: agent names render from scope; an absent review is a render failure", () => {
     expect(render("{agent.name} {agent.review}", { ...scope, agent: { name: "a", review: "/r <PR_URL>" } })).toBe("a /r <PR_URL>");

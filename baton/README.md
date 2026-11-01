@@ -64,7 +64,7 @@ host outage otherwise; an agent `working` is `active`, unless its `programStatus
 host outage, never `gone`. Interrupt sends Escape to the terminal, twice for a Devin turn at work
 (see Known limits on Orca). A session end closes its
 terminal before the launch directory is released, except a park (the terminal stays until `unpark`
-or `disarm`) and an end after `interrupted` (it stays until the run ends); triage, driver and
+or `disarm`) and an end after `interrupted` (it stays until the run ends); driver and
 molt-parent terminals close too.
 
 The blocked park. A worker in `waiting` with no structured question (an omp `ask` dialog shows as
@@ -79,12 +79,8 @@ session is watched again. `baton unpark <run> <unit>` clears it by hand, and `--
 the session and moves the unit. A stop file wins, `disarm` closes the worker, no driver takes it
 and no stall clock runs on it; the run summary counts it as sent to you.
 
-`baton answer <run> <unit> <label>` sends the unit's pending question the option whose label is
-exactly `<label>`. rc 0 sent, 2 refused (no live session, no pending request, several questions, a
-multi-select, an unknown label, a host with no `respond`), 3 host auth, 4 host down. The triage
-brief uses it. Orca defines no `respond`: it reports an omp question's text but not its options,
-so `baton answer` refuses there (rc 2) and a question is the blocked park and the operator's, not
-triage's. The command and the host interface's optional `respond` stay for a host that can answer.
+A question always reaches the operator: through the blocked park, and the picker it shows (see
+Answering a blocked park). No model answers a seat's question.
 
 Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
 
@@ -169,7 +165,7 @@ digit (which only moves there), the text, Enter. On `devin-ask` it is Up once pe
 each (Up from row 1 wraps to Other), the text, Enter.
 An answer records `{"kind": "answered", "unit", "screen": n, "label"}` or
 `{"kind": "answered", "unit", "screen_text": true}`; the text itself is not logged. rc 64 for any
-other argument shape; the three-argument `baton answer <run> <unit> <label>` is unchanged.
+other argument shape, the three-argument `baton answer <run> <unit> <label>` included (removed in 0.14.0).
 
 Known limits:
 
@@ -205,7 +201,6 @@ only: baton has no Codex manifest.
     baton status [<run>]            baton report <run>
     baton disarm <run>              baton tick [--run <id>]
     baton unpark <run> [<unit>] [--to <stage>]
-    baton answer <run> <unit> <label>
     baton answer <run> <unit> --park <at> --screen <n> <label>
     baton answer <run> <unit> --park <at> --screen-text <text> --question <line>
     baton screen <run> <unit>
@@ -231,7 +226,7 @@ of its sources, until you run `baton unpark <new-id>`. That is the one step that
 installs no timer and does not change the source. The source may be in any status.
 
 Each unit keeps its group, order, vars and stage, and starts a fresh visit to that stage: no
-session, thread, claim, driver, triage or request record, no park, and zero launches and stalls. A
+session, thread, claim, driver or request record, no park, and zero launches and stalls. A
 param or var that holds the source run's directory follows to the new one; a path under another
 run's directory (`r10` beside `r1`) does not.
 
@@ -297,44 +292,10 @@ The table is one JSON object keyed by role:
 The skill writes this file from crew's two files after the operator's yes; without crew, write it
 by hand.
 
-## Triage
-
-A seat can stop on a prompt no one answers, such as an OMP `/review` picker. Triage runs only on a
-host that reports the thread's pending request as a structured question. Orca does not, so on Orca
-a stuck seat is the blocked park or the stall rule, and a `triage` stage never launches; the stage
-stays for a host that does. Without a `triage` stage in the recipe, baton logs one `pending`
-event per request and the stall clock runs as before. With one, the clock pauses and baton
-launches a single triage session per request id per stage visit (`triage` event). The recipe's
-`triage` stage takes the launch fields plus `note_file` and `stall_minutes` (default 10); its
-message may use `{pending.thread}`, `{pending.request}`, `{pending.questions}` and
-`{pending.stage}` (`note_file` may not). `stop_file`, `watch`, `before` and `after_launch` are
-accepted there and ignored; no other stage may then be named `triage`. The triage session does one of three things:
-
-- **Answers** the prompt with `baton answer <run> <unit> <label>` (one question, one option, by its
-  exact label): the seat goes on (`triage answered`). A refusal, such as a request with several
-  questions, means the triage writes a note.
-- **Writes the note file**: baton relaunches the seat (`triage relaunch`) and the brief tells it
-  to read the note first. A relaunch counts toward the two-stall park, but is logged as
-  `triage relaunch`, so `report`'s `stall` count leaves it out.
-- **Writes the stop file**: the unit parks `stop`, as for any stop.
-
-Parks and how to clear them:
-
-- **`second prompt`**: the seat asked again after its triage. Read the thread, decide, then
-  `baton unpark <run> <unit>`. A plain unpark keeps the unit's triaged request ids, so the
-  relaunched seat's next prompt parks `second prompt` again. Use
-  `baton unpark <run> <unit> --to <stage>` to start a fresh stage visit with a fresh triage.
-- **`triage gave no answer`**: the triage ended with no answer, note or stop. Check its thread,
-  then unpark the same way.
-- **`stop` written by triage**: handle it as any stop (see the runbook below).
-
-`unpark --to` and `disarm` clear a live triage and release its claim. `baton report` counts
-`triage`, `triage answered` and `triage relaunch`.
-
 ## Driver
 
 A recipe may carry one top-level `driver` stage (`kind: "driver"`). It takes the launch fields
-(like `triage`, with `stall_minutes` as its time limit, default 10) plus `state_file`,
+(with `stall_minutes` as its time limit, default 10) plus `state_file`,
 `result_file` and `ledger` (paths rendered with the unit's scope), `clearing` (a non-empty list of
 names the driver may report having cleared) and `resume_to` (park stage to the stages a resume may
 enter). Its message may use `{driver.stage}`, `{driver.reason}` and `{driver.launch}` (the launch's
@@ -401,8 +362,7 @@ Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every
 
 The `park` event in `events.jsonl` is `{kind, unit, stage, reason}` plus `thread` (the seat's
 thread id, when the unit had a session); on a `stop` park, `stop_file` (the stage's stop file,
-rendered: the path only, never its text, which a seat wrote); on `second prompt` and `triage gave no answer`,
-`questions` (the pending request's questions, JSON-stringified; left off when there are none); and
+rendered: the path only, never its text, which a seat wrote); and
 on `before failed`, `after_launch failed` and `run failed`, `hook` (the failed hook's 1-based place
 in its list) and `argv` (its rendered argv). Those three parks' notices end with
 ` — hook <n> (<program>)`, the argv's first word without its directory, after the PR a merge-stage
@@ -422,9 +382,9 @@ park names: a notice leaves the host, so the rendered arguments stay in the even
 run-spine lane queues each round's work items, an implementer per item, gap re-entry, a `verify`
 seat that writes the item's verdict file, close on that verdict (`--verdict`) and correction (back
 to `verify`), ordered merges onto the spine branch, the spine PR's review rounds, and the spine
-close. Every session stage, `triage` and `driver` names a crew role, so the arm needs `--seats`
+close. Every session stage and `driver` names a crew role, so the arm needs `--seats`
 with a row for each of `spine session`, `implementer`, `verifier`, `close session`, `reviewer`
-(with `review`), `work-PR session`, `triage` and `driver` (see Seats). The briefs it names are
+(with `review`), `work-PR session` and `driver` (see Seats). The briefs it names are
 prose; `common.md` is read first by every seat.
 
 Copy the example outside the plugin cache first, and pass that copy's `briefs` path: a plugin
@@ -486,7 +446,7 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - Claude Code adds a plugin-registry row for a launch directory. At startup it copies each plugin
   that a tracked `.claude/settings.json` enables into `~/.claude/plugins/installed_plugins.json`
   as a `project`-scope row whose `projectPath` is the launch directory. A per-launch worktree
-  (the default for the `triage` and `driver` stages) of a repo with such a file can leave
+  (the default for the `driver` stage) of a repo with such a file can leave
   one row per launch, and `release` removing the directory does not remove it. baton cannot
   prevent this and does not edit that file. baton does not use the row, and the skill takes the row whose
   `projectPath` is the AI workspace root. A stage that sets `launch_dir: "root"` reuses the root's
@@ -506,9 +466,6 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - `baton unpark` during a live driver removes its claim but does not interrupt the driver thread or
   release its launch worktree; its later result is ignored.
 - A live driver is not watched while the run is parked; it is handled after the run re-arms.
-- Triage can answer, and baton can interrupt, only an OMP seat's prompt (the triage seat itself
-  may run on any agent). A Claude Code or Devin seat stuck on a prompt stalls into a stop, which
-  reaches the operator.
 - A close resumed after its commit halts on a stale verdict: the verdict was taken on the staged
   tree.
 - Untracked files that a test run leaves in the item worktree between `verify` and `close` change
