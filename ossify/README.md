@@ -1,4 +1,4 @@
-# ossify (v1.32.5)
+# ossify (v1.33.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -220,6 +220,10 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.33.0 (#233), `OSSIFY_ADVERSARY` accepts `devin`. The recipe runs from an empty directory
+with a no-tools prompt, because Devin run from a repo exited 0 with prose and no audit.
+`OSSIFY_ADVERSARY_MODEL` picks its model.
 
 Since 1.32.5 (#946, #1025), `work-item`'s verification runs a new git-running test once more with no
 host git identity, and its rc 2 text no longer calls a missing test file the usual cause. Prose only.
