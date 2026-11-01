@@ -1,6 +1,6 @@
 {
   "name": "bot-on-openbot",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Sends baton notices to the operator as OpenBot questions and turns a tapped option into one fixed baton or gh command. A CLI and a service; no skill.",
   "author": {
     "name": "Pras"

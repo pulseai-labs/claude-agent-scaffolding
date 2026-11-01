@@ -1,0 +1,144 @@
+{
+  "id": "7a2d04e0-e008-474d-a9c4-9aaf7071eeab",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_c20012b6-d68e-4021-bc61-6b6fbde82762",
+      "status": "running",
+      "tail": [
+        "  options ham, egg, leek. Then reply with only the answer and stop.",
+        " ⏺ Asked user Pick toppings for the probe?",
+        " ✗ Canceled due to user interrupt",
+        " ✱ Canceled. What should Devin do?",
+        "❭ Run once in the foreground and wait: python3 -c \"import time; time.sleep(60)\". Then reply done.",
+        " ✗ python3 -c \"import time; time.sleep(60)\" Canceled due to user interrupt",
+        " ✱ Canceled. What should Devin do?",
+        "❭ Call your question tool once. Question: \"We found two ways to carry the probe across the staging boundary, and each",
+        "  one changes what the verifier reads at close, so which of the two ways should this work item take, given the brief",
+        "  says nothing on it at all?\" Options: \"Keep it (Recommended)\" with description \"Keep the current form of the probe as",
+        "  it stands today, because it has the lowest risk and every later stage reads it without change, although a later",
+        "  cleanup may still want to revisit this choice in another release\" ; \"Move it\" with description \"Move it now\". Then",
+        "  reply with only the answer and stop.",
+        "── Probe carry ─────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "  We found two ways to carry the probe across the staging boundary, and each one changes what the verifier reads at",
+        "  close, so which of the two ways should this work item take, given the brief says nothing on it at all?",
+        "  ❭ 1 Keep it (Recommended)",
+        "      Keep the current form of the probe as it stands today, because it has the lowest risk and every later stage reads",
+        "      it without change, although a later cleanup may still want to revisit this choice in another release",
+        "    2 Move it",
+        "      Move it now",
+        "      Other (type your own)",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "↑↓ select · ↵ confirm · ? help me out · esc cancel"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "282",
+      "latestCursor": "282",
+      "returnedLineCount": 24,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 93
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}

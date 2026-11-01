@@ -1,0 +1,184 @@
+{
+  "id": "5a6c84f0-fb26-4f89-831f-a986bc2b48ea",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_3c68865f-42e7-4da2-959a-2b5c3d35858f",
+      "status": "running",
+      "tail": [
+        " ▐▛███▛█   Claude Code v2.1.316",
+        "▝▜██████▀  Sonnet 5.5 with medium effort · Claude Ultra",
+        " ▝▝   ▝▝   ~/projects/pilot-fourseat",
+        "❯ For a harness test: call your tool for asking the user a question exactly once. Question text: \"Which colour for the probe?\" Options: red, green, blue. Do not do anything else first. After the answer,",
+        "  reply with only the chosen answer, then stop.",
+        "  Called 1 tool",
+        "● green",
+        "✻ Brewed for 4s · done 17:50 · 1 message hidden (/focus to show)",
+        "❯ Call your question tool once: question \"Pick a size for the probe?\", options small, large. Then reply with only the answer and stop.",
+        "  Called 1 tool",
+        "● teal",
+        "✻ Sautéed for 3s · done 17:50 · 1 message hidden (/focus to show)",
+        "❯ Run the shell command sleep 200 in the foreground once, wait for it, then reply done.",
+        "  Ran 1 shell command",
+        "● The harness blocked sleep 200 in the foreground, so the command did not run. I did not work around the block. Nothing is done.",
+        "✻ Sautéed for 4s · done 17:51",
+        "❯ Run this command in the foreground once and wait: python3 -c \"import time; time.sleep(200)\". Then reply done.",
+        "  Ran 1 shell command",
+        "  ⎿  Interrupted · What should Claude do instead?",
+        "❯ Call your question tool once with TWO questions in the same call: \"Pick a size?\" (small, large) and \"Pick a shape?\" (round, square). Then reply with only the answers and stop.",
+        "● Pick a size?",
+        "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "←  ☐ Size  ☐ Shape  ✔ Submit  →",
+        "Pick a size?",
+        "❯ 1. small",
+        "     Small",
+        "  2. large",
+        "     Large",
+        "  3. Type something.",
+        "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "  4. Chat about this",
+        "Enter to select · Tab/Arrow keys to navigate · Esc to cancel"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "1",
+      "latestCursor": "1",
+      "returnedLineCount": 32,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 3
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 158
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 71
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 118
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 94
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 28
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}

@@ -2,6 +2,12 @@
 
 All notable changes to the `bot-on-openbot` plugin.
 
+## 0.3.1 - 2026-11-01
+
+- **Fixed: a blocked park on a Claude Code or Devin seat offers its options (#998).** `parseScreen`
+  now takes baton 0.13.0's picker kinds `claude-ask` and `devin-ask`. Any other kind still reads as no
+  picker.
+
 ## 0.3.0 - 2026-11-01
 
 - Fixes #1002: a question for a wait notice ("unit moved to a stage", such as the spine PR's Merge

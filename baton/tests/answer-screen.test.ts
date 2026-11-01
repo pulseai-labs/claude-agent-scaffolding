@@ -39,6 +39,38 @@ test("screen answer works on the numbered picker", async () => {
   expect(host.sent).toEqual([{ thread: "thread-1", text: "\x1b[A".repeat(5) + "\x1b[B".repeat(3) + "\r" }]);
 });
 
+test("screen answer on Claude Code: a digit, and free text through its row", async () => {
+  const claude = screenOf("terminal-read-claude-ask.json");
+  const host = await p.blockedAt1(claude);
+  expect((await pick("--screen", "2", "green")).rc).toBe(0);
+  expect(host.sent).toEqual([{ thread: "thread-1", text: "2" }]);
+  expect((await pick("--screen", "2", "blue")).rc).toBe(2);
+  expect((await pick("--screen", "4", "Type something.")).rc).toBe(2);
+  expect(host.sent).toHaveLength(1);
+  host.sent.length = 0;
+  expect((await pick("--screen-text", "teal", "--question", "Which colour for the probe?")).rc).toBe(0);
+  expect(host.sent.map((k) => k.text)).toEqual(["4", "teal", "\r"]);
+});
+
+test("screen answer on Devin: a digit, and free text from the cursor's row", async () => {
+  const devin = screenOf("terminal-read-devin-ask.json");
+  const host = await p.blockedAt1(devin);
+  expect((await pick("--screen", "3", "blue")).rc).toBe(0);
+  expect(host.sent).toEqual([{ thread: "thread-1", text: "3" }]);
+  host.sent.length = 0;
+  expect((await pick("--screen-text", "teal", "--question", "Which colour for the probe?")).rc).toBe(0);
+  expect(host.sent.map((k) => k.text)).toEqual(["\x1b[A", "teal", "\r"]);
+});
+
+test("screen answer refuses a Claude Code or Devin picker of two questions", async () => {
+  const two = screenOf("terminal-read-claude-two-questions.json");
+  const host = await p.blockedAt1(two);
+  expect((await pick("--screen", "1", "small")).err).toContain("no picker on screen");
+  host.screens["thread-1"] = screenOf("terminal-read-devin-two-questions.json");
+  expect((await pick("--screen", "1", "small")).err).toContain("no picker on screen");
+  expect(host.sent).toEqual([]);
+});
+
 test("screen answer refuses when line n has another label", async () => {
   const host = await p.blockedAt1(ASK);
   for (const [n, label] of [["2", "blue"], ["2", "Green"], ["2", "green "], ["5", "Other (type your own)"], ["9", "red"]]) {

@@ -59,10 +59,11 @@ function coversLocal(reply: any, what: string): void {
  */
 export function mapOrcaState(terminal: object | undefined, agent: object | undefined): ThreadStatus["state"] {
   if (terminal === undefined) return "gone";
-  const a = agent as { state?: unknown; interrupted?: unknown } | undefined;
+  const a = agent as { state?: unknown; interrupted?: unknown; programStatus?: { state?: unknown } } | undefined;
   switch (a?.state) {
     case "working":
-      return "active";
+      // A Devin seat on a question stays `working`; only programStatus says blocked (#998).
+      return a.programStatus?.state === "blocked" ? "waiting" : "active";
     case "waiting":
     case "blocked":
       return "waiting";
@@ -71,6 +72,13 @@ export function mapOrcaState(terminal: object | undefined, agent: object | undef
     default:
       return "active";
   }
+}
+
+/** The agent row of a terminal is the one whose paneKey is `${tabId}:${leafId}` (spike 1c). */
+function agentRow(terminal: any, worktrees: any[]): any {
+  const paneKey = typeof terminal?.tabId === "string" && typeof terminal?.leafId === "string" ? `${terminal.tabId}:${terminal.leafId}` : undefined;
+  if (paneKey === undefined) return undefined;
+  return worktrees.flatMap((w) => (Array.isArray(w?.agents) ? w.agents : [])).find((a: { paneKey?: unknown }) => a?.paneKey === paneKey);
 }
 
 type Repo = { id: string; displayName: string; path: string };
@@ -167,12 +175,7 @@ export class OrcaHost implements Host {
     const { terminals, worktrees } = this.readLists();
     const terminal = terminals.find((t) => t?.handle === threadId);
     if (terminal === undefined) return { state: this.confirmGone(threadId), activity: "|" };
-    // The agent row of a terminal is the one whose paneKey is `${tabId}:${leafId}` (spike 1c).
-    const paneKey = typeof terminal?.tabId === "string" && typeof terminal?.leafId === "string" ? `${terminal.tabId}:${terminal.leafId}` : undefined;
-    const agent =
-      paneKey === undefined
-        ? undefined
-        : worktrees.flatMap((w) => (Array.isArray(w?.agents) ? w.agents : [])).find((a: { paneKey?: unknown }) => a?.paneKey === paneKey);
+    const agent = agentRow(terminal, worktrees);
     // updatedAt and stateStartedAt move with the agent; lastOutputAt moves every ~5 s with no input (spike 8).
     return { state: mapOrcaState(terminal, agent), activity: `${agent?.updatedAt ?? ""}|${agent?.stateStartedAt ?? ""}` };
   }
@@ -198,9 +201,30 @@ export class OrcaHost implements Host {
   }
 
   async interrupt(threadId: string, _reason: string): Promise<void> {
+    const twice = this.needsTwoEscapes(threadId);
     this.lists = undefined;
-    // Escape aborts an omp turn; `--interrupt` sends Ctrl-C, which omp ignores (spike 5).
-    this.onTerminal(["terminal", "send", "--terminal", threadId, "--text", "\x1b"]);
+    // Escape aborts an omp or Claude Code turn; `--interrupt` sends Ctrl-C, which omp ignores (spike 5).
+    const send = ["terminal", "send", "--terminal", threadId, "--text", "\x1b"];
+    this.onTerminal(send);
+    if (twice) this.onTerminal(send);
+  }
+
+  /**
+   * A Devin turn at work stops only on two Escapes in two sends: one Escape, or both in one send,
+   * does nothing (#998). One on a Devin picker cancels it, and at Devin's or Claude Code's idle
+   * prompt two open a revert menu, so only a Devin row at work gets two. An unread row gets one.
+   */
+  private needsTwoEscapes(threadId: string): boolean {
+    let lists: { terminals: any[]; worktrees: any[] };
+    try {
+      lists = this.readLists();
+    } catch (e) {
+      if (e instanceof HostDownError) return false;
+      throw e;
+    }
+    const terminal = lists.terminals.find((t) => t?.handle === threadId);
+    const agent = terminal === undefined ? undefined : agentRow(terminal, lists.worktrees);
+    return agent?.agentType === "devin" && agent?.programStatus?.state === "working";
   }
 
   async findByNonce(project: string, nonce: string): Promise<string[]> {

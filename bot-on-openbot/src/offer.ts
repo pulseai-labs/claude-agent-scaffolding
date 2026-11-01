@@ -11,7 +11,7 @@ import type { Notice } from "./notice.ts";
 
 /** The picker JSON `baton screen` prints (baton 0.7.0, src/picker.ts). */
 export type Picker = {
-  kind: "omp-ask" | "numbered";
+  kind: "omp-ask" | "numbered" | "claude-ask" | "devin-ask";
   question: string;
   options: { n: number; label: string }[];
   other: number | null;

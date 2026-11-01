@@ -1,0 +1,254 @@
+{
+  "id": "dcf8fbc8-98f2-424d-99d1-405712770040",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_3c68865f-42e7-4da2-959a-2b5c3d35858f",
+      "status": "running",
+      "tail": [
+        " ▐▛███▛█   Claude Code v2.1.316",
+        "▝▜██████▀  Sonnet 5.5 with medium effort · Claude Ultra",
+        " ▝▝   ▝▝   ~/projects/pilot-fourseat",
+        "❯ For a harness test: call your tool for asking the user a question exactly once. Question text: \"Which colour for the probe?\" Options: red, green, blue. Do not do anything else first. After the answer,",
+        "  reply with only the chosen answer, then stop.",
+        "  Called 1 tool",
+        "● green",
+        "✻ Brewed for 4s · done 17:50 · 1 message hidden (/focus to show)",
+        "❯ Call your question tool once: question \"Pick a size for the probe?\", options small, large. Then reply with only the answer and stop.",
+        "  Called 1 tool",
+        "● teal",
+        "✻ Sautéed for 3s · done 17:50 · 1 message hidden (/focus to show)",
+        "❯ Run the shell command sleep 200 in the foreground once, wait for it, then reply done.",
+        "  Ran 1 shell command",
+        "● The harness blocked sleep 200 in the foreground, so the command did not run. I did not work around the block. Nothing is done.",
+        "✻ Sautéed for 4s · done 17:51",
+        "❯ Run this command in the foreground once and wait: python3 -c \"import time; time.sleep(200)\". Then reply done.",
+        "  Ran 1 shell command",
+        "  ⎿  Interrupted · What should Claude do instead?",
+        "❯ Call your question tool once with TWO questions in the same call: \"Pick a size?\" (small, large) and \"Pick a shape?\" (round, square). Then reply with only the answers and stop.",
+        "  Called 1 tool",
+        "  ⎿  Interrupted · What should Claude do instead?",
+        "✻ Brewed for 1s · done 17:53 · 1 message hidden (/focus to show)",
+        "❯ Call your question tool once, allowing multiple selections (multiSelect): question \"Pick toppings for the probe?\", options ham, egg, leek. Then reply with only the answer and stop.",
+        "  Called 1 tool",
+        "  ⎿  Interrupted · What should Claude do instead?",
+        "✻ Crunched for 1s · done 17:54 · 1 message hidden (/focus to show)",
+        "❯ Call your question tool once. Question: \"We found two ways to carry the probe across the staging boundary, and each one changes what the verifier reads at close, so which of the two ways should this",
+        "  work item take, given the brief says nothing on it at all?\" Options: \"Keep it (Recommended)\" with description \"Keep the current form of the probe as it stands today, because it has the lowest risk and",
+        "  every later stage reads it without change, although a later cleanup may still want to revisit this choice in another release\" ; \"Move it\" with description \"Move it now\". Then reply with only the answer",
+        "  and stop.",
+        "  We found two ways to carry the probe across the staging boundary, and each one changes what the verifier reads at close, so which of the two ways should this work item take, given the brief says nothing",
+        "  on it at all?",
+        "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        " ☐ Probe",
+        "│ We found two ways to carry the probe across the staging boundary, and each one changes what the verifier reads at close, so which of the two ways should this work item take, given the brief says nothing",
+        "│ on it at all?",
+        "❯ 1. Keep it (Recommended)",
+        "     Keep the current form of the probe as it stands today, because it has the lowest risk and every later stage reads it without change, although a later cleanup may still want to revisit this choice in",
+        "     another release",
+        "  2. Move it",
+        "     Move it now",
+        "  3. Type something.",
+        "─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "  4. Chat about this",
+        "Enter to select · ↑/↓ to navigate · Esc to cancel"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "1",
+      "latestCursor": "1",
+      "returnedLineCount": 46,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 3
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 158
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 71
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 118
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 94
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 28
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 23
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 5
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 3
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 2
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 194
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}

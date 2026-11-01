@@ -1,0 +1,154 @@
+{
+  "id": "2e941004-f6ba-4855-a26a-91a42d9851ac",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_c20012b6-d68e-4021-bc61-6b6fbde82762",
+      "status": "running",
+      "tail": [
+        "  answer and stop.",
+        " ⏺ Asked user Pick a size for the probe?",
+        " └ teal",
+        " teal",
+        "❭ Run the shell command `sleep 200` in the foreground once, wait for it, then reply done.",
+        " Running  sleep 200  in the foreground now.",
+        " ✓ sleep 200 Running in background shell 9f81dd",
+        " ✗ Read shell 9f81dd Failed",
+        " ✱ Canceled. What should Devin do?",
+        "❭ Run this command once in the foreground and wait: python3 -c \"import time; time.sleep(150)\". Then reply done.",
+        " Running it now.",
+        " ✓ python3 -c \"import time; time.sleep(150)\" Running in background shell 8f6cf8",
+        " It backgrounded after 10s; waiting for it to finish.",
+        " ✗ Read shell 8f6cf8 Failed",
+        " ✱ Canceled. What should Devin do?",
+        "❭ Call your question tool once with TWO questions in the same call: \"Pick a size?\" (small, large) and \"Pick a shape?\"",
+        "  (round, square). Then reply with only the answers and stop.",
+        "── Size · Shape ────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "  Pick a size?",
+        "  ❭ 1 small",
+        "      Small size",
+        "    2 large",
+        "      Large size",
+        "      Other (type your own)",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "↑↓ select · ↵ confirm · ←→ switch question · ? help me out · esc cancel"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "157",
+      "latestCursor": "157",
+      "returnedLineCount": 26,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 109
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 104
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}
