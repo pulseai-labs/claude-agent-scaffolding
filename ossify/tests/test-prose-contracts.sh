@@ -2419,6 +2419,10 @@ pin "$_981_RT" 'and its `verifier:` line, as the bone set'"'"'s §2.' \
   "#980 retrospective flesh §1: each item's verifier line"
 pin "$SKILLS/close/SKILL.md" '`report.md`, `verify.md` and the state' \
   "#980 close SKILL.md §10: verify.md is a durable record"
+pin "$SKILLS/plan-spine/references/spec-authoring.md" '**An AC that runs a test file the item creates tests for it first**' \
+  "#909 spec-authoring: an AC naming a file the item creates tests for it first"
+pin "$SKILLS/plan-spine/references/spec-authoring.md" '`test -f tests/new.test.js && node --test tests/new.test.js tests/old.test.js`' \
+  "#909 spec-authoring: the form guards the runner with test -f"
 pin "$SKILLS/plan-spine/references/spec-authoring.md" '**An AC that diffs against a commit names a fixed sha**' \
   "#981 spec-authoring: base-relative ACs pin a sha, never a moving ref"
 
