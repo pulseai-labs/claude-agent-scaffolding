@@ -23,14 +23,14 @@ AC-4  pytest tests/                                        exit 0
 
 ```bash
 oss redgate "<worktree-abs>" "pytest tests/test_slugify.py::test_ascii_slug" "exit 0"
-# rc 2 — tests/test_slugify.py does not exist yet. ADVISORY. Recorded, proceed.
+# rc 0 — RED. tests/test_slugify.py does not exist yet, so pytest exits nonzero. Proceed.
 
 oss redgate "<worktree-abs>" "python -m tocgen sample.md" "output contains - [Install](#install)"
 # rc 0 — RED. The generator runs but emits no anchor links yet. Proceed.
 ```
 
-rc 2 on AC-1 and AC-2 is the ordinary case, not a problem: the test file is
-something step 1 below is about to write. Both advisories go into the report's
+RED for that reason on AC-1 and AC-2 is the ordinary case, not a problem: the test
+file is something step 1 below is about to write. Note it in the report's
 `## 8. Blockers and advisories`. Nothing here blocks.
 
 ### AC-1 — ASCII slugs
@@ -100,8 +100,8 @@ the report**, and both need the same sanity check first.
 1. **Cascade from a sibling AC.** AC-2's minimum implementation already satisfied
    AC-3, so AC-3's brand-new test passes immediately. Ordinary in a coherent work
    item, and good news.
-2. **The RED gate could not probe it (rc 2) and the behaviour was already there.**
-   The test file did not exist, so the gate was advisory; the newly written test
+2. **The RED gate read only a missing file, and the behaviour was already there.**
+   The test file did not exist, so RED said nothing about the code; the newly written test
    passes on first run because the production code already handled the case (a
    library default, a framework behaviour).
 

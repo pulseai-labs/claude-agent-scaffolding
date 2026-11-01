@@ -121,7 +121,7 @@ None.
 
 ## 8. Blockers and advisories
 
-- RED gate returned rc 2 (advisory) for AC-1 and AC-2 — `tests/test_slugify.py`
+- RED gate read RED for AC-1 and AC-2 only because `tests/test_slugify.py`
   did not exist at pre-flight, which is the expected starting state. Both were
   authored and driven RED→GREEN in the loop.
 

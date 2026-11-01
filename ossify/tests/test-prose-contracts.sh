@@ -2419,9 +2419,9 @@ pin "$_981_RT" 'and its `verifier:` line, as the bone set'"'"'s §2.' \
   "#980 retrospective flesh §1: each item's verifier line"
 pin "$SKILLS/close/SKILL.md" '`report.md`, `verify.md` and the state' \
   "#980 close SKILL.md §10: verify.md is a durable record"
-pin "$SKILLS/work-item/SKILL.md" '`env GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 <command>`' \
+pin "$SKILLS/work-item/SKILL.md" '`GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 oss verify_step "<worktree-abs>" "<command>" "<expectation>"`' \
   "#946 work-item: a test that runs git also runs with no host identity"
-pin "$SKILLS/work-item/SKILL.md" 'the command cannot run here yet (rc 126 or 127' \
+pin "$SKILLS/work-item/SKILL.md" 'the command cannot run here yet (it exits 126 or 127' \
   "#1025 work-item: rc 2 names what the gate returns it for"
 pin "$SKILLS/plan-spine/references/spec-authoring.md" '**An AC that runs a test file the item creates tests for it first**' \
   "#909 spec-authoring: an AC naming a file the item creates tests for it first"
