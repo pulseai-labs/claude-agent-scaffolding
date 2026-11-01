@@ -34,7 +34,7 @@ const PARAMS: Record<string, string> = {
   oss: "/bin/oss", briefs: "/briefs",
 };
 
-// Spec D2: each session stage, the triage stage and the driver name a crew role, verbatim.
+// Spec D2: each session stage and the driver name a crew role, verbatim.
 const STAGE_ROLES: Record<string, string> = {
   lane: "spine session", regap: "spine session",
   implement: "implementer", correct: "implementer",
@@ -45,7 +45,7 @@ const STAGE_ROLES: Record<string, string> = {
 };
 const stageRoles = (r: Recipe) => ({
   ...Object.fromEntries(sessions(r).map(([n, s]) => [n, s.role])),
-  triage: r.triage?.role, driver: r.driver?.role,
+  driver: r.driver?.role,
 });
 
 /** Agent or harness names in a recipe's text: the recipe names roles, never agents. */
@@ -78,10 +78,10 @@ describe("ossify-spine recipe", () => {
 
   test("every-session-stage-has-role: the D2 role, and no instance or model", () => {
     const r = loadRecipe();
-    expect(stageRoles(r)).toEqual({ ...STAGE_ROLES, triage: "triage", driver: "driver" });
+    expect(stageRoles(r)).toEqual({ ...STAGE_ROLES, driver: "driver" });
     const launchers: [string, Record<string, unknown>][] = [
       ...Object.entries(raw().stages as Record<string, Record<string, unknown>>).filter(([, s]) => s.kind === "session"),
-      ["triage", raw().triage], ["driver", raw().driver],
+      ["driver", raw().driver],
     ];
     for (const [name, s] of launchers) {
       for (const k of ["instance", "model"]) expect([name, k, k in s]).toEqual([name, k, false]);
@@ -92,7 +92,7 @@ describe("ossify-spine recipe", () => {
     // control: the same comparison fails on a copy where verify names the implementer role
     const copy = structuredClone(r);
     (copy.stages.verify as SessionStage).role = "implementer";
-    expect(stageRoles(copy)).not.toEqual({ ...STAGE_ROLES, triage: "triage", driver: "driver" });
+    expect(stageRoles(copy)).not.toEqual({ ...STAGE_ROLES, driver: "driver" });
   });
 
   test("no-agent-names-in-recipe", () => {
@@ -505,89 +505,26 @@ describe("ossify-spine briefs", () => {
     expect(brief("spine-finish.md")).toContain("git push");
   });
 
-  test("common tells a relaunched seat to read the triage note first", () => {
-    expect(brief("common.md")).toContain("<your OUT>/triage-note.md");
+  test("the example carries no triage: no stage, no brief, no note in common.md (removed in 0.14.0)", () => {
+    expect("triage" in raw()).toBe(false);
+    expect(existsSync(join(BRIEFS_DIR, "triage.md"))).toBe(false);
+    expect(brief("common.md")).not.toContain("triage");
+    expect(JSON.stringify(raw())).not.toMatch(/triage|\{pending\./);
+    // control: the shared brief still tells a seat what a stop is
+    expect(brief("common.md")).toContain("$SPINE_STOP_FILE");
   });
 
-  test("every session stage names its OUT, where common.md puts the triage note", () => {
+  test("every session stage names its OUT, where a seat's stop file and output live", () => {
     for (const [name, s] of sessions(loadRecipe())) {
       expect([name, s.message.includes(`OUT: ${OUT}.`)]).toEqual([name, true]);
     }
   });
 });
 
-describe("ossify-spine triage", () => {
-  const triage = () => loadRecipe().triage!;
-  const NOTE = "{run.dir}/out/{unit.id}/triage-note.md";
-
+describe("ossify-spine driver", () => {
   test("no stage carries the retired T3 drop key", () => {
-    expect(triage().env.OMP_T3_SEAT).toBeUndefined();
+    expect(JSON.stringify(loadRecipe())).not.toContain("OMP_T3_SEAT");
     expect(JSON.stringify(loadRecipe())).not.toContain("DROP_T3_MCP");
-  });
-
-  test("triage env carries stop file and ledger", () => {
-    const t = triage();
-    expect(t.env.SPINE_STOP_FILE).toBe(`${OUT}/stop`);
-    expect(t.env.SPINE_LEDGER).toBe("{param.spine_dir}/autopilot-ledger.md");
-    expect(t.env.SEAT_MODS_ALLOW).toBe(OUT);
-    expect(t.env.SEAT_MODS_ROLE).toBe("orchestrator");
-  });
-
-  test("triage launch fields and note file", () => {
-    const t = triage();
-    expect([t.kind, t.role, t.project, t.cwd, t.launch_dir, t.title, t.stall_minutes]).toEqual(
-      ["triage", "triage", "{param.ai_project}", "{param.ai_root}", "worktree", "triage {unit.id}", 10],
-    );
-    // the engine renders note_file outside a triage scope, so it names no {pending.*}
-    expect(t.note_file).toBe(NOTE);
-    expect(t.message).toContain(`Note file: ${NOTE}.`);
-    expect(t.message).toContain(`Stop file: ${OUT}/stop.`);
-    for (const k of ["stop_file", "watch", "before", "after_launch"]) expect(k in t).toBe(false);
-    for (const ph of ["{pending.thread}", "{pending.stage}", "{pending.request}", "{pending.questions}"]) {
-      expect([ph, t.message.includes(ph)]).toEqual([ph, true]);
-    }
-    expect(t.message).toContain("{param.briefs}/triage.md");
-    // `baton answer` takes the run and the unit; the message is where the seat reads them.
-    expect(t.message).toContain("Run: {run.id}. Unit: {unit.id}.");
-  });
-
-  test("triage brief checks the stop rule before answering", () => {
-    const b = brief("triage.md");
-    expect(b).toContain("checking in this order and stopping at the first that applies");
-    const at = (h: string) => b.indexOf(h);
-    expect(at("1. **Stop**")).toBeGreaterThan(-1);
-    expect(at("1. **Stop**")).toBeLessThan(at("2. **Answer**"));
-    expect(at("2. **Answer**")).toBeLessThan(at("3. **Correct**"));
-    expect(b).toContain("answerable from the brief but touches an ADR, a bone or the skeleton is still a stop");
-  });
-
-  test("triage brief appends the ledger entry before the action", () => {
-    // the engine may end the triage as soon as the stop file, the note or the answer lands
-    const b = brief("triage.md");
-    const ledger = b.indexOf("append one ledger entry to `$SPINE_LEDGER`");
-    expect(ledger).toBeGreaterThan(-1);
-    expect(ledger).toBeLessThan(b.indexOf("then take the action"));
-    expect(b.indexOf("then take the action")).toBeLessThan(b.indexOf("then end the turn"));
-  });
-
-  test("triage brief maps every session stage to the brief its message names", () => {
-    const b = brief("triage.md");
-    expect(b).toContain("`_` written as `-`");
-    for (const [name, s] of sessions(loadRecipe())) {
-      const file = `${name.replaceAll("_", "-")}.md`;
-      expect([name, s.message.includes(`{param.briefs}/${file}`)]).toEqual([name, true]);
-    }
-  });
-
-  test("triage brief names the three actions and the answer shape", () => {
-    const b = brief("triage.md");
-    for (const pin of [
-      "baton answer <run> <unit> \"<label>\"", "the chosen option's `label`, exactly",
-      "Exit 75 (a tick holds the lock): wait a minute and retry once.", "Any other non-zero exit: write the note file and stop.", "triage-note.md",
-      "$SPINE_STOP_FILE", "never approve a merge",
-    ]) {
-      expect([pin, b.includes(pin)]).toEqual([pin, true]);
-    }
   });
 
   test("example recipe has a valid driver", () => {

@@ -37,7 +37,7 @@ const cut = (s: string): string => (s.length > SHOW_MAX ? `${s.slice(0, SHOW_MAX
 // The shape baton's forge accepts; anything else never reaches gh.
 const PR_URL_RE = /^https:\/\/github\.com\/[^/\s]+\/[^/\s]+\/pull\/[0-9]+$/;
 
-// baton records a park's questions as JSON.stringify(PendingQuestion[]) (baton/src/host.ts).
+// baton before 0.14.0 recorded some parks' questions as a JSON array of `{id, header, question, options}`; a park written then can still arrive.
 // An array renders one "\n- " line per question; a string that does not decode to one is shown raw,
 // after a space. Either way the result follows "questions:" directly. (bot-on-telegram press.ts.)
 export function renderQuestions(raw: string): string {

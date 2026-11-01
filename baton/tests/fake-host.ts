@@ -4,7 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { claimKey, claimPath } from "../src/claims.ts";
 import {
-  HostAuthError, HostDownError, type Host, type LaunchRequest, type PendingRequest, type ThreadStatus,
+  HostAuthError, HostDownError, type Host, type LaunchRequest, type ThreadStatus,
 } from "../src/host.ts";
 
 export type Behaviour = {
@@ -13,8 +13,6 @@ export type Behaviour = {
   end: "completed" | "failed" | "waiting" | "interrupted";
   handoffLine?: string;
   loseResponse?: boolean;
-  /** From step `atStep` the thread is `active` with `request` pending, and does not advance, until `answer`. */
-  pending?: { atStep: number; request: PendingRequest };
 };
 
 export type SeenClaim = { nonce: string; env: Record<string, string> } | null;
@@ -24,13 +22,9 @@ type Thread = {
   id: string;
   launch: Launch;
   step: number;
-  /** The behaviour's pending request was answered. */
-  answered?: boolean;
-  /** A request raised by the test, replacing any other. */
-  raised?: PendingRequest;
   /** Ended by the test (`finish`) or gone (`drop`). */
   forced?: ThreadStatus["state"];
-  /** Set by `block`: `waiting` with no request the host can read, and no steps, until `unblock`. */
+  /** Set by `block`: `waiting` on a question the host cannot read, and no steps, until `unblock`. */
   blocked?: boolean;
 };
 
@@ -71,14 +65,12 @@ export class FakeHost implements Host {
   closes: string[] = [];
   /** What `screen` returns per thread; a thread with no entry reads `""`. */
   screens: Record<string, string> = {};
-  answers: { threadId: string; requestId: string; answers: Record<string, string> }[] = [];
   /** What `keys` sent, in order. */
   sent: { thread: string; text: string }[] = [];
-  /** With it, the instance has `close`, `screen`, `respond` and `keys`; without, none of them, as a 0.4.0 host. */
+  /** With it, the instance has `close`, `screen` and `keys`; without, none of them, as a 0.4.0 host. */
   withOptional: boolean;
   declare close?: (threadId: string) => Promise<void>;
   declare screen?: (threadId: string) => Promise<string>;
-  declare respond?: (threadId: string, requestId: string, answers: Record<string, string>) => Promise<void>;
   declare keys?: (threadId: string, text: string) => Promise<void>;
   /** Not set by the constructor: a test that needs them assigns them. */
   declare endRun?: (runId: string) => Promise<void>;
@@ -97,10 +89,6 @@ export class FakeHost implements Host {
     this.screen = async (threadId) => {
       this.check();
       return this.screens[threadId] ?? "";
-    };
-    this.respond = async (threadId, requestId, answers) => {
-      this.check();
-      this.answers.push({ threadId, requestId, answers });
     };
     this.keys = async (threadId, text) => {
       this.check();
@@ -143,17 +131,9 @@ export class FakeHost implements Host {
     if (t.forced === "gone") return { state: "gone", activity: "" };
     const activity = `${t.id}:${t.step}`;
     if (t.forced) return { state: t.forced, activity };
-    const pending = this.pendingOf(t);
-    if (t.blocked) return pending ? { state: "waiting", activity, pending } : { state: "waiting", activity };
-    if (pending) return { state: "active", activity, pending };
+    if (t.blocked) return { state: "waiting", activity };
     const done = t.step >= t.launch.behaviour.ticks;
     return { state: done ? t.launch.behaviour.end : "active", activity };
-  }
-
-  private pendingOf(t: Thread): PendingRequest | undefined {
-    if (t.raised) return t.raised;
-    const p = t.launch.behaviour.pending;
-    return p && !t.answered && t.step >= p.atStep ? p.request : undefined;
   }
 
   private thread(threadId: string): Thread {
@@ -162,19 +142,7 @@ export class FakeHost implements Host {
     return t;
   }
 
-  /** Answer the thread's pending request: it clears, and the thread goes on with its steps. */
-  answer(threadId: string): void {
-    const t = this.thread(threadId);
-    t.answered = true;
-    delete t.raised;
-  }
-
-  /** Make `request` the thread's pending request, replacing any other. */
-  raise(threadId: string, request: PendingRequest): void {
-    this.thread(threadId).raised = request;
-  }
-
-  /** The thread waits on a question the host cannot read: status `waiting`, no `pending`, no steps. */
+  /** The thread waits on a question: status `waiting`, no steps. */
   block(threadId: string): void {
     this.thread(threadId).blocked = true;
   }
@@ -210,7 +178,7 @@ export class FakeHost implements Host {
   advance(): void {
     for (const t of this.threads) {
       const b = t.launch.behaviour;
-      if (t.step >= b.ticks || t.forced || t.blocked || this.pendingOf(t)) continue;
+      if (t.step >= b.ticks || t.forced || t.blocked) continue;
       t.step++;
       if (t.step === b.ticks) {
         // `{unit}` in a write's path or content is the launching unit's id, so one stage

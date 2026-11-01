@@ -21,7 +21,6 @@ const USAGE = [
   "       baton status [<run>]",
   "       baton disarm <run>",
   "       baton unpark <run> [<unit>] [--to <stage>]",
-  "       baton answer <run> <unit> <label>",
   "       baton answer <run> <unit> --park <at> --screen <n> <label>",
   "       baton answer <run> <unit> --park <at> --screen-text <text> --question <line>",
   "       baton screen <run> <unit>",
@@ -390,7 +389,6 @@ async function disarmCmd(args: string[]): Promise<number> {
       return fail(runError(e, id));
     }
     for (const u of Object.values(run.units)) {
-      if (u.triage) removeClaim(u.triage.session.claim_key, u.triage.session.claim_nonce);
       if (u.driver) removeClaim(u.driver.session.claim_key, u.driver.session.claim_nonce);
       if (!u.session) continue;
       removeClaim(u.session.claim_key, u.session.claim_nonce);
@@ -525,46 +523,12 @@ async function unparkCmd(args: string[]): Promise<number> {
 }
 
 // ---- answer ---------------------------------------------------------------------------
-// The one answer path for a worker's pending question. rc 0 sent, 2 refused, 3 host auth, 4 host down.
-// It answers one question with one option, by the option's exact label (byte for byte); anything
-// else is left to whoever can read the screen.
+// The one answer path for a blocked worker's question: the two `--screen` forms below. Any other
+// argument list is a usage error. rc 0 sent, 2 refused, 3 host auth, 4 host down, 64 usage.
 
 async function answerCmd(args: string[]): Promise<number> {
   if (args.length === 7 || args.length === 8) return answerScreenCmd(args);
-  if (args.length !== 3) return usage();
-  const [runId, unitId, label] = args;
-  return locked(async () => {
-    const store = openStore();
-    let run: RunState;
-    try {
-      run = store.readRun(runId);
-    } catch (e) {
-      return fail(runError(e, runId));
-    }
-    const unit = own(run.units, unitId);
-    if (!unit) return fail(`no such unit: ${unitId}`);
-    const thread = unit.session?.thread_id;
-    if (!thread) return fail("no live session");
-    try {
-      const host = makeHost();
-      if (!host.respond) return fail("host cannot answer");
-      const pending = (await host.status(thread)).pending;
-      if (!pending || pending.questions.length === 0) return fail("no pending request");
-      if (pending.questions.length > 1) return fail("several questions");
-      const q = pending.questions[0];
-      if (q.multiSelect === true) return fail("multi-select");
-      if (!q.options.some((o) => o.label === label)) return fail(`no option labelled "${label}"`);
-      await host.respond(thread, pending.id, { [q.id]: label });
-      store.event(runId, { kind: "answered", unit: unitId, request: pending.id, label });
-      return 0;
-    } catch (e) {
-      process.stderr.write(`baton answer: ${(e as Error).message}\n`);
-      if (e instanceof AnswerRefused) return 2;
-      if (e instanceof HostAuthError) return 3;
-      if (e instanceof HostDownError) return 4;
-      return 2;
-    }
-  });
+  return usage();
 }
 
 // ---- answer --screen / --screen-text ----------------------------------------------------
@@ -700,7 +664,6 @@ function reportCmd(args: string[]): number {
   if (!existsSync(path)) return fail(`no such run: ${id}`);
   const counts: Record<string, number> = {
     launched: 0, successor: 0, stall: 0, park: 0, unpark: 0, merged: 0,
-    triage: 0, "triage answered": 0, "triage relaunch": 0,
   };
   let armed: number | undefined;
   let last: number | undefined;

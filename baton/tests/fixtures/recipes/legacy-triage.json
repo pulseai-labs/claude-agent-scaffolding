@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "name": "legacy-triage",
+  "params": ["root", "ai_project", "ai_root", "briefs", "spine_dir"],
+  "sources": [],
+  "seed": [{ "id": "u1", "stage": "work" }],
+  "stages": {
+    "work": {
+      "kind": "session",
+      "role": "implementer",
+      "project": "{param.ai_project}",
+      "cwd": "{param.root}/w/{unit.id}",
+      "title": "work {unit.id}",
+      "message": "Read {param.briefs}/work.md and follow it. Unit: {unit.id}.",
+      "env": { "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop" },
+      "handoff": null,
+      "stop_file": "{run.dir}/out/{unit.id}/stop",
+      "outcomes": [{ "when": [{ "file": "{run.dir}/out/{unit.id}/done" }], "to": "done" }]
+    }
+  },
+  "triage": {
+    "kind": "triage",
+    "role": "triage",
+    "project": "{param.ai_project}",
+    "cwd": "{param.ai_root}",
+    "launch_dir": "worktree",
+    "title": "triage {unit.id}",
+    "message": "Read {param.briefs}/triage.md and follow it. Stuck thread: {pending.thread}. Stage: {pending.stage}. Run: {run.id}. Unit: {unit.id}. Request: {pending.request}. Questions: {pending.questions}. Note file: {run.dir}/out/{unit.id}/triage-note.md. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+    "env": {
+      "SEAT_MODS_ROLE": "orchestrator",
+      "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
+      "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
+      "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
+    },
+    "stall_minutes": 10,
+    "note_file": "{run.dir}/out/{unit.id}/triage-note.md"
+  }
+}

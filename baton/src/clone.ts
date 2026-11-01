@@ -123,13 +123,13 @@ export function cloneRunState(src: RunState, o: CloneOpts): RunState {
       checkStage(recipe, stage, `unit ${old.id}`);
       // The allowlist. Group, order and vars are the unit's identity; record_seen and
       // record_at_entry are digests of files the new run reads again; the rest is live state
-      // (session, driver, triage, parked, kept, claims, counts) and starts empty.
+      // (session, driver, parked, kept, claims, counts) and starts empty.
       const u: UnitState = {
         id: old.id, group: old.group, order: old.order, vars, stage, launches: {}, stalls: 0,
         ...(record && old.record_seen !== undefined ? { record_seen: old.record_seen } : {}),
         ...(record && old.record_at_entry !== undefined ? { record_at_entry: old.record_at_entry } : {}),
       };
-      // A fresh visit to the stage it is in: zero counts, no triage, no leftover merge counters.
+      // A fresh visit to the stage it is in: zero counts, no leftover merge counters.
       enterStage(u, stage);
       put(u);
     }

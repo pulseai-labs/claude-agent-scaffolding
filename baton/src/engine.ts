@@ -2,9 +2,8 @@
 // closing the threads an ended park kept (a host with `close` only), 0 orphan recovery,
 // 1 sources, 2 stop files, then blocked parks, 3 live sessions, 4 wait stages, 5 merge stages,
 // 6 launches due, 7 drivers, 8 done. A host that refuses the credentials or cannot be reached
-// stops the tick with nothing marked. Step 3 also runs the decision procedure for a session
-// waiting on a pending request: wait, triage it once, act on the triage's result. A session
-// waiting with no request to read and no triage out gets a blocked park (design §4.5).
+// stops the tick with nothing marked. In step 3 a session that waits on a question, on a host that
+// can show the screen, gets a blocked park at once (design §4.5): a question always reaches the operator.
 // Step 7, with a driver in the recipe: a parked unit gets one driver session, whose result
 // resumes it, escalates it to the operator, or stops the run. Only an escalate or a stop notifies.
 
@@ -18,12 +17,12 @@ import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claim
 import { ledgerLine, readDriverResult, renderDriverState } from "./driver.ts";
 import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
 import {
-  HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type PendingRequest, type ThreadStatus,
+  HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type ThreadStatus,
 } from "./host.ts";
 import { readConfig, type Config } from "./notify.ts";
 import {
   DEFAULT_SLOTS, DEFAULT_STAGE_SLOTS, isProtoName, nonce as launchNonce, own, render, threadTitle, UNIT_ID_RE,
-  type DriverStage, type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type TriageStage, type WaitStage,
+  type DriverStage, type Outcome, type Recipe, type Scope, type SessionStage, type Stage, type WaitStage,
 } from "./recipe.ts";
 import { mergeUnit, type HookFailure, type ParkPr } from "./merge.ts";
 import { validateRoleTable, type RoleAgent, type RoleTable } from "./roles.ts";
@@ -65,9 +64,6 @@ const DEFAULT_LAUNCH_DIR = "worktree";
 const DEFAULT_MAX_LAUNCHES = 3;
 const DEFAULT_STALL_MINUTES = 45;
 const DEFAULT_SETTLE_MINUTES = 10;
-const DEFAULT_TRIAGE_STALL_MINUTES = 10;
-/** The `seq` key and nonce segment of a triage launch: `<run>/<unit>/triage/<n>`. */
-const TRIAGE = "triage";
 const DEFAULT_DRIVER_STALL_MINUTES = 10;
 /** The `seq` key and nonce segment of a driver launch: `<run>/<unit>/driver/<n>`. */
 const DRIVER = "driver";
@@ -133,7 +129,7 @@ export function unparkUnit(run: RunState, recipe: Recipe | undefined, u: UnitSta
   }
   delete u.parked;
   if (to !== undefined) {
-    enterStage(u, to, recipe && triageNote(run, recipe, u)); // the same stage entry an outcome's move makes
+    enterStage(u, to); // the same stage entry an outcome's move makes
   } else {
     // Resume in place: the counts that parked it start over; the visit's record_at_entry stands.
     u.stalls = 0;
@@ -142,16 +138,6 @@ export function unparkUnit(run: RunState, recipe: Recipe | undefined, u: UnitSta
     u.launches[u.stage] = 0;
   }
   return consumed === undefined ? { stage: u.stage } : { stage: u.stage, consumed };
-}
-
-/** The unit's rendered triage note path; undefined with no triage stage or a path that cannot render. */
-export function triageNote(run: RunState, recipe: Recipe, u: UnitState): string | undefined {
-  if (!recipe.triage) return undefined;
-  try {
-    return render(recipe.triage.note_file, unitScope(run, u));
-  } catch {
-    return undefined;
-  }
 }
 
 /** A merge-stage park names its PR and what stopped it, so the notice alone says where to look. */
@@ -243,7 +229,7 @@ const ROLE_TABLE_FILE = "seats.json";
 /** A role stage's agent could not be found: the run's role table is missing, invalid, or lacks the role. */
 class RoleError extends Error {}
 
-/** The launch fields a session, triage or driver stage shares that pick its agent and claim env. */
+/** The launch fields a session or driver stage shares that pick its agent and claim env. */
 type AgentFields = { role?: string; instance?: string; model?: string; env: Record<string, string> };
 /** What a stage launches on, with the scope its message renders with. */
 type Agent = { scope: Scope; instance: string; model: string; env: Record<string, string> };
@@ -364,8 +350,7 @@ class RunTick {
   // ---- unit exits -------------------------------------------------------------------------
 
   /**
-   * End the unit's session: interrupt (if asked), remove its claim, release its directory. A
-   * triage still running for it is interrupted and released first: every exit ends the triage.
+   * End the unit's session: interrupt (if asked), remove its claim, release its directory.
    *
    * On a host with `close` (design §4.7) the thread's terminal is closed before the release,
    * which removes the directory it runs in. A park (`keep`), or an end after an `interrupted`
@@ -373,7 +358,6 @@ class RunTick {
    * to read, until the unit is unparked or the run ends.
    */
   private async endSession(u: UnitState, o: { interrupt?: string; release?: boolean; keep?: "unpark" } = {}): Promise<void> {
-    await this.endTriage(u, { interrupt: true });
     const s = u.session;
     if (!s) return;
     const { stage, scope } = this.ctx(u);
@@ -431,7 +415,7 @@ class RunTick {
 
   private async park(
     u: UnitState, reason: string,
-    o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr; hook?: HookFailure; stopFile?: string } = {},
+    o: { interrupt?: string; release?: boolean; thread?: string; pr?: ParkPr; hook?: HookFailure; stopFile?: string } = {},
   ): Promise<void> {
     const thread = u.session?.thread_id ?? o.thread; // endSession deletes the session; a caller that ended it first passes it
     await this.endSession(u, { ...o, keep: "unpark" });
@@ -441,7 +425,6 @@ class RunTick {
     this.ev("park", {
       unit: u.id, stage: u.stage, reason,
       ...(thread ? { thread } : {}),
-      ...(o.questions?.length ? { questions: JSON.stringify(o.questions) } : {}),
       ...(o.pr ? { pr: o.pr.url, pr_state: o.pr.why, ...(o.pr.failing ? { failing: o.pr.failing } : {}) } : {}),
       ...(o.hook ? { hook: o.hook.hook, argv: o.hook.argv } : {}),
       ...(o.stopFile ? { stop_file: o.stopFile } : {}),
@@ -456,7 +439,7 @@ class RunTick {
   private async move(u: UnitState, o: Outcome, note?: string, thread?: string, pr?: ParkPr): Promise<void> {
     if (o.to === "park") return this.park(u, "outcome", { thread, pr });
     const from = u.stage;
-    enterStage(u, o.to, triageNote(this.run, this.recipe, u));
+    enterStage(u, o.to);
     this.entered.add(u.id);
     this.save();
     this.ev("transition", { unit: u.id, from, to: o.to });
@@ -615,28 +598,6 @@ class RunTick {
         }
       });
     }
-    // A triage launch whose outcome was unknown, found the same way; none found, it has ended.
-    for (const u of this.ordered()) {
-      const t = u.triage;
-      if (!t || t.session.thread_id || t.lost || u.parked) continue;
-      await this.guard(u, async () => {
-        const ts = t.session;
-        const ids = await this.host.findByNonce(ts.project!, ts.nonce);
-        if (ids.length === 1) {
-          ts.thread_id = ids[0];
-          this.ev("adopted", { unit: u.id, nonce: ts.nonce, thread: ids[0] });
-          this.save();
-        } else if (ids.length >= 2) {
-          this.ev("ambiguous nonce", { unit: u.id, nonce: ts.nonce, threads: ids, dir: ts.launch_dir });
-          await this.endTriage(u, { release: false });
-          await this.park(u, "ambiguous nonce", { interrupt: "stop" });
-        } else if (this.nowMs() - Date.parse(ts.launched_at) > ORPHAN_MS) {
-          this.ev("orphan", { unit: u.id, nonce: ts.nonce });
-          t.lost = true;
-          this.save();
-        }
-      });
-    }
     // A driver launch whose outcome was unknown, the same way; none found, it has ended (step 7).
     for (const u of this.ordered()) {
       const d = u.driver;
@@ -774,7 +735,7 @@ class RunTick {
   /**
    * After step 2: each blocked park, in order: a stop file turns it into a `stop` park (the
    * terminal kept); an `unpark --to` ends the session as a normal end and enters that stage; a
-   * worker no longer waiting with no request is unblocked, and step 3 reads it this same tick.
+   * worker no longer waiting is unblocked, and step 3 reads it this same tick.
    * Otherwise nothing changes: a blocked park runs no stall clock.
    */
   private async blocked(): Promise<void> {
@@ -797,7 +758,7 @@ class RunTick {
         }
         const s = u.session;
         const st = s?.thread_id ? await this.host.status(s.thread_id) : undefined;
-        if (st?.state === "waiting" && !st.pending) return;
+        if (st?.state === "waiting") return;
         delete u.parked;
         if (s) s.last_progress_at = this.nowIso();
         this.save();
@@ -854,10 +815,9 @@ class RunTick {
           s.progress_mark = mark;
           s.last_progress_at = this.nowIso();
         }
-        if (await this.prompt(u, s, st)) return;
-        // No request to read and no triage out: the question is the operator's, at once. Only on
-        // a host that can show the screen; any other host keeps the 0.4.0 path (the stall clock).
-        if (this.host.screen !== undefined && st.state === "waiting" && !st.pending && !u.triage) return this.blockedPark(u, s, this.launchedWith(stage, scope, s).project);
+        // The question is the operator's, at once. Only on a host that can show the screen; any
+        // other host keeps the 0.4.0 path (the stall clock).
+        if (this.host.screen !== undefined && st.state === "waiting") return this.blockedPark(u, s, this.launchedWith(stage, scope, s).project);
         const idle = this.nowMs() - Date.parse(s.last_progress_at);
         const max = stage.max_launches ?? DEFAULT_MAX_LAUNCHES;
         const launches = own(u.launches, u.stage) ?? 0;
@@ -930,191 +890,13 @@ class RunTick {
     return room > 0 ? head + tail.join(" | ").slice(-room) : head.slice(0, SCREEN_CHARS);
   }
 
-  /** `kind` names the event: a triage that asks for a relaunch logs `triage relaunch`. */
-  private async stall(u: UnitState, s: Session, kind = "stall"): Promise<void> {
+  private async stall(u: UnitState, s: Session): Promise<void> {
     await this.host.interrupt(s.thread_id!, "stalled");
     u.stalls += 1;
-    this.ev(kind, { unit: u.id, nonce: s.nonce, stalls: u.stalls });
+    this.ev("stall", { unit: u.id, nonce: s.nonce, stalls: u.stalls });
     if (u.stalls >= STALLS_TO_PARK) return this.park(u, "stalled");
     await this.endSession(u);
     this.held.add(u.id); // a stalled unit relaunches next tick
-  }
-
-  // ---- triage -----------------------------------------------------------------------------
-
-  /** Hold the unit's stall clock: its idle time starts again from now. */
-  private pause(s: Session): void {
-    s.last_progress_at = this.nowIso();
-    this.save();
-  }
-
-  /**
-   * The decision procedure (A-D) for a session's pending request. True when it acted on the
-   * unit; false sends the session on along the ordinary path, where its stall clock runs.
-   */
-  private async prompt(u: UnitState, s: Session, st: ThreadStatus): Promise<boolean> {
-    // A request is live only while its thread is at work: one read on an ended thread is stale.
-    const p = atWork(st) ? st.pending : undefined;
-    const triage = this.recipe.triage;
-    const seen = u.triaged ?? [];
-    if (!triage) {
-      // A: no triage stage. Each request is logged once; nothing else changes.
-      if (p && !seen.includes(p.id)) {
-        u.triaged = [...seen, p.id];
-        this.save();
-        this.ev("pending", { unit: u.id, nonce: s.nonce, request: p.id });
-      }
-      return false;
-    }
-    const t = u.triage;
-    if (t) {
-      // B: a triage is out for this unit.
-      if (!(await this.triageEnded(t, triage))) {
-        if (p?.id === t.request_id) {
-          this.pause(s);
-          return true;
-        }
-        if (p) {
-          await this.park(u, "second prompt", { interrupt: "stop", questions: p.questions });
-          return true;
-        }
-        return false; // the answer landed; the triage's end names the event
-      }
-      // Ended: acted on exactly once, then cleared.
-      const noted = p?.id === t.request_id && existsSync(render(triage.note_file, this.scope(u)));
-      await this.endTriage(u);
-      if (p?.id === t.request_id) {
-        if (noted) await this.stall(u, s, "triage relaunch");
-        else await this.park(u, "triage gave no answer", { interrupt: "stop", questions: p.questions });
-        return true;
-      }
-      if (!p) {
-        this.ev("triage answered", { unit: u.id, nonce: t.session.nonce, request: t.request_id });
-        return false;
-      }
-      await this.park(u, "second prompt", { interrupt: "stop", questions: p.questions });
-      return true;
-    }
-    // C: a request and no triage out. D: no request.
-    if (!p || seen.includes(p.id)) return false;
-    if (seen.length > 0) {
-      await this.park(u, "second prompt", { interrupt: "stop", questions: p.questions });
-      return true;
-    }
-    await this.launchTriage(u, s, p, triage);
-    if (!u.triage) return false; // refused: the stall clock runs
-    this.pause(s);
-    return true;
-  }
-
-  /** Has the triage ended? One past its time limit is interrupted and has. */
-  private async triageEnded(t: NonNullable<UnitState["triage"]>, triage: TriageStage): Promise<boolean> {
-    if (t.lost) return true;
-    const id = t.session.thread_id;
-    if (!id) return false; // step 0 is still looking for it by nonce
-    if (!atWork(await this.host.status(id))) return true;
-    const limit = (triage.stall_minutes ?? DEFAULT_TRIAGE_STALL_MINUTES) * MIN;
-    if (this.nowMs() - Date.parse(t.session.launched_at) < limit) return false;
-    await this.host.interrupt(id, "stalled");
-    return true;
-  }
-
-  /**
-   * Clear the unit's triage: remove its claim and release its directory. With `interrupt`, a
-   * triage thread still at work is interrupted first (`triage dropped`). A host with `close`
-   * closes the thread before the release.
-   */
-  private async endTriage(u: UnitState, o: { interrupt?: boolean; release?: boolean } = {}): Promise<void> {
-    const t = u.triage;
-    if (!t) return;
-    const ts = t.session;
-    if (o.interrupt && ts.thread_id && !t.lost && atWork(await this.host.status(ts.thread_id))) {
-      await this.host.interrupt(ts.thread_id, "stop");
-      this.ev("triage dropped", { unit: u.id, nonce: ts.nonce, request: t.request_id });
-    }
-    if (this.host.close && ts.thread_id && !t.lost) await this.host.close(ts.thread_id);
-    removeClaim(ts.claim_key, ts.claim_nonce);
-    if (o.release !== false) await this.releaseDir(u, ts.launch_dir, () => ({ project: ts.project!, cwd: ts.cwd! }));
-    delete u.triage;
-    this.save();
-  }
-
-  /**
-   * Launch the one triage of this stage visit for request `p`, stored in `u.triage`, never
-   * `u.session`. The request id is recorded before anything is launched. The triage stage's
-   * stop_file, watch, before and after_launch are not used.
-   */
-  private async launchTriage(u: UnitState, stuck: Session, p: PendingRequest, triage: TriageStage): Promise<void> {
-    const scope = this.scope(u, {
-      pending: { thread: stuck.thread_id!, request: p.id, questions: JSON.stringify(p.questions), stage: u.stage },
-    });
-    // Every field renders before any side effect.
-    const project = render(triage.project, scope);
-    const cwd = render(triage.cwd, scope);
-    const { env, instance, model, scope: agentScope } = this.agent(triage, scope);
-    const title = render(triage.title, scope);
-    const text = render(triage.message, agentScope);
-    const note = render(triage.note_file, this.scope(u));
-
-    u.triaged = [...(u.triaged ?? []), p.id];
-    this.save();
-    removeFile(note);
-    const seqBefore = own(u.seq, TRIAGE);
-    u.seq ??= {};
-    const n = (seqBefore ?? 0) + 1;
-    u.seq[TRIAGE] = n;
-    const nn = launchNonce(this.run.id, u.id, TRIAGE, n);
-    let dir: string;
-    try {
-      dir = await this.host.bind(project, cwd, nn, triage.launch_dir ?? DEFAULT_LAUNCH_DIR);
-    } catch (e) {
-      if (isHostError(e)) {
-        // The host was not reached and made no directory: unmark, so a later tick triages.
-        u.triaged = u.triaged.filter((id) => id !== p.id);
-        if (u.triaged.length === 0) delete u.triaged;
-        if (seqBefore === undefined) delete u.seq[TRIAGE];
-        else u.seq[TRIAGE] = seqBefore;
-        if (Object.keys(u.seq).length === 0) delete u.seq;
-        throw e;
-      }
-      return this.triageRefused(u, nn, `bind: ${message(e)}`);
-    }
-    let key: string;
-    try {
-      key = writeClaim(dir, env, nn);
-    } catch (e) {
-      if (dir !== cwd) await this.releaseDir(u, dir, () => ({ project, cwd }));
-      return this.triageRefused(u, nn, `claim: ${message(e)}`);
-    }
-    const now = this.nowIso();
-    const ts: Session = {
-      nonce: nn, claim_nonce: nn, launch_dir: dir, claim_key: key, project, cwd,
-      launched_at: now, last_progress_at: now, progress_mark: "",
-    };
-    u.triage = { request_id: p.id, session: ts };
-    this.save();
-    this.ev("triage", { unit: u.id, nonce: nn, request: p.id });
-    const req: LaunchRequest = { nonce: nn, title: threadTitle(title, nn), project, instance, model, cwd: dir, message: text };
-    try {
-      ts.thread_id = (await this.host.launch(req)).threadId;
-    } catch (e) {
-      if (isHostError(e)) throw e;
-      if (e instanceof LaunchError) {
-        await this.endTriage(u);
-        return this.triageRefused(u, nn, e.message);
-      }
-      // Unknown: the launch may have reached the host. Step 0 looks for it by nonce.
-      this.report.errors.push(`${this.run.id}/${u.id}: triage launch outcome unknown: ${message(e)}`);
-      this.ev("launch unknown", { unit: u.id, nonce: nn, reason: message(e) });
-      return;
-    }
-    this.save();
-  }
-
-  /** A triage the host refused: the request stays recorded, and the session's stall clock runs. */
-  private triageRefused(u: UnitState, nonce: string, reason: string): void {
-    this.ev("launch failed", { unit: u.id, nonce, reason });
-    this.save();
   }
 
   /** The handoff path when the stage's handoff file ends in a `<stamp> <token> <path>` line newer than this launch. */
@@ -1141,7 +923,6 @@ class RunTick {
     const { instance, model, scope: agentScope } = this.agent(stage, scope);
     const title = render(stage.title, scope);
     const text = render(stage.handoff!.message, agentScope);
-    await this.endTriage(u, { interrupt: true });
     // The parent's terminal closes; its claim and directory pass to the successor, unreleased.
     if (this.host.close && old.thread_id) await this.host.close(old.thread_id);
     const n = this.mint(u);
