@@ -36,6 +36,12 @@ Stop and report if any check fails. Do not arm around a failure.
   go to the default agent with a note. Report that. It does not stop.
 - **Orca knows both repos.** The AI workspace and the canonical appear in `orca repo list`.
   Their display names there are the values of the `ai_project` and `project` params.
+- **Who walks the `user:` lines.** `oss get '[.demo_ledger[] | select(.source_spine == "<spine>" and .type == "user")]'`,
+  run in the AI workspace root, lists them, planned ones included. Read the standing orders as the
+  base branch has them (ossify's `cumulative-demo.md` §3). A spine with a `user:` line and no order
+  that gives the demo walk to the `spine_finish` seat's role is not a failed check: say in the proposal
+  that the run parks after the merge (`spine-pr`, reason `stop`) until the operator walks the lines
+  or an order is added first.
 - **The recipe copy.** `~/baton-recipes/ossify-spine/` exists; if not, propose the README's copy
   step. Compare it with the installed baton's `examples/ossify-spine/` (ignore `*.bak*`). A
   difference is reported, not a failed check. Propose a refresh only when no run of any project

@@ -71,6 +71,26 @@ describe("running-a-spine-on-baton", () => {
     expect("--param via=x").toContain("--param via="); // control: the probe matches the old line
   });
 
+  // #1003: a spine's user: lines need a walker; the preflight says so before the arm instead of parking after the merge.
+  test("the preflight reads the user: lines and the orders, and warns in the proposal rather than failing", () => {
+    const s = skill();
+    const bullet = s.split("\n- **").find((b) => b.startsWith("Who walks the `user:` lines."))?.replace(/\s+/g, " ") ?? "";
+    // planned lines count: `oss demo_user_lines` is active-only, and a spine's lines are still planned before the arm
+    expect(bullet).toContain(".type == \"user\"")
+    expect(bullet).toContain("planned ones included");
+    expect(bullet).not.toContain("demo_user_lines");
+    expect(bullet).toContain("as the base branch has them");
+    expect(bullet).toContain("no order that gives the demo walk to the `spine_finish` seat's role");
+    expect(bullet).toContain("is not a failed check: say in the proposal that the run parks after the merge");
+    // it sits in the preflight, before the proposal step that shows the command
+    expect(s.indexOf("Who walks the `user:` lines.")).toBeGreaterThan(s.indexOf("## 1. Preflight"));
+    expect(s.indexOf("Who walks the `user:` lines.")).toBeLessThan(s.indexOf("## 2. Propose, then stop"));
+    // control: the bullet must not turn into a stop - it never says to stop or arm around it
+    expect(bullet).not.toMatch(/\b(stop and report|do not arm|refuse)/i);
+    // control: the probe finds nothing in a skill without the bullet
+    expect("- **The recipe copy.** x".split("\n- **").find((b) => b.startsWith("Who walks the `user:` lines."))).toBeUndefined();
+  });
+
   test("after arming, a watch request runs no command and the close is baton's", () => {
     const s = skill();
     expect(s).toContain('"Keep an eye on it" is not a status request');

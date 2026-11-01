@@ -213,7 +213,11 @@ async function armCmd(args: string[]): Promise<number> {
 function statusCmd(args: string[]): number {
   if (args.length > 1) return usage();
   const store = openStore();
-  const ids = args.length ? [args[0]] : store.listRuns();
+  // The bare form lists every run, so each row leads with its run id and a header names the columns.
+  // `status <run>` keeps the bare rows: a reader of one run needs neither.
+  const bare = args.length === 0;
+  const ids = bare ? store.listRuns() : [args[0]];
+  if (bare && ids.length) process.stdout.write("RUN UNIT STAGE LAUNCHES STALLS PARKED THREAD\n");
   for (const id of ids) {
     let run: RunState;
     try {
@@ -224,7 +228,7 @@ function statusCmd(args: string[]): number {
     for (const u of Object.values(run.units)) {
       const launches = Object.values(u.launches).reduce((a, b) => a + b, 0);
       process.stdout.write(
-        `${u.id} ${u.stage} ${launches} ${u.stalls} ${u.parked?.reason ?? "-"} ${u.session?.thread_id ?? "-"}\n`,
+        `${bare ? `${id} ` : ""}${u.id} ${u.stage} ${launches} ${u.stalls} ${u.parked?.reason ?? "-"} ${u.session?.thread_id ?? "-"}\n`,
       );
     }
   }
