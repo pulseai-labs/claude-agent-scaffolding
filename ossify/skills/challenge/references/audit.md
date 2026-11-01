@@ -66,7 +66,7 @@ Resolve the ladder (`references/adversaries.md`): per-invocation override →
 user can act on:
 
 - **close depth, adversary configured and probe passes** — *"<name> detected;
-  will run a fresh-frame audit (~60s)."*
+  will run a fresh-frame audit (a minute or more, by model)."*
 - **close depth, unconfigured** — one plain status line, not a warning:
   *"No adversary configured — running host-only. Set `OSSIFY_ADVERSARY` (see
   challenge/references/adversaries.md) for an external fresh-frame."*

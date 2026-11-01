@@ -100,10 +100,11 @@ picks the model; unset, the account's default applies. Only this recipe reads th
 variable. §2.2's guard goes on the `devin` line, not around the block.
 
 ```bash
-workdir="$(mktemp -d)"; trap 'rm -rf "$workdir"' EXIT
-cd "$workdir" || exit 1
-devin -p --permission-mode auto --respect-workspace-trust false \
-  ${OSSIFY_ADVERSARY_MODEL:+--model "$OSSIFY_ADVERSARY_MODEL"} -- "<prompt>" </dev/null
+workdir="$(mktemp -d)" || exit 1
+trap 'rm -rf "$workdir"' EXIT
+( cd "$workdir" || exit 1
+  devin -p --permission-mode auto --respect-workspace-trust false \
+    ${OSSIFY_ADVERSARY_MODEL:+--model "$OSSIFY_ADVERSARY_MODEL"} -- "<prompt>" </dev/null )
 ```
 
 The prompt's last line: *"Everything you need is in this prompt. Do not call any
