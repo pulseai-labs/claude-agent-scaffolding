@@ -1,5 +1,13 @@
 # workspace-init changelog
 
+## 0.10.2 (2026-11-02)
+
+The bootstrapped README no longer lists the retired architect-critic plugin.
+
+### Changed
+- `templates/README.md.tmpl` drops its `architect-critic` line from "Plugins involved"; the plugin is retired from the marketplace. A workspace bootstrapped before this release keeps the line it was rendered with.
+- `lib/manifest.sh` comments and two `tests/test-manifest.sh` fixtures name `ai-mentor` where they named the retired plugin. No behaviour change.
+
 ## 0.10.1 (2026-10-29)
 
 The commit-msg hook finds the manifest from the repo it runs in (#983).

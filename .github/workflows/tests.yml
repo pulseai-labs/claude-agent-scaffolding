@@ -56,9 +56,6 @@ jobs:
       - name: ai-mentor suite
         run: bash ai-mentor/tests/test-frontmatter-lint.sh
 
-      - name: architect-critic suite
-        run: bash architect-critic/run-tests.sh
-
       - name: ossify suite
         run: bash ossify/tests/run-all.sh
 

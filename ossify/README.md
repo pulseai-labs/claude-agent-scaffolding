@@ -1,4 +1,4 @@
-# ossify (v1.33.0)
+# ossify (v1.33.1)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -220,6 +220,11 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.33.1, the README names `challenge` as the marketplace's one adversarial audit surface: the
+architect-critic plugin is retired from the marketplace, and ossify's `challenge` is what remains.
+`oss critic_detect` is unchanged and answers `absent` once the plugin is gone; removing the verb is a
+major release. Prose only; no state change.
 
 Since 1.33.0 (#233), `OSSIFY_ADVERSARY` accepts `devin`. The recipe runs from an empty directory
 with a no-tools prompt, because Devin run from a repo exited 0 with prose and no audit.
@@ -545,12 +550,12 @@ in each skill's `references/`, so every harness the plugin ships on has them.
 
 `challenge` is the grill and the adversarial critic, absorbed in-tree at 1.1.0:
 the bone grill gate, the spec-core close audit, the release class veto, and the
-spine plan/close audits all run on ossify alone — no ai-mentor or
-architect-critic install required. Both plugins remain useful standalone;
-ossify no longer depends on either. A close-depth audit recruits an external
-fresh-frame adversary when one is configured via `OSSIFY_ADVERSARY`
-(`skills/challenge/references/adversaries.md`); unconfigured means host-only,
-by declaration.
+spine plan/close audits all run on ossify alone — no ai-mentor install
+required. ai-mentor remains useful standalone; ossify does not depend on it.
+`challenge` is the marketplace's one adversarial audit surface. A close-depth
+audit recruits an external fresh-frame adversary when one is configured via
+`OSSIFY_ADVERSARY` (`skills/challenge/references/adversaries.md`); unconfigured
+means host-only, by declaration.
 
 Ossify is in the Claude and Codex marketplaces as of v1.0.0. Plan D's consolidated eval
 covers all 10 acceptance scenarios; scenario 10 is a run rather than a standing

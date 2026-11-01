@@ -12,9 +12,8 @@ Covers `grill-me` and `council` here (ai-mentor owns the convention). The shared
 policy ships as `recommendation-policy.md` next to each skill's `SKILL.md` (a
 byte-identical copy of the marketplace SoT
 `docs/conventions/recommendation-policy.md`, guarded by the repo-root parity
-test). `architect-critic`'s `critiquing-spec` and `code-judo`'s
-`deepen-architecture` carry the same convention — verify those in their own
-plugins.
+test). `code-judo`'s `deepen-architecture` carries the same convention — verify
+it in its own plugin.
 
 ## How to use
 

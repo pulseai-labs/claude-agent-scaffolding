@@ -2,7 +2,7 @@
 
 A **plugin marketplace** published to three surfaces: Claude Code (`/plugin install`, from
 `.claude-plugin/marketplace.json`), Codex (`.agents/plugins/marketplace.json`, the v0
-dual-publish contract), and OMP (`.omp-plugin/marketplace.json`, ten plugins;
+dual-publish contract), and OMP (`.omp-plugin/marketplace.json`, nine plugins;
 `tests/test-omp-surface.sh` keeps it in step). There is no application — the plugins *are* the product.
 
 **A change to a plugin manifest or to packaging has to be carried to every surface that
@@ -11,7 +11,7 @@ checks version and frontmatter parity across the two marketplaces. `seat-mods`, 
 `baton` and `bot-on-openbot` are deliberately absent from the Codex set — check the deferred list in
 `tests/test-codex-dual-publish.sh` before assuming a plugin ships everywhere.
 
-Shipped: `workspace-init`, `ai-mentor`, `architect-critic`, `claude-security-audit`, `ossify`,
+Shipped: `workspace-init`, `ai-mentor`, `claude-security-audit`, `ossify`,
 `code-judo`, `crew`, `merge-bar`, `seat-mods`, `molt`, `baton`, `bot-on-openbot`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
@@ -183,10 +183,10 @@ cross-plugin parity breaks no single plugin suite can see.
 
 **Some gates do not run themselves, and CI does not run them either.** Several plugins ship
 validation that both `tests.yml` and the plugin's own `run-tests.sh` skip — session-driven
-LLM-judge harnesses under `tests/eval/` (ossify, architect-critic), behavioural checklists
+LLM-judge harnesses under `tests/eval/` (ossify), behavioural checklists
 walked by hand (ai-mentor's five `tests/*.md`, required before a version bump). A green CI run
-says nothing about any of them, and a plugin's own runner can miss them too: `architect-critic/run-tests.sh`
-discovers only `tests/unit/` and `tests/integration/`, so its evaluator never runs from either.
+says nothing about any of them, and a plugin's own runner can miss them too: `ossify/tests/run-all.sh`
+never runs `ossify/tests/eval/`, so its evaluator does not run from the runner.
 
 **Before bumping a plugin's version, list that plugin's `tests/` and `evals/` trees and compare
 them against what its own runner actually executes.** Whatever the runner does not execute is

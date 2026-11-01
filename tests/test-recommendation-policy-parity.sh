@@ -18,7 +18,6 @@ SOT="$ROOT/docs/conventions/recommendation-policy.md"
 COPIES=(
   "$ROOT/ai-mentor/skills/grill-me/recommendation-policy.md"
   "$ROOT/ai-mentor/skills/council/recommendation-policy.md"
-  "$ROOT/architect-critic/templates/recommendation-policy.md"
   "$ROOT/code-judo/skills/deepen-architecture/references/recommendation-policy.md"
 )
 

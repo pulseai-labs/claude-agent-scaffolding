@@ -1,1 +1,0 @@
-{"scores": {"correct_file": 5, "source_tag_timestamp": 5, "duplicate_validation": 5, "link_to_challenge": 5, "empty_text_rejected": 4}, "pass": true, "notes": "A clear 'principle text required' error was emitted with no writes to principles.md or state.json, but the output does not demonstrate a non-zero exit code."}

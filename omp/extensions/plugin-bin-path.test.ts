@@ -32,10 +32,10 @@ describe("loader", () => {
   });
   test("finds modules through the Claude record too", async () => {
     const h = home();
-    record(h, ".claude", { "architect-critic": stub(h, "architect-critic", 1) });
+    record(h, ".claude", { "ai-mentor": stub(h, "ai-mentor", 1) });
     const pi: any = {};
     await load(pi, h);
-    expect(pi.ran).toBe("architect-critic@1");
+    expect(pi.ran).toBe("ai-mentor@1");
   });
   test("a plugin of our marketplace without omp/bin-path.ts yields no candidate", () => {
     const h = home();

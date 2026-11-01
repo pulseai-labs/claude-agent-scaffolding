@@ -1,1 +1,0 @@
-{"scores":{"table_shape":5,"columns_present":4,"limit_honored":5,"empty_state":5,"timeout_flagged":5},"pass":true,"notes":"Exactly one data row with all required columns correctly populated; only blemish is the flattened 'claude' rendering of the adversaries_used array, a minor formatting difference."}

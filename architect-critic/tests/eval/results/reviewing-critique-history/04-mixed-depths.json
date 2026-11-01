@@ -1,1 +1,0 @@
-{"scores":{"table_shape":5,"columns_present":4,"limit_honored":5,"empty_state":5,"timeout_flagged":5},"pass":true,"notes":"Six correct rows in descending order render both depth values and both adversary combinations side by side; the unbracketed 'claude' / 'claude+codex' array rendering is a minor formatting difference only."}

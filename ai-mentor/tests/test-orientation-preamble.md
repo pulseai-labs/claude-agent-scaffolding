@@ -8,8 +8,6 @@ coherent. Derived from available context; if context is thin the agent **asks**
 rather than fabricating. Re-surfaceable on demand ("where am I?").
 
 Covers `grill-me` and `council` here (ai-mentor owns the convention).
-`architect-critic`'s `critiquing-spec` carries the same convention — verify it in
-that plugin's own session (its block fires at Step 4, after the artifact resolves).
 
 ## How to use
 
