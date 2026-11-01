@@ -12,11 +12,6 @@ export type LaunchRequest = {
   message: string;
 };
 
-export type PendingOption = { label: string; description?: string };
-export type PendingQuestion = { id: string; header: string; question: string; options: PendingOption[]; multiSelect?: boolean };
-/** A user-input request a thread has raised and is blocked on. */
-export type PendingRequest = { id: string; questions: PendingQuestion[] };
-
 export type ThreadStatus = {
   /**
    * `interrupted`: the turn was stopped from outside (often an operator about to steer). The
@@ -25,8 +20,6 @@ export type ThreadStatus = {
   state: "active" | "completed" | "interrupted" | "failed" | "waiting" | "gone";
   /** Opaque mark that changes whenever the thread does. */
   activity: string;
-  /** Set only when the host saw a pending request and could read it; `state` is unaffected. */
-  pending?: PendingRequest;
 };
 
 /** The host refused the credentials. */
@@ -53,7 +46,7 @@ export class LaunchError extends Error {
   }
 }
 
-/** The host cannot deliver these answers to this request (a shape it cannot answer). */
+/** The host cannot deliver this answer (a terminal that is gone, a screen that no longer matches). */
 export class AnswerRefused extends Error {
   constructor(message: string) {
     super(message);
@@ -81,8 +74,6 @@ export interface Host {
   close?(threadId: string): Promise<void>;
   /** The thread's rendered screen as plain text; `""` when the thread is gone. */
   screen?(threadId: string): Promise<string>;
-  /** Answer the thread's pending request `requestId`: `answers` maps question id to the chosen label. */
-  respond?(threadId: string, requestId: string, answers: Record<string, string>): Promise<void>;
   /**
    * Send `text` to the thread's terminal as typed, bytes unchanged. A terminal that is gone throws
    * `AnswerRefused("terminal gone")`. Only `baton answer --screen` / `--screen-text` call it, after

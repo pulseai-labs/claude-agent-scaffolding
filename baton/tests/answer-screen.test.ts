@@ -256,12 +256,13 @@ test("the new forms parse exactly; anything else is usage", async () => {
   expect(host.sent).toEqual([]);
 });
 
-test("the old form still refuses on a host without respond", async () => {
-  await p.blockedAt1(ASK);
-  setHostForTest(new FakeHost({}, { withOptional: false }));
-  const r = await p.run("answer", "r", "u1", "green");
-  expect(r.rc).toBe(2);
-  expect(r.err).toContain("host cannot answer");
-  // A three-argument call is the old form, whatever its label.
-  expect((await p.run("answer", "r", "u1", "--screen")).err).toContain("host cannot answer");
+test("the plain three-argument form is gone: usage, with nothing sent (removed in 0.14.0)", async () => {
+  const host = await p.blockedAt1(ASK);
+  for (const args of [["r", "u1", "green"], ["r", "u1", "--screen"], ["r", "u1"], ["r"], []]) {
+    const r = await p.run("answer", ...args);
+    expect([args, r.rc]).toEqual([args, 64]);
+  }
+  expect((await p.run("answer", "r", "u1", "green")).err).not.toContain("answer <run> <unit> <label>");
+  expect(host.sent).toEqual([]);
+  expect(p.events().filter((e) => e.kind === "answered")).toEqual([]);
 });

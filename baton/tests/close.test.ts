@@ -270,7 +270,7 @@ test("disarm: a close that fails is reported and the disarm goes on", async () =
   expect(runState().units.a.kept?.map((k) => k.thread)).toEqual(["thread-2"]); // left on record, not closed
 });
 
-// ---- fix round 1: a park by outcome keeps; triage, driver and molt parent threads close -----
+// ---- fix round 1: a park by outcome keeps; driver and molt parent threads close -----
 
 function outcomeRecipe(to: "park" | "done") {
   return recipe({ work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to }] }) }, ["a"]);
@@ -305,56 +305,6 @@ test("control: the same recipe's non-park outcome closes, then releases", async 
   expect(u.stage).toBe("done");
   expect(order).toEqual(["close thread-1", `release ${join(root, "launch", "r1_a_work_1")}`]);
   expect(u.kept).toBeUndefined();
-});
-
-const REQ = { id: "req-1", questions: [{ id: "q1", header: "Pick", question: "Which way?", options: [{ label: "left" }] }] };
-
-function triageRecipe() {
-  return {
-    ...recipe({ work: sess() }, ["a"]),
-    triage: {
-      kind: "triage", instance: "tinst", model: "tmod", project: "proj",
-      cwd: "{param.root}/w/{unit.id}", title: "triage {unit.id}", message: "answer {pending.request}",
-      env: { TK: "t-{unit.id}" }, note_file: "{run.dir}/notes/{unit.id}.md",
-    },
-  };
-}
-
-/** Seat thread-1 pending at once; its triage (thread-2) launches at minute 1, then answers and ends. */
-async function triageAnswers(withOptional: boolean): Promise<string[]> {
-  await arm(triageRecipe());
-  host = new FakeHost({
-    work: { ticks: 3, end: "completed", pending: { atStep: 0, request: REQ } },
-    triage: { ticks: 100, end: "completed" },
-  }, { withOptional });
-  ownDirs(host);
-  await doTick();
-  at(1);
-  await doTick();
-  expect(host.launches.map((l) => l.request.nonce)).toEqual(["r1/a/work/1", "r1/a/triage/1"]);
-  const log = withOptional ? recordOrder(host) : [];
-  host.answer("thread-1");
-  host.finish("thread-2", "completed");
-  at(2);
-  await doTick();
-  return log;
-}
-
-test("triage end closes the triage thread before its release", async () => {
-  const order = await triageAnswers(true);
-  const u = runState().units.a;
-  expect(u.triage).toBeUndefined();
-  expect(order).toEqual(["close thread-2", `release ${join(root, "launch", "r1_a_triage_1")}`]);
-  expect(u.session?.thread_id).toBe("thread-1"); // the seat goes on
-});
-
-test("control: on a host without close the triage ends as in 0.4.0", async () => {
-  await triageAnswers(false);
-  const u = runState().units.a;
-  expect(u.triage).toBeUndefined();
-  expect(u.parked).toBeUndefined();
-  expect(host.releases.map((r) => r.dir)).toEqual([join(root, "launch", "r1_a_triage_1")]);
-  expect(u.session?.thread_id).toBe("thread-1");
 });
 
 function driverRecipe() {

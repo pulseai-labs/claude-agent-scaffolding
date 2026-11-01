@@ -245,7 +245,7 @@ function newHost(lane: Effect, extra: Record<string, Effect> = {}): SeatHost {
 
 /** The run's role table: one agent per D2 role, as `running-a-spine-on-baton` writes it. */
 const SEATS = Object.fromEntries(
-  ["spine session", "implementer", "verifier", "close session", "reviewer", "work-PR session", "triage", "driver"].map((role) => [role, {
+  ["spine session", "implementer", "verifier", "close session", "reviewer", "work-PR session", "driver"].map((role) => [role, {
     agent: `${role.replaceAll(" ", "-").toLowerCase()}-agent`, argv: ["seat-bin", role], brief_delivery: "inject",
     expected_model: `${role}-model`, effort: "high", env: {}, ...(role === "reviewer" ? { review: "/review" } : {}),
   }]),

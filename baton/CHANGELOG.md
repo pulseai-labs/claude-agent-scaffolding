@@ -2,6 +2,38 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.14.0 - 2026-11-02
+
+A seat's question always reaches the operator: triage is removed (#1023).
+
+- **Changed: a seat's question is never tried by a model first.** On Orca, the only host since 0.6.0,
+  `OrcaHost.status` never set `pending` and the host had no `respond`, so a recipe's `triage` stage
+  never launched and a waiting seat went straight to the blocked park. That is now the only path. The
+  blocked park no longer checks for a request or a live triage, and the phone path (`baton screen`,
+  `baton answer --park <at> --screen` and `--screen-text`) is unchanged.
+- **Removed: the `triage` stage and everything behind it.** The recipe's `triage` field and its
+  validation, the `{pending.*}` placeholders, the `second prompt` and `triage gave no answer` parks,
+  the `pending`, `triage`, `triage answered`, `triage relaunch` and `triage dropped` events, `triaged`
+  and `triage` on a unit, the triage counters in `baton report`, `pending` on the host's status and
+  `respond` on the host interface. The example recipe loses its `triage` stage and `briefs/triage.md`;
+  `briefs/common.md` no longer tells a seat to read a triage note.
+- **Removed: `baton answer <run> <unit> <label>`.** Only the triage brief used it, and on Orca it always
+  refused. Any other argument list than the two `--screen` forms is rc 64 (usage). A park event no
+  longer carries `questions`.
+- **Kept, so a run armed before 0.14.0 goes on: legacy `triage` is tolerated.**
+  - A recipe with a top-level `triage` key validates and loads: the key is not checked, its strings are
+    not walked for `{pending.*}`, and the stage never launches. This holds for `baton validate`,
+    `baton arm`, `baton clone` (`recipe_sha256` is taken from the bytes as they are) and the tick, which
+    reads the run's own `recipe.json`.
+  - A `seats.json` with a `triage` role is accepted, and a recipe no longer needs one.
+  - A `run.json` with `triaged` or `triage` on a unit loads. Neither field is read or written: they stay
+    in `run.json` as they were until the run ends, and a clone drops them. A triage thread live at the
+    upgrade is not ended by baton: its claim and directory stay until you close them.
+  - A unit already parked for `second prompt` or `triage gave no answer` unparks with `baton unpark`
+    as any park; `baton report` counts only the events it names and passes the old triage events.
+- Known limit: the host interface and status no longer carry a structured request. A host that can read
+  one needs a new design, not the old stage.
+
 ## 0.13.0 - 2026-11-01
 
 Answer and interrupt Claude Code and Devin seats (#998).

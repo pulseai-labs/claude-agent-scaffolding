@@ -119,11 +119,12 @@ describe("status mapping, from recorded and hand-edited 1.4.238 fixtures", () =>
     expect((await statusWith(list, ps)).activity).toBe(a.activity);
   });
 
-  test("no agent row: activity is the empty pair; pending is never set; failed is never returned", async () => {
+  test("no agent row: activity is the empty pair; failed is never returned", async () => {
     const s = await statusWith("terminal-list.json", "worktree-ps-done-no-agent.edited.json");
     expect(s).toEqual({ state: "active", activity: "|" });
+    // an omp ask dialog reads waiting, with no structured question: the status carries only state and activity
     const blocked = await statusWith("terminal-list.json", "worktree-ps-omp-ask.json");
-    expect(blocked.pending).toBeUndefined();
+    expect(Object.keys(blocked).sort()).toEqual(["activity", "state"]);
   });
 
   test("a truncated terminal list is host down, never gone (Review Focus 2)", async () => {

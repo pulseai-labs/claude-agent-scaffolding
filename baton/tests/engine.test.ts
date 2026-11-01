@@ -1691,3 +1691,47 @@ test("control: the gone note is only on a thread gone park", async () => {
   await doTick();
   expect(notifyLines()[0]).not.toContain("seat.log");
 });
+
+// ---- the park event: the thread, never a questions field --------------------------------------
+// Triage (baton 0.14.0 removed it) was the only park that carried `questions`; no park does now.
+
+test("a stall park records the thread and no questions", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1000, end: "completed" } });
+  await doTick();
+  for (let m = 1; m <= 200 && !runState().units.a.parked; m += 10) {
+    at(m);
+    await doTick();
+  }
+  const e = lastPark();
+  expect(e.reason).toBe("stalled");
+  expect(e.thread).toMatch(/^thread-\d+$/);
+  expect("questions" in e).toBe(false);
+});
+
+test("a session stage whose outcome moves to park records the session's thread", async () => {
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "park" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  await doTick();
+  done("a");
+  host.finish("thread-1", "completed");
+  at(1);
+  await doTick();
+  const e = lastPark();
+  expect(e.reason).toBe("outcome");
+  expect(e.thread).toMatch(/^thread-\d+$/);
+});
+
+test("a park with no session records neither a thread nor questions", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 5, end: "completed" } });
+  host.launch = async () => { throw new HostDownError("launch outcome unknown: bad model"); };
+  for (let i = 0; i < 12 && !runState().units.a.parked; i++) {
+    at(i * 1.5);
+    await doTick();
+  }
+  const e = lastPark();
+  expect(e.reason).toBe("cap");
+  expect("thread" in e).toBe(false);
+  expect("questions" in e).toBe(false);
+});

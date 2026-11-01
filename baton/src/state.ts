@@ -64,13 +64,6 @@ export type UnitState = {
   merge_failures?: number;
   /** Consecutive failed forge reads (PR view, PR-URL argv, landed check); three park the unit. */
   forge_failures?: number;
-  /** Request ids triaged in this stage visit; reset by enterStage. */
-  triaged?: string[];
-  /**
-   * The live triage session for the unit's current pending request. `lost`: step 0 found no
-   * thread for its nonce, so the triage counts as ended.
-   */
-  triage?: { request_id: string; session: Session; lost?: true };
   /** Ended sessions' threads kept open; absent when there are none. */
   kept?: KeptThread[];
 };
@@ -78,10 +71,11 @@ export type UnitState = {
 /**
  * Enter `stage`: the state every stage visit starts with. Shared by an outcome's move and
  * `unpark --to`. Launch and stall counts are per visit; the nonce sequence (seq) is never reset.
- * `noteFile` is the recipe's rendered triage note path: a note from an earlier visit goes. Every
- * caller has ended the unit's triage before (a park or a session end releases it).
+ *
+ * A `triaged` or `triage` field in older state is not part of the type: it is never read and never
+ * written, so it stays in run.json as it was (baton 0.14.0 removed triage).
  */
-export function enterStage(u: UnitState, stage: string, noteFile?: string): void {
+export function enterStage(u: UnitState, stage: string): void {
   u.stage = stage;
   u.record_at_entry = u.record_seen;
   u.launches[stage] = 0;
@@ -89,15 +83,6 @@ export function enterStage(u: UnitState, stage: string, noteFile?: string): void
   delete u.cwd_busy;
   delete u.merge_failures;
   delete u.forge_failures;
-  delete u.triaged;
-  delete u.triage;
-  if (noteFile !== undefined) {
-    try {
-      unlinkSync(noteFile);
-    } catch (e) {
-      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
-    }
-  }
 }
 
 // Every status in the union: `satisfies` makes a type check (tsc, an editor) flag a status added there and missing here.

@@ -50,16 +50,7 @@ export type MergeStage = {
   outcomes: { merged: string; red: string; conflict: string };
   run_after?: string[][];
 };
-/** The recipe's one triage session: launched for a unit stuck on a prompt. The engine ignores the
- *  SessionStage fields stop_file, watch, before and after_launch for it; they validate as for a session. `stall_minutes` is the
- *  triage session's own time limit (default 10, applied by the engine). */
-export type TriageStage = Omit<SessionStage, "kind" | "outcomes" | "handoff" | "slots" | "max_launches" | "settle_minutes"> & {
-  kind: "triage";
-  /** File the triage session writes to ask for a relaunch with a correction note. */
-  note_file: string;
-};
-/** The recipe's one driver session: launched when a unit parks. Like triage, the engine ignores no
- *  extra fields here; the session-only ones below are refused. */
+/** The recipe's one driver session: launched when a unit parks. The session-only fields below are refused. */
 export type DriverStage = Omit<SessionStage, "kind" | "outcomes" | "handoff" | "slots" | "max_launches"
   | "settle_minutes" | "before" | "after_launch" | "stop_file" | "watch"> & {
   kind: "driver";
@@ -90,7 +81,6 @@ export type Recipe = {
   sources: Source[];
   seed: { id: string; stage: string; vars?: Record<string, string> }[];
   stages: Record<string, Stage>;
-  triage?: TriageStage;
   driver?: DriverStage;
 };
 
@@ -102,7 +92,6 @@ export type Scope = {
   handoff_path?: string;
   pr?: { url: string; head: string };
   driver?: { reason: string; stage: string; launch: string };
-  pending?: { thread: string; request: string; questions: string; stage: string };
   /** A role stage's agent, from the run's role table; `review` only when the table gives one. */
   agent?: { name: string; review?: string };
 };
@@ -148,13 +137,10 @@ const VAR_NAME_RE = /^[A-Za-z0-9_]+$/;
 const FIXED_NAMES = new Set([
   "unit.id", "run.id", "run.dir", "run.group", "attempt", "handoff_path", "pr.url", "pr.head",
 ]);
-// Usable only in the triage stage: the stuck unit's pending request.
-const PENDING_NAMES = new Set(["pending.thread", "pending.request", "pending.questions", "pending.stage"]);
-
 // Usable only in the driver's launch fields: why the unit parked, where, and the launch's number
 // (`<n>` of the nonce `<run>/<unit>/driver/<n>`). Its state and result files may use the number only.
 const DRIVER_NAMES = new Set(["driver.reason", "driver.stage", "driver.launch"]);
-type PlaceholderMode = "stage" | "triage" | "driver" | "driver-file";
+type PlaceholderMode = "stage" | "driver" | "driver-file";
 
 // Usable only in the message (and a session's handoff message) of a stage with a role.
 const AGENT_NAMES = new Set(["agent.name", "agent.review"]);
@@ -162,7 +148,6 @@ const AGENT_NAMES = new Set(["agent.name", "agent.review"]);
 /** Is `name` (the text between braces) a placeholder the recipe may use? Returns a reason or null. */
 function placeholderProblem(name: string, params: Set<string>, mode: PlaceholderMode = "stage"): string | null {
   if (FIXED_NAMES.has(name)) return null;
-  if (mode === "triage" && PENDING_NAMES.has(name)) return null;
   if (mode === "driver" && DRIVER_NAMES.has(name)) return null;
   if (mode === "driver-file" && name === "driver.launch") return null;
   if (name.startsWith("param.")) {
@@ -190,12 +175,6 @@ export function render(tpl: string, scope: Scope): string {
       case "pr.head":
         if (!scope.pr) throw new Error("no pr in scope");
         return name === "pr.url" ? scope.pr.url : scope.pr.head;
-      case "pending.thread":
-      case "pending.request":
-      case "pending.questions":
-      case "pending.stage":
-        if (!scope.pending) throw new Error("no pending in scope");
-        return scope.pending[name.slice(8) as "thread" | "request" | "questions" | "stage"];
       case "driver.reason":
       case "driver.stage":
       case "driver.launch":
@@ -237,7 +216,7 @@ const TERMINALS = ["done", "park"];
 /** Role names may hold spaces and capitals. */
 export const ROLE_RE = /^[A-Za-z][A-Za-z0-9 -]*$/;
 
-/** Role to the names of the stages using it (the triage and driver stages are named "triage" and "driver"). */
+/** Role to the names of the stages using it (the driver stage is named "driver"). */
 export function recipeRoles(r: Recipe): Map<string, string[]> {
   const out = new Map<string, string[]>();
   const add = (role: string | undefined, name: string) => {
@@ -245,7 +224,6 @@ export function recipeRoles(r: Recipe): Map<string, string[]> {
     out.set(role, [...(out.get(role) ?? []), name]);
   };
   for (const [name, st] of Object.entries(r.stages)) if (st.kind === "session") add(st.role, name);
-  add(r.triage?.role, "triage");
   add(r.driver?.role, "driver");
   return out;
 }
@@ -349,7 +327,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     });
   };
 
-  // The launch fields a session stage, the triage stage and the driver stage share.
+  // The launch fields a session stage and the driver stage share.
   const launchFields = (p: string, st: Obj) => {
     if (st.role !== undefined && (!isStr(st.role) || !ROLE_RE.test(st.role))) {
       err(`${p}.role`, `role must match ${ROLE_RE.source}`);
@@ -423,21 +401,8 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     }
   }
 
-  if (r.triage !== undefined) {
-    const t = r.triage;
-    if (!isObj(t)) err("triage", "must be an object");
-    else {
-      if (t.kind !== "triage") err("triage.kind", 'must be "triage"');
-      for (const k of ["outcomes", "handoff", "slots", "max_launches", "settle_minutes"]) {
-        if (k in t) err(`triage.${k}`, "not allowed on a triage stage");
-      }
-      if (!isStr(t.note_file)) err("triage.note_file", "must be a string");
-      launchFields("triage", t);
-      // A stage named triage would share the triage launches' seq key and nonce segment.
-      if (stageNames.has("triage")) err("stages.triage", "a recipe with a triage stage cannot name a stage triage");
-    }
-  }
-
+  // LEGACY-TRIAGE: a top-level "triage" key (a recipe written before baton 0.14.0) is ignored. It is not
+  // validated and its strings are not walked for placeholders: it may hold {pending.*}, which no longer exist.
   if (r.driver !== undefined) {
     const d = r.driver;
     if (!isObj(d)) err("driver", "must be an object");
@@ -537,7 +502,6 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       agentPaths.add(`stages.${name}.message`).add(`stages.${name}.handoff.message`);
     }
   }
-  if (isObj(r.triage) && r.triage.role !== undefined) agentPaths.add("triage.message");
   if (isObj(r.driver) && r.driver.role !== undefined) agentPaths.add("driver.message");
   const walk = (v: unknown, path: string, mode: PlaceholderMode = "stage") => {
     if (isStr(v)) {
@@ -553,12 +517,6 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
     else if (isObj(v)) for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`, mode);
   };
   walk(r.stages, "stages");
-  if (isObj(r.triage)) {
-    // note_file renders with the unit's own scope: no pending request there.
-    const { note_file, ...launch } = r.triage;
-    walk(launch, "triage", "triage");
-    walk(note_file, "triage.note_file");
-  }
   if (isObj(r.driver)) {
     // state_file and result_file are paths: of the driver names only the launch number (no slash).
     // The ledger is also named in the run's summary, which has no launch: unit scope only.
