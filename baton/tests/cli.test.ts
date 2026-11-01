@@ -215,6 +215,24 @@ test("status prints one line per unit", async () => {
   expect((await runIn(st, "status", "nope")).rc).toBe(2);
 });
 
+test("bare status names each row's run and heads the columns; status <run> keeps the bare rows (#1001)", async () => {
+  const st = newState();
+  expect((await runIn(st, "status")).out).toBe("");
+  await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer");
+  await runIn(st, "arm", RELAY, "--run", "r2", ...PARAMS, "--no-timer");
+  const all = await runIn(st, "status");
+  expect(all.rc).toBe(0);
+  // both runs have a unit named planner: only the leading run id tells the rows apart
+  expect(all.out).toBe(
+    "RUN UNIT STAGE LAUNCHES STALLS PARKED THREAD\n" +
+    "r1 planner planner 0 0 - -\n" +
+    "r2 planner planner 0 0 - -\n",
+  );
+  // adjacent control: the one-run form keeps its old shape, with no run id and no header
+  expect((await runIn(st, "status", "r2")).out).toBe("planner planner 0 0 - -\n");
+  expect((await runIn(st, "status", "r1")).out).toBe("planner planner 0 0 - -\n");
+});
+
 test("disarm marks the run disarmed and removes only its units' claims", async () => {
   const st = newState();
   await runIn(st, "arm", RELAY, "--run", "r1", ...PARAMS, "--no-timer");

@@ -2,6 +2,24 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.10.2 - 2026-11-01
+
+Three small fixes found in the #993 live acceptance.
+
+- **Changed: bare `baton status` names each row's run and heads the columns (#1001).** Rows
+  were `<unit> <stage> <launches> <stalls> <parked> <thread>` with no run id, so rows of different
+  runs could not be told apart. The bare form now starts each row with the run id and prints a
+  header line first. `baton status <run>` is unchanged: no run id, no header. The README names the
+  columns. Nothing in this repo parses the output.
+- **Changed: the skill's preflight checks who walks a spine's `user:` lines (#1003).** When the
+  spine has such a line and no standing order names the `spine_finish` seat's role, the proposal
+  says the run parks after the merge until the operator walks the lines or an order is added. It
+  warns and does not stop the arm.
+- **Documented, no code change: a driver launch can leave a project-scope row in
+  `~/.claude/plugins/installed_plugins.json` (#1004).** Claude Code writes it at startup, from the
+  launch directory's tracked `.claude/settings.json`. baton cannot prevent it. See Known limits in
+  the README.
+
 ## 0.10.1 - 2026-11-01
 
 Each verify round leaves its record (#1005). `examples/ossify-spine` moves the last verdict to
