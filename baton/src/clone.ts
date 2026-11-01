@@ -46,10 +46,11 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /**
  * Point a path at the new run. Each directory in `from` becomes `to` where it stands as a whole
  * path prefix: `/s/runs/r1` inside `/s/runs/r1/x` moves, inside `/s/runs/r10/x` does not.
+ * `to` goes in through a function, so a `$` in the state directory stays literal.
  */
 function rewriteDirs(text: string, from: string[], to: string): string {
   let out = text;
-  for (const d of from) out = out.replace(new RegExp(`(?<![\\w./-])${escapeRe(d)}(?![\\w.-])`, "g"), to);
+  for (const d of from) out = out.replace(new RegExp(`(?<![\\w./-])${escapeRe(d)}(?![\\w.-])`, "g"), () => to);
   return out;
 }
 

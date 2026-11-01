@@ -263,6 +263,15 @@ test("a param naming the source run directory follows to the clone; another run'
   expect(c.params.repo).toBe(`${dirOf("r1")}0/other`);
 });
 
+test("a `$` in the state directory stays literal when a path moves to the clone", async () => {
+  state = join(root, "st$&a$$te");
+  process.env.BATON_STATE_DIR = state;
+  await source();
+  expect((await cli("clone", "r1", "c1")).rc).toBe(0);
+  expect(rawRun("c1").params.project).toBe(`${dirOf("c1")}/project`);
+  expect(rawRun("c1").params.project).toContain("st$&a$$te");
+});
+
 test("--param overrides a declared param; an undeclared one is refused (control: declared works)", async () => {
   await source();
   const bad = await cli("clone", "r1", "c1", "--param", "nope=1");
