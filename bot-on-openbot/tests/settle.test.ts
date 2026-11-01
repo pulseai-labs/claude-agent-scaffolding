@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { find, open, record, type DeliveryRec } from "../src/deliveries.ts";
 import { blockedOffer, offerFor } from "../src/offer.ts";
 import { serve } from "../src/serve.ts";
+import { spoolNotice } from "../src/spool.ts";
 import { SETTLE_MODE, sweepSettled, wellFormed } from "../src/settle.ts";
 import { handleTap } from "../src/tap.ts";
 import { captureErr, COLOURS, defaultRun, FIX, makeEnv, P1, P5, serveOpts, type Env } from "./helpers.ts";
@@ -362,4 +363,84 @@ test("settle finds the exact prompt of an offer with labels not shown", async ()
   env.writeRun(defaultRun({ units: { u5: { id: "u5", stage: "build", parked: null, vars: {} } } }));
   await sweepSettled(env.botFor, env.defaultAgent, T0);
   expect(posts.map((x) => x.path)).toEqual([`/v1/agents/${AGENT_ID}/prompts/req-exact/answer`]);
+});
+
+// #1002: a wait notice ("unit moved to a stage") has no park. Its key names the stage; it settles when
+// the unit leaves that stage, not only when the run ends.
+const MOVE = "r1/u2/review/2026-10-27T11:00:00.000Z";
+const moveRec = (over: Partial<DeliveryRec> = {}): DeliveryRec => {
+  const offer = offerFor({ kind: "unit-move", run: "r1", unit: "u2", stage: "review" }, "baton r1/u2 moved to review", "r1")!;
+  const r: DeliveryRec = { key: MOVE, phase: "asked", run: "r1", unit: "u2", title: offer.title, offer, ask_id: "d1", ...over };
+  record(r);
+  return r;
+};
+const moveUnit = (stage: string) => env.writeRun(defaultRun({ units: { u2: { id: "u2", stage, parked: null, vars: { pr_url: "https://github.com/o/r/pull/7" } } } }));
+
+test("a wait notice settles when its unit leaves the stage, while the run is still armed (#1002)", async () => {
+  const r = moveRec();
+  prompts = [promptOf(r)];
+  moveUnit("spine_finish");
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
+  expect(posts).toEqual([{ path: `/v1/agents/${AGENT_ID}/prompts/req-1/answer`, body: { answers: { reply: ["settled"] } } }]);
+  expect(find(MOVE)).toMatchObject({ phase: "closed", closed_by: "settled" });
+});
+
+test("control: a wait notice whose unit is still at the stage stays open", async () => {
+  const r = moveRec();
+  prompts = [promptOf(r)];
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
+  expect(posts).toEqual([]);
+  expect(find(MOVE)!.phase).toBe("asked");
+});
+
+test("a wait notice's follow-up settles with it; a follow-up of another stage's notice does not", async () => {
+  const r = moveRec();
+  record({ ...r, phase: "closed", closed_by: "tap" });
+  const f: DeliveryRec = { ...r, key: `${MOVE}#1`, phase: "asked", offer: { ...r.offer!, text: "Merge PR #7?" }, ask_id: "d2" };
+  record(f);
+  moveUnit("review");
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
+  moveUnit("spine_finish");
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
+  expect(find(`${MOVE}#1`)).toMatchObject({ phase: "closed", closed_by: "settled" });
+});
+
+test("control: a record with a unit but no park and no stage in its key settles on nothing", async () => {
+  const r = moveRec({ key: "r1/u2/odd" });
+  prompts = [promptOf(r)];
+  moveUnit("spine_finish");
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
+  expect(find("r1/u2/odd")!.phase).toBe("asked");
+});
+
+test("a wait notice whose unit is gone from run.json settles; one with an unreadable run.json does not", async () => {
+  moveRec();
+  writeFileSync(join(env.dir, "baton", "runs", "r1", "run.json"), "{garbage");
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(0);
+  env.writeRun(defaultRun({ units: {} }));
+  expect(await sweepSettled(env.botFor, env.defaultAgent, T0)).toBe(1);
+});
+
+test("after a hand merge the stale Merge question settles and the held park reaches the phone (#1002)", async () => {
+  const r = moveRec();
+  env.status("d1", "running", "turn-1");
+  prompts = [promptOf(r)];
+  moveUnit("spine_finish");
+  // the run's next notice: a park of u1, held back while u2's question is open
+  spoolNotice(PARK, "baton r1/u1 parked in build: second prompt");
+  env.setReplies({ run: env.delivery("d9") });
+  env.status("d9", "running", "turn-9");
+  await captureErr(() => serve(serveOpts(env, T0, 2)));
+  expect(find(MOVE)).toMatchObject({ phase: "closed", closed_by: "settled" });
+  expect(find(PARK)).toMatchObject({ phase: "asked", ask_id: "d9" });
+});
+
+test("control: while the wait notice's unit stays at the stage, the park stays held", async () => {
+  const r = moveRec();
+  env.status("d1", "running", "turn-1");
+  prompts = [promptOf(r)];
+  spoolNotice(PARK, "baton r1/u1 parked in build: second prompt");
+  await captureErr(() => serve(serveOpts(env, T0, 2)));
+  expect(find(MOVE)!.phase).toBe("asked");
+  expect(find(PARK)).toBeUndefined();
 });

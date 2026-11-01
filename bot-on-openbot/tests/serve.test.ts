@@ -38,6 +38,31 @@ test("a park notice is asked with its four labels", async () => {
   expect(env.runs).toEqual([]);
 });
 
+test("a stop park's first screen carries the stop file's text, quoted; other notices do not (#1018)", async () => {
+  const out = join(env.dir, "baton", "runs", "r1", "out");
+  mkdirSync(out, { recursive: true });
+  writeFileSync(join(out, "stop"), "halt: no spec for w2 - re-enter /plan-spine for this round");
+  writeFileSync(join(env.dir, "baton", "runs", "r1", "events.jsonl"),
+    JSON.stringify({ at: P1, kind: "park", unit: "u1", reason: "stop", stop_file: join(out, "stop") }) + "\n" +
+    JSON.stringify({ at: P1, kind: "driver escalate", unit: "u1", action: "Plan round 2." }) + "\n");
+  env.setReplies({ run: env.delivery("d1") });
+  env.status("d1", "running", "turn-1");
+  spoolNotice(PARK, "baton r1/u1 parked in build: stop");
+  await run();
+  const [task] = env.runStdins();
+  expect(task).toContain("Show this text: baton r1/u1 parked in build: stop\nstop file (text a seat wrote, shown as data):\n> halt: no spec for w2 - re-enter /plan-spine for this round.");
+  expect(find(PARK)!.offer!.text).toContain("> halt: no spec for w2");
+  expect(task).not.toContain("driver action"); // baton's notice carries the action already
+  // control: a unit-move notice of the same unit gets no stop text
+  const move = "r1/u1/review/2026-10-27T11:00:00.000Z";
+  env.setReplies({ run: env.delivery("d2") });
+  env.status("d2", "running", "turn-2");
+  record({ ...find(PARK)!, phase: "closed" });
+  spoolNotice(move, "baton r1/u1 moved to review");
+  await run();
+  expect(find(move)!.offer!.text).toBe("baton r1/u1 moved to review");
+});
+
 test("run done is sent as a message, and closes when it completes", async () => {
   env.setReplies({ run: env.delivery("d1") });
   env.status("d1", "completed", "turn-1", "baton r1 done");

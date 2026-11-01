@@ -329,7 +329,8 @@ Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every
   recipe's `slots`, over the defaults `{"session": 2, "build": 1}`.
 
 The `park` event in `events.jsonl` is `{kind, unit, stage, reason}` plus `thread` (the seat's
-thread id, when the unit had a session); on `second prompt` and `triage gave no answer`,
+thread id, when the unit had a session); on a `stop` park, `stop_file` (the stage's stop file,
+rendered: the path only, never its text, which a seat wrote); on `second prompt` and `triage gave no answer`,
 `questions` (the pending request's questions, JSON-stringified; left off when there are none); and
 on `before failed`, `after_launch failed` and `run failed`, `hook` (the failed hook's 1-based place
 in its list) and `argv` (its rendered argv). Those three parks' notices end with
@@ -379,6 +380,10 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   `## Clarifications` (or into the file the stop names), delete the `stop` file, then
   `baton unpark <run> <unit>`. If the stop file is still there, `unpark` renames it to
   `<path>.consumed-<iso>`, so it does not park the unit again.
+- **A round barrier is a stop.** A spine planned one round at a time halts the lane at the next
+  round (`no spec for <work item>`), and the lane's stop file starts `round barrier:`. Plan the round
+  (plan-spine for the spine), then `baton unpark <run> lane`. An unpark before the specs exist stops
+  again. The brief writes that wording; baton parses no stop text, and a notifier shows the file.
 - **After a gap stop**, send the item back to its implementer: `baton unpark <run> <wi> --to implement`.
 - **A reversal before the spine merges**: write it to `out/spine-pr/operator.md`, then
   `baton unpark <run> spine-pr --to spine_work`; that round does it first and then removes the file.

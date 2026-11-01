@@ -747,6 +747,28 @@ test("stop file parks only that unit", async () => {
   expect(notifyLines().length).toBe(1);
 });
 
+// #1018: a stop park's event names the rendered stop file, so a notifier can show why the unit stopped.
+// Only a stop park carries it; the text itself stays in the file, never in the event or the notice.
+test("a stop park's event names the rendered stop file; other parks carry none", async () => {
+  await arm(recipe({ work: sess({ stop_file: "{run.dir}/stop/{unit.id}" }) }, ["a", "b"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  await doTick();
+  mkdirSync(join(runDir(), "stop"), { recursive: true });
+  writeFileSync(join(runDir(), "stop", "a"), "halt: no spec for w2 - re-enter /plan-spine for this round");
+  at(1);
+  await doTick();
+  const e = lastPark();
+  expect([e.unit, e.reason, e.stop_file]).toEqual(["a", "stop", join(runDir(), "stop", "a")]);
+  expect(notifyLines()[0]).not.toContain("no spec for w2");
+  // control: a park that is not a stop carries no stop_file, though its stage names one
+  fresh();
+  await arm(recipe({ work: sess({ stop_file: "{run.dir}/stop/{unit.id}", before: [["false"]] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  await doTick();
+  expect(lastPark().reason).toBe("before failed");
+  expect("stop_file" in lastPark()).toBe(false);
+});
+
 // A failed hook's park names it (#906): the reason stays the same, the event carries the hook's
 // 1-based index and rendered argv, and the notice ends with them, as a merge park ends with its PR.
 const lastPark = () => events().filter((e) => e.kind === "park").at(-1);

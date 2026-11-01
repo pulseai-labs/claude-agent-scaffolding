@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { newestPark, readUnit, reviewedHead, runRepo, stageNames } from "../src/baton-state.ts";
+import { execFileSync } from "node:child_process";
+import { newestPark, readHead, readUnit, reviewedHead, runRepo, stageNames } from "../src/baton-state.ts";
 
 beforeEach(() => {
   process.env.BATON_STATE_DIR = join(import.meta.dir, "fixtures", "baton");
@@ -39,10 +40,10 @@ test("reviewedHead accepts only a full 40-hex sha on line 2", () => {
 
 test("newestPark is the last park event for the unit, skipping garbage", () => {
   expect(newestPark("r1", "u1")).toEqual({
-    reason: "second prompt", thread: "th-2",
+    at: "t2", reason: "second prompt", thread: "th-2",
     questions: expect.stringMatching(/^\[\{"id":"q1","header":"Database","question":"which db\?"/),
   });
-  expect(newestPark("r1", "u2")).toEqual({ reason: "other" });
+  expect(newestPark("r1", "u2")).toEqual({ at: "t1b", reason: "other" });
   expect(newestPark("r1", "u4")).toBeNull();
   expect(newestPark("nope", "u1")).toBeNull();
 });
@@ -81,6 +82,47 @@ test("runRepo is params.repo when it is an absolute path, else null", () => {
     expect(runRepo("c")).toBeNull();
     expect(runRepo("d")).toBeNull();
     expect(runRepo("missing")).toBeNull();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("newestPark carries a stop_file path and the driver escalate action that follows its park", () => {
+  const root = mkdtempSync(join(tmpdir(), "bot-park-"));
+  try {
+    process.env.BATON_STATE_DIR = root;
+    mkdirSync(join(root, "runs", "a"), { recursive: true });
+    const ev = (...lines: unknown[]) => writeFileSync(join(root, "runs", "a", "events.jsonl"), lines.map((l) => JSON.stringify(l)).join("\n") + "\n");
+    ev({ at: "t1", kind: "park", unit: "u", reason: "stop", stop_file: "/s/stop" },
+      { at: "t2", kind: "driver escalate", unit: "u", action: "Plan round 2." },
+      { at: "t2", kind: "driver escalate", unit: "other", action: "not mine" });
+    expect(newestPark("a", "u")).toEqual({ at: "t1", reason: "stop", stop_file: "/s/stop", action: "Plan round 2." });
+    // a newer park drops the older park's action; a relative stop_file is not a path baton wrote
+    ev({ at: "t1", kind: "park", unit: "u", reason: "stop", stop_file: "/s/stop" },
+      { at: "t2", kind: "driver escalate", unit: "u", action: "Plan round 2." },
+      { at: "t3", kind: "park", unit: "u", reason: "stall", stop_file: "rel/stop" });
+    expect(newestPark("a", "u")).toEqual({ at: "t3", reason: "stall" });
+    // an escalate with no park before it belongs to nothing
+    ev({ at: "t2", kind: "driver escalate", unit: "u", action: "x" });
+    expect(newestPark("a", "u")).toBeNull();
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("readHead reads at most 8 KiB of a regular file and nothing else", () => {
+  const root = mkdtempSync(join(tmpdir(), "bot-head-"));
+  try {
+    writeFileSync(join(root, "big"), "x".repeat(20000));
+    writeFileSync(join(root, "small"), "halt: no spec");
+    expect(readHead(join(root, "big"))!.length).toBe(8192);
+    expect(readHead(join(root, "small"))).toBe("halt: no spec");
+    expect(readHead(join(root, "missing"))).toBeNull();
+    expect(readHead(root)).toBeNull(); // a directory
+    execFileSync("mkfifo", [join(root, "fifo")]); // control: opening it must not block
+    expect(readHead(join(root, "fifo"))).toBeNull();
+    symlinkSync("/dev/zero", join(root, "zero")); // a device reads forever and never errors
+    expect(readHead(join(root, "zero"))).toBeNull();
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

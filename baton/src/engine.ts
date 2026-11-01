@@ -430,7 +430,7 @@ class RunTick {
 
   private async park(
     u: UnitState, reason: string,
-    o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr; hook?: HookFailure } = {},
+    o: { interrupt?: string; release?: boolean; questions?: unknown[]; thread?: string; pr?: ParkPr; hook?: HookFailure; stopFile?: string } = {},
   ): Promise<void> {
     const thread = u.session?.thread_id ?? o.thread; // endSession deletes the session; a caller that ended it first passes it
     await this.endSession(u, { ...o, keep: "unpark" });
@@ -443,6 +443,7 @@ class RunTick {
       ...(o.questions?.length ? { questions: JSON.stringify(o.questions) } : {}),
       ...(o.pr ? { pr: o.pr.url, pr_state: o.pr.why, ...(o.pr.failing ? { failing: o.pr.failing } : {}) } : {}),
       ...(o.hook ? { hook: o.hook.hook, argv: o.hook.argv } : {}),
+      ...(o.stopFile ? { stop_file: o.stopFile } : {}),
     });
     this.report.parked.push(u.id);
     // With a driver, step 7 settles the park: only its escalate or stop reaches the operator.
@@ -762,7 +763,7 @@ class RunTick {
           const st = await this.host.status(u.session.thread_id);
           if (st.state === "active" || st.state === "waiting") interrupt = "stop";
         }
-        await this.park(u, "stop", { interrupt });
+        await this.park(u, "stop", { interrupt, stopFile: render(stage.stop_file!, scope) });
       });
     }
   }
@@ -780,7 +781,7 @@ class RunTick {
       await this.guard(u, async () => {
         const { stage, scope } = this.ctx(u);
         if (stage?.kind === "session" && stage.stop_file !== undefined && existsSync(render(stage.stop_file, scope))) {
-          return this.park(u, "stop", { interrupt: "stop" });
+          return this.park(u, "stop", { interrupt: "stop", stopFile: render(stage.stop_file, scope) });
         }
         if (b.to !== undefined) {
           await this.endSession(u, { interrupt: "stop" });

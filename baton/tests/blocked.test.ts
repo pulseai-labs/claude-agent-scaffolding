@@ -246,6 +246,9 @@ test("stop file during a blocked park", async () => {
   expect(host.interrupts).toEqual([{ threadId: "thread-1", reason: "stop" }]);
   expect(host.closes).toEqual([]);
   expect(u.kept?.map((k) => [k.thread, k.until])).toEqual([["thread-1", "unpark"]]);
+  // the stop park names its file (#1018); the earlier blocked park, which was no stop, did not
+  const parks = events().filter((e) => e.kind === "park");
+  expect(parks.map((e) => [e.reason, e.stop_file])).toEqual([["blocked", undefined], ["stop", stopFile()]]);
 });
 
 test("stop file wins over a requested unpark --to", async () => {

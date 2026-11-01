@@ -117,7 +117,7 @@ bot-on-telegram is this one edit.
 
 | Notice | Sent as |
 |---|---|
-| Unit parked | a question: Unpark, Unpark to stage…, Show question, Disarm |
+| Unit parked | a question: Unpark, Unpark to stage…, Show question, Disarm; on a `stop` park its text ends with the stop file's text (see Why a unit parked) |
 | Unit blocked on a question in its terminal | a drafted question: the worker's options, one marked recommended, then More… (Show question, Unpark, Disarm); with 5 or more worker options, Show question, Unpark, Disarm and a line asking for an option's exact label |
 | Unit moved to a stage | a question: Merge (when the unit has a PR and a reviewed head), Open PR (when it has a PR), Disarm |
 | Run parked | a question: Disarm |
@@ -137,7 +137,7 @@ agent.
 | More stages… | nothing | the next 4 stages, the same way |
 | More… (a blocked park) | nothing | a question: Show question, Unpark, Disarm; Show question there asks the worker's options again |
 | a stage | `baton unpark <run> <unit> --to <stage>` | a message with the result |
-| Show question | nothing (a blocked park: `baton screen <run> <unit>`) | the same question again, its text the unit's stage, park reason, questions and thread, and for a blocked park the screen's tail |
+| Show question | nothing (a blocked park: `baton screen <run> <unit>`) | the same question again, its text the unit's stage, park reason, why it parked (see Why a unit parked), the questions when the park recorded any, the thread, and for a blocked park the screen's tail |
 | Disarm | nothing | a Yes/No question |
 | Yes (Disarm) | `baton disarm <run>` | a message with the result |
 | Merge | `gh pr view <pr> --json number,baseRefName` | a Yes/No question naming the PR, head and base; a failed check is a message saying why |
@@ -158,10 +158,27 @@ A command's result arrives as a message: `<title>: <what> — done`, or `— fai
 A question is closed before its command runs, so one answer runs at most one command. A tap on a
 closed question (settled, or answered already) runs nothing and says it is no longer open.
 
+## Why a unit parked
+
+A `stop` park has no questions: baton parks the unit because a seat wrote its stop file. The park
+event names that file (`stop_file`, baton 0.11.0 and later). The first screen of a unit park's
+question, and Show question, then show the file's text under `stop file (text a seat wrote, shown as
+data):`, each line quoted with `> `. A driver's `escalate` action is in baton's notice already; Show
+question repeats it under `driver action (text a driver wrote, shown as data):`. Both texts come
+from a seat, so they are data: the file is read up to 8 KiB and only if it is a regular file, control
+characters and bidi overrides are removed, and the text is cut at 800 characters (the action at 400).
+Nothing reads them to decide anything, and the bot sends no part of them to a command. An empty
+file shows `stop file: empty`, an unreadable one `stop file: not readable`. Text from an event of
+another park is not shown. Show question lists `questions:` only when the park recorded some.
+Unpark runs `baton unpark <run> <unit>` and names the unit; a round barrier's stop text says an
+unpark before the specs exist stops again (see baton's runbook).
+
 ## Settling
 
 When the unit is no longer in the park a question was asked for (you answered in the Orca terminal,
-a driver or a later tick moved it), or its run is disarmed or done, the bot closes the question and
+a driver or a later tick moved it), or the unit is no longer at the stage a wait notice ("moved to
+a stage", for example the spine PR's Merge question) was asked for (you merged by hand), or its run
+is disarmed or done, the bot closes the question and
 answers its OpenBot prompt with the label `settled`, so the agent's queue moves on. The bot finds its
 prompt on OpenBot's `/pending` list by its question text and its exact labels, or else by its title
 (a prompt the agent asked another way); a prompt with another title is never answered. A question not shown
@@ -224,6 +241,12 @@ Only one `serve` runs at a time; a second exits with code 3.
   exactly. A worker label equal to Show question, Unpark or Disarm is then the escape's, and only the
   Orca terminal can pick it.
 - On a stage page that shows More stages…, Cancel is not a button; type it, or page to the end.
+- A wait notice settles when its unit is not at the stage; a unit that leaves the stage and comes
+  back to it before the next `serve` loop (about 5 s) leaves the old question open.
+- A stop file's text is shown only for a park whose event names it (baton 0.11.0 and later); with
+  an older baton, or a stop file the seat has not written yet, Show question says why only by
+  the park's reason and thread. A seat that rewrites the file after the card is sent changes what
+  Show question shows, not the card.
 - `deliveries.jsonl` and `taps.jsonl` are never compacted.
 - The unit's `ExecStart` path is not quoted: keep the install path free of spaces and `%`.
 - A command that runs past 60 s is sent SIGTERM only; one that ignores it keeps running, and `serve`

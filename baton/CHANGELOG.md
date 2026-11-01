@@ -2,6 +2,21 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.11.0 - 2026-11-01
+
+A stop park says where its reason is (#1018).
+
+- **Added: `stop_file` on a `stop` park's event.** The stage's stop file, rendered: the path only,
+  never its text, which a seat wrote. A notifier reads the file itself. Other parks carry none.
+  `bot-on-openbot` 0.3.0 shows it. Baton parses no stop text and decides nothing from it (skill-first
+  question 2: it renders a path from the recipe's own template).
+- **Changed: the example lane's brief writes a round barrier plainly.** A halt `no spec for <work item>`
+  (a spine planned one round at a time) is a stop whose file starts `round barrier: the next round is
+  not planned yet`, says to plan it with plan-spine and then unpark, and says an unpark before the
+  specs exist stops again; the halt line follows. Additive: `recipe.json` is unchanged, so an armed
+  run keeps its pinned recipe, and a stop file in the old wording still shows as it is.
+- **Docs: the runbook names the round barrier.**
+
 ## 0.10.1 - 2026-11-01
 
 Each verify round leaves its record (#1005). `examples/ossify-spine` moves the last verdict to
