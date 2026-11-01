@@ -1,4 +1,4 @@
-# ossify (v1.32.2)
+# ossify (v1.32.3)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -220,6 +220,9 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.32.3 (#909, #934), `plan-spine`'s spec rules say that an AC running a test file the item
+creates tests for that file first, since `node --test` on node 22 skips a missing one. Prose only.
 
 Since 1.32.2 (#872), `touch_check` and the three `expired_*` gates return rc 2, could not check,
 when they cannot find the project's state. `touch_check` used to return rc 1, which reads as clean.

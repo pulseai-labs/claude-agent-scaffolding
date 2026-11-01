@@ -152,6 +152,11 @@ blocking gap **at pre-flight** rather than a confusing failure at the close gate
 planned on, never a moving ref such as `origin/main`, which holds the item's own
 change once the spine lands and fails a re-run of the gate (#981).
 
+**An AC that runs a test file the item creates tests for it first**:
+`test -f tests/new.test.js && node --test tests/new.test.js tests/old.test.js`.
+`node --test` on node 22 skips a named file that is missing and exits 0 on the rest,
+so the RED gate stops on a green that proves nothing (#909, #934).
+
 **An AC expected GREEN at start.** A regression guard, or a deletion check whose state the
 spine starts in, passes before the work, and the RED gate stops on it
 (`work-item/SKILL.md` §4). Declare each such AC below the ACs, one line each:
