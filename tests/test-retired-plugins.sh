@@ -40,7 +40,7 @@ RETIRED="$AUTO_NAME $CRITIC_NAME"
 pattern_for() {
   case "$1" in
     "$AUTO_NAME") printf '%s' "$AUTO_NAME" ;;
-    "$CRITIC_NAME") printf '%s' "architect"'[-_ ]?critic([^[:alnum:]]|$)|critiquing'"-spec([^[:alnum:]]|$)" ;; # bounded on a letter or digit: "critically" is valid text, and ARCHITECT_CRITIC_ARGS is still a hit
+    "$CRITIC_NAME") printf '%s' "architect"'[-_ ]?critic([^[:alnum:]]|$)|critiquing'"-spec([^[:alnum:]]|$)" ;; # bounded on a letter or digit: a longer word is valid text, and the capitals-with-underscore variable form still hits
     *) printf '%s' "$1" ;;
   esac
 }
