@@ -2,7 +2,7 @@
 # lib/manifest.sh — pairing manifest read/write/resolve/validate
 #
 # Cross-plugin contract per SPEC §6.2 / §6.3 / §6.4 / §6.5.
-# Consumers: ossify (reads pairing.json as a translated fallback), architect-critic v0.2 (loose).
+# Consumers: ossify (reads pairing.json as a translated fallback).
 #
 # Bash 3.2+ compatible (stock macOS). Requires: jq.
 #
@@ -72,9 +72,9 @@ wi_plugin_version() {
 #   - Claude Code sets ${CLAUDE_PLUGIN_DATA} per-process to the INVOKING
 #     plugin's data dir. Useless for cross-plugin resolution (SPEC §6.3).
 #   - Actual layout on disk: ~/.claude/plugins/data/<plugin>-<marketplace>/
-#     (e.g. architect-critic-claude-agent-scaffolding).
+#     (e.g. ai-mentor-claude-agent-scaffolding).
 #   - But marketplace suffix is unknown at manifest-author time. Existing
-#     plugins (ai-mentor, architect-critic) all
+#     plugins (e.g. ai-mentor) all
 #     fall back to ${HOME}/.claude/plugins/data/<plugin> for their own data
 #     paths when ${CLAUDE_PLUGIN_DATA} is unset (e.g. shell-level tests).
 #

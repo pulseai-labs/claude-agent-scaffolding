@@ -1,1 +1,0 @@
-{"scores": {"shipped_defaults": 5, "source_tags": 5, "suppression_surfaced": 5, "source_filter": 5, "override_annotated": 5}, "pass": true, "notes": "Output lists exactly the four shipped defaults verbatim under a 'Shipped defaults' section header with user-promoted and project principles fully omitted; no suppression or override scenario applies to this fixture."}

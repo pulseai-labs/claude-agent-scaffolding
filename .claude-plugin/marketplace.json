@@ -1,7 +1,7 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "claude-agent-scaffolding",
-  "description": "Personal plugin marketplace for agent-assisted development: dual-repo workspace bootstrap, a skeleton-first delivery lifecycle, anti-sycophancy design critique, strict code-quality and architecture review, configuration security auditing, and decision-making mentor surfaces. Described by capability rather than by plugin name, so it does not go stale as plugins land.",
+  "description": "Personal plugin marketplace for agent-assisted development: dual-repo workspace bootstrap, a skeleton-first delivery lifecycle, adversarial design critique, strict code-quality and architecture review, configuration security auditing, and decision-making mentor surfaces. Described by capability rather than by plugin name, so it does not go stale as plugins land.",
   "owner": {
     "name": "Pras"
   },
@@ -17,12 +17,6 @@
       "description": "Decision-making mentor. Four skills auto-invoke on natural-language triggers: grill-me (one-question-at-a-time plan interrogation with CORE posture + 4 cognitive-discipline escape valves), council (5-persona multi-angle idea validation, Karpathy LLM Council pattern with codebase-aware Historian), eli10 (repeatable simplification), fool (sticky beginner's-mind mode). Skill-first; no hooks, no state.",
       "category": "productivity",
       "source": "./ai-mentor"
-    },
-    {
-      "name": "architect-critic",
-      "description": "Anti-sycophancy reviewer (skill-first). 6 skills auto-invoke on natural-language triggers: critiquing-spec (audit + sequential rebuttal with T=4 concession scoring), managing-async-critique (background Codex audits: status/result/cancel/resume), checking-adversary-readiness (doctor), reviewing-critique-history, listing-principles, promoting-principle. Ships ghost-notes (Wald survivor-bias) + CORE protocol (Curiosity/Objectivity/Reassurance/Empathy) as default principles. Principle promotion is manual (/promote-principle). Codex 0.125+ adversarial fresh-frame at close-depth, synchronous OR async. Standalone-invocable; other skills can invoke it in-conversation (no file IPC).",
-      "category": "workflow",
-      "source": "./architect-critic"
     },
     {
       "name": "claude-security-audit",

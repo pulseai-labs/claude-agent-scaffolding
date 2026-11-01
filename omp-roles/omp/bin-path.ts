@@ -1,10 +1,10 @@
 // Puts the bin/ of this marketplace's installed plugins on PATH for OMP sessions.
-// OMP has no plugin bin/ mechanism (spec B, F4), so skills that call `oss`, `wi`
-// or `arc` through `command -v` fail without this. The install path always comes
+// OMP has no plugin bin/ mechanism (spec B, F4), so skills that call `oss` or `wi`
+// through `command -v` fail without this. The install path always comes
 // from a record, never from "newest in cache" (see ~/.local/bin/oss). It writes
 // no file and never searches the filesystem.
 //
-// This file is the source of truth. ossify, workspace-init and architect-critic
+// This file is the source of truth. ossify, workspace-init and omp-roles
 // ship byte-identical copies at <plugin>/omp/bin-path.ts; the user-level loader
 // (omp/extensions/plugin-bin-path.ts) imports the newest installed copy, so a
 // plugin update refreshes this logic. Bump VERSION on any behaviour change, and

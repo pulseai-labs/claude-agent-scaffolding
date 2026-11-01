@@ -1,1 +1,0 @@
-{"scores":{"table_shape":5,"columns_present":4,"limit_honored":5,"empty_state":5,"timeout_flagged":5},"pass":true,"notes":"The timed-out close-depth run is clearly flagged with an asterisk in a dedicated 'timeout?' column while both clean runs are left unmarked; adversaries flattening keeps columns_present at the minor-formatting level."}

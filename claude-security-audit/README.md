@@ -96,7 +96,7 @@ Critical findings **cannot be suppressed**; they must be remediated.
 
 ## Composition
 
-`claude-security-audit` is fully standalone. It runs in any Claude Code project, with or without other plugins. Sibling to `architect-critic` (anti-sycophancy spec/plan review) — different concern, no integration required in v0.1.
+`claude-security-audit` is fully standalone. It runs in any Claude Code project, with or without other plugins. It has no integration with any other plugin in v0.1.
 
 ## License
 

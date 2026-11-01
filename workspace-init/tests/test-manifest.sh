@@ -263,11 +263,11 @@ test_B4_resolve_ampersand_and_backslash_in_root_are_literal() {
 
 test_C1_plugin_data_resolves_to_path() {
   local ai; ai="$(_setup_pair c1)" || return 1
-  local out; out="$(wi_manifest_resolve "$ai" '${PLUGIN_DATA:architect-critic}')"
+  local out; out="$(wi_manifest_resolve "$ai" '${PLUGIN_DATA:ai-mentor}')"
   # Must be an absolute path
   [[ "$out" == /* ]] || { echo "    not absolute: $out"; return 1; }
   # Must contain the plugin name somewhere
-  assert_contains "architect-critic" "$out" || return 1
+  assert_contains "ai-mentor" "$out" || return 1
 }
 
 test_C2_plugin_data_for_nonexistent_plugin_still_resolves_to_path() {
@@ -619,7 +619,7 @@ wi_test_run test_J4_canonical_git_tracked_unaffected_by_flag
 
 # ---------------------------------------------------------------------------
 # K. principles_user_global removal — the pointer had zero consumers after the
-#    architect-critic owned path moved to $HOME/.claude/architect-critic/.
+#    plugin that owned the path moved it to its own directory under $HOME/.claude/.
 #    The generic ${PLUGIN_DATA:<name>} resolver (group C) is untouched; this
 #    deletes one data key, not the mechanism.
 # ---------------------------------------------------------------------------

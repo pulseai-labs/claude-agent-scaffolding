@@ -1,8 +1,0 @@
-{
-  "challenges": [
-    {"severity": "premise", "text": "Phase 5.2 lacks a fallback strategy for codex unavailability", "rationale": "Without a fallback, the entire critique pipeline blocks on a third-party CLI being installed and authenticated, which is an unstated dependency."},
-    {"severity": "gap", "text": "No mention of state.json schema migration", "rationale": "Schema fields evolve across versions; absent a migration path, users on older state files will hit unparseable JSON at first run."},
-    {"severity": "alternative", "text": "Consider hash-based dedup instead of exact-match", "rationale": "Exact-match dedup misses near-duplicates that differ only in whitespace or capitalization, undercounting redundancy."}
-  ],
-  "divergences": []
-}

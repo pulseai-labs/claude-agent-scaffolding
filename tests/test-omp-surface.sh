@@ -9,7 +9,7 @@
 set -u
 export LC_ALL=C
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OMP_SIX="ossify merge-bar workspace-init architect-critic code-judo ai-mentor"
+OMP_FIVE="ossify merge-bar workspace-init code-judo ai-mentor"
 # The two mods (spec C): catalog entries equal their Claude entries; their text is not gated here.
 OMP_MODS="seat-mods molt"
 # Claude plugins also listed on OMP for an OMP top (spec D): catalog entries equal their Claude entries; text not gated.
@@ -17,7 +17,7 @@ OMP_SHARED="crew"
 # Plugins that exist on OMP only: no Claude-catalog entry, no .claude-plugin/, versioned by package.json.
 OMP_ONLY="omp-roles"
 # Plugins whose text checks 2-4 enforce on the shipped tree. Widened per PR (spec B §4.4).
-GATED_PLUGINS="$OMP_SIX"
+GATED_PLUGINS="$OMP_FIVE"
 # The (a|b) alternation keeps this line from matching itself in check 5.
 OLD_REF_RE='references/(handoff|work-pr)/'
 
@@ -34,11 +34,11 @@ fm_value() { # $1=file $2=key -> the frontmatter value, surrounding quotes remov
 check_catalog() { # $1=root
   local r=$1 o="$1/.omp-plugin/marketplace.json" c="$1/.claude-plugin/marketplace.json" p v
   [ -f "$o" ] || { echo "catalog: .omp-plugin/marketplace.json missing"; return; }
-  [ "$(jq -r '[.plugins[].name] | sort | join(" ")' "$o")" = "$(printf '%s\n' $OMP_SIX $OMP_MODS $OMP_SHARED $OMP_ONLY | sort | paste -sd' ' -)" ] \
-    || echo "catalog: lists $(jq -c '[.plugins[].name]' "$o"), want exactly the six, the two mods, the shared and the OMP-only plugins"
+  [ "$(jq -r '[.plugins[].name] | sort | join(" ")' "$o")" = "$(printf '%s\n' $OMP_FIVE $OMP_MODS $OMP_SHARED $OMP_ONLY | sort | paste -sd' ' -)" ] \
+    || echo "catalog: lists $(jq -c '[.plugins[].name]' "$o"), want exactly the five, the two mods, the shared and the OMP-only plugins"
   jq -e --slurpfile c "$c" '.name == $c[0].name and .owner == $c[0].owner' "$o" >/dev/null \
     || echo "catalog: name/owner differ from the Claude catalog"
-  for p in $OMP_SIX $OMP_MODS $OMP_SHARED; do
+  for p in $OMP_FIVE $OMP_MODS $OMP_SHARED; do
     # The exact-list check owns missing entries; compare only entries that are present.
     jq -e --arg p "$p" '[.plugins[] | select(.name == $p)] | length == 0' "$o" >/dev/null && continue
     jq -e --arg p "$p" --slurpfile c "$c" \
@@ -174,8 +174,8 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/omp-surface.XXXXXX")"; trap 'rm -rf "$WORK"' 
 make_fixture() { # $1=dir
   local d=$1 p
   mkdir -p "$d/.claude-plugin" "$d/.omp-plugin"
-  jq -n --arg six "$OMP_SIX $OMP_MODS $OMP_SHARED" '{name:"m", owner:{name:"o"},
-    plugins: (($six | split(" ")) | map({name:., source:("./"+.), description:"d", category:"c"}))}' \
+  jq -n --arg names "$OMP_FIVE $OMP_MODS $OMP_SHARED" '{name:"m", owner:{name:"o"},
+    plugins: (($names | split(" ")) | map({name:., source:("./"+.), description:"d", category:"c"}))}' \
     > "$d/.claude-plugin/marketplace.json"
   jq --arg only "$OMP_ONLY" '.plugins += (($only | split(" ")) | map({name:., source:("./"+.), description:"d", category:"c"}))' \
     "$d/.claude-plugin/marketplace.json" > "$d/.omp-plugin/marketplace.json"
@@ -185,7 +185,7 @@ make_fixture() { # $1=dir
   for p in $OMP_ONLY; do
     mkdir -p "$d/$p/bin" "$d/$p/omp"; printf '{"name":"%s","version":"0.1.0"}\n' "$p" > "$d/$p/package.json"
   done
-  for p in $OMP_SIX; do
+  for p in $OMP_FIVE; do
     mkdir -p "$d/$p/.claude-plugin" "$d/$p/skills/$p-s" "$d/$p/commands"
     printf '{"name":"%s","version":"1.0.0"}\n' "$p" > "$d/$p/.claude-plugin/plugin.json"
     printf -- '---\nname: %s-s\ndescription: Use when testing — a fixture skill\n---\nBody.\n' "$p" > "$d/$p/skills/$p-s/SKILL.md"
@@ -209,14 +209,14 @@ findings() { # $1=root $2=plugins -> all findings of all checks
 control() { # $1=label $2=expected finding prefix $3=planting command (run in the fixture dir)
   local d="$WORK/$1" out
   make_fixture "$d"; (cd "$d" && eval "$3")
-  out=$(findings "$d" "$OMP_SIX")
+  out=$(findings "$d" "$OMP_FIVE")
   if [ "$(printf '%s\n' "$out" | grep -c .)" -eq 1 ] && printf '%s' "$out" | grep -Fq "$2"; then pass "control $1 turns red"
   else fail "control $1: want exactly one '$2' finding, got: ${out:-<none>}"; fi
 }
 
 printf 'OMP surface gate\n'
 make_fixture "$WORK/clean"
-out=$(findings "$WORK/clean" "$OMP_SIX"); [ -z "$out" ] && pass "clean fixture has no findings" || fail "clean fixture: $out"
+out=$(findings "$WORK/clean" "$OMP_FIVE"); [ -z "$out" ] && pass "clean fixture has no findings" || fail "clean fixture: $out"
 
 control catalog-extra   "catalog: lists"            'jq ".plugins += [{name:\"extra\",source:\"./extra\",description:\"d\",category:\"c\"}]" .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json'
 # Adjacent controls: absence is the list finding; a present shared entry must still match Claude.

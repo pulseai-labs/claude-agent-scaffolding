@@ -1,1 +1,0 @@
-{"scores":{"table_shape":5,"columns_present":5,"limit_honored":5,"empty_state":5,"timeout_flagged":5},"pass":true,"notes":"Empty state handled cleanly with a human-readable 'No critique runs yet.' message and no table skeleton or phantom rows."}
