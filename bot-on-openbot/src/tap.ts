@@ -15,6 +15,7 @@ import { confirmOffer, moreOffer, refusedOffer, stageOffer, type Act, type Offer
 import type { OpenBot } from "./openbot.ts";
 import { stillOpen } from "./settle.ts";
 import { stateDir } from "./paths.ts";
+import { whyLines } from "./why.ts";
 import { log } from "./log.ts";
 
 export type TapCtx = { bot: OpenBot; runner: Runner; now: () => Date };
@@ -199,17 +200,19 @@ function notSent(rec: DeliveryRec, res: { rc: number; stderr: string }): void {
   followUp(rec, { offer: refusedOffer(rec.title, `Not sent: ${failure(res.rc, res.stderr)}`), ...(rec.picker ? { picker: rec.picker } : {}) });
 }
 
-// What Show question shows: the unit's stage, the park reason, its questions and thread, and for a
-// blocked park the tail of a fresh `baton screen`.
+// What Show question shows: the unit's stage, the park reason, why it parked (a stop file's text, a
+// driver's escalate action), the park's questions when it recorded any, its thread, and for a blocked
+// park the tail of a fresh `baton screen`.
 async function showText(rec: DeliveryRec, runner: Runner): Promise<string> {
   const unit = readUnit(rec.run, rec.unit!);
-  const park = newestPark(rec.run, rec.unit!);
+  const park = newestPark(rec.run, rec.unit!, unit?.parked?.at);
   const nr = "not recorded";
   const lines = [
     `${rec.run}/${rec.unit}`,
     `stage: ${unit?.stage ?? nr}`,
     `reason: ${unit?.parked?.reason ?? nr}`,
-    `questions:${park?.questions !== undefined ? renderQuestions(park.questions) : ` ${nr}`}`,
+    ...whyLines(park),
+    ...(park?.questions !== undefined ? [`questions:${renderQuestions(park.questions)}`] : []),
     `thread: ${park?.thread ?? nr}`,
   ];
   if (rec.picker) {

@@ -384,6 +384,10 @@ describe("ossify-spine briefs", () => {
       expect([pin, l.includes(pin)]).toEqual([pin, true]);
     }
     expect(l).toMatch(/\bmv\b/);
+    // a round barrier reads plainly in the stop file the operator is shown (#1018)
+    for (const pin of ["no spec for <work item>", "round barrier: the next round is not planned yet", "plan-spine for <spine>, then unpark", "stops here again"]) {
+      expect([pin, l.includes(pin)]).toEqual([pin, true]);
+    }
     // the three keys the queue source reads beyond ossify's own record, plus issued_at
     const queue = loadRecipe().sources.find((s) => s.stage === "implement")!;
     for (const key of [queue.group_key, queue.order_key, "issued_at"]) {

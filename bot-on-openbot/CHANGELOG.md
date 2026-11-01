@@ -2,6 +2,20 @@
 
 All notable changes to the `bot-on-openbot` plugin.
 
+## 0.3.0 - 2026-11-01
+
+- Fixes #1002: a question for a wait notice ("unit moved to a stage", such as the spine PR's Merge
+  question) now settles when its unit leaves that stage. `settled()` compared the unit's park only,
+  and a wait notice has none, so it stayed open until the run was done: after a hand merge it held
+  back the run's next park. The stage comes from the notice's key, so a question left open by 0.2.x
+  settles on upgrade.
+- Fixes #1018: a unit park's card and Show question say why it parked. A `stop` park shows the stop
+  file's text (baton 0.11.0 names the file in the park event), and Show question shows a driver's
+  escalate action. Both are seat text: read up to 8 KiB from a regular file, control characters
+  removed, cut at 800 (action 400) characters, each line quoted with `> `, never interpreted.
+  Show question lists `questions:` only when the park recorded some. Unpark already names the unit
+  (`baton unpark <run> <unit>`); a test pins it.
+
 ## 0.2.2 - 2026-10-29
 
 Tests and docs only; no behaviour change (#975, the non-blocking items from PR #960).

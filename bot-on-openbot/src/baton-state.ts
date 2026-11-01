@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readFileSync, readSync } from "node:fs";
 import { isAbsolute, join } from "node:path";
 import { batonStateDir } from "./paths.ts";
 
@@ -71,17 +71,23 @@ export function reviewedHead(run: string, unit: string): string | null {
   return m ? m[1]! : null;
 }
 
-export function newestPark(
-  run: string,
-  unit: string,
-): { reason?: string; thread?: string; questions?: string } | null {
+export type ParkEvent = { at?: string; reason?: string; thread?: string; questions?: string; stop_file?: string; action?: string };
+
+// The unit's `park` event, with the `driver escalate` action recorded after it, if any (an escalate
+// belongs to the park before it). Without `since`: the newest park event. With `since`, a park's `at`
+// (its notice key's last part, or run.json's `parked.at`): the park's own event. baton reads the clock
+// for `parked.at`, saves, and only then appends the event, which takes its own later reading, so the
+// two differ by a few ms and an earlier park's event is always before `since`. The park's event is
+// therefore the first one at or after `since`; a later park's event ends the search.
+export function newestPark(run: string, unit: string, since?: string): ParkEvent | null {
   let text: string;
   try {
     text = readFileSync(join(runDir(run), "events.jsonl"), "utf8");
   } catch {
     return null;
   }
-  let found: { reason?: string; thread?: string; questions?: string } | null = null;
+  let found: ParkEvent | null = null;
+  let locked = false; // `since` found its event: a later park event is another park's
   for (const line of text.split("\n")) {
     let ev: unknown;
     try {
@@ -89,12 +95,47 @@ export function newestPark(
     } catch {
       continue;
     }
-    if (!isObj(ev) || ev.kind !== "park" || ev.unit !== unit) continue;
-    const p: { reason?: string; thread?: string; questions?: string } = {};
+    if (!isObj(ev) || ev.unit !== unit) continue;
+    if (ev.kind === "driver escalate") {
+      if (found && typeof ev.action === "string") found.action = ev.action;
+      continue;
+    }
+    if (ev.kind !== "park") continue;
+    if (since !== undefined) {
+      if (locked) break;
+      if (typeof ev.at !== "string" || ev.at < since) continue;
+      locked = true;
+    }
+    const p: ParkEvent = {};
+    if (typeof ev.at === "string") p.at = ev.at;
     if (typeof ev.reason === "string") p.reason = ev.reason;
     if (typeof ev.thread === "string") p.thread = ev.thread;
     if (typeof ev.questions === "string") p.questions = ev.questions;
+    if (typeof ev.stop_file === "string" && isAbsolute(ev.stop_file)) p.stop_file = ev.stop_file;
     found = p;
   }
   return found;
+}
+
+const READ_MAX_BYTES = 8192;
+
+// The start of a text file a seat wrote, or null when it is missing, not a regular file or unreadable.
+// Never reads past READ_MAX_BYTES, and never opens a FIFO or a device (a seat could plant one).
+export function readHead(path: string): string | null {
+  let fd: number;
+  try {
+    fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK); // a FIFO must not block the open
+  } catch {
+    return null;
+  }
+  try {
+    if (!fstatSync(fd).isFile()) return null;
+    const buf = Buffer.alloc(READ_MAX_BYTES);
+    const n = readSync(fd, buf, 0, READ_MAX_BYTES, 0);
+    return buf.subarray(0, n).toString("utf8");
+  } catch {
+    return null;
+  } finally {
+    closeSync(fd);
+  }
 }

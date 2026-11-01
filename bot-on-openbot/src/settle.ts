@@ -6,6 +6,7 @@ import { readUnit, runReadable, runStatus } from "./baton-state.ts";
 import { agentOf, all, record, type DeliveryRec } from "./deliveries.ts";
 import { log } from "./log.ts";
 import { shownLabels } from "./offer.ts";
+import { parseKey } from "./notice.ts";
 import { OpenBotDown, OpenBotRefused, type OpenBot, type Prompt } from "./openbot.ts";
 
 /** Spike: OpenBot accepts an answer with a label the prompt never offered (answer-unoffered-label.txt). */
@@ -38,13 +39,17 @@ function promptOf(r: DeliveryRec, prompts: Prompt[]): Prompt | undefined {
   return prompts.find((p) => norm(p.question) === question && wellFormed(r, p)) ?? prompts.find((p) => ours(r, p));
 }
 
-// Left its park: the run ended, or (for a park question) the unit is no longer in that park.
-// A run whose run.json cannot be read settles nothing: unknown is not "left the park".
+// Left what it was asked for: the run ended, or the unit is no longer in that park (a park question)
+// or at that stage (a wait notice, which has no park: its key `<run>/<unit>/<stage>/<at>` names the
+// stage; a follow-up's key only adds `#<n>` after `<at>`). A run whose run.json cannot be read settles
+// nothing: unknown is not "left".
 function settled(r: DeliveryRec): boolean {
   if (!runReadable(r.run)) return false;
   if (["disarmed", "done"].includes(runStatus(r.run) ?? "")) return true;
-  if (r.unit === undefined || r.park_at === undefined) return false;
-  return readUnit(r.run, r.unit)?.parked?.at !== r.park_at;
+  if (r.unit === undefined) return false;
+  if (r.park_at !== undefined) return readUnit(r.run, r.unit)?.parked?.at !== r.park_at;
+  const n = parseKey(r.key);
+  return n.kind === "unit-move" && readUnit(r.run, r.unit)?.stage !== n.stage;
 }
 
 /** Still in its park, known: the run reads as armed or parked, and a park question's unit is at its park. */

@@ -1,7 +1,7 @@
 import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseScreen, screen, type Runner } from "./actions.ts";
-import { readUnit } from "./baton-state.ts";
+import { newestPark, readUnit } from "./baton-state.ts";
 import { agentKey, agentOf, close, find, followUp, open, record, type DeliveryRec } from "./deliveries.ts";
 import { parseKey, type Notice } from "./notice.ts";
 import { log } from "./log.ts";
@@ -13,6 +13,7 @@ import { ours, SETTLED_LABEL, stillOpen, sweepSettled, wellFormed } from "./sett
 import { listSpool, removeSpool } from "./spool.ts";
 import { handleTap } from "./tap.ts";
 import { askTask, draftTask, messageTask, parseDraft } from "./task.ts";
+import { whyLines } from "./why.ts";
 
 export class LockHeldError extends Error {
   constructor() {
@@ -165,7 +166,9 @@ async function deliver(key: string, raw: string, note: string | undefined, agent
   }
   const message = withNote(note, raw);
   const run = n.kind === "plain" ? "" : n.run;
-  const offer = offerFor(n, message, run);
+  // A unit park's card says why: a stop file's text. (A driver's escalate action is in the notice already.)
+  const why = n.kind === "unit-park" ? whyLines(newestPark(n.run, n.unit, n.at), { action: false }) : [];
+  const offer = offerFor(n, [message, ...why].join("\n"), run);
   if (!offer) {
     const { deliveryId } = await bot.run(messageTask(message), key);
     record({ key, phase: "asked", agent, run, title: message.split("\n")[0]!.slice(0, 200), say: message, ask_id: deliveryId });
