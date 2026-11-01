@@ -21,11 +21,11 @@ const OTHER_LABEL = "Other (type your own)";
 const TITLES: Record<string, PickerKind> = { Ask: "omp-ask", "Review Mode": "numbered" };
 
 /**
- * The footers of a one-question, one-answer picker, whole lines. Claude Code adds the Vim hint on
- * its free-text row. Another footer means another shape: Devin's two questions (`←→ switch
- * question`) and multi-select (`␣ toggle`), Claude Code's two questions (`Tab/Arrow keys`).
+ * The footers of a one-question, one-answer picker, whole lines. Another footer means another
+ * shape: Devin's two questions (`←→ switch question`) and multi-select (`␣ toggle`), Claude Code's
+ * two questions (`Tab/Arrow keys`) and its focused free-text row (a Vim hint).
  */
-const CLAUDE_FOOTER = /^Enter to select · ↑\/↓ to navigate( · ctrl\+g to edit in Vim)? · Esc to cancel$/;
+const CLAUDE_FOOTER = "Enter to select · ↑/↓ to navigate · Esc to cancel";
 const DEVIN_FOOTER = "↑↓ select · ↵ confirm · ? help me out · esc cancel";
 const RULE = /^─+$/;
 
@@ -78,7 +78,8 @@ function digitRows(
  * something.` last, a rule, the `Chat about this` row, the footer as the screen's last line.
  * Options are the rows before `Type something.`; `other` numbers that row. A typed draft replaces
  * the row's label, a multi-select's or two questions' header starts with an arrow, and a cursor on
- * the Chat row leaves no cursor among the rows: all three read as no picker.
+ * the Chat row leaves no cursor among the rows: all three read as no picker. So does a cursor on
+ * the free-text row: a digit there is typed into it, not a selection (review #1022 C1).
  */
 function parseClaudeAsk(lines: string[], foot: number): Picker | null {
   const chat = /^(?:❯ |  )(\d)\. Chat about this$/.exec(lines[foot - 1] ?? "");
@@ -92,7 +93,7 @@ function parseClaudeAsk(lines: string[], foot: number): Picker | null {
   const blk = digitRows(lines.slice(head + 1, foot - 2), /^(❯ |  )(\d)\. (\S.*)$/, /^ {5}\S/);
   if (!blk || blk.rows.length < 2 || Number(chat[1]) !== blk.rows.length + 1) return null;
   const typed = blk.rows[blk.rows.length - 1];
-  if (typed.label !== "Type something.") return null;
+  if (typed.label !== "Type something." || typed.cursor) return null;
   return {
     kind: "claude-ask",
     question: blk.question,
@@ -135,7 +136,7 @@ function parseDevinAsk(lines: string[], foot: number): Picker | null {
  * block below it; the `Other (type your own)` row must be last and sets `other` (its row number),
  * and is left out of `options`. numbered: rows `<n>. <label>` with n = 1..k, no gap; the question
  * is the box title. Repeated labels are null (an answer is
- * checked by its label).
+ * checked by its label). claude-ask and devin-ask draw no box: see their parsers.
  */
 export function parsePicker(screen: string): Picker | null {
   const lines = screen.split("\n");
@@ -143,7 +144,7 @@ export function parsePicker(screen: string): Picker | null {
   const raw = lines.map((l) => l.trimEnd());
   let end = raw.length - 1;
   while (end >= 0 && raw[end] === "") end--;
-  if (end >= 0 && CLAUDE_FOOTER.test(raw[end])) return parseClaudeAsk(raw, end);
+  if (end >= 0 && raw[end] === CLAUDE_FOOTER) return parseClaudeAsk(raw, end);
   if (end >= 0 && raw[end] === DEVIN_FOOTER) return parseDevinAsk(raw, end);
   const footers = lines.flatMap((l, i) => (l.trim().startsWith("│") && inner(l).includes(LIVE_FOOTER) ? [i] : []));
   if (footers.length !== 1) return null;
@@ -198,7 +199,8 @@ export function parsePicker(screen: string): Picker | null {
 /**
  * The keys per kind, from the spike README: Up stops at row 1 and Down at the last row (no wrap),
  * Home and PageUp do nothing, so Up × every row (Other included) reaches row 1 from anywhere.
- * Enter is `\r`. Only omp-ask has a free-text row.
+ * Enter is `\r`. Of these two, only omp-ask has a free-text row. claude-ask and devin-ask: see
+ * keysFor and textKeys.
  */
 const KEYS: Record<"omp-ask" | "numbered", { up: string; down: string; enter: string; text: boolean }> = {
   "omp-ask": { up: "\x1b[A", down: "\x1b[B", enter: "\r", text: true },

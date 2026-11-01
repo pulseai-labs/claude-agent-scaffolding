@@ -58,10 +58,11 @@ when the run finishes and on `baton disarm`.
 
 Status and interrupt. From `orca terminal list` and `orca worktree ps`: a terminal not listed is
 `gone` only when `orca terminal read` confirms it (a terminal-gone error or status `exited`), and a
-host outage otherwise; an agent `working` is `active`; `waiting` or `blocked` is `waiting`; `done`
-is `completed` (`interrupted` when Orca says so). A missing agent row or an unknown state is
+host outage otherwise; an agent `working` is `active`, unless its `programStatus` is `blocked`;
+`waiting` or `blocked` is `waiting`; `done` is `completed` (`interrupted` when Orca says so). A missing agent row or an unknown state is
 `active`, never `completed`, and a truncated list, or one that does not cover the local host, is a
-host outage, never `gone`. Interrupt sends Escape to the terminal. A session end closes its
+host outage, never `gone`. Interrupt sends Escape to the terminal, twice for a Devin turn at work
+(see Known limits on Orca). A session end closes its
 terminal before the launch directory is released, except a park (the terminal stays until `unpark`
 or `disarm`) and an end after `interrupted` (it stays until the run ends); triage, driver and
 molt-parent terminals close too.
@@ -102,8 +103,9 @@ Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
 - Interrupt is per agent. Claude Code's turn stops on one Escape. A Devin turn at work
   (`programStatus: working`) gets two Escapes in two sends: one does nothing, and so do two in one
   send. A Devin picker gets one, which cancels it. Two at an idle prompt open a revert menu on both
-  agents, which a stale row can cause on Devin; the operator closes it with Escape. A stopped Devin
-  turn leaves its background shells running until the terminal closes.
+  agents, which a stale row can cause on Devin; the operator closes it with Escape. A Devin turn at
+  work whose row cannot be read gets one Escape, which does nothing; the stall rule catches it. A
+  stopped Devin turn leaves its background shells running until the terminal closes.
 - `baton disarm` leaves live (non-parked) workers running; their terminals and per-launch
   worktrees stay until you close them by hand.
 - After an Orca restart the terminals and their processes survive, but a live worker has no agent
@@ -127,7 +129,7 @@ terminal, with keys checked against a fresh screen:
 
 `baton screen` prints one JSON line, `{"park_at", "thread", "screen", "picker"}`: the park's `at`
 (the last part of its notice key), the worker's terminal, its screen read now, and the picker parsed
-from it, `{"kind", "question", "options": [{"n", "label"}], "other"}` or `null`. It reads only:
+from it, `{"kind", "question", "options": [{"n", "label"}], "other"}` (`devin-ask` adds `cursor`) or `null`. It reads only:
 no lock, nothing sent. rc 2 when the run is disarmed or done, the unit is not in a blocked park, an
 `unpark --to` is in flight, the unit's session is not the park's thread, or the host has no
 `screen`; 3 host auth, 4 host down.
@@ -173,7 +175,8 @@ Known limits:
 
 - A picker of any other shape reads as no picker, and both answer forms refuse it. Answer it in the
   terminal. That covers two questions in one call and multi-select on Claude Code and Devin, a typed
-  draft or the cursor on `Chat about this` on Claude Code, and the cursor on Other on Devin.
+  draft or the cursor on `Type something.` or `Chat about this` on Claude Code, and the cursor on Other
+  on Devin.
 - A label too long for one line reads only up to the wrap: its other lines look like a description.
   A question spans its lines, joined by one space.
 - `--screen-text` needs an Other row, so it does not work on `numbered`.

@@ -38,11 +38,14 @@ describe("claude-ask", () => {
     });
   });
 
-  test("the cursor on the free-text row, with its Vim footer, still parses", () => {
-    const s = CLAUDE.replace("❯ 1. red", "  1. red")
-      .replace("  4. Type something.", "❯ 4. Type something.")
-      .replace("· Esc to cancel", "· ctrl+g to edit in Vim · Esc to cancel");
-    expect(parsePicker(s)?.other).toBe(4);
+  test("the cursor on the free-text row reads as no picker, with or without its Vim footer", () => {
+    const s = CLAUDE.replace("❯ 1. red", "  1. red").replace("  4. Type something.", "❯ 4. Type something.");
+    expect(parsePicker(s)).toBeNull();
+    expect(parsePicker(s.replace("· Esc to cancel", "· ctrl+g to edit in Vim · Esc to cancel"))).toBeNull();
+    // The adjacent control: the Vim footer alone, on a cursor elsewhere, is another shape too.
+    expect(parsePicker(CLAUDE.replace("· Esc to cancel", "· ctrl+g to edit in Vim · Esc to cancel"))).toBeNull();
+    // And the cursor on another row still parses.
+    expect(parsePicker(CLAUDE.replace("❯ 1. red", "  1. red").replace("  3. blue", "❯ 3. blue"))?.kind).toBe("claude-ask");
   });
 
   test("two questions, a multi-select and a typed draft read as no picker", () => {
