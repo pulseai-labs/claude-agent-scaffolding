@@ -1,4 +1,4 @@
-# ossify (v1.32.3)
+# ossify (v1.32.4)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -220,6 +220,10 @@ history pass that drafts standards entries from review history: a class that rec
 more PRs is drafted, and the operator accepts each entry. `skills/start/references/reviewer-home.md`
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
+
+Since 1.32.4 (#859), spine close reads `Bones this spine registers` at any heading level and ends it
+at the next heading of its level or higher. A nested section with a prose bone used to report "no
+bones"; it now halts, naming the line. No state change.
 
 Since 1.32.3 (#909, #934), `plan-spine`'s spec rules say that an AC running a test file the item
 creates tests for that file first, since `node --test` on node 22 skips a missing one. Prose only.

@@ -2518,6 +2518,46 @@ t_assert_rc 0 "A4: a case-different heading is the same section and is read"
 t_assert_eq "ADR-0060" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0060") | .adr')" \
   "A4: ...its row reached the registry"
 
+# A4b. The section nested a level down, as `### ...` under `## Spine context` with a
+# sibling after it: it is read, its row registers, and the sibling ends it (#859).
+printf 'the nested fixture ADR\n' > "$B4CANON/docs/adr/adr-0601-a-nested-heading.md"
+printf 'the nested-then-parent fixture ADR\n' > "$B4CANON/docs/adr/adr-0602-a-nested-then-parent.md"
+git -C "$B4CANON" add docs/adr/adr-0601-a-nested-heading.md docs/adr/adr-0602-a-nested-then-parent.md
+git -C "$B4CANON" commit -qm "fixture: the nested-heading ADRs"
+printf '# %s - registers its bones\n\n## Spine context\n\n### Base branches\n\ncanonical | main\n\n### Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0601 | a nested heading | src/nested/** | |\n\n### Risk posture\n\nlow, and this line is not a bone\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+t_assert_rc 0 "A4b: a ### section is read, and a ### sibling ends it"
+t_assert_eq "ADR-0601" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0601") | .adr')" \
+  "A4b: ...its row reached the registry"
+
+# A4c. The same section ended by a heading above it.
+printf '# %s - registers its bones\n\n## Spine context\n\n### Bones this spine registers\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0602 | a nested then parent | src/parent/** | |\n\n## Decomposition\n\nw1 the item\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+t_assert_rc 0 "A4c: a heading above a ### section ends it"
+t_assert_eq "ADR-0602" "$(cd "$B4WS" && bash "$OSS" get '.bones[] | select(.adr=="ADR-0602") | .adr')" \
+  "A4c: ...its row reached the registry"
+
+# A4d. The issue's repro: a ### section stating its bone in prose. It halts, naming
+# the line, and never reports a boneless plan.
+printf '# %s - registers its bones\n\n## Spine context\n\n### Bones this spine registers\n\n**ADR-0031** the prose bone\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+t_assert_rc 1 "A4d: a prose bone in a ### section halts"
+t_assert_contains "$T_OUT" "ADR-0031" "A4d: ...naming the line"
+case "$T_OUT" in
+  *"declares no bones"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: A4d: a prose bone was reported as declaring no bones";;
+  *) T_PASS=$((T_PASS+1));;
+esac
+
+# A4e. CONTROL: a deeper heading does not end a ## section, so a line under it is
+# still in the section and still halts.
+printf '# %s - registers its bones\n\n## Bones this spine registers\n\nNone.\n\n### Notes\n\nADR-0099 is planned\n' \
+  "$B4SP" > "$B4DIR/SPINE.md"
+t_capture env "PATH=$SHIM:$PATH" bash -c "cd '$B4WS'; set -euo pipefail; spine_id='$B4SP'; merge_shas='canonical:$(_b4_sha)'; . '$B4_BLOCK'"
+t_assert_rc 1 "A4e: a deeper heading stays inside a ## section, and its lines still halt"
+
 # A5. `None.` AND a table: `None.` is the whole answer, so one of the two is wrong
 # and neither the step nor the registry may pick one silently.
 printf '# %s - registers its bones\n\n## Spine context\n\ncanonical | main\n\n## Bones this spine registers\n\nNone.\n\n| ADR | Title | Touch surface (glob csv) | Revisit when |\n|---|---|---|---|\n| ADR-0061 | a row beside None. | src/beside/** | |\n' \

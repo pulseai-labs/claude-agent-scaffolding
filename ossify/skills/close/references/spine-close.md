@@ -816,7 +816,10 @@ spine_md="$spine_dirs/SPINE.md"
 
 # THE SECTION'S TABLE BODY, AND WHAT ELSE THE SECTION MAY SAY. Inside
 # `## Bones this spine registers` (any case: the heading is matched case-folded,
-# because `## Bones This Spine Registers` is the same section) a PRESENT section is
+# because `## Bones This Spine Registers` is the same section; and at any level: a
+# plan that nests it as `### ...` under `## Spine context` declares the same section,
+# and read as absent it would report "no bones". It ends at the next heading of its
+# level or higher, #859) a PRESENT section is
 # either the single line `None.` or a table: `F` marks it found, `N` is that line,
 # `X` is any other non-blank line (which HALTS, below - reading only `|` lines made
 # `TBD`, a placeholder, or a table written without its outer pipes report "declares
@@ -833,8 +836,8 @@ spine_md="$spine_dirs/SPINE.md"
 # one slot left, into a slot the loop's own guards then read as present.
 recs="$(awk '
   { low = tolower($0) }
-  low ~ /^## bones this spine registers[[:space:]]*$/ { insec = 1; found = 1; next }
-  insec && /^##[^#]/ { exit }
+  low ~ /^#+ bones this spine registers[[:space:]]*$/ { match($0, /^#+/); lvl = RLENGTH; insec = 1; found = 1; next }
+  insec && /^#+[^#]/ { match($0, /^#+/); if (RLENGTH <= lvl) exit }
   insec && /^[[:space:]]*$/ { next }
   insec && /^[[:space:]]*None\.[[:space:]]*$/ { printf "N\n"; next }
   insec && /^[[:space:]]*\|/ {
