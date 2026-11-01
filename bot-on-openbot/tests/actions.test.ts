@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 import {
-  answerScreen, answerText, defaultRunner, disarm, merge, prView, screen, unpark, unparkTo, type Runner,
+  answerScreen, answerText, defaultRunner, disarm, merge, parseScreen, prView, screen, unpark, unparkTo, type Runner,
 } from "../src/actions.ts";
 
 const recorder = () => {
@@ -49,4 +49,11 @@ test("defaultRunner turns a missing binary into a failed result, not a throw", a
   const res = await defaultRunner(["bot-on-openbot-no-such-binary-xyz"]);
   expect(res.rc).not.toBe(0);
   expect(res.stderr).toBe("bot-on-openbot-no-such-binary-xyz: could not start");
+});
+
+test("parseScreen takes baton's four picker kinds and no other", () => {
+  const line = (kind: string) =>
+    JSON.stringify({ park_at: "t", screen: "s", picker: { kind, question: "q", options: [{ n: 1, label: "a" }], other: 2, cursor: 1 } });
+  for (const kind of ["omp-ask", "numbered", "claude-ask", "devin-ask"]) expect(parseScreen(line(kind))?.picker?.kind).toBe(kind as never);
+  expect(parseScreen(line("codex-ask"))?.picker).toBeNull();
 });

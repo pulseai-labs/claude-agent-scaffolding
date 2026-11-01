@@ -2,6 +2,20 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.13.0 - 2026-11-01
+
+Answer and interrupt Claude Code and Devin seats (#998).
+
+- **Added: picker kinds `claude-ask` and `devin-ask`.** `baton screen` reads them and `baton answer
+  --screen` and `--screen-text` answer them, with keys measured on Claude Code 2.1.316 and Devin
+  3000.11.234: a digit selects, since both pickers wrap and an Up count reaches no fixed row. Two
+  questions in one call, multi-select and a typed draft read as no picker, as before.
+- **Fixed: a Devin seat on a question reads as blocked.** Its agent row stays `working`, so baton saw
+  an active seat and the stall clock ended it. The host now reads `programStatus: blocked` on a
+  `working` row as waiting, so the question reaches the operator at once.
+- **Changed: an interrupt is per agent.** A Devin turn at work gets two Escapes in two sends, since one
+  does nothing. Every other case still gets one.
+
 ## 0.12.0 - 2026-11-01
 
 A supported way to clone a run (#974).

@@ -218,8 +218,8 @@ Only one `serve` runs at a time; a second exits with code 3.
   `openbot-cli` alone and did not need them to send.
 - OpenBot allows 30 runs per agent per hour. A refused or failed run keeps the notice in the spool, in
   order, and holds only that agent for the loop; a busy spine waits there. Follow-up questions and result messages each take a run.
-- A picker that is neither omp's ask picker nor omp's numbered `/review` picker reads as no picker: the
-  question then offers only Show question, Unpark and Disarm, and says to answer in the Orca terminal.
+- A picker of a kind baton does not parse reads as no picker (baton's README lists the kinds; two
+  questions in one call and multi-select are among those it refuses): the question then offers only Show question, Unpark and Disarm, and says to answer in the Orca terminal.
 - Free text reaches a worker only through a picker's Other row; elsewhere typed text runs nothing.
 - Settling, and dismissing a malformed prompt, answer it with `settled`, a label it never offered;
   OpenBot accepts that today. If the agent rewords the title as well, the bot cannot find its prompt on

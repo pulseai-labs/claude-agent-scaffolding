@@ -1,0 +1,164 @@
+{
+  "id": "e6474d49-a97b-409c-af6a-241c74482ffe",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_c20012b6-d68e-4021-bc61-6b6fbde82762",
+      "status": "running",
+      "tail": [
+        " Running it now.",
+        " ✓ python3 -c \"import time; time.sleep(150)\" Running in background shell 8f6cf8",
+        " It backgrounded after 10s; waiting for it to finish.",
+        " ✗ Read shell 8f6cf8 Failed",
+        " ✱ Canceled. What should Devin do?",
+        "❭ Call your question tool once with TWO questions in the same call: \"Pick a size?\" (small, large) and \"Pick a shape?\"",
+        "  (round, square). Then reply with only the answers and stop.",
+        " ⏺ Asked user 2 questions",
+        " ✗ Canceled due to user interrupt",
+        " ✱ Canceled. What should Devin do?",
+        "❭ Call your question tool once: question \"Pick a size for the probe?\", options small, medium, large. Then reply with",
+        "  only the answer and stop.",
+        " ⏺ Asked user Pick a size for the probe?",
+        " └ large",
+        " large",
+        "❭ Call your question tool once, allowing multiple selections (multiSelect): question \"Pick toppings for the probe?\",",
+        "  options ham, egg, leek. Then reply with only the answer and stop.",
+        "── Toppings ────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "  Pick toppings for the probe? (multi-select)",
+        "  □ 1 ham",
+        "      Ham topping",
+        "  □ 2 egg",
+        "      Egg topping",
+        "  □ 3 leek",
+        "      Leek topping",
+        "  □ 4 Other (type your own)",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "↑↓ select · ␣ toggle · ↵ confirm · ? help me out · esc cancel"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "209",
+      "latestCursor": "209",
+      "returnedLineCount": 28,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 111
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 103
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}

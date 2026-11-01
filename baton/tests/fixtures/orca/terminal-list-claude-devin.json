@@ -1,0 +1,60 @@
+{
+  "id": "dae1cde4-27ac-4d0e-88c4-1ff345be0f0f",
+  "ok": true,
+  "result": {
+    "terminals": [
+      {
+        "handle": "term_3c68865f-42e7-4da2-959a-2b5c3d35858f",
+        "ptyId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat@@c26f13ed",
+        "incarnationId": "fbe4e1b4-b379-4534-b7ad-a6a403870ec8",
+        "orphaned": false,
+        "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+        "worktreePath": "/home/dev/projects/pilot-fourseat",
+        "branch": "refs/heads/spine/r0.s14-cli-help-flag",
+        "tabId": "362a8474-dada-4585-9871-4956bff52732",
+        "leafId": "92897c5f-d52f-4ec3-86e9-d42642a46233",
+        "title": "probe-998-claude",
+        "connected": true,
+        "writable": true,
+        "lastOutputAt": 1793535965233,
+        "preview": "-5-5 --effort medium --dangerously-skip-permissions 'For a harness test: call your tool for asking the user a question exactly once. Question text: \"Which colour for the probe?\" Options: red, green, blue. Do not do anything else first. After the answer, reply with only the chosen answer, then stop.'",
+        "executionHostId": "local",
+        "agentIdentity": "claude"
+      },
+      {
+        "handle": "term_c20012b6-d68e-4021-bc61-6b6fbde82762",
+        "ptyId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat@@0547bfd6",
+        "incarnationId": "cc92a0d0-d3e0-41f6-ae38-bfd374187422",
+        "orphaned": false,
+        "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+        "worktreePath": "/home/dev/projects/pilot-fourseat",
+        "branch": "refs/heads/spine/r0.s14-cli-help-flag",
+        "tabId": "d0c5f139-af76-444c-967c-dfc46bead3c0",
+        "leafId": "93177dec-e5c4-4870-bad7-7f88383f16c4",
+        "title": "probe-998-devin",
+        "connected": true,
+        "writable": true,
+        "lastOutputAt": 1793535965684,
+        "preview": "e, although a later cleanup may still want to revisit this choice in another release\n2 Move it\nMove it now\nOther (type your own)\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n↑↓ select · ↵ confirm · ? help me out · esc cancel",
+        "executionHostId": "local",
+        "agentIdentity": "devin"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "topologyRevisions": {
+      "03853cf9-feaf-4887-abcb-47e880046a7b::/home/dev/projects/pulse-factory/pulse-factory": 37,
+      "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat": 83,
+      "1b1cc238-2bbc-4d5c-b9ff-64d4aac52984::/home/dev/projects/pulse-factory/pulse-factory-ai": 64
+    },
+    "totalCount": 2,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}

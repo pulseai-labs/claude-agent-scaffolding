@@ -73,7 +73,7 @@ export function parseScreen(stdout: string): { park_at: string; screen: string; 
 }
 
 function isPicker(p: unknown): p is Picker {
-  if (!isObj(p) || (p.kind !== "omp-ask" && p.kind !== "numbered") || typeof p.question !== "string") return false;
+  if (!isObj(p) || !["omp-ask", "numbered", "claude-ask", "devin-ask"].includes(p.kind as string) || typeof p.question !== "string") return false;
   if (!(p.other === null || (typeof p.other === "number" && Number.isInteger(p.other)))) return false;
   return Array.isArray(p.options) && p.options.length > 0 && p.options.every((o, i) =>
     isObj(o) && o.n === i + 1 && typeof o.label === "string" && o.label !== "");

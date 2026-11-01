@@ -10,6 +10,8 @@ const FIXTURES = join(import.meta.dir, "fixtures", "orca");
 const HANDLE = "term_3a3a4b2c-380f-4bcc-a4e0-9053d6206ec7"; // terminal-list.json
 const PANE = "65ef09a7-ba88-45eb-a72c-543f923e6b3b:037f73cd-bff0-448b-a33b-44fb694b1693"; // tabId:leafId of that row
 const LIVE = "term_9ce372e1-8d73-4999-b4db-e85223e7f6e5"; // terminal-list-working-live.json
+const CLAUDE_SEAT = "term_3c68865f-42e7-4da2-959a-2b5c3d35858f"; // terminal-list-claude-devin.json
+const DEVIN_SEAT = "term_c20012b6-d68e-4021-bc61-6b6fbde82762"; // the same list
 const ABSENT = "term_deadbeef-0000-0000-0000-000000000000"; // in no list
 
 let base: string, fakeDir: string, state: string;
@@ -70,6 +72,8 @@ describe("status mapping, from recorded and hand-edited 1.4.238 fixtures", () =>
     ["working -> active (recorded live pair)", "terminal-list-working-live.json", "worktree-ps-working-live.json", "active", LIVE],
     ["waiting -> waiting", "terminal-list.json", "EDIT:waiting", "waiting"],
     ["blocked -> waiting (recorded omp ask)", "terminal-list.json", "worktree-ps-omp-ask.json", "waiting"],
+    ["waiting -> waiting (recorded Claude Code ask)", "terminal-list-claude-devin.json", "worktree-ps-claude-devin-ask.json", "waiting", CLAUDE_SEAT],
+    ["working, programStatus blocked -> waiting (recorded Devin ask)", "terminal-list-claude-devin.json", "worktree-ps-claude-devin-ask.json", "waiting", DEVIN_SEAT],
     ["done -> completed (recorded)", "terminal-list.json", "worktree-ps-done.json", "completed"],
     ["done after a dialog -> completed (recorded)", "terminal-list.json", "worktree-ps-omp-dialog.json", "completed"],
     ["done + interrupted -> interrupted (hand-edited)", "terminal-list.json", "worktree-ps-done-interrupted.edited.json", "interrupted"],
@@ -312,7 +316,65 @@ describe("mapOrcaState", () => {
       expect(mapOrcaState(T, a)).toBe("active");
     }
   });
+  test("programStatus turns only a working row into waiting", () => {
+    const blocked = { state: "blocked", kind: "question" };
+    expect(mapOrcaState(T, { state: "working", programStatus: blocked })).toBe("waiting");
+    // The adjacent controls: a working row with any other status stays active, and a finished
+    // row with a late blocked status stays finished.
+    for (const st of ["working", "idle", "done", undefined]) expect(mapOrcaState(T, { state: "working", programStatus: { state: st } })).toBe("active");
+    expect(mapOrcaState(T, { state: "done", programStatus: blocked })).toBe("completed");
+  });
+
   test("interrupted counts only when it is exactly true", () => {
     for (const i of ["true", 1, "yes"]) expect(mapOrcaState(T, { state: "done", interrupted: i })).toBe("completed");
+  });
+});
+
+describe("interrupt per agent (#998)", () => {
+  const sends = () => callsTo("terminal send").map((a) => a[a.indexOf("--text") + 1]);
+  /** The recorded pair with the seat's row edited, then one interrupt. */
+  async function interruptWith(id: string, edit: (row: any) => void): Promise<string[]> {
+    const ps = edited("worktree-ps-claude-devin-ask.json", "ps.json", (o) => {
+      for (const row of o.result.worktrees[0].agents) edit(row);
+    });
+    replies({ "terminal list": "terminal-list-claude-devin.json", "worktree ps": ps, "terminal send": "terminal-send-escape.json" });
+    await host().interrupt(id, "stalled");
+    return sends();
+  }
+  const programStatus = (state: string) => (row: any) => (row.programStatus = { state });
+
+  test("a Devin turn at work gets two Escapes, in two sends", async () => {
+    expect(await interruptWith(DEVIN_SEAT, programStatus("working"))).toEqual(["\x1b", "\x1b"]);
+  });
+
+  test("a Devin picker gets one: one cancels it", async () => {
+    expect(await interruptWith(DEVIN_SEAT, () => {})).toEqual(["\x1b"]);
+  });
+
+  test("an idle Devin prompt gets one: two open its revert menu", async () => {
+    expect(await interruptWith(DEVIN_SEAT, programStatus("idle"))).toEqual(["\x1b"]);
+  });
+
+  test("a Claude Code turn at work gets one: one stops it, and two open its rewind menu", async () => {
+    expect(await interruptWith(CLAUDE_SEAT, programStatus("working"))).toEqual(["\x1b"]);
+  });
+
+  test("an omp turn at work gets one", async () => {
+    const ps = edited("worktree-ps-working-live.json", "ps.json", (o) => (o.result.worktrees[0].agents[0].programStatus = { state: "working" }));
+    replies({ "terminal list": "terminal-list-working-live.json", "worktree ps": ps, "terminal send": "terminal-send-escape.json" });
+    await host().interrupt(LIVE, "stalled");
+    expect(sends()).toEqual(["\x1b"]);
+  });
+
+  test("a terminal with no agent row gets one", async () => {
+    replies({ "terminal list": "terminal-list-claude-devin.json", "worktree ps": "worktree-ps-working-live.json", "terminal send": "terminal-send-escape.json" });
+    await host().interrupt(DEVIN_SEAT, "stalled");
+    expect(sends()).toEqual(["\x1b"]);
+  });
+
+  test("lists that cannot be read still send one: the Escape is not lost to them", async () => {
+    replies({ "terminal send": "terminal-send-escape.json" });
+    await host().interrupt(DEVIN_SEAT, "stalled");
+    expect(sends()).toEqual(["\x1b"]);
   });
 });

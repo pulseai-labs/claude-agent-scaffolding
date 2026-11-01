@@ -1,0 +1,104 @@
+{
+  "id": "dd439e50-86e0-4530-a73a-19d845002c4a",
+  "ok": true,
+  "result": {
+    "worktrees": [
+      {
+        "workspaceKind": "git",
+        "worktreeId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e::/home/dev/projects/pilot-fourseat",
+        "repoId": "aa6e4d54-1cd0-46f3-a8d2-f35b7695548e",
+        "hostId": "local",
+        "terminalPlatform": "linux",
+        "repo": "pilot-fourseat",
+        "path": "/home/dev/projects/pilot-fourseat",
+        "branch": "refs/heads/spine/r0.s14-cli-help-flag",
+        "isArchived": false,
+        "isMainWorktree": true,
+        "hasHostSidebarActivity": true,
+        "defaultBranch": true,
+        "worktreeInstanceId": "6d70ff84-ff58-4928-85bd-49a7e3a1acee",
+        "parentWorktreeId": null,
+        "childWorktreeIds": [],
+        "displayName": "spine/r0.s14-cli-help-flag",
+        "workspaceStatus": "in-progress",
+        "sortOrder": 1793483457371,
+        "lastActivityAt": 1793535656703,
+        "linkedIssue": null,
+        "linkedPR": null,
+        "linkedLinearIssue": null,
+        "linkedGitLabMR": null,
+        "linkedGitLabIssue": null,
+        "linkedItems": [],
+        "comment": "",
+        "isPinned": false,
+        "isActive": false,
+        "unread": true,
+        "liveTerminalCount": 3,
+        "hasAttachedPty": true,
+        "unverifiableTerminalCount": 0,
+        "lastOutputAt": 1793535965594,
+        "preview": "e, although a later cleanup may still want to revisit this choice in another release\n2 Move it\nMove it now\nOther (type your own)\n────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────\n↑↓ select · ↵ confirm · ? help me out · esc cancel",
+        "status": "permission",
+        "agents": [
+          {
+            "paneKey": "d0c5f139-af76-444c-967c-dfc46bead3c0:93177dec-e5c4-4870-bad7-7f88383f16c4",
+            "parentPaneKey": null,
+            "state": "working",
+            "agentType": "devin",
+            "prompt": "Call your question tool once. Question: \"We found two ways to carry the probe across the staging boundary, and each one changes what the verifier reads at close, so which of the two ways should this w",
+            "taskTitle": null,
+            "displayName": null,
+            "lastAssistantMessage": null,
+            "toolName": "ask_user_question",
+            "toolInput": null,
+            "interrupted": false,
+            "stateStartedAt": 1793535883377,
+            "updatedAt": 1793535952229,
+            "programStatus": {
+              "state": "blocked",
+              "kind": "question",
+              "observedAt": 1793535952544
+            }
+          },
+          {
+            "paneKey": "362a8474-dada-4585-9871-4956bff52732:92897c5f-d52f-4ec3-86e9-d42642a46233",
+            "parentPaneKey": null,
+            "state": "waiting",
+            "agentType": "claude",
+            "prompt": "Call your question tool once. Question: \"We found two ways to carry the probe across the staging boundary, and each one changes what the verifier reads at close, so which of the two ways should this w",
+            "taskTitle": null,
+            "displayName": null,
+            "lastAssistantMessage": null,
+            "toolName": "AskUserQuestion",
+            "toolInput": null,
+            "interrupted": false,
+            "mainAgent": {
+              "state": "waiting",
+              "stateStartedAt": 1793535951607
+            },
+            "stateStartedAt": 1793535951607,
+            "updatedAt": 1793535951644,
+            "programStatus": {
+              "state": "blocked",
+              "kind": "question",
+              "message": "answer: We found two ways to carry the probe across the staging boundary, and each one changes what the verifier reads at close, so which of the two ways should this work item take, given the brief says nothing on it at all? (Keep it (Recommended) · Move it)",
+              "observedAt": 1793535951625
+            }
+          }
+        ],
+        "terminalVerdict": "live"
+      }
+    ],
+    "hostScope": {
+      "hostIds": [
+        "local"
+      ],
+      "omittedHostIds": []
+    },
+    "totalCount": 84,
+    "truncated": false
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}

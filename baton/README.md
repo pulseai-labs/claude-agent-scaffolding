@@ -58,10 +58,11 @@ when the run finishes and on `baton disarm`.
 
 Status and interrupt. From `orca terminal list` and `orca worktree ps`: a terminal not listed is
 `gone` only when `orca terminal read` confirms it (a terminal-gone error or status `exited`), and a
-host outage otherwise; an agent `working` is `active`; `waiting` or `blocked` is `waiting`; `done`
-is `completed` (`interrupted` when Orca says so). A missing agent row or an unknown state is
+host outage otherwise; an agent `working` is `active`, unless its `programStatus` is `blocked`;
+`waiting` or `blocked` is `waiting`; `done` is `completed` (`interrupted` when Orca says so). A missing agent row or an unknown state is
 `active`, never `completed`, and a truncated list, or one that does not cover the local host, is a
-host outage, never `gone`. Interrupt sends Escape to the terminal. A session end closes its
+host outage, never `gone`. Interrupt sends Escape to the terminal, twice for a Devin turn at work
+(see Known limits on Orca). A session end closes its
 terminal before the launch directory is released, except a park (the terminal stays until `unpark`
 or `disarm`) and an end after `interrupted` (it stays until the run ends); triage, driver and
 molt-parent terminals close too.
@@ -94,6 +95,17 @@ Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
   keep running after it (a subagent keeps the worker `working` until it ends). The first stall ends
   the session and closes its terminal, but a park (the second stall, or a stop file) keeps the
   terminal, so such a worker can keep running until `unpark` or `disarm`.
+- `state` lags on two agents (Claude Code 2.1.316, Devin 3000.11.234). A Devin seat on a question
+  stays `working`, so the host also reads `programStatus: blocked` on a `working` row as waiting. A
+  Devin turn stopped by Escape stays `working`, so it reads `active` and runs into the stall clock.
+  A Claude Code picker cancelled by Escape stays `waiting` until the next turn, so a tick that sees
+  it makes a blocked park with no picker on the screen.
+- Interrupt is per agent. Claude Code's turn stops on one Escape. A Devin turn at work
+  (`programStatus: working`) gets two Escapes in two sends: one does nothing, and so do two in one
+  send. A Devin picker gets one, which cancels it. Two at an idle prompt open a revert menu on both
+  agents, which a stale row can cause on Devin; the operator closes it with Escape. A Devin turn at
+  work whose row cannot be read gets one Escape, which does nothing; the stall rule catches it. A
+  stopped Devin turn leaves its background shells running until the terminal closes.
 - `baton disarm` leaves live (non-parked) workers running; their terminals and per-launch
   worktrees stay until you close them by hand.
 - After an Orca restart the terminals and their processes survive, but a live worker has no agent
@@ -117,7 +129,7 @@ terminal, with keys checked against a fresh screen:
 
 `baton screen` prints one JSON line, `{"park_at", "thread", "screen", "picker"}`: the park's `at`
 (the last part of its notice key), the worker's terminal, its screen read now, and the picker parsed
-from it, `{"kind", "question", "options": [{"n", "label"}], "other"}` or `null`. It reads only:
+from it, `{"kind", "question", "options": [{"n", "label"}], "other"}` (`devin-ask` adds `cursor`) or `null`. It reads only:
 no lock, nothing sent. rc 2 when the run is disarmed or done, the unit is not in a blocked park, an
 `unpark --to` is in flight, the unit's session is not the park's thread, or the host has no
 `screen`; 3 host auth, 4 host down.
@@ -127,6 +139,13 @@ Two picker kinds are known, as omp v18.11.3 draws them: `omp-ask` (the `ask` too
 out) and `numbered` (omp's `/review` box, `Review Mode`, rows `<n>. <label>`; its question is the box
 title). Only a box followed by a `⏎ select` footer is live: the `ask` call above it, an answered
 picker and the free-text box read as no picker.
+
+Two more, as Claude Code 2.1.316 and Devin 3000.11.234 draw one question with one answer:
+`claude-ask` (AskUserQuestion: ` ☐ <header>`, the question, `<n>. <label>` rows, `Type something.`,
+then a rule and `Chat about this`; `other` numbers the `Type something.` row) and `devin-ask`
+(ask_user_question: `── <title> ──`, the question, `<n> <label>` rows, an unnumbered `Other (type your
+own)`; `other` is one past the last option, and the picker also carries `cursor`, the cursor's row).
+Each is live only with its own footer as the screen's last line.
 
 `--screen` selects option `<n>` and `--screen-text` types `<text>` through the Other row. Both run
 under the store lock, read the screen again, and send keys only when every check passes; each
@@ -142,8 +161,12 @@ failed check is rc 2 with one line `baton answer: <reason>` and nothing sent:
   or `<text>` is empty or holds a control byte (any byte below 0x20, and 0x7f: an Enter, an Escape
   or a tab would act on the terminal, not arrive as the answer).
 
-The keys are fixed per kind: Up once per row (the Other row counted; Up stops at row 1), Down to
-the row, Enter, in one send. Free text is three sends: to the Other row and Enter, the text, Enter.
+The keys are fixed per kind. On `omp-ask` and `numbered`: Up once per row (the Other row counted; Up
+stops at row 1), Down to the row, Enter, in one send, and free text is three sends: to the Other row
+and Enter, the text, Enter. On `claude-ask` and `devin-ask` the rows wrap, and a digit selects its row
+from anywhere, so an answer is one digit. Free text on `claude-ask` is the `Type something.` row's
+digit (which only moves there), the text, Enter. On `devin-ask` it is Up once per cursor row, one send
+each (Up from row 1 wraps to Other), the text, Enter.
 An answer records `{"kind": "answered", "unit", "screen": n, "label"}` or
 `{"kind": "answered", "unit", "screen_text": true}`; the text itself is not logged. rc 64 for any
 other argument shape; the three-argument `baton answer <run> <unit> <label>` is unchanged.
@@ -151,8 +174,12 @@ other argument shape; the three-argument `baton answer <run> <unit> <label>` is 
 Known limits:
 
 - A picker of any other shape reads as no picker, and both answer forms refuse it. Answer it in the
-  terminal.
-- `--screen-text` needs an Other row, so it works on `omp-ask` only.
+  terminal. That covers two questions in one call and multi-select on Claude Code and Devin, a typed
+  draft or the cursor on `Type something.` or `Chat about this` on Claude Code, and the cursor on Other
+  on Devin.
+- A label too long for one line reads only up to the wrap: its other lines look like a description.
+  A question spans its lines, joined by one space.
+- `--screen-text` needs an Other row, so it does not work on `numbered`.
 - The numbered `/review` picker rarely reaches a blocked park on Orca: a picker opened between turns
   leaves the agent row `done` (see Known limits on Orca).
 - The free-text sends are not checked between each other: a host failure after the first leaves the

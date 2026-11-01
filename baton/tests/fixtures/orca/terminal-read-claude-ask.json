@@ -1,0 +1,124 @@
+{
+  "id": "d1b7b49e-2b5f-408c-b609-0020f8534e01",
+  "ok": true,
+  "result": {
+    "terminal": {
+      "handle": "term_3c68865f-42e7-4da2-959a-2b5c3d35858f",
+      "status": "running",
+      "tail": [
+        " ▐▛███▛█   Claude Code v2.1.316",
+        "▝▜██████▀  Sonnet 5.5 with medium effort · Claude Ultra",
+        " ▝▝   ▝▝   ~/projects/pilot-fourseat",
+        "❯ For a harness test: call your tool for asking the user a question exactly once. Question text: \"Which colour for the",
+        "  probe?\" Options: red, green, blue. Do not do anything else first. After the answer, reply with only the chosen",
+        "  answer, then stop.",
+        "  Which colour for the probe?",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        " ☐ Colour",
+        "Which colour for the probe?",
+        "❯ 1. red",
+        "     Red",
+        "  2. green",
+        "     Green",
+        "  3. blue",
+        "     Blue",
+        "  4. Type something.",
+        "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────",
+        "  5. Chat about this",
+        "Enter to select · ↑/↓ to navigate · Esc to cancel"
+      ],
+      "truncated": false,
+      "limited": false,
+      "oldestCursor": "0",
+      "nextCursor": "1",
+      "latestCursor": "1",
+      "returnedLineCount": 20,
+      "tailRows": [
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 2
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 8
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 100
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 1
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        },
+        {
+          "wrapped": false,
+          "trailingSpaces": 0
+        }
+      ],
+      "source": "screen"
+    }
+  },
+  "_meta": {
+    "runtimeId": "c2e187e3-e580-42a8-9e85-2372d239781c"
+  }
+}
