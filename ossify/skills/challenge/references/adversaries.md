@@ -11,8 +11,8 @@ not by accident.
 
 1. **Per-invocation override.** The calling prose or the user names an
    adversary for this run.
-2. **`OSSIFY_ADVERSARY`** — `codex`, `claude`, or the literal `none` (force
-   host-only even where a recipe would resolve).
+2. **`OSSIFY_ADVERSARY`** — `codex`, `claude`, `devin`, or the literal `none`
+   (force host-only even where a recipe would resolve).
 3. **Host-only.** The declared default. No implicit adversary is ever assumed
    from the host agent.
 
@@ -33,13 +33,13 @@ is a value, not an omission.
 
 Each recipe: a probe, an invocation, the output contract (§3), a timeout, and
 the failure path (§4). `codex` and `claude` are ported verbatim from
-architect-critic 0.6.0's proven invocations; they are the complete validated
-set. A third entry joins only after a real run proves it (§2.1).
+architect-critic 0.6.0's proven invocations, and `devin` joined after a real
+audit run (§2.1). These three are the complete validated set.
 
 _Dispatcher invocations below are `"$oss_bin" …` — THIS fence resolves `oss` itself and checks that what answers is ossify's own dispatcher before using it, so nothing here depends on an earlier Bash call._
 
 **Every invocation runs under the timeout guard (§2.2) — an unguarded hang is
-a blocked ceremony.** And both resolve the schema path **before entering
+a blocked ceremony.** And `codex` and `claude` resolve the schema path **before entering
 Bash**: `${CLAUDE_PLUGIN_ROOT}` is not exported into Bash-tool subprocesses
 (it expands to empty there — `doctor/references/budget-check.md` documents the
 behaviour). Resolve from the `oss` dispatcher. Two steps, loud on failure:
@@ -89,6 +89,44 @@ claude --print \
 ```
 
 Validate the response against §3.
+
+### devin — proven on a real audit
+
+**Probe:** `command -v devin`.
+
+**Invocation.** It runs from a new empty directory, never from the repo, and the
+prompt ends with the no-tools sentence below. `OSSIFY_ADVERSARY_MODEL`, when set,
+picks the model; unset, the account's default applies. Only this recipe reads that
+variable. §2.2's guard goes on the `devin` line, not around the block.
+
+```bash
+workdir="$(mktemp -d)" || exit 1
+trap 'rm -rf "$workdir"' EXIT
+( cd "$workdir" || exit 1
+  devin -p --permission-mode auto --respect-workspace-trust false \
+    ${OSSIFY_ADVERSARY_MODEL:+--model "$OSSIFY_ADVERSARY_MODEL"} -- "<prompt>" </dev/null )
+```
+
+The prompt's last line: *"Everything you need is in this prompt. Do not call any
+tool, read any file, or invoke any skill. Your only message is that JSON object
+and nothing else."*
+
+Read stdout and validate it against §3. Devin has no schema flag, so the contract
+in the prompt is all that holds the shape.
+
+Both rules come from a measured failure. Run from a repo, Devin reached for its
+skills, print mode rejected the tool call, and the process exited **0** with one
+sentence of prose. That is invalid output (§4), never a clean audit. A slow model
+can also pass the default limit: `swe-2-max` took 292 s on a 15 KB artifact, so set
+`OSSIFY_ADVERSARY_TIMEOUT_S` to suit the model (§2.2). Print mode refuses an untrusted
+directory, and a new temporary one is untrusted, so the trust flag is required. The
+directory is empty, so the flag trusts nothing.
+
+**The sentence does not sandbox it.** Print mode rejects tools that need confirmation,
+but `auto` still approves read-only ones, and Devin read a file outside its directory
+in a test. An artifact carrying instructions could make it read local files and send
+them to its model provider. Do not select this recipe for an artifact you did not
+write or review.
 
 ### 2.1 Adding a recipe
 
