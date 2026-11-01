@@ -79,8 +79,9 @@ session is watched again. `baton unpark <run> <unit>` clears it by hand, and `--
 the session and moves the unit. A stop file wins, `disarm` closes the worker, no driver takes it
 and no stall clock runs on it; the run summary counts it as sent to you.
 
-A question always reaches the operator: through the blocked park, and the picker it shows (see
-Answering a blocked park). No model answers a seat's question.
+A question reaches the operator, not a model: through the blocked park, and the picker it shows (see
+Answering a blocked park). The known limits below name the cases the blocked park misses, where the
+stall rule catches the seat.
 
 Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
 

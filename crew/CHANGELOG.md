@@ -2,6 +2,10 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.9.2
+
+**The shipped role list no longer names `triage` (#1023).** baton 0.14.0 removed that stage, so `config.md` lists only baton's `driver`. A project file that still fills a `triage` row is harmless: baton ignores it.
+
 ## 0.9.1
 
 **The status block's fields can run for several lines (#994, with seat-mods 0.13.0).** `SKILL.md` §8 says so, and several decisions go one numbered item each. Text only.
