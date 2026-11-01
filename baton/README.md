@@ -186,6 +186,11 @@ only: baton has no Codex manifest.
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
 with rc 2.
 
+`baton status` prints one line per unit with these columns: the unit, its stage, launches so far,
+stalls, the park reason, and the session's thread id (`-` when empty). With no argument it lists every
+run, puts the run id first on each row and heads the columns (`RUN UNIT STAGE LAUNCHES STALLS PARKED
+THREAD`). `baton status <run>` prints that run's rows without the run id or the header.
+
 ## Seats
 
 A stage with a `role` (a crew role name, such as `implementer` or `verifier`) launches on the
@@ -412,6 +417,14 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - A stage whose `cwd` is a project root starts by default in a detached per-launch worktree, not
   at the root, so its brief must name the paths it works in, and writes to tracked files there
   are lost on `release`. A stage that needs the real checkout sets `launch_dir: "root"`.
+- Claude Code adds a plugin-registry row for a launch directory. At startup it copies each plugin
+  that a tracked `.claude/settings.json` enables into `~/.claude/plugins/installed_plugins.json`
+  as a `project`-scope row whose `projectPath` is the launch directory. A per-launch worktree
+  (the default for the `triage` and `driver` stages) of a repo with such a file can leave
+  one row per launch, and `release` removing the directory does not remove it. baton cannot
+  prevent this and does not edit that file. baton does not use the row, and the skill takes the row whose
+  `projectPath` is the AI workspace root. A stage that sets `launch_dir: "root"` reuses the root's
+  row but loses the isolation above.
 - While a `launch_dir: "root"` session runs, a hand-started thread at that root reads its claim.
   A hand-started thread bound to a baton launch directory or a live item worktree also reads that
   claim.
