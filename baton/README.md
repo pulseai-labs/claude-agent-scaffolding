@@ -174,6 +174,7 @@ only: baton has no Codex manifest.
 
     baton validate <recipe.json>
     baton arm <recipe.json> --run <id> [--param k=v]... [--seats <file>] [--no-timer]
+    baton clone <run> <new-id> [--recipe <file>] [--param k=v]... [--reset <unit>[=<stage>]]... [--fresh]
     baton status [<run>]            baton report <run>
     baton disarm <run>              baton tick [--run <id>]
     baton unpark <run> [<unit>] [--to <stage>]
@@ -185,6 +186,44 @@ only: baton has no Codex manifest.
 
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
 with rc 2.
+
+### Clone
+
+`baton clone <run> <new-id>` makes a new run from an existing one, for a rerun or a test. Use it in
+place of copying a run directory by hand. It is mechanical work on baton's own state, and it
+refuses before it writes anything.
+
+The clone holds `run.json`, `recipe.json`, `seats.json` (when the source has one), a fresh
+`events.jsonl` with one `cloned` line, and empty `queue` and `out`. Nothing else is copied: not
+`spine/`, whose unit files a source would read again, and not the source's own `out` files. The
+recipe is the source's, byte for byte, and `recipe_sha256` is taken from the bytes the clone holds.
+Units stay an object keyed by unit id.
+
+A clone starts **parked** for the reason `cloned`. The tick does nothing for it, not even a read
+of its sources, until you run `baton unpark <new-id>`. That is the one step that starts it. Clone
+installs no timer and does not change the source. The source may be in any status.
+
+Each unit keeps its group, order, vars and stage, and starts a fresh visit to that stage: no
+session, thread, claim, driver, triage or request record, no park, and zero launches and stalls. A
+param or var that holds the source run's directory follows to the new one; a path under another
+run's directory (`r10` beside `r1`) does not.
+
+| Flag | Does |
+|---|---|
+| `--recipe <file>` | Pins the clone to another recipe instead of the source's. It must validate, name only stages the units are in, and find every role in the source's `seats.json`. A param it declares that the source lacks needs `--param`. |
+| `--param k=v` | Sets a declared param. Without it the source's value stands. |
+| `--reset <unit>` | Sends a seed unit back to its seed stage and vars. |
+| `--reset <unit>=<stage>` | Sends any unit to that stage (`done` and `park` included). Repeatable. |
+| `--fresh` | Writes the recipe's seed, as `arm` does, and drops every other unit; the first tick that runs reads the source units again from their files. Not with `--reset`. |
+
+It refuses, with rc 2, a source that does not exist or whose `run.json` is malformed, a new id that
+exists or that `arm` would refuse, a recipe that does not validate, a missing or undeclared param,
+an unknown unit or stage, and a role the source's seat table lacks. A usage error is rc 64.
+
+Known limits: clone does not check whether another run of the same project is armed or parked.
+`arm` does not either; that check is in the skill's preflight. Apply it before you unpark a clone.
+`--fresh` and `--reset <seed unit>` drop a unit's vars and digests; a unit that came from a source
+file gets its vars back on the next read.
 
 `baton status` prints one line per unit with these columns: the unit, its stage, launches so far,
 stalls, the park reason, and the session's thread id (`-` when empty). With no argument it lists every
