@@ -223,7 +223,8 @@ review-ledger line per merged PR. No `lib/` code, no state change.
 
 Since 1.33.0 (#233), `OSSIFY_ADVERSARY` accepts `devin`. The recipe runs from an empty directory
 with a no-tools prompt, because Devin run from a repo exited 0 with prose and no audit.
-`OSSIFY_ADVERSARY_MODEL` picks its model.
+`OSSIFY_ADVERSARY_MODEL` picks its model, and only this recipe reads it. Its read-only tools stay
+approved, so do not select it for an artifact you did not write or review.
 
 Since 1.32.5 (#946, #1025), `work-item`'s verification runs a new git-running test once more with no
 host git identity, and its rc 2 text no longer calls a missing test file the usual cause. Prose only.
