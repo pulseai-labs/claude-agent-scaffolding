@@ -316,6 +316,11 @@ test_normalize_path_layouts() {
   assert_eq "@plugin:p@m:h.sh" "$(csa_normalize_path "$base/m/p/unknown/h.sh")" "three-level, unknown version" || rc=1
   assert_eq "@plugin:p:hooks/h.sh" "$(csa_normalize_path "$base/p/0.1.0/hooks/h.sh")" "array-era two-level stays" || rc=1
   assert_eq "@plugin:p:h.sh" "$(csa_normalize_path "$base/p/0.1.0/h.sh")" "array-era two-level, file at the top" || rc=1
+  # A version with an unusual name still drops out of the id, and a flat path keeps its own shape.
+  assert_eq "@plugin:p@m:h.sh" "$(csa_normalize_path "$base/m/p/1/h.sh")" || rc=1
+  assert_eq "@plugin:p@m:h.sh" "$(csa_normalize_path "$base/m/p/latest/h.sh")" || rc=1
+  assert_eq "@plugin:p@m:d/h.sh" "$(csa_normalize_path "$base/m/p/2026-11-02/d/h.sh")" || rc=1
+  assert_eq "@plugin:p:2.0/h.sh" "$(csa_normalize_path "$base/p/1.0.0/2.0/h.sh")" || rc=1
   [[ "$(csa_normalize_path "$base/m/p/1.2.3/h.sh")" != "$(csa_normalize_path "$base/m2/p/1.2.3/h.sh")" ]] \
     || { printf '    two marketplaces share an id\n' >&2; rc=1; }
   return "$rc"

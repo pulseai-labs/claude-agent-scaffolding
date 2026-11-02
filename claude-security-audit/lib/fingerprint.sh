@@ -14,16 +14,17 @@ csa_canonicalize_excerpt() {
 # cache/<marketplace>/<plugin>/<version>/<rest>: that becomes
 # `@plugin:<plugin>@<marketplace>:<rest>`. The older two-level layout,
 # cache/<plugin>/<version>/<rest>, becomes `@plugin:<plugin>:<rest>`. The two
-# differ only by depth, so the third segment decides: a version-named segment
-# followed by more path means the three-level layout.
+# differ only by depth, so the second segment decides: a version-named second
+# segment means the two-level layout, and anything else is three-level, so a
+# version with an unusual name (1, latest, a date) still drops out of the id.
 csa_normalize_path() {
   local p="$1"
   local re3='/\.claude/plugins/cache/([^/]+)/([^/]+)/([^/]+)/(.+)$'
   local re2='/\.claude/plugins/cache/([^/]+)/[^/]+/(.+)$'
   if [[ "$p" =~ $re3 ]]; then
     # csa_is_version_name runs its own =~, which would clobber BASH_REMATCH.
-    local mkt="${BASH_REMATCH[1]}" plug="${BASH_REMATCH[2]}" ver="${BASH_REMATCH[3]}" rest="${BASH_REMATCH[4]}"
-    if csa_is_version_name "$ver"; then
+    local mkt="${BASH_REMATCH[1]}" plug="${BASH_REMATCH[2]}" rest="${BASH_REMATCH[4]}"
+    if ! csa_is_version_name "$plug"; then
       printf '@plugin:%s@%s:%s' "$plug" "$mkt" "$rest"
       return
     fi

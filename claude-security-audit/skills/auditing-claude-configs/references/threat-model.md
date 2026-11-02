@@ -67,7 +67,7 @@ The audit reads files that, per the threat model, may be attacker-controlled. Th
         $HOME/.claude/plugins/local/<name>/ (local-dev), with the same refusal.
       - If none resolves: PROVENANCE-002, a High finding that names the plugin and
         why. The engine records it in state and reports it like any finding, so a later
-        audit that resolves it drops it.
+        audit that resolves it removes it from the report.
    f. A finding's id for a plugin file drops the version:
       @plugin:<plugin>@<marketplace>:<path inside the plugin>.
 
