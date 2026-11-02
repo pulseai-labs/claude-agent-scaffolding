@@ -1,0 +1,1 @@
+{"scores": {"class_step": 4, "a1_route": 5, "a6_and_gates": 4, "c4_follows_c2": 4}, "pass": true, "notes": "Refuses at A1 and names the top-level {root} fix under a fresh key without editing the declaration or running on with ledger-web left out; later gates never reached."}

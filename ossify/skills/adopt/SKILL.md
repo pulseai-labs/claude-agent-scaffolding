@@ -1,12 +1,14 @@
 ---
 name: adopt
-description: Use when onboarding a project that already has code, tests, history and ADRs, which /ossify:start refuses — six fail-closed gates, six conversions, Release 0 closed retroactively, an adoption record
+description: Use when onboarding a project that already has product source, which /ossify:start refuses — a scaffold-dev legacy stack or a plain repo — fail-closed gates, six conversions, Release 0 closed retroactively, an adoption record
 ---
 
 # adopt
 
 You are the conductor of ossify's **adoption** — the on-ramp for a project
-that already has code; `/start` refuses it on its content gate.
+that already has code; `/start` refuses it on its content gate. Two inputs:
+class L, a scaffold-dev legacy stack (this body), and class P, a plain repo
+with none (#536) — `references/plain-repo.md` is its depth.
 
 **Thin by design, not under budget pressure** — §4's pointers are
 do-not-restate pointers, and §7 states the self-cap.
@@ -33,9 +35,7 @@ Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on C
 **Do NOT auto-invoke when:**
 
 - The project is greenfield — that is `/start`.
-- The project has no scaffold-dev legacy stack — no roadmap state, no
-  active-context cursor, no legacy spec. This version adopts THAT stack;
-  anything else is out of scope today.
+- No declared repo carries product source at `HEAD` — that is `/start` (§3).
 - Ossify state already exists at the routed path — route to `doctor`.
 - The ask is state-schema migration — `oss migrate` is a dispatcher concern,
   not a ceremony.
@@ -46,7 +46,7 @@ Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on C
 ## 3. Pre-flight gates (fail closed, in order)
 
 Each gate refuses fail-closed. A1 reuses `/start`'s exact refusal contract;
-A3–A5's refusals name the **legacy stack's** close ceremony — scaffold-dev's
+A3–A5's refusals (class P: `references/plain-repo.md` §3) name the **legacy stack's** close ceremony — scaffold-dev's
 slice close, then re-run — never "clean your tree", which fixes a symptom;
 or, where scaffold-dev is no longer installed, close the slice by hand (#732):
 the operator finishes or abandons the slice until the state A3–A5 check holds —
@@ -71,15 +71,21 @@ cursor on a boundary — with every change committed in the repo it touched. The
   it from the journey-map station it is about to run, and adoption has no such
   station, so ask the operator which repos hold the product and confirm each
   root against a checkout that actually carries its code — every gate below,
-  and C3's project-wide ADR scan, iterates exactly this set.
+  and C3's project-wide ADR scan, iterates exactly this set. Class P runs in
+  an operator-made AI workspace and authors the topology there, in both routes
+  (`references/plain-repo.md` §2).
+- **Class step — after A1.** Product source at `HEAD` in a declared repo
+  (not a `tooling_repo`) decides it: none → `/start`; a legacy stack → class
+  L, below; neither → class P (`references/plain-repo.md` §1). L and P never mix.
 - **A2 — no ossify state at the routed path.** State exists: already
   onboarded → route to `doctor`, full stop — every `/start` project has
   state and no adoption record, so the record's absence distinguishes
   nothing.
 - **A3 — every tree adoption will edit is clean, tracked and untracked.**
   Sweep every repo the topology declares (A1 only confirms it resolves) plus
-  the AI workspace: `git -C "$(oss repo_root <name>)" status --porcelain`
-  each. Any line, in any one, is work in flight; refuse, naming the legacy
+  the AI workspace: `git -C "$(oss repo_root <name>)" status --porcelain
+  --untracked-files=all` each. Any line, in any one — class P exempts only the
+  topology A1 authored this run — is work in flight; refuse, naming the legacy
   stack's slice close. Each declared repo, never the AI workspace, must also
   be on its default branch — require it where the manifest declares one
   (`boundary-audit.md`'s own precedent); else name the checked-out branch and
@@ -98,12 +104,16 @@ cursor on a boundary — with every change committed in the repo it touched. The
   is itself a finding — name it, and probe the conventional path everywhere.
   Then `find <dir> -mindepth 1 -maxdepth 1` per repo: any directory means a
   slice is open (a plain probe; the oss verb needs the state A2 just forbade).
+  Class P runs `git worktree list --porcelain` instead.
 - **A5 — legacy position is on a boundary.** The live position is the
   manifest-routed memory bank's `05-active-context.md` cursor (the roadmap
   file is inventory, not position). An active slice there refuses and
-  names it.
+  names it. Class P records `A5: no legacy stack`.
+- **A6 — something ships (class P only).** The operator names a journey step
+  that works from a clean checkout today, or adoption refuses before any state
+  (`references/plain-repo.md` §3).
 
-Once all six pass, **record a baseline SHA per declared repo** — `git -C
+Once every gate passes, **record a baseline SHA per declared repo** — `git -C
 "$(oss repo_root <name>)" rev-parse HEAD` for each; the adoption record
 cites a **baseline table**, not one SHA, and everything downstream is
 relative to each repo's own baseline. Then `oss init "<project-name>"` —
@@ -117,10 +127,11 @@ into the state it creates. Nothing hand-authors `project-state.json`.
 **Do not restate these — read the pointer, work it against the project.**
 
 - **Vision — confirm, do not elicit** (`/start` §4): read it back for correction.
+  Class P elicits it, as `/start` §4 does.
 - **Risk gates — derive from existing constraints** (`/start` §8 owns the
   families and the control menu); mint with `oss risk_gate_add`.
 - **Smoke — narrowed** (`/start` §9) to **unverified external pins** —
-  shipped tests already cover the code's own claims.
+  shipped tests already cover the code's own claims. No test suite: `/start` §9 in full.
 - **Spike — unchanged** (`/start` §9a). Rarely fires on an adopted project.
 - **Posture — unchanged** (`/start` §10 + `references/posture-block.md`): a
   genuine open decision, unaffected by prior code.
@@ -208,7 +219,7 @@ a list of no gaps is not evidence that the pass ran.
    change that. Answer, or `not-applicable` with a reason.
 
 An ADR that no longer describes the code is a **finding** for the read-out,
-not a bone to write.
+not a bone to write. Class P: `references/plain-repo.md` §6.
 
 ### C4 — The adopted baseline is Release 0, retroactively closed
 
@@ -218,7 +229,7 @@ oss release_status "<release-id>" closed
 ```
 
 The skeleton exists — it was built before ossify arrived; `release_status`
-accepts `closed`. **Do not reconstruct per-slice history as spines and work
+accepts `closed`. Class P closes it only while a step is still `shipped` after C2 (`references/plain-repo.md` §4). **Do not reconstruct per-slice history as spines and work
 items** — unearned records. The first ossify-planned release is Release 1.
 
 Then author the **stub retrospective** at
@@ -236,12 +247,14 @@ no blank destinations — an adopted project is all occupied surface.
 | Destination | Action |
 |---|---|
 | `MASTER-SPEC.md` | map legacy phases → the 7 lean sections; keep legacy sections (spec-validation reads their presence as legal) |
-| `AGENTS.md` | merge ossify's loop section when the file exists; author it when absent; preserve hand-authored zones. If the AI workspace still holds a `CLAUDE.md` (root or `.claude/`), leave it untouched and name `ossify:doctor`'s interop repair in the adoption record and the hand-off: Claude Code loads `CLAUDE.md` over `AGENTS.md` until it is migrated |
+| `AGENTS.md` | merge ossify's loop section when the file exists, but a workspace-init stub is replaced (`../start/references/occupied-destinations.md` §1a); author it when absent; preserve hand-authored zones. If the AI workspace still holds a `CLAUDE.md` (root or `.claude/`), leave it untouched and name `ossify:doctor`'s interop repair in the adoption record and the hand-off: Claude Code loads `CLAUDE.md` over `AGENTS.md` until it is migrated |
 | `EXECUTIVE-SUMMARY.md` | leave; no gate reads it |
 | memory bank | append with harvest's provenance trailer (`close/references/harvest.md`), declaring `source: adoption` with the baseline this pass recorded — `r0 baseline <sha>`, one `<repo>=<sha>` per declared repo when the adoption spans several; **never truncate**. For `09-known-issues.md` / `10-decisions-log.md`, harvest's never-regenerate rule wins — they hold the history adoption preserves (#268; the brief's conditional is still owed) |
 | `tech-debt.md`, `PUBLIC_BOUNDARY.md` | author (absent) |
 | `CODING_STANDARDS.md`, `review-ledger.md`, `08-governance.md` `## Review` | author when absent, per `../start/references/reviewer-home.md` §1–§4; then its `reviewer-home.md` §5 history pass |
 | each declared repo's `docs/adr/` | append only, continuing the series |
+
+Class P: files inside a declared repo (`CLAUDE.md`, `.claude/`, specs, memory bank) are inputs, never written (`references/plain-repo.md` §5).
 
 ### C6 — Record the demo-ledger seed candidates
 
@@ -281,7 +294,8 @@ Refuse to declare completion, naming the station that never ran, when:
 - the posture bone is absent, or `posture` is null or outside its four
   values — posture **is** a bone and always gets set (§4).
 - no closed `Release 0` in state, or its stub retrospective absent — C4
-  never finished, and `plan-release` would plan the greenfield
+  never finished (a class P halt at C2 with zero `shipped` steps is a halt,
+  not a completion: `references/plain-repo.md` §4), and `plan-release` would plan the greenfield
   `Release 0`, not Release 1.
 - the adoption record lacks the per-station lines its row requires — a zero
   must be visible and answered, never unasked (`/start` §12: thin succeeds

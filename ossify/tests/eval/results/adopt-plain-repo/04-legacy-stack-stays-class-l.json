@@ -1,0 +1,1 @@
+{"scores": {"class_step": 5, "a1_route": 4, "a6_and_gates": 5, "c4_follows_c2": 4}, "pass": true, "notes": "Control: picks L from the roadmap state and cursor, runs A3 to A5 on the legacy path with no exemption, no A6 and no worktree list, and writes nothing to the legacy state."}

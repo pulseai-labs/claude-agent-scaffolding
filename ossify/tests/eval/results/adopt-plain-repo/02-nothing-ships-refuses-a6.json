@@ -1,0 +1,1 @@
+{"scores": {"class_step": 5, "a1_route": 4, "a6_and_gates": 5, "c4_follows_c2": 5}, "pass": true, "notes": "Refuses at A6 with the nothing-ships wording before oss init, writes no state and no Release 0, and leaves the topology uncommitted with the delete-to-retry note."}

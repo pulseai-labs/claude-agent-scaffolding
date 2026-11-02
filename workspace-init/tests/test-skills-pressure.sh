@@ -167,12 +167,16 @@ test_printed_skill_routes_point_to_ossify() {
   # projects that came from the legacy scaffold stack, and a plain existing-source
   # repository has no supported continuation — instead of advertising the refusal.
   assert_contains 'legacy scaffold stack' "$pair_sec" || return 1
-  assert_contains 'no supported ossify continuation yet' "$pair_sec" || return 1
+  assert_not_contains 'no supported ossify continuation' "$pair_sec" || return 1
+  # #536: a canonical with product source routes to adopt on ossify 1.35.0 or later, and
+  # the memory-bank abort of /pair-workspace is named with its plain route.
+  assert_contains '`/ossify:adopt` (ossify 1.35.0 or later), with or without the legacy scaffold stack' "$(printf '%s' "$pair_sec" | tr '\n' ' ' | tr -s ' ')" || return 1
+  assert_contains 'makes `/pair-workspace` abort' "$(printf '%s' "$pair_sec" | tr '\n' ' ' | tr -s ' ')" || return 1
   assert_not_contains '# canonical has source or history' "$pair_sec" || return 1
   # #809: history alone is not a reason to route to adopt.
   assert_not_contains 'carries source or history' "$pair_sec" || return 1
   assert_contains 'history alone included' "$pair_sec" || return 1
-  assert_contains 'plain repos: #536' "$pair_sec" || return 1
+  assert_not_contains 'plain repos: #536' "$pair_sec" || return 1
 
   # S8 round 2 (G2): adoption's clean-tree gate sweeps every declared repo, so this
   # block must say the canonical is swept too — the pairing never cleans it.
@@ -195,7 +199,8 @@ test_printed_skill_routes_point_to_ossify() {
   # is how this class returns — every other surface carries the qualifier), and the
   # AGENTS.md work is committed before the route, or A3 refuses on the dirt that
   # step itself created.
-  assert_contains 'only for a project previously onboarded with the legacy scaffold stack' "$dual_sec" || return 1
+  assert_contains 'with or without the legacy scaffold stack' "$(printf '%s' "$dual_sec" | tr '\n' ' ' | tr -s ' ')" || return 1
+  assert_not_contains 'plain repos: #536' "$dual_sec" || return 1
   # #768: step 3 now routes the leftover CLAUDE.md to /ossify:doctor, which authors
   # the repair — so the block says the user *reviews and commits* the result, rather
   # than authoring the file themselves. Same commitment before the route (A3).
@@ -321,7 +326,8 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   # S8 closing edit (item 3): the row's continuation clause states adoption's
   # qualifier — the claim it replaced ("for existing source or history" alone)
   # is what the row must not carry back.
-  assert_contains 'only for a project previously onboarded with the legacy scaffold stack' "$row" || return 1
+  assert_contains 'with or without the legacy scaffold stack' "$row" || return 1
+  assert_not_contains 'plain repos: #536' "$row" || return 1
 
   # S8 round 1 (F3): the lifecycle overview above the table must not leave
   # workspace-init at the head of the chain this release retires for new
@@ -555,9 +561,11 @@ test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c() {
   # the pin that keeps the removal out.
   assert_contains 'leave the leftover `CLAUDE.md` exactly where it is' "$dual_flat" || return 1
   # What 1.24.0 or later does is kept, on every surface that names it.
-  assert_contains 'On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`' \
-    "$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")" || return 1
-  assert_contains 'adopt merges its loop section into' "$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")" || return 1
+  # #536: adopt (1.35.0 or later) replaces the marked stub, carrying its two policy sections.
+  assert_contains 'adopt replaces the marked `AGENTS.md` stub, carrying its' \
+    "$(printf '%s' "$(cat "$WI_PLUGIN_ROOT/skills/pairing-canonical-repo/SKILL.md")" | tr '\n' ' ' | tr -s ' ')" || return 1
+  assert_contains 'It replaces this stub, carrying its `## Git policy` and `## AI-trace filter` sections across' "$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")" || return 1
+  assert_not_contains 'adopt merges its loop section into this' "$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")" || return 1
   assert_contains 'It moves or merges `CLAUDE.md` into `AGENTS.md`' "$dual_flat" || return 1
   # The Claude Code 2.1.277 sentence is not ossify and stays on every surface.
   assert_contains 'Claude Code 2.1.277 or later' "$(cat "$WI_PLUGIN_ROOT/templates/AGENTS.md.stub.tmpl")" || return 1

@@ -1,0 +1,1 @@
+{"scores": {"class_step": 4, "a1_route": 4, "a6_and_gates": 4, "c4_follows_c2": 5}, "pass": true, "notes": "Does not call release_add with zero shipped steps, writes the record to that point, halts, and names the state file with its .base.json sibling and ADOPTION.md to remove; says the floor does not apply to the halt."}

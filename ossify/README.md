@@ -1,4 +1,4 @@
-# ossify (v1.34.0)
+# ossify (v1.35.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -221,11 +221,20 @@ more PRs is drafted, and the operator accepts each entry. `skills/start/referenc
 can be followed alone by an existing ossify project. merge-bar's `working-a-pr` (0.7.0) appends one
 review-ledger line per merged PR. No `lib/` code, no state change.
 
+Since 1.35.0 (#536), `/ossify:adopt` takes a plain existing-source repo, class P: product source at `HEAD` and no
+scaffold-dev legacy stack. The operator makes an AI workspace (an empty directory, `git init`) and runs `/ossify:adopt`
+there; A1 authors `.ossify/topology.json` with the repos the operator names, and a product repo a resolved topology does
+not declare refuses with the fix. A class step after A1 decides G/H (to `/ossify:start`), L (the legacy path, unchanged)
+or P. Class P adds gate A6 (the operator names a step that works from a clean checkout today, else adoption refuses
+before any state), probes `git worktree list --porcelain` and `status --untracked-files=all`, and closes Release 0 only
+while a step is still `shipped` after C2; zero left halts with the record written. A workspace-init `AGENTS.md` stub is
+replaced, not merged, for both classes. The product repo's own `CLAUDE.md`, `.claude/`, spec and memory bank are inputs,
+never written. Depth: `skills/adopt/references/plain-repo.md`. No `lib/` code.
+
 Since 1.34.0 (#809), `/ossify:start`'s canonical-content gate refuses on product source at `HEAD`, not on
 history. A declared repo with commits and nothing at `HEAD` that is product (class H) proceeds as
 greenfield, and the §13 hand-off records each such repo's commit count and what is at `HEAD`. A repo with
-product source still routes to `/ossify:adopt`, which takes only a project onboarded with the legacy
-scaffold stack; plain repos are #536. The probe proposes and the operator confirms. No `lib/` code.
+product source still routes to `/ossify:adopt` (which took only a legacy-stack project until 1.35.0, #536). The probe proposes and the operator confirms. No `lib/` code.
 
 Since 1.33.1, the README names `challenge` as the marketplace's one adversarial audit surface: the
 architect-critic plugin is retired from the marketplace, and ossify's `challenge` is what remains.
@@ -321,8 +330,8 @@ longer cites `scaffold-onboard` files as live: the interop-repair deferral calls
 that repair the retired plugin's, the budget check cites only the upstream issue,
 rule authoring no longer names a paired stack, and `start` no longer routes a
 one-change amendment to `/amend-spec`, a command only `scaffold-onboard` shipped
-(name the section and the edit instead). `/ossify:adopt` still targets
-projects onboarded with the legacy scaffold stack. No state schema, journal
+(name the section and the edit instead). `/ossify:adopt` still targeted
+projects onboarded with the legacy scaffold stack until 1.35.0. No state schema, journal
 operation or command changes.
 
 Since 1.16.0, a demo line has three statuses beside `active`: `planned` (#363,
