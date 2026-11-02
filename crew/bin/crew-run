@@ -5,7 +5,13 @@
 # stamps the times from the clock, appends the events, and ends in the same step: dagr's
 # producer loop - write a temp file beside the target, `dagr check --strict` it, rename it over
 # the target only when it is clean. A failed verb leaves the run file byte-identical and no temp
-# file behind. The seat stays the single writer, so there is no lock.
+# file behind. Each run file has one owning seat, but that seat can issue two calls at once, so
+# every verb holds a lock file beside the run file (RUN.lock) from its read to its rename. A lock
+# is never taken over automatically. `commit` also refuses a candidate older than the run file;
+# it cannot see a change made between the seat's own read and its candidate's write.
+#
+# Code under docs/conventions/skill-first.md question 2: mechanical work on a closed input (our
+# run file's versioned schema, ids we mint); free text is only ever a jq --arg value.
 #
 # It never decides. The outcome, the evidence tier, the cause and the locator come from the seat
 # as arguments; free text reaches the document only as a `jq --arg` value and is never parsed.
@@ -30,9 +36,11 @@ usage() { echo "crew-run: $* (try: crew-run help)" >&2; exit 2; }
 
 TMP=""
 ERRF=""
+LOCK=""
 cleanup() {
   if [ -n "$TMP" ]; then rm -f "$TMP"; fi
   if [ -n "$ERRF" ]; then rm -f "$ERRF"; fi
+  if [ -n "$LOCK" ]; then rm -f "$LOCK"; fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT HUP
@@ -172,7 +180,7 @@ check_and_rename() {
     fi
     exit 1
   fi
-  mv -f "$cand" "$target" || die "could not rename $cand over $target"
+  mv -f -- "$cand" "$target" || die "could not rename $cand over $target"
 }
 
 # --- the document ----------------------------------------------------------------------
@@ -181,6 +189,30 @@ RUN=""
 load_run() {
   RUN=${O_run:-${DAGR_RUN:-}}
   [ -n "$RUN" ] || usage "--run FILE is required (or set DAGR_RUN)"
+  [ ! -d "$RUN" ] || die "$RUN is a directory, not a run file"
+}
+
+# lock_run: hold RUN.lock from the read to the rename. The lock is a file bash itself creates
+# with noclobber (O_EXCL), so one caller wins whatever mkdir or coreutils the host has; the
+# loser waits up to CREW_RUN_LOCK_WAIT seconds (default 30), then refuses. A lock is never taken
+# over: a holder killed with SIGKILL leaves it, and the refusal names its pid and whether that pid
+# still runs, so the seat can judge and remove it.
+lock_run() {
+  local l="$RUN.lock" pid tries=0 max
+  max=$(( ${CREW_RUN_LOCK_WAIT:-30} * 5 ))
+  [ -d "$(dirname "$RUN")" ] || die "no directory for $RUN"
+  while ! ( set -o noclobber; printf '%s\n' "$$" > "$l" ) 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge "$max" ]; then
+      pid=$(cat "$l" 2>/dev/null || true)
+      if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+        die "$l is held by pid $pid, which is not running on this host; $RUN is unchanged. If no crew-run is running, remove $l"
+      fi
+      die "another crew-run holds $l (pid ${pid:-unknown}); $RUN is unchanged. If no crew-run is running, remove $l"
+    fi
+    sleep 0.2
+  done
+  LOCK=$l
 }
 
 read_v3() {
@@ -263,6 +295,7 @@ verb_open() {
   [ -z "$O_cause" ] || in_set "$O_cause" initial sent_back gate_failed followup superseded \
     || usage "--cause takes initial, sent_back, gate_failed, followup or superseded, not '$O_cause'"
   find_dagr
+  lock_run
   read_v3
   stamp
   transact '
@@ -303,6 +336,7 @@ verb_settle() {
   local re='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
   [ -z "$O_ended_at" ] || [[ $O_ended_at =~ $re ]] || usage "--ended-at takes YYYY-MM-DDTHH:MM:SSZ"
   find_dagr
+  lock_run
   read_v3
   stamp
   transact '
@@ -330,6 +364,7 @@ verb_send_back() {
   check_tier "$O_tier"
   check_seen
   find_dagr
+  lock_run
   read_v3
   stamp
   transact '
@@ -376,6 +411,8 @@ verb_commit() {
   [ "$cdir" = "$(cd "$tdir" && pwd -P)" ] || die "the candidate must sit in the run file's directory, so the rename is atomic"
   [ ! "$POS" -ef "$RUN" ] || die "the candidate and the run file are the same file"
   find_dagr
+  lock_run
+  [ ! "$RUN" -nt "$POS" ] || die "$RUN changed after $POS was written; rebuild it from the current file"
   check_and_rename "$POS" "$RUN"
   echo "committed $RUN"
 }

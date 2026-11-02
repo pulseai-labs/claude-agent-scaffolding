@@ -477,7 +477,7 @@ write_stub "$T/stub-a/dagr" A
 write_stub "$T/stub-b/dagr" B
 write_stub "$T/stub-c/bin/dagr" Cbin
 write_stub "$T/stub-c/target/release/dagr" Ctarget
-for tool in bash env jq mktemp cp mv rm dirname basename date cat head; do
+for tool in bash env jq mktemp cp mv rm dirname basename date cat head mkdir sleep; do
   p="$(command -v "$tool" 2>/dev/null || true)"
   [ -z "$p" ] || ln -sf "$p" "$T/sys/$tool"
 done
@@ -636,6 +636,53 @@ jt "the run is complete: every attempt is terminal" '[.tasks[].attempts[].state]
 jt "attempt ids are unique" '[.tasks[].attempts[].id] | (length == (unique | length))'
 eq "the nine writes left only run.json" "$(ls -A "$D")" "run.json"
 eq "the event log never lost an event: 4 started, 5 settled" "$(jq -r '[.events[].type] as $t | [($t | map(select(. == "attempt_started")) | length), ($t | map(select(. == "attempt_settled")) | length)] | map(tostring) | join(" ")' "$R")" "4 5"
+
+# --- the lock and stale candidates -----------------------------------------------------
+
+section "the lock: overlapping calls lose nothing; a held lock refuses, live or dead"
+fresh par
+jq '.tasks += [range(1; 13) | {id: ("P" + tostring), title: "p", kind: "impl", owner: "imp", state: "queued", deps: [], attempts: []}]' "$R" > "$R.new" && mv "$R.new" "$R"
+for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+  env -u DAGR_BIN -u DAGR_RUN -u HERDR_PLUGIN_ROOT TMPDIR="$CR_TMP" DAGR_BIN="$DAGR_REAL" "$CREW_RUN" open --run "$R" --task "P$i" --actor imp --pane "w1:p$i" --machine m1 --report "$D/p$i.md" >/dev/null 2>"$T/par$i.err" &
+done
+wait
+eq "twelve overlapping opens: twelve attempts written" "$(jq '[.tasks[] | select(.id | startswith("P")) | .attempts | length] | add' "$R")" "12"
+eq "twelve overlapping opens: twelve attempt_started events" "$(jq '[.events[] | select(.type == "attempt_started")] | length' "$R")" "12"
+ck "twelve overlapping opens: dagr strict clean" lints "$R"
+eq "twelve overlapping opens: only run.json is left" "$(ls -A "$D")" "run.json"
+fresh held
+printf '%s\n' "$$" > "$R.lock"
+LIST0="$(ls -A "$D")"
+CR_ENV="DAGR_BIN=$DAGR_REAL CREW_RUN_LOCK_WAIT=1"
+refusal "a lock held by a live pid" 2 "holds $R.lock" open --run "$R" --task IMPL --actor imp --pane w1:p2 --machine m1 --report "$D/imp.md"
+eq "the live holder's lock is left alone" "$(cat "$R.lock")" "$$"
+rm -f "$R.lock"
+fresh dead
+sh -c 'exit 0' & DEADPID=$!; wait "$DEADPID"
+printf '%s\n' "$DEADPID" > "$R.lock"
+LIST0="$(ls -A "$D")"
+refusal "a lock whose holder is dead is never taken over" 2 "not running on this host" open --run "$R" --task IMPL --actor imp --pane w1:p2 --machine m1 --report "$D/imp.md"
+eq "the dead holder's lock is left for the seat" "$(cat "$R.lock")" "$DEADPID"
+rm -f "$R.lock"
+CR_ENV="DAGR_BIN=$DAGR_REAL"
+
+section "commit and --run: a stale candidate and a directory are refused"
+fresh stale
+jq '.generated_at = "2026-11-01T09:00:01Z"' "$R" > "$D/run.json.tmp"
+touch -d '2001-01-01 00:00:00' "$D/run.json.tmp" 2>/dev/null || touch -t 200101010000 "$D/run.json.tmp"
+LIST0="$(ls -A "$D")"
+refusal "commit of a candidate older than the run file" 2 "changed after" commit --run "$R" "$D/run.json.tmp"
+ck "the stale candidate is left for the seat" test -f "$D/run.json.tmp"
+fresh dirrun
+mkdir "$D/asdir"; jq . "$R" > "$D/cand.json"
+cr commit --run "$D/asdir" "$D/cand.json"
+eq "commit onto a directory: exit 2" "$RC" "2"
+has "commit onto a directory: says why" "$ERR" "is a directory"
+ck "commit onto a directory: the candidate stays where it was" test -f "$D/cand.json"
+ck "commit onto a directory: nothing moved into it" test -z "$(ls -A "$D/asdir")"
+cr open --run "$D/nodir/run.json" --task IMPL --actor imp --pane p --machine m --report r
+eq "a run file in a missing directory: exit 2" "$RC" "2"
+has "a run file in a missing directory: says why" "$ERR" "no directory for"
 
 # --- free text --------------------------------------------------------------------------
 
