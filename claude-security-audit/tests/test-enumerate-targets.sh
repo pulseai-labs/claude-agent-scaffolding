@@ -177,9 +177,11 @@ _csa_big_enabled_array() { # $1 = first name; prints a JSON array > 131072 bytes
 test_enum_paranoid_candidates_exact_membership_under_pipefail() {
   local fake_home; fake_home="$(mktemp -d "${TMPDIR:-/tmp}/csa-paranoid-home.XXXXXX")"
   local fixture; fixture="$(mktemp -d "${TMPDIR:-/tmp}/csa-paranoid-project.XXXXXX")"
-  mkdir -p "$fake_home/.claude/plugins/cache/alpha" \
-    "$fake_home/.claude/plugins/cache/alpha-extra" \
-    "$fake_home/.claude/plugins/cache/beta" "$fixture/.claude"
+  # Flat cache/<name>/<version> directories: a version directory is what marks a
+  # directory as a plugin rather than a marketplace.
+  mkdir -p "$fake_home/.claude/plugins/cache/alpha/1.0.0" \
+    "$fake_home/.claude/plugins/cache/alpha-extra/1.0.0" \
+    "$fake_home/.claude/plugins/cache/beta/1.0.0" "$fixture/.claude"
   printf '{"enabledPlugins":%s}\n' "$(_csa_big_enabled_array alpha)" > "$fixture/.claude/settings.json"
   local size; size="$(wc -c < "$fixture/.claude/settings.json")"
   [[ "$size" -gt 131072 ]] || { printf '    fixture is only %s bytes\n' "$size" >&2; rm -rf "$fixture" "$fake_home"; return 1; }
@@ -215,15 +217,14 @@ test_enum_enabled_plugins_transport() {
   assert_eq "514" "$(printf '%s\n' "$out" | awk 'END { print NR }')" "large project array plus user: every name" || rc=1
   assert_contains "$out" "big-first" "large array keeps its first name" || rc=1
   assert_contains "$out" "u1" "large array still merges the user list" || rc=1
-  # Claude Code's own settings hold enabledPlugins as an object map. It is not
-  # read as a list here (a separate gap), but it must not fail the merge: the
-  # project array still comes through and the enumeration succeeds.
+  # Claude Code's own settings hold enabledPlugins as an object map (#825). It
+  # is read alongside a project array, and the enumeration succeeds.
   printf '{"enabledPlugins":{"x@m":true}}\n' > "$fake_home/.claude/settings.json"
   printf '{"enabledPlugins":["p1"]}\n' > "$fixture/.claude/settings.json"
   local orc=0
   out="$(HOME="$fake_home" csa_enum_enabled_plugins "$fixture")" || orc=$?
   assert_eq "0" "$orc" "object-form user settings: no failure" || rc=1
-  assert_eq "p1" "$out" "object-form user settings: project array still read" || rc=1
+  assert_eq $'p1\nx@m' "$out" "object-form user settings: read with the project array" || rc=1
   rm -rf "$fixture" "$fake_home"
   return "$rc"
 }
@@ -289,7 +290,7 @@ test_enum_paranoid_candidates_whole_names() {
   local fake_home; fake_home="$(mktemp -d "${TMPDIR:-/tmp}/csa-names-home.XXXXXX")"
   local fixture; fixture="$(mktemp -d "${TMPDIR:-/tmp}/csa-names-project.XXXXXX")"
   local cache="$fake_home/.claude/plugins/cache" rc=0 out
-  mkdir -p "$cache/my plugin" "$cache/other one" "$cache/ordinary" "$cache/ok" "$cache/nl"$'\n'"name" "$fixture/.claude"
+  mkdir -p "$cache/my plugin/1.0.0" "$cache/other one/1.0.0" "$cache/ordinary/1.0.0" "$cache/ok/1.0.0" "$cache/nl"$'\n'"name/1.0.0" "$fixture/.claude"
   printf '%s\n' '{"enabledPlugins":["my plugin","ok","nl\nname"]}' > "$fixture/.claude/settings.json"
   out="$(HOME="$fake_home" CSA_PROJECT_ROOT="$fixture" csa_enum_paranoid_candidates)" || { printf '    rc %s\n' "$?" >&2; rc=1; }
   assert_eq $'ordinary\nother one' "$out" "enabled names with a space or newline are excluded whole; the rest are one line each" || rc=1
@@ -307,7 +308,7 @@ test_enum_paranoid_candidates_refuse_newline_candidate() {
   local fake_home; fake_home="$(mktemp -d "${TMPDIR:-/tmp}/csa-nl-home.XXXXXX")"
   local fixture; fixture="$(mktemp -d "${TMPDIR:-/tmp}/csa-nl-project.XXXXXX")"
   local cache="$fake_home/.claude/plugins/cache" rc=0 out err prc=0
-  mkdir -p "$cache/ordinary" "$cache/nl"$'\n'"name" "$fixture/.claude"
+  mkdir -p "$cache/ordinary/1.0.0" "$cache/nl"$'\n'"name/1.0.0" "$fixture/.claude"
   local errf; errf="$(mktemp)"
   out="$(HOME="$fake_home" CSA_PROJECT_ROOT="$fixture" csa_enum_paranoid_candidates 2>"$errf")" || prc=$?
   err="$(<"$errf")"; rm -f "$errf"

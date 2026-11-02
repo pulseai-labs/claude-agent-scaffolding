@@ -53,3 +53,13 @@ csa_mkdir_lock() {
   fi
   return 1
 }
+
+# csa_is_version_name <name> — exit 0 if <name> looks like a plugin version
+# directory: semver-ish (`1.2.3`, `v2.0`, `1.0.0-beta.1`), a 7-40 char lowercase
+# hex commit digest, or `unknown`. Claude Code names a cached version one of
+# these; the cache layout tells a version directory from a plugin directory by it.
+csa_is_version_name() {
+  local n="${1:-}"
+  local semver='^v?[0-9]+(\.[0-9A-Za-z_+-]+)+$' sha='^[0-9a-f]{7,40}$'
+  [[ "$n" =~ $semver || "$n" =~ $sha || "$n" == "unknown" ]]
+}

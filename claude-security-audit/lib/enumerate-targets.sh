@@ -108,15 +108,30 @@ csa_enum_project_targets() {
   csa_enum_codex_project_targets "$root"
 }
 
-# _csa_enum_settings_plugin_list <settings-file> — the file's enabledPlugins
-# array as compact JSON. An absent file, malformed JSON (SETTINGS-PARSE is the
-# rule engine's concern) or a value that is not an array reads as []. A path
-# that exists but is not a regular file, or cannot be read, is NOT an empty
-# list: rc 2 (#424).
+# _csa_enum_oneline <string> — the string with newline, carriage return and tab
+# escaped, so a name or path from untrusted input stays on one output line.
+_csa_enum_oneline() {
+  local s="$1"
+  s="${s//$'\n'/\\n}"
+  s="${s//$'\r'/\\r}"
+  s="${s//$'\t'/\\t}"
+  printf '%s' "$s"
+}
+
+# _csa_enum_settings_plugin_list <settings-file> — the file's enabledPlugins as
+# one compact JSON object, plugin key to boolean. Claude Code writes an object
+# map (`{"plugin@marketplace": true}`); only boolean values are kept. An array
+# of names (fixtures, older files) reads as each name `true`. An absent file,
+# malformed JSON (SETTINGS-PARSE is the rule engine's concern) or an absent key
+# reads as {}. A value that holds entries yet yields none (a string, a number,
+# an array of non-strings, an object of non-booleans) also reads as {}, but
+# warns on stderr naming the shape: an audit that silently skips every plugin
+# reads as a clean one. A path that exists but is not a regular file, or cannot
+# be read, is NOT an empty set: rc 2 (#424).
 _csa_enum_settings_plugin_list() {
-  local f="$1" list
+  local f="$1" out list warn
   if [[ ! -e "$f" ]]; then
-    printf '[]\n'
+    printf '{}\n'
     return 0
   fi
   if [[ ! -f "$f" ]]; then
@@ -128,50 +143,235 @@ _csa_enum_settings_plugin_list() {
     printf 'csa: cannot read %s; the enabled-plugin set is unknown\n' "$f" >&2
     return 2
   fi
-  list="$(jq -c '.enabledPlugins // [] | if type == "array" then . else [] end' "$f" 2>/dev/null)" || list='[]'
-  printf '%s\n' "${list:-[]}"
+  # Line 1: the map. Line 2: the shape's type when it held entries but none
+  # were usable, else empty.
+  out="$(jq -r '
+    .enabledPlugins as $e
+    | (if ($e | type) == "object" then $e | with_entries(select((.value | type) == "boolean"))
+       elif ($e | type) == "array" then [$e[] | select(type == "string") | {key: ., value: true}] | from_entries
+       else {} end) as $m
+    | ($m | tojson),
+      (if ($m | length) == 0 and (($e | type) == "string" or ($e | type) == "number" or $e == true
+            or ((($e | type) == "object" or ($e | type) == "array") and ($e | length) > 0))
+       then ($e | type) else "" end)
+  ' "$f" 2>/dev/null)" || out=$'{}\n'
+  list="$(printf '%s\n' "$out" | sed -n 1p)"
+  warn="$(printf '%s\n' "$out" | sed -n 2p)"
+  if [[ -n "$warn" ]]; then
+    printf 'csa: warning: %s has an enabledPlugins value of an unrecognized shape (%s) with no usable entries; its plugins are NOT scanned\n' "$f" "$warn" >&2
+  fi
+  [[ -n "$list" ]] || list='{}'
+  printf '%s\n' "$list"
 }
 
-# _csa_enum_enabled_json <project-root> — the merged, de-duplicated enabled set
-# as one JSON array. The lists reach jq on stdin, never as an argv value, so
-# no OS per-argument limit can empty them (#424); a failure is rc 2, never [].
+# _csa_enum_enabled_json <project-root> — the merged enabled map as one JSON
+# object, plugin key to boolean. Files merge by key, later wins: the user's
+# settings.json, then the project's, then the project's settings.local.json, so
+# a project `false` disables a user `true`. The maps reach jq on stdin, never
+# as an argv value, so no OS per-argument limit can empty them (#424); a
+# failure is rc 2, never {}.
 _csa_enum_enabled_json() {
-  local root="$1" project_list user_list merged
-  project_list="$(_csa_enum_settings_plugin_list "$root/.claude/settings.json")" || return 2
-  user_list="$(_csa_enum_settings_plugin_list "${HOME}/.claude/settings.json")" || return 2
-  if ! merged="$(printf '%s\n%s\n' "$project_list" "$user_list" | jq -sc 'add | unique')"; then
-    printf 'csa: could not merge the enabled-plugin lists\n' >&2
+  local root="$1" user_map project_map local_map merged
+  user_map="$(_csa_enum_settings_plugin_list "${HOME}/.claude/settings.json")" || return 2
+  project_map="$(_csa_enum_settings_plugin_list "$root/.claude/settings.json")" || return 2
+  local_map="$(_csa_enum_settings_plugin_list "$root/.claude/settings.local.json")" || return 2
+  if ! merged="$(printf '%s\n%s\n%s\n' "$user_map" "$project_map" "$local_map" | jq -sc 'add // {}')"; then
+    printf 'csa: could not merge the enabled-plugin sets\n' >&2
     return 2
   fi
   printf '%s\n' "$merged"
 }
 
+# csa_enum_enabled_plugins <project-root> — the keys left at true, one per line,
+# sorted. A key's newline, carriage return and tab are escaped so it stays one
+# line (it can never resolve to a plugin).
 csa_enum_enabled_plugins() {
   local merged
   merged="$(_csa_enum_enabled_json "$1")" || return 2
-  printf '%s\n' "$merged" | jq -c '.[]' | tr -d '"'
+  printf '%s\n' "$merged" | jq -r '
+    [to_entries[] | select(.value == true) | .key | gsub("\n"; "\\n") | gsub("\r"; "\\r") | gsub("\t"; "\\t")]
+    | sort | .[]' || return 2
 }
 
-csa_enum_resolve_plugin_path() {
-  local name="$1"
-  local cache_dir="${HOME}/.claude/plugins/cache/${name}"
-  if [[ -d "$cache_dir" ]]; then
-    if [[ -f "$cache_dir/.active" ]]; then
-      printf '%s/%s\n' "$cache_dir" "$(cat "$cache_dir/.active")"
-      return 0
-    fi
-    local versions; versions=$(find "$cache_dir" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
-    local count; count=$(printf '%s\n' "$versions" | grep -c .)
-    if [[ "$count" -eq 1 ]]; then
-      printf '%s\n' "$versions"
-      return 0
-    fi
+# _csa_enum_record_file — path of Claude Code's install record.
+_csa_enum_record_file() {
+  printf '%s\n' "${HOME}/.claude/plugins/installed_plugins.json"
+}
+
+# _csa_enum_record_lookup <key> <project-root> — the installPath that
+# installed_plugins.json records for <key> in this project's scope: a `local`
+# entry whose projectPath is this project, else a `project` one, else the
+# `user` one. rc 0 prints it; rc 1: no record file, or no entry for this key
+# and project (the caller falls back to the cache layout); rc 2: the record
+# exists but cannot be read, is not JSON, or is not the shape this code knows.
+_csa_enum_record_lookup() {
+  local key="$1" root="$2" rec rows scope ppath ipath phys_root pp
+  rec="$(_csa_enum_record_file)"
+  [[ -e "$rec" || -L "$rec" ]] || return 1
+  if [[ ! -f "$rec" || ! -r "$rec" ]]; then
+    printf 'csa: cannot read %s; where plugins are installed is unknown\n' "$rec" >&2
+    return 2
   fi
-  local local_dir="${HOME}/.claude/plugins/local/${name}"
-  if [[ -d "$local_dir" ]]; then
-    printf '%s\n' "$local_dir"
+  # `input` (not `.`) so an empty file is an error, not an empty answer.
+  rows="$(jq -n -r --arg k "$key" 'input |
+    if (.plugins | type) != "object" then error("no plugins object")
+    elif ((.plugins[$k] // []) | type) != "array" then error("entry is not a list")
+    else
+      [ (.plugins[$k] // [])[] | select(type == "object")
+        | select((.scope | type) == "string" and (.installPath | type) == "string")
+        | {scope, installPath, projectPath: (if (.projectPath | type) == "string" and (.projectPath | length) > 0 then .projectPath else "-" end)}
+        | select(.scope == "user" or .projectPath != "-") ]
+      | (map(select(.scope == "local")) + map(select(.scope == "project")) + map(select(.scope == "user")))[]
+      | [.scope, .projectPath, .installPath] | @tsv
+    end' "$rec" 2>/dev/null)" || {
+    printf 'csa: %s is not the expected installed-plugins record (JSON with a plugins object of lists); where plugins are installed is unknown\n' "$rec" >&2
+    return 2
+  }
+  phys_root="$(cd -- "$root" 2>/dev/null && pwd -P)" || phys_root="${root%/}"
+  while IFS=$'\t' read -r scope ppath ipath; do
+    [[ -n "$scope" ]] || continue
+    if [[ "$scope" == user ]]; then
+      printf '%s\n' "$ipath"
+      return 0
+    fi
+    [[ "$ppath" == /* ]] || continue
+    pp="$(cd -- "$ppath" 2>/dev/null && pwd -P)" || pp="${ppath%/}"
+    if [[ "$pp" == "$phys_root" ]]; then
+      printf '%s\n' "$ipath"
+      return 0
+    fi
+  done <<< "$rows"
+  return 1
+}
+
+# _csa_enum_guard_dir <path> — rc 0 prints <path> as a directory physically
+# inside ~/.claude/plugins, rewritten under $HOME/.claude/plugins so its
+# `/.claude/plugins/` shape survives a symlinked home. rc 1 prints why not.
+# A project under audit is hostile input and the install record is read from
+# the user's home: neither may point the scan at /etc or at another project.
+_csa_enum_guard_dir() {
+  local p="$1" proot phys
+  if [[ "$p" != /* ]]; then
+    printf 'installPath %s is not absolute' "$(_csa_enum_oneline "$p")"
+    return 1
+  fi
+  if ! proot="$(cd -- "${HOME}/.claude/plugins" 2>/dev/null && pwd -P)"; then
+    printf 'installPath %s cannot be checked: %s/.claude/plugins is missing' "$(_csa_enum_oneline "$p")" "$HOME"
+    return 1
+  fi
+  if [[ ! -d "$p" ]]; then
+    printf 'installPath %s is not a directory' "$(_csa_enum_oneline "$p")"
+    return 1
+  fi
+  if ! phys="$(cd -- "$p" 2>/dev/null && pwd -P)"; then
+    printf 'installPath %s cannot be entered' "$(_csa_enum_oneline "$p")"
+    return 1
+  fi
+  case "$phys" in
+    "$proot"/?*) : ;;
+    *)
+      printf 'installPath %s resolves outside %s' "$(_csa_enum_oneline "$p")" "$proot"
+      return 1
+      ;;
+  esac
+  if [[ "$phys" == *$'\n'* || "$phys" == *$'\t'* ]]; then
+    printf 'installPath %s holds a tab or newline' "$(_csa_enum_oneline "$p")"
+    return 1
+  fi
+  printf '%s/.claude/plugins/%s\n' "$HOME" "${phys#$proot/}"
+}
+
+# _csa_enum_safe_segment <name> — rc 0 if <name> is one safe path segment: not
+# empty, no `/`, no `..`, not `.`, no newline.
+_csa_enum_safe_segment() {
+  local n="$1"
+  [[ -n "$n" && "$n" != "." && "$n" != *"/"* && "$n" != *".."* && "$n" != *$'\n'* ]]
+}
+
+# _csa_enum_pick_version <plugin-dir> — the one version directory to scan:
+# the one `.active` names, else the only version directory. rc 1 if neither.
+_csa_enum_pick_version() {
+  local dir="$1" v c count=0 only=""
+  [[ -d "$dir" ]] || return 1
+  if [[ -f "$dir/.active" ]]; then
+    v="$(cat "$dir/.active" 2>/dev/null)" || return 1
+    [[ -n "$v" ]] || return 1
+    printf '%s/%s\n' "$dir" "$v"
     return 0
   fi
+  while IFS= read -r c; do
+    [[ -n "$c" ]] || continue
+    count=$((count + 1))
+    only="$c"
+  done < <(find "$dir" -maxdepth 1 -mindepth 1 -type d 2>/dev/null)
+  if [[ "$count" -eq 1 ]]; then
+    printf '%s\n' "$only"
+    return 0
+  fi
+  return 1
+}
+
+# csa_enum_resolve_plugin_path <plugin-key> [<project-root>] — where one enabled
+# plugin lives. rc 0 prints the directory; rc 1 prints, on stdout, the reason it
+# did not resolve (the PROVENANCE-002 text); rc 2: the install record is
+# unreadable, so where plugins live is unknown.
+#   1. installed_plugins.json: this project's local/project entry, else user's.
+#      Its installPath is used only if it is a directory inside ~/.claude/plugins.
+#   2. No record entry, key `plugin@marketplace`: cache/<marketplace>/<plugin>/,
+#      its .active version or its only version.
+#   3. A bare name: cache/<name>/ the same way, then local/<name>/.
+# Any name part holding `/` or `..` is refused. The default project root is
+# CSA_PROJECT_ROOT, else the working directory.
+csa_enum_resolve_plugin_path() {
+  local key="$1" root="${2:-${CSA_PROJECT_ROOT:-$PWD}}"
+  local pdir="${HOME}/.claude/plugins" ip rc=0 cand out plugin mkt
+  # The key is passed to jq as an argument, so a long one could only fail
+  # there. No plugin id comes near this length.
+  if [[ "${#key}" -gt 1024 ]]; then
+    printf 'not installed at expected path (name too long)'
+    return 1
+  fi
+
+  ip="$(_csa_enum_record_lookup "$key" "$root")" || rc=$?
+  case "$rc" in
+    0)
+      if out="$(_csa_enum_guard_dir "$ip")"; then
+        printf '%s\n' "$out"
+        return 0
+      fi
+      printf '%s' "$out"
+      return 1
+      ;;
+    1) : ;;
+    *) return 2 ;;
+  esac
+
+  if [[ "$key" == *@* ]]; then
+    plugin="${key%@*}"
+    mkt="${key##*@}"
+    if ! _csa_enum_safe_segment "$plugin" || ! _csa_enum_safe_segment "$mkt"; then
+      printf 'not installed at expected path (name is not a safe path segment)'
+      return 1
+    fi
+    if cand="$(_csa_enum_pick_version "$pdir/cache/$mkt/$plugin")" && out="$(_csa_enum_guard_dir "$cand")"; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+  else
+    if ! _csa_enum_safe_segment "$key"; then
+      printf 'not installed at expected path (name is not a safe path segment)'
+      return 1
+    fi
+    if cand="$(_csa_enum_pick_version "$pdir/cache/$key")" && out="$(_csa_enum_guard_dir "$cand")"; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+    if [[ -d "$pdir/local/$key" ]] && out="$(_csa_enum_guard_dir "$pdir/local/$key")"; then
+      printf '%s\n' "$out"
+      return 0
+    fi
+  fi
+  printf 'not installed at expected path'
   return 1
 }
 
@@ -186,49 +386,116 @@ csa_enum_targets_all() {
   if ! enabled_plugins="$(csa_enum_enabled_plugins "$root")"; then
     return 2
   fi
+  # Resolve every plugin in this shell, not inside the output pipeline below: an
+  # unreadable install record is rc 2, which a pipeline subshell would drop.
+  local resolved="" plugin_name plugin_path rc
+  while IFS= read -r plugin_name; do
+    [[ -z "$plugin_name" ]] && continue
+    rc=0
+    plugin_path="$(csa_enum_resolve_plugin_path "$plugin_name" "$root")" || rc=$?
+    case "$rc" in
+      0) resolved="${resolved}${plugin_name}"$'\t'"${plugin_path}"$'\n' ;;
+      1) printf 'finding: PROVENANCE-002 plugin %s enabled but %s\n' "$plugin_name" "$plugin_path" >&2 ;;
+      *) return 2 ;;
+    esac
+  done <<< "$enabled_plugins"
   {
     [[ -n "$project_targets" ]] && printf '%s\n' "$project_targets"
-    while read -r plugin_name; do
+    while IFS=$'\t' read -r plugin_name plugin_path; do
       [[ -z "$plugin_name" ]] && continue
-      local plugin_path
-      if ! plugin_path="$(csa_enum_resolve_plugin_path "$plugin_name")"; then
-        printf 'finding: PROVENANCE-002 plugin %s enabled but not installed at expected path\n' "$plugin_name" >&2
-        continue
-      fi
-      find "$plugin_path" -type f 2>/dev/null | while read -r f; do
-        local rel="${f#$plugin_path/}"
-        printf '@plugin:%s:%s\t%s\n' "$plugin_name" "$rel" "$f"
-      done
-    done <<< "$enabled_plugins"
+      find "$plugin_path" -type f 2>/dev/null \
+        | CSA_LABEL="$plugin_name" CSA_PREFIX="$plugin_path/" awk '
+            BEGIN { l = ENVIRON["CSA_LABEL"]; p = ENVIRON["CSA_PREFIX"]; n = length(p) }
+            { rel = (substr($0, 1, n) == p) ? substr($0, n + 1) : $0
+              printf "@plugin:%s:%s\t%s\n", l, rel, $0 }'
+    done <<< "$resolved"
   } | awk -F '\t' '!seen[$NF]++'
 }
 
-# csa_enum_paranoid_candidates — cached plugins that are not enabled, one per
-# line, sorted by codepoint. Read/report only: it lists candidates and never
-# approves anything. Each cache directory name is one identity, compared whole
-# against the enabled set inside jq (NUL-delimited in, no word splitting,
-# #425). A candidate whose name holds a newline cannot be one output line, so
-# the enumeration refuses with rc 2 and emits nothing rather than split it.
-csa_enum_paranoid_candidates() {
-  local cache="${HOME}/.claude/plugins/cache"
-  [[ -d "$cache" ]] || return 0
-  local enabled_json names_file rc=0
-  enabled_json="$(_csa_enum_enabled_json "${CSA_PROJECT_ROOT:-$PWD}")" || return 2
-  names_file="$(mktemp "${TMPDIR:-/tmp}/csa-cache-names.XXXXXX")" || return 2
-  if ! find "$cache" -maxdepth 1 -mindepth 1 -type d -print0 > "$names_file" 2>/dev/null; then
-    printf 'csa: cannot list the plugin cache %s\n' "$cache" >&2
-    rm -f "$names_file"
+# _csa_enum_is_flat_plugin_dir <dir> — rc 0 if a plugin cache directory holds a
+# version directory directly (the older cache/<plugin>/<version> layout),
+# rc 1 if it is a marketplace directory holding plugin directories.
+_csa_enum_is_flat_plugin_dir() {
+  local d="$1" c
+  [[ -f "$d/.active" ]] && return 0
+  for c in "$d"/*; do
+    [[ -d "$c" ]] || continue
+    csa_is_version_name "${c##*/}" && return 0
+  done
+  return 1
+}
+
+# _csa_enum_record_keys — the install record's plugin keys as a JSON array;
+# [] if there is no record. A record that exists but cannot be read or has an
+# unknown shape is rc 2.
+_csa_enum_record_keys() {
+  local rec; rec="$(_csa_enum_record_file)"
+  if [[ ! -e "$rec" && ! -L "$rec" ]]; then
+    printf '[]\n'
+    return 0
+  fi
+  if [[ ! -f "$rec" || ! -r "$rec" ]]; then
+    printf 'csa: cannot read %s; the installed plugins are unknown\n' "$rec" >&2
     return 2
   fi
-  printf '%s\n' "$enabled_json" | jq -r --rawfile names "$names_file" '
-    (map(select(type == "string") | {(.): true}) | add // {}) as $enabled
-    | [ $names | split("\u0000")[] | select(length > 0) | split("/") | last ]
+  jq -n -c 'input | if (.plugins | type) == "object" and ([.plugins[] | type] | all(. == "array")) then .plugins | keys else error("no plugins object of lists") end' "$rec" 2>/dev/null || {
+    printf 'csa: %s is not the expected installed-plugins record (JSON with a plugins object of lists); the installed plugins are unknown\n' "$rec" >&2
+    return 2
+  }
+}
+
+# csa_enum_paranoid_candidates — installed or cached plugins that are not
+# enabled, as `plugin@marketplace` (a bare name for the older flat cache
+# layout), one per line, sorted by codepoint. Candidates are the install
+# record's keys plus each cache/<marketplace>/<plugin> directory, minus the keys
+# left at true; a `false` key is a candidate. `temp_git_*` is a clone in
+# progress and is skipped. Read/report only: it lists candidates and never
+# approves anything. Each identity is compared whole against the enabled set
+# inside jq (NUL-delimited in, no word splitting, #425). A candidate whose name
+# holds a newline cannot be one output line, so the enumeration refuses with
+# rc 2 and emits nothing rather than split it.
+csa_enum_paranoid_candidates() {
+  local cache="${HOME}/.claude/plugins/cache" rec
+  rec="$(_csa_enum_record_file)"
+  [[ -d "$cache" || -e "$rec" || -L "$rec" ]] || return 0
+  local enabled_json keys_json top_file sub_file names_file rc=0 a b base
+  enabled_json="$(_csa_enum_enabled_json "${CSA_PROJECT_ROOT:-$PWD}")" || return 2
+  keys_json="$(_csa_enum_record_keys)" || return 2
+  top_file="$(mktemp "${TMPDIR:-/tmp}/csa-cache-top.XXXXXX")" || return 2
+  sub_file="$(mktemp "${TMPDIR:-/tmp}/csa-cache-sub.XXXXXX")" || { rm -f "$top_file"; return 2; }
+  names_file="$(mktemp "${TMPDIR:-/tmp}/csa-cache-names.XXXXXX")" || { rm -f "$top_file" "$sub_file"; return 2; }
+  if [[ -d "$cache" ]]; then
+    if ! find "$cache" -maxdepth 1 -mindepth 1 -type d -print0 > "$top_file" 2>/dev/null; then
+      printf 'csa: cannot list the plugin cache %s\n' "$cache" >&2
+      rm -f "$top_file" "$sub_file" "$names_file"
+      return 2
+    fi
+    while IFS= read -r -d '' a; do
+      base="${a##*/}"
+      case "$base" in temp_git_*) continue ;; esac
+      if _csa_enum_is_flat_plugin_dir "$a"; then
+        printf '%s\0' "$base" >> "$names_file"
+        continue
+      fi
+      if ! find "$a" -maxdepth 1 -mindepth 1 -type d -print0 > "$sub_file" 2>/dev/null; then
+        printf 'csa: cannot list the plugin cache %s\n' "$a" >&2
+        rm -f "$top_file" "$sub_file" "$names_file"
+        return 2
+      fi
+      while IFS= read -r -d '' b; do
+        printf '%s@%s\0' "${b##*/}" "$base" >> "$names_file"
+      done < "$sub_file"
+    done < "$top_file"
+  fi
+  printf '%s\n' "$enabled_json" | jq -r --rawfile names "$names_file" --slurpfile rk <(printf '%s\n' "$keys_json") '
+    ([to_entries[] | select(.value == true) | {(.key): true}] | add // {}) as $enabled
+    | ([ $names | split("\u0000")[] | select(length > 0) ] + [ ($rk[0] // [])[] | select(type == "string") ])
     | unique
     | map(select($enabled[.] | not))
     | if any(.[]; contains("\n"))
       then "csa: refusing a plugin cache name that contains a newline\n" | halt_error(2)
       else .[]
       end' || rc=2
-  rm -f "$names_file"
+  rm -f "$top_file" "$sub_file" "$names_file"
   return "$rc"
 }

@@ -10,6 +10,9 @@ _csa_failed=0
 # Shared sandbox — create once for the whole test file.
 _CSA_TMP="$(mktemp -d "${TMPDIR:-/tmp}/csa-test.XXXXXX")"
 trap 'rm -rf "$_CSA_TMP"' EXIT
+# record_audit reads the enabled-plugin set from $HOME; keep these tests off the host's.
+export HOME="$_CSA_TMP/home"
+mkdir -p "$HOME/.claude"
 
 # ---------------------------------------------------------------------------
 # 1. init creates schema_version=2 file
@@ -410,6 +413,32 @@ test_unmapped_rule_id_ages_on_every_run() {
     "an unmapped finding ages on focused runs too" || return 1
 }
 
+
+# #825: the audit records the enabled set it saw (the SessionStart reminder
+# compares against it), not a hardcoded empty list.
+test_record_audit_writes_the_enabled_set_snapshot() {
+  local root="$_CSA_TMP/snap1"
+  mkdir -p "$root/.claude/audits"
+  printf '%s\n' '{"enabledPlugins":{"b@m":true,"a@m":true,"off@m":false}}' > "$root/.claude/settings.json"
+  printf '%s\n' '{"enabledPlugins":["bare"]}' > "$HOME/.claude/settings.json"
+  csa_state_init "$root"
+  csa_state_record_audit "$root" 1 ".claude/audits/2026-05-25-01.md" ""
+  local got; got="$(jq -c '.last_audit.enabled_plugins_snapshot' "$(csa_state_path "$root")")"
+  rm -f "$HOME/.claude/settings.json"
+  assert_eq '[{"name":"a@m"},{"name":"b@m"},{"name":"bare"}]' "$got" "snapshot holds the enabled keys, sorted, as {name}"
+}
+
+test_record_audit_refuses_when_the_enabled_set_is_unknown() {
+  local root="$_CSA_TMP/snap2" rc=0
+  mkdir -p "$root/.claude/audits"
+  mkdir "$root/.claude/settings.json"
+  csa_state_init "$root"
+  csa_state_record_audit "$root" 1 ".claude/audits/2026-05-25-01.md" "" 2>/dev/null || rc=$?
+  assert_eq "2" "$rc" "an unreadable settings path is rc 2" || return 1
+  local len; len="$(jq '.audit_history | length' "$(csa_state_path "$root")")"
+  assert_eq "0" "$len" "nothing was recorded"
+}
+
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
@@ -432,5 +461,7 @@ csa_test_run test_record_audit_refuses_unknown_focus              || _csa_failed
 csa_test_run test_legacy_runs_read_as_full_runs                   || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_unmapped_rule_id_ages_on_every_run              || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_gc_window_ignores_later_run_indices             || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_record_audit_writes_the_enabled_set_snapshot    || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_record_audit_refuses_when_the_enabled_set_is_unknown || _csa_failed=$((_csa_failed + 1))
 
 [[ "$_csa_failed" -eq 0 ]] || exit 1

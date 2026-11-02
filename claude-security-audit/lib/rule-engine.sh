@@ -158,6 +158,35 @@ _csa_rule_engine_validate_focus() {
   return 2
 }
 
+# _csa_enum_stderr_to_findings <enumeration-stderr>
+# Turns each `finding: PROVENANCE-002 plugin <key> enabled but <reason>` line
+# into a High finding JSONL record on stdout, and passes every `csa:` line on
+# to stderr. Other lines (info notes) are dropped, as they always were on success.
+_csa_enum_stderr_to_findings() {
+  local line rest key reason fuid file
+  while IFS= read -r line; do
+    case "$line" in
+      "finding: PROVENANCE-002 plugin "*" enabled but "*)
+        rest="${line#finding: PROVENANCE-002 plugin }"
+        key="${rest%% enabled but *}"
+        reason="${rest#* enabled but }"
+        file="@plugin:$key"
+        fuid=""
+        if declare -F csa_finding_uid >/dev/null 2>&1; then
+          fuid="$(csa_finding_uid "PROVENANCE-002" "$file" "$key")"
+        fi
+        jq -nc --arg key "$key" --arg reason "$reason" --arg file "$file" --arg fuid "$fuid" '
+          {rule_id: "PROVENANCE-002", file: $file, line: 0, offset: 0,
+           preview: ("plugin " + $key + " is enabled but " + $reason),
+           severity: "high", context: {plugin: $key, reason: $reason}}
+          + (if $fuid == "" then {} else {finding_uid: $fuid} end)'
+        ;;
+      "csa: "*) printf '%s\n' "$line" >&2 ;;
+    esac
+  done <<< "${1-}"
+  return 0
+}
+
 # csa_rule_engine_scan_all <project_root> [<focus>]
 # Discovers all rule files (filtered by focus aspect), runs the matrix.
 # Uses aspect-based pre-filtering to reduce rule×target cross-product.
@@ -181,6 +210,11 @@ csa_rule_engine_scan_all() {
     rm -f "$findings_out" "$targets_file"
     return 2
   fi
+  # On success enumeration's stderr still carries two things that must not be
+  # lost: PROVENANCE-002 lines (an enabled plugin that did not resolve is a
+  # High finding, not a note) and `csa:` warnings (an enabledPlugins shape the
+  # reader could not use).
+  _csa_enum_stderr_to_findings "$enum_error" >> "$findings_out"
   while read -r rule_file; do
     [[ -z "$rule_file" ]] && continue
     local aspect; aspect="$(_csa_rule_aspect_from_file "$rule_file")"

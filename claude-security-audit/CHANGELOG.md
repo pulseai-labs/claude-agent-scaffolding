@@ -1,5 +1,20 @@
 # claude-security-audit changelog
 
+## 0.2.0 (2026-11-02)
+
+**Audits now scan your enabled plugins, so a first real run reports more.** On a real Claude Code install the scanner read no enabled plugin at all, and said nothing about it: a clean audit and a skipped one looked the same (#825). Expect new findings, on first-party plugins too, the first time you audit after upgrading.
+
+### Fixed
+- **`enabledPlugins` is read as Claude Code writes it.** It is an object map, `{"plugin@marketplace": true|false}`; the scanner only knew an array of names and read the object as empty. Only boolean values count, `false` means not enabled, and the array form still reads (each name as `true`). The user's `settings.json`, the project's, then the project's `settings.local.json` merge by key, the later file winning, so a project `false` disables a user `true`. A plugin's identity is the whole `plugin@marketplace` key. `settings.local.json` is a new read.
+- **Each enabled plugin resolves to where it is installed.** The scanner looked for `cache/<plugin>/<version>`; Claude Code uses `cache/<marketplace>/<plugin>/<version>` and records every install in `~/.claude/plugins/installed_plugins.json`. The scanner now takes this project's `local` or `project` entry (its `projectPath` is the project root), else the `user` entry. An `installPath` is used only if it is a directory physically inside `~/.claude/plugins/`; one that points elsewhere (a `..`, a symlink out) is PROVENANCE-002. With no record entry it falls back to the cache layout, and a name part holding `/` or `..` is refused. An `installed_plugins.json` that exists but cannot be read or is not the shape this code knows stops the audit (rc 2), never an empty set.
+- **PROVENANCE-002 is a finding.** An enabled plugin that does not resolve was a stderr line that a successful scan dropped. It is now a High finding that names the plugin and why, recorded in `state.json` and reported like any other, and a later audit that resolves it drops it.
+- **A plugin finding's id survives a version bump.** `FUID` paths for `cache/<marketplace>/<plugin>/<version>/...` now normalise to `@plugin:<plugin>@<marketplace>:...`; the older two-level form is unchanged. No stored id needs migrating: a real install never scanned a plugin, so no real finding used the old form.
+- **Paranoid-mode candidates are plugins, not marketplaces.** They are the install record's keys plus each `cache/<marketplace>/<plugin>` as `plugin@marketplace`, minus the enabled set; a `false` plugin is a candidate. `temp_git_*` (a clone in progress) is skipped.
+- **The SessionStart reminder's "enabled-plugin set changed" note is true.** `state.json` stored an empty snapshot whatever was enabled, and the hook read the object map's values (`true`, `false`) instead of names. The audit now records the enabled set and the hook compares the same set. The first reminder after upgrading may print one false "changed" note; the next audit rewrites the snapshot.
+
+### Added
+- **A loud warning for a shape the reader cannot use.** An `enabledPlugins` value that holds entries but yields none (a string, an array of non-strings, an object of non-booleans) prints `csa: warning: ... unrecognized shape (...)`, since Claude Code can change this format.
+
 ## 0.1.8 (2026-10-15)
 
 ### Fixed
