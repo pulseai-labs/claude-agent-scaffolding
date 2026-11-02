@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Fake date: only `date +%s`, read from the fake clock that the fake sleep advances.
+d=${MB_FAKE_DIR:?}
+[ "$*" = "+%s" ] || { echo "fake date: unexpected call: $*" >&2; exit 99; }
+cat "$d/clock" 2>/dev/null || echo 1000000

@@ -4,8 +4,8 @@
 // from a record, never from "newest in cache" (see ~/.local/bin/oss). It writes
 // no file and never searches the filesystem.
 //
-// This file is the source of truth. ossify, workspace-init and omp-roles
-// ship byte-identical copies at <plugin>/omp/bin-path.ts; the user-level loader
+// This file is the source of truth. ossify, workspace-init, omp-roles and
+// merge-bar ship byte-identical copies at <plugin>/omp/bin-path.ts; the user-level loader
 // (omp/extensions/plugin-bin-path.ts) imports the newest installed copy, so a
 // plugin update refreshes this logic. Bump VERSION on any behaviour change, and
 // MIN_LOADER_VERSION only when the loader itself must change.
