@@ -1,0 +1,1 @@
+{"scores": {"source_decides": 5, "operator_confirms": 5, "route_and_record": 5}, "pass": true, "notes": "Refuses on product source at HEAD, authors nothing, names the Rust crate and 9 commits, routes to /ossify:adopt with the legacy-scaffold-stack caveat (plain repos are #536), and correctly records no class H note."}

@@ -1979,6 +1979,23 @@ pin "$SKILLS/start/SKILL.md" 'declares under its `tooling_repo` key is not the p
   "start §3's content gate does not count a declared tooling repo as product content (#553)"
 pin "$SKILLS/start/SKILL.md" '`.ossify/topology.json` every key is just a repo name, so every declared repo there is checked.' \
   "start §3 limits the tooling-repo exemption to the pairing manifest (#553)"
+# #809: the gate reads product source at HEAD, not history. History alone
+# proceeds as class H and is recorded in the hand-off; source at HEAD refuses.
+pin "$SKILLS/start/SKILL.md" 'product'"'"'s own source at `HEAD`.' \
+  "start §3's content gate asks for product source at HEAD (#809)"
+pin "$SKILLS/start/SKILL.md" '**No product source at `HEAD`, history or not:** proceed as greenfield.' \
+  "start §3's content gate proceeds on history alone (#809)"
+pin "$SKILLS/start/SKILL.md" '**Product source at `HEAD`:** author nothing and refuse' \
+  "start §3's content gate still refuses product source at HEAD (#809)"
+pin "$SKILLS/start/SKILL.md" 'only propose; whether `HEAD` holds' \
+  "start §3's probe proposes and the operator confirms what HEAD holds (#809)"
+pin "$SKILLS/start/SKILL.md" 'The hand-off records class H history (§3): per repo, commit count and what is at `HEAD`.' \
+  "start §13's hand-off records class H's history (#809)"
+if grep -Fq 'source or its own history' "$SKILLS/start/SKILL.md"; then
+  T_FAIL=$((T_FAIL+1)); echo "FAIL: start §3's gate still refuses on history alone (#809)"
+else
+  T_PASS=$((T_PASS+1))
+fi
 
 # ---------------------------------------------------------------------------
 # Adoption's horizon reaches Release 1 (#302). It is not in state; plan-release

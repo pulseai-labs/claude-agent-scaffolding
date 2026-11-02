@@ -82,9 +82,11 @@ test_A1_agents_md_writes_file_with_project_name() {
   # Assert the routes themselves, not just the strings: line 5's prose already
   # contains `/ossify:start`, so the bare substring would survive the route's
   # removal (measured — that mutation SURVIVED until this line named the route).
-  assert_contains '- Empty canonical: run `/ossify:start`' "$content" || return 1
+  assert_contains '- Canonical with no product source at `HEAD` (history alone is fine on ossify 1.34.0 or later): run `/ossify:start`' "$content" || return 1
   assert_contains '- `/ossify:adopt` currently targets projects previously onboarded' "$content" || return 1
   assert_not_contains '/onboard' "$content" || return 1
+  # #809: history alone no longer refuses /ossify:start.
+  assert_not_contains 'carries source or history' "$content" || return 1
 }
 
 test_A2_agents_md_fallback_to_manifest_name() {

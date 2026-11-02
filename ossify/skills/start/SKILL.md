@@ -91,14 +91,11 @@ set the journey-map station asks about next (`canonical` only if that is
 genuinely the name). Then re-probe `oss state_path` and `oss repo_root <name>`
 for every declared repo, halting only if one still refuses.
 
-**Canonical-content gate (refuses fail-fast).** `/start` is pre-code ceremony:
-establish whether any declared repo (`oss repo_root <name>` per name) already
-carries the product's own source or its own history — either alone refuses,
-and a bare pairing scaffold is neither. A repo the pairing manifest (`.workspace/pairing.json`) declares under its `tooling_repo` key is not the product (#553):
-it carries its own history by nature, so this gate skips it. In a native
-`.ossify/topology.json` every key is just a repo name, so every declared repo there is checked. If so, author nothing and refuse,
-naming what you found and routing to **`/ossify:adopt`** — the adopt-forward
-path for a project that already has code (native `adopt` on Codex).
+**Canonical-content gate (refuses fail-fast).** `/start` is pre-code ceremony: establish whether any declared repo (`oss repo_root <name>` per name) carries the product's own source at `HEAD`. A repo the pairing manifest (`.workspace/pairing.json`) declares under its `tooling_repo` key is not the product (#553): it carries its own history by nature, so this gate skips it. In a native
+`.ossify/topology.json` every key is just a repo name, so every declared repo there is checked. `git -C <root> ls-tree -r --name-only HEAD` and `git -C <root> rev-list --count HEAD` only propose; whether `HEAD` holds product (not docs, a dead prototype or a bare pairing scaffold) is your judgment, so for a repo with history or files beyond the scaffold, show what you found and ask the operator to confirm. A repo with no commit has neither: name it.
+- **Product source at `HEAD`:** author nothing and refuse, naming what you found and routing to **`/ossify:adopt`** — the adopt-forward path for a project that already has code (native `adopt` on Codex), which today takes only a project onboarded with the legacy scaffold stack (plain repos: #536).
+- **No product source at `HEAD`, history or not:** proceed as greenfield. History alone is class H (#809): note each such repo's commit count and what is at `HEAD` for §13's hand-off.
+
 Those tokens are load-bearing too. Past both gates, settle every occupied destination
 (`references/occupied-destinations.md`), then `oss init "<project-name>"`, which refuses
 if ossify state already exists — the "already onboarded" signal; route per §2, never force past it.
@@ -413,7 +410,7 @@ Full minima in `references/lean-spec-schema.md`.
 The memory bank + `AGENTS.md` are authored **by ossify**, in conversation, from
 the lean spec sections — not by calling scaffold-onboard, whose brief targets the
 retired 10-phase schema. Never emit fill-in markers; thin-and-true beats a `TODO`.
-**Never write over an existing file:** honour the per-file answers §3 collected (`references/occupied-destinations.md`).
+**Never write over an existing file:** honour the per-file answers §3 collected (`references/occupied-destinations.md`). The hand-off records class H history (§3): per repo, commit count and what is at `HEAD`.
 
 Full derivation brief in `references/memory-bank-brief.md`; section schema in `references/lean-spec-schema.md`.
 

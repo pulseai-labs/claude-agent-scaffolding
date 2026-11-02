@@ -282,10 +282,10 @@ Next steps:
   3. cd /Users/example/projects/foo-ai && claude      # Claude Code; on Codex, run `codex` in that directory instead
   4. Continue into ossify only where it currently continues: `/ossify:adopt` targets projects
      previously onboarded with the legacy scaffold stack — it reads that stack's roadmap state,
-     active-context cursor and legacy spec. A repository that already carries source or history
-     but never used that stack has no supported ossify continuation yet; `/ossify:start` sends
-     such a repository here rather than onboarding it. (For an empty canonical, `/ossify:start`
-     does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     active-context cursor and legacy spec. A repository that carries product source at `HEAD`
+     but never used that stack has no supported ossify continuation yet (plain repos: #536);
+     `/ossify:start` sends such a repository here rather than onboarding it. (For a canonical
+     with no product source, history alone included on ossify 1.34.0 or later, `/ossify:start` does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
      On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`. Continue into
      ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`,
      `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.

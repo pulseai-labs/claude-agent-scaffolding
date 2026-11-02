@@ -136,13 +136,15 @@ test_printed_skill_routes_point_to_ossify() {
   assert_contains '/ossify:start' "$init_sec" || return 1
 
   # S8 round 4 (F2): the fresh block opens no tool, so half its readers are on Codex —
-  # it must name the skill form the way the Scenario-C block does. And (F3) a recorded
-  # tooling repo that already carries history refuses the route outright.
+  # it must name the skill form the way the Scenario-C block does. (The F3 line, that a
+  # recorded tooling repo with history refuses the route, went with ossify 1.19.4 / #553.)
   assert_contains 'on Codex, invoke the corresponding ossify skill — `start`, or `adopt`' "$init_sec" || return 1
-  assert_contains 'a recorded tooling repo that already carries history refuses it too' "$init_sec" || return 1
+  assert_not_contains 'refuses it too' "$init_sec" || return 1
+  # #809: history alone no longer refuses /ossify:start; only product source at HEAD does.
+  assert_contains 'history alone is fine' "$init_sec" || return 1
 
-  # Scenario A + C: existing source or history routes directly to /ossify:adopt;
-  # /ossify:start appears only as the empty-canonical exception.
+  # Scenario A + C: product source at HEAD routes to /ossify:adopt; /ossify:start
+  # takes a canonical with no product source, history alone included (#809).
   assert_contains '/ossify:adopt' "$pair_sec" || return 1
   assert_contains '/ossify:start' "$pair_sec" || return 1
   assert_contains '/ossify:adopt' "$dual_sec" || return 1
@@ -167,6 +169,10 @@ test_printed_skill_routes_point_to_ossify() {
   assert_contains 'legacy scaffold stack' "$pair_sec" || return 1
   assert_contains 'no supported ossify continuation yet' "$pair_sec" || return 1
   assert_not_contains '# canonical has source or history' "$pair_sec" || return 1
+  # #809: history alone is not a reason to route to adopt.
+  assert_not_contains 'carries source or history' "$pair_sec" || return 1
+  assert_contains 'history alone included' "$pair_sec" || return 1
+  assert_contains 'plain repos: #536' "$pair_sec" || return 1
 
   # S8 round 2 (G2): adoption's clean-tree gate sweeps every declared repo, so this
   # block must say the canonical is swept too — the pairing never cleans it.
@@ -228,8 +234,9 @@ test_examples_routes_and_created_paths_match_reality() {
   # Closing sentences name the ossify route, not the retired one.
   assert_contains '/ossify:start' "$init_ex_sec" || return 1
   assert_contains '/ossify:adopt' "$pair_ex_sec" || return 1
-  # F3's clause rides the same mirror: the example must state it too.
-  assert_contains 'a recorded tooling repo that already carries history refuses it too' "$init_ex_sec" || return 1
+  # The #809 clause rides the same mirror: the example must state it too.
+  assert_not_contains 'refuses it too' "$init_ex_sec" || return 1
+  assert_contains 'history alone is fine' "$init_ex_sec" || return 1
   if grep -Eq "$_retired_route_patterns" <<<"$init_ex_sec"; then
     echo "    retired route survives in fresh-bootstrap next-steps"; return 1
   fi

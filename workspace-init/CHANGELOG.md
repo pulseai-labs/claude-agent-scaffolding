@@ -1,5 +1,13 @@
 # workspace-init changelog
 
+## 0.10.3 (2026-11-02)
+
+Routing prose follows ossify 1.34.0.
+
+### Changed
+- **`/ossify:start` takes a canonical with history but no product source (#809).** The Scenario A and C next steps, the fresh-bootstrap block, both READMEs and the AGENTS and README stubs say `/ossify:start` is for a canonical with no product source at `HEAD`, history alone included. A canonical with product source goes to `/ossify:adopt`, which today adopts only a project onboarded with the legacy scaffold stack (plain repos: #536).
+- **The fresh-bootstrap next steps drop the tooling-repo line.** It said a recorded tooling repo with history refuses the `/ossify:start` route; ossify 1.19.4 (#553) stopped counting a declared tooling repo as product content.
+
 ## 0.10.2 (2026-11-02)
 
 The bootstrapped README no longer lists the retired architect-critic plugin.
