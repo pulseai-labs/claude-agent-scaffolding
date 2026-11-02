@@ -2,6 +2,29 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.9.0
+
+`mb`: the PR loop's `gh` mechanics as one tested helper. (#750)
+
+- New `bin/mb` (bash 3.2 and `jq`): `threads`, `checks`, `rules`, `blockers`, `wait`, `reply`,
+  `resolve`, and `help`, which names the plugin. Each verb pins the fields it reads from `gh`; a
+  missing field is exit 2, never an empty result. It prints facts and approves nothing: `blockers`
+  ends with a count that says it is not a verdict, and prints `unknown: BLOCKED` when GitHub says
+  blocked and nothing explains it.
+- `mb wait <PR> --head <sha>` is bounded (default 540 seconds, no sleep past the limit) and never
+  passes early: it needs a workflow run for that exact SHA, and a check list holding only skipped
+  checks is not a pass. Exit 0 passed, 1 a check failed, 3 head moved, 4 no run appeared, 75 limit
+  reached. A reply body comes only by `--body-file`, never as an argument.
+- `working-a-pr` calls the verbs where it had inline `gh` mechanics, states the plain-`gh`
+  fallback for Codex and a missing `mb` once, and keeps its rule that the loop does not poll a
+  reviewer (`mb wait` reads checks only). `commands/work-pr.md` allows `Bash(mb:*)`.
+- New `omp/bin-path.ts`, byte-identical to the other copies, so OMP puts `mb` on `PATH` through the
+  user-level `plugin-bin-path.ts` loader. Codex has no `bin/` mechanism; it takes the prose fallback.
+- Tests: `tests/test-mb.sh` runs `mb` against a fake `gh` serving recorded output of this
+  repository's PRs 1028, 1029 and 1031 and its rules. The runner globs `tests/test-*.sh`, so CI runs it.
+- Agent-loaded bytes against 0.8.0 (`wc -c`): `skills/working-a-pr/SKILL.md` 21174 -> 21802 (+628);
+  `commands/work-pr.md` +12; the other skills are unchanged. `bin/mb` is not loaded by an agent.
+
 ## 0.8.0
 
 Retro: repeated review findings become proposed rules, written only when the operator accepts.

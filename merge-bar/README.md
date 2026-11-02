@@ -35,6 +35,15 @@ On Codex, invoke the skills by name.
 /plugin install merge-bar@claude-agent-scaffolding
 ```
 
+## The `mb` helper
+
+`bin/mb` (bash and `jq`) does the fixed `gh` calls of a PR loop and prints facts; it never merges and
+never approves. `mb threads <PR>` (unresolved threads, bot markup stripped), `mb checks <PR>`,
+`mb rules`, `mb blockers <PR>`, `mb wait <PR> --head <sha> [--max-seconds N]` (bounded; exit 0 passed,
+1 a check failed, 3 head moved, 4 no run appeared, 75 limit reached), `mb reply <thread> --body-file <f>`
+and `mb resolve <thread>`. `mb help` names the plugin. Claude Code puts `bin/` on `PATH`; on Codex there
+is no `bin/`, and `working-a-pr` falls back to plain `gh`.
+
 ## Known-limits ledger
 
 After a merge, `working-a-pr` writes the PR's known limits as `[KL]` lines, and its one
@@ -48,10 +57,10 @@ a newer PR shows it. With no paired workspace there is no log.
 
 ## Tests
 
-`bash merge-bar/run-tests.sh` runs the frontmatter lint and ten fidelity pins; CI runs it.
+`bash merge-bar/run-tests.sh` runs the frontmatter lint, ten fidelity pins and the `mb` tests; CI runs it.
 The behaviour evals in `tests/eval/` are session-driven and **not** run by CI — follow
 `tests/eval/RUNBOOK.md` before any version bump.
 
 ## OMP
 
-Install per the root README. Skills are reachable as `skill://<name>`, with no `merge-bar:` prefix. No Claude Code-only parts.
+Install per the root README, including its `plugin-bin-path.ts` loader, which puts `mb` on `PATH` (`omp/bin-path.ts` is a byte-identical copy of the marketplace's). Skills are reachable as `skill://<name>`, with no `merge-bar:` prefix. No Claude Code-only parts.

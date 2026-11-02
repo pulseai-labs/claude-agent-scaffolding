@@ -1,0 +1,534 @@
+#!/usr/bin/env bash
+# mb - merge-bar's helper for PR mechanics (#750). Plugin: merge-bar.
+#
+# Fixed `gh` calls whose input is a PR number and a head SHA: unresolved review threads,
+# the checks of the current head, the base's merge rules, a stated blocker, a bounded wait,
+# a thread reply and a thread resolve. It prints facts. It never merges and never approves:
+# "no blocker found" is not "ready to merge", and a skipped check is not a pass.
+#
+# GitHub's JSON is another tool's output, so each verb pins the fields it reads. A missing
+# field is exit 2 with the field named, never an empty result.
+#
+# Exit codes: 0 done; 2 could not read, or bad usage; `wait` also 1 a check failed,
+# 3 head moved, 4 no run appeared, 75 limit reached.
+#
+# bash 3.2 and jq 1.6 compatible: no bash 4 arrays or expansions, no jq 1.7 builtins.
+set -euo pipefail
+
+MB_PR_FIELDS='number,state,isDraft,headRefOid,headRefName,baseRefName,mergeable,mergeStateStatus,statusCheckRollup,url'
+MB_PR_SPEC='number:number state:string isDraft:boolean headRefOid:string headRefName:string baseRefName:string mergeable:string mergeStateStatus:string statusCheckRollup:array url:string'
+
+# --- failure and usage ---------------------------------------------------------------
+
+mb_die() { echo "mb: $*" >&2; exit 2; }
+mb_usage() { echo "mb: $* (try: mb help)" >&2; exit 2; }
+
+# --- gh access -----------------------------------------------------------------------
+
+MB_OUT=""
+MB_ERR=""
+
+# mb_try <gh args...>: stdout in MB_OUT. On failure rc 1 with gh's first stderr line in MB_ERR.
+mb_try() {
+  local errf rc=0
+  errf=$(mktemp "${TMPDIR:-/tmp}/mb.XXXXXX") || { MB_ERR="mktemp failed"; return 1; }
+  MB_OUT=$(gh "$@" 2>"$errf") || rc=$?
+  MB_ERR=$(head -n 1 "$errf" 2>/dev/null) || MB_ERR=""
+  rm -f "$errf"
+  if [ "$rc" -ne 0 ]; then
+    [ -n "$MB_ERR" ] || MB_ERR="gh exited $rc"
+    return 1
+  fi
+  return 0
+}
+
+# mb_get <what> <gh args...>: as mb_try, but exit 2 naming what could not be read.
+mb_get() {
+  local what="$1"
+  shift
+  mb_try "$@" || mb_die "could not read $what: $MB_ERR"
+}
+
+# mb_need <json> <what> <spec>: every "key:type" in the spec must be present with that jq type.
+mb_need() {
+  local missing
+  missing=$(printf '%s' "$1" | jq -r --arg spec "$3" \
+    '. as $j | ($spec | split(" ") | map(split(":"))) | map(select(($j[.[0]] | type) != .[1]) | .[0]) | join(",")') \
+    || mb_die "could not read $2: gh did not return a JSON object"
+  [ -z "$missing" ] || mb_die "could not read $2: missing or mistyped field(s): $missing"
+}
+
+# mb_need_jq <json> <what> <jq boolean filter> <message>
+mb_need_jq() {
+  printf '%s' "$1" | jq -e "$3" >/dev/null 2>&1 || mb_die "could not read $2: $4"
+}
+
+mb_set_repo() {
+  [ -z "$O_REPO" ] && return 0
+  case "$O_REPO" in
+    */*/*|*[!A-Za-z0-9._/-]*|/*|*/) mb_usage "--repo takes OWNER/REPO" ;;
+    */*) ;;
+    *) mb_usage "--repo takes OWNER/REPO" ;;
+  esac
+  export GH_REPO="$O_REPO"
+}
+
+# --- option parsing ------------------------------------------------------------------
+
+O_REPO=""; O_RAW=0; O_HEAD=""; O_MAX=""; O_SETTLE=""; O_INTERVAL=""; O_BODY=""; O_BASE=""; P1=""
+
+# mb_parse "<allowed option names>" args...: sets O_* and P1 (at most one positional).
+mb_parse() {
+  local allowed=" $1 " name val
+  shift
+  O_REPO=""; O_RAW=0; O_HEAD=""; O_MAX=""; O_SETTLE=""; O_INTERVAL=""; O_BODY=""; O_BASE=""; P1=""
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --raw)
+        case "$allowed" in *" raw "*) O_RAW=1 ;; *) mb_usage "unknown option $1" ;; esac ;;
+      --repo|--head|--max-seconds|--settle-seconds|--interval|--body-file|--base)
+        name=${1#--}
+        case "$allowed" in *" $name "*) ;; *) mb_usage "unknown option $1" ;; esac
+        [ $# -ge 2 ] || mb_usage "$1 needs a value"
+        val=$2
+        shift
+        case "$name" in
+          repo) O_REPO=$val ;;
+          head) O_HEAD=$val ;;
+          max-seconds) O_MAX=$val ;;
+          settle-seconds) O_SETTLE=$val ;;
+          interval) O_INTERVAL=$val ;;
+          body-file) O_BODY=$val ;;
+          base) O_BASE=$val ;;
+        esac ;;
+      -*) mb_usage "unknown option $1" ;;
+      *)
+        [ -z "$P1" ] || mb_usage "one argument only, got a second: $1"
+        P1=$1 ;;
+    esac
+    shift
+  done
+}
+
+mb_need_pr_number() {
+  case "$P1" in
+    ''|*[!0-9]*) mb_usage "$1 needs a PR number" ;;
+  esac
+}
+
+# mb_posint <flag> <value>: a positive decimal integer of at most 7 digits.
+mb_posint() {
+  case "$2" in
+    ''|*[!0-9]*) mb_usage "$1 takes a positive whole number" ;;
+  esac
+  [ "${#2}" -le 7 ] && [ "$((10#$2))" -gt 0 ] || mb_usage "$1 takes a positive whole number"
+}
+
+# --- shared jq -----------------------------------------------------------------------
+
+# A check, whether a CheckRun or a StatusContext, as one of success | failure | pending | skipped.
+# GitHub reports a skipped check (and CodeRabbit's) as SKIPPED or NEUTRAL; both read as skipped.
+MB_JQ_DEFS='
+def cname: if .__typename == "StatusContext" then .context else .name end;
+def craw: (if .__typename == "StatusContext" then .state elif .status == "COMPLETED" then .conclusion else .status end) | ascii_downcase;
+def cstate:
+  if .__typename == "StatusContext" then
+    (.state | ascii_downcase
+      | if . == "success" then "success" elif . == "pending" or . == "expected" then "pending" else "failure" end)
+  elif .status != "COMPLETED" then "pending"
+  else
+    (.conclusion | ascii_downcase
+      | if . == "success" then "success" elif . == "skipped" or . == "neutral" then "skipped" else "failure" end)
+  end;
+'
+
+MB_JQ_ROLLUP_OK='all(.statusCheckRollup[];
+  (.__typename == "CheckRun" and (.name | type) == "string" and (.status | type) == "string"
+     and (.status != "COMPLETED" or (.conclusion | type) == "string"))
+  or (.__typename == "StatusContext" and (.context | type) == "string" and (.state | type) == "string"))'
+
+# mb_pr_view <pr>: PRJ holds the validated `gh pr view` JSON.
+PRJ=""
+mb_pr_view() {
+  mb_get "pull request #$1" pr view "$1" --json "$MB_PR_FIELDS"
+  PRJ=$MB_OUT
+  mb_need "$PRJ" "pull request #$1" "$MB_PR_SPEC"
+  mb_need_jq "$PRJ" "pull request #$1" "$MB_JQ_ROLLUP_OK" "a check in statusCheckRollup lacks its typename, name, status or conclusion"
+}
+
+# --- review threads ------------------------------------------------------------------
+
+MB_THREADS_Q='query($owner: String!, $name: String!, $pr: Int!, $endCursor: String) {
+  repository(owner: $owner, name: $name) {
+    pullRequest(number: $pr) {
+      reviewThreads(first: 100, after: $endCursor) {
+        pageInfo { hasNextPage endCursor }
+        nodes {
+          id
+          isResolved
+          isOutdated
+          path
+          line
+          originalLine
+          comments(first: 1) { nodes { author { login } body } }
+        }
+      }
+    }
+  }
+}'
+
+# mb_threads_fetch <pr>: THREADS holds every review thread of the PR, resolved or not, as one array.
+THREADS=""
+mb_threads_fetch() {
+  mb_get "review threads of #$1" api graphql --paginate -f query="$MB_THREADS_Q" \
+    -F owner='{owner}' -F name='{repo}' -F pr="$1"
+  THREADS=$(printf '%s' "$MB_OUT" | jq -s -c \
+    'if length > 0 and all(.[]; (.data.repository.pullRequest.reviewThreads.nodes | type) == "array")
+     then [.[].data.repository.pullRequest.reviewThreads.nodes[]] else error("no reviewThreads.nodes") end' 2>/dev/null) \
+    || mb_die "could not read review threads of #$1: data.repository.pullRequest.reviewThreads.nodes is missing"
+  mb_need_jq "$THREADS" "review threads of #$1" \
+    'all(.[]; (.id | type) == "string" and (.isResolved | type) == "boolean" and (.isOutdated | type) == "boolean" and (.comments.nodes | type) == "array")' \
+    "a thread lacks id, isResolved, isOutdated or comments"
+}
+
+# --- rules ---------------------------------------------------------------------------
+
+# mb_rules_load <base>: sets MB_REPO (repo JSON) and MB_RULES (the effective rules array).
+# Returns 1 with MB_ERR when either cannot be read or lacks a field; the caller decides.
+MB_REPO=""; MB_RULES=""
+mb_rules_load() {
+  local base_enc
+  mb_try api "repos/{owner}/{repo}" || return 1
+  MB_REPO=$MB_OUT
+  mb_check_repo "$MB_REPO" || return 1
+  base_enc=$(printf '%s' "$1" | jq -sRr '@uri')
+  mb_try api "repos/{owner}/{repo}/rules/branches/$base_enc" || return 1
+  MB_RULES=$MB_OUT
+  printf '%s' "$MB_RULES" | jq -e 'type == "array" and all(.[]; (.type | type) == "string")' >/dev/null 2>&1 \
+    || { MB_ERR="rules/branches/$1 is not a list of rules"; return 1; }
+  printf '%s' "$MB_RULES" | jq -e '
+      all(.[] | select(.type == "pull_request");
+        (.parameters.required_review_thread_resolution | type) == "boolean" and (.parameters.allowed_merge_methods | type) == "array")
+      and all(.[] | select(.type == "required_status_checks");
+        (.parameters.strict_required_status_checks_policy | type) == "boolean" and (.parameters.required_status_checks | type) == "array")' \
+    >/dev/null 2>&1 || { MB_ERR="a pull_request or required_status_checks rule lacks a field mb reads"; return 1; }
+  return 0
+}
+
+mb_check_repo() {
+  printf '%s' "$1" | jq -e '(.allow_merge_commit | type) == "boolean" and (.allow_squash_merge | type) == "boolean"
+      and (.allow_rebase_merge | type) == "boolean" and (.default_branch | type) == "string" and (.full_name | type) == "string"' \
+    >/dev/null 2>&1 || { MB_ERR="repos/{owner}/{repo} lacks allow_merge_commit, allow_squash_merge, allow_rebase_merge, default_branch or full_name"; return 1; }
+}
+
+# mb_rules_facts: one JSON object from MB_REPO and MB_RULES.
+mb_rules_facts() {
+  jq -c -n --argjson repo "$MB_REPO" --argjson rules "$MB_RULES" '
+    ($rules | map(select(.type == "pull_request") | .parameters)) as $pr
+    | ($rules | map(select(.type == "required_status_checks") | .parameters)) as $sc
+    | { repo: $repo.full_name,
+        methods: ([ (if $repo.allow_merge_commit then "merge" else empty end),
+                    (if $repo.allow_squash_merge then "squash" else empty end),
+                    (if $repo.allow_rebase_merge then "rebase" else empty end) ]
+                  | map(select(. as $m | all($pr[]; .allowed_merge_methods | index($m) != null)))),
+        uptodate: any($sc[]; .strict_required_status_checks_policy == true),
+        checks: ([ $sc[] | .required_status_checks[] | .context ] | unique),
+        threads: any($pr[]; .required_review_thread_resolution == true) }'
+}
+
+# --- verbs ---------------------------------------------------------------------------
+
+mb_cmd_help() {
+  cat <<'EOF'
+mb - merge-bar's helper for PR mechanics (plugin: merge-bar). It prints facts and never approves.
+verbs:
+  threads <pr> [--raw]        unresolved review threads; --raw keeps the bot markup
+  checks <pr>                 checks and workflow runs for the current head, and older-head runs holding the queue
+  rules [--base <branch>]     allowed merge methods, up-to-date branch, required checks, resolved threads
+  blockers <pr>               every stated reason the PR cannot merge, from what can be read
+  wait <pr> --head <sha> [--max-seconds N]
+                              poll checks (default limit 540s). exit 0 passed, 1 a check failed,
+                              3 head moved, 4 no run appeared, 75 limit reached (run it again)
+  reply <thread-id> --body-file <file>   reply in a review thread
+  resolve <thread-id>         resolve a review thread
+every verb takes --repo OWNER/REPO (else the current repository). exit 2: could not read, or bad usage.
+EOF
+}
+
+mb_cmd_threads() {
+  mb_parse "repo raw" "$@"
+  mb_need_pr_number "threads"
+  mb_set_repo
+  mb_threads_fetch "$P1"
+  printf '%s' "$THREADS" | jq -r --argjson raw "$O_RAW" '
+    def clean:
+      gsub("\r"; "")
+      | gsub("<!--[\\s\\S]*?-->"; "")
+      | reduce range(0; 20) as $i (.; gsub("<details[^>]*>(?:(?!<details)[\\s\\S])*?</details>"; ""; "i"))
+      | gsub("</?(?:summary|details|picture|source|img|dl|dt|dd|p|br|b|i|em|strong|a|sub|sup|div|span|ul|ol|li|hr|h[1-6]|table|thead|tbody|tr|td|th|blockquote)(?:\\s[^>]*)?/?>"; ""; "i")
+      | gsub("\n{3,}"; "\n\n")
+      | sub("^\\s+"; "") | sub("\\s+$"; "");
+    [ .[] | select(.isResolved | not) ] as $open
+    | ($open[] |
+        "thread \(.id)  \(.path // "(no path)")\(if (.line // .originalLine) != null then ":\(.line // .originalLine)" else "" end)  @\(.comments.nodes[0].author.login // "unknown")\(if .isOutdated then "  [outdated]" else "" end)",
+        ((.comments.nodes[0].body // "") | (if $raw == 1 then . else clean end) | split("\n") | map(if . == "" then "" else "  " + . end) | join("\n"))),
+      "unresolved: \($open | length)"'
+}
+
+mb_cmd_checks() {
+  mb_parse "repo" "$@"
+  mb_need_pr_number "checks"
+  mb_set_repo
+  local sha branch runs_head runs_branch
+  mb_pr_view "$P1"
+  sha=$(printf '%s' "$PRJ" | jq -r .headRefOid)
+  branch=$(printf '%s' "$PRJ" | jq -r .headRefName)
+  mb_get "workflow runs for $sha" api "repos/{owner}/{repo}/actions/runs?head_sha=$sha&per_page=100"
+  runs_head=$MB_OUT
+  mb_need_runs "$runs_head" "workflow runs for $sha"
+  mb_get "workflow runs on $branch" api "repos/{owner}/{repo}/actions/runs?branch=$(printf '%s' "$branch" | jq -sRr '@uri')&per_page=50"
+  runs_branch=$MB_OUT
+  mb_need_runs "$runs_branch" "workflow runs on $branch"
+  printf '%s' "$PRJ" | jq -r "$MB_JQ_DEFS"'
+    "pr #\(.number) \(.state) head \(.headRefOid) (\(.headRefName) -> \(.baseRefName))",
+    "checks at head:",
+    (if (.statusCheckRollup | length) == 0 then "  none"
+     else (.statusCheckRollup[] | "  \(cstate)  \(craw)  \(cname)") end),
+    ([.statusCheckRollup[] | cstate] as $s
+      | "summary: success=\($s | map(select(. == "success")) | length) failure=\($s | map(select(. == "failure")) | length) pending=\($s | map(select(. == "pending")) | length) skipped=\($s | map(select(. == "skipped")) | length)")'
+  printf '%s' "$runs_head" | jq -r '
+    "workflow runs at head:",
+    (if (.workflow_runs | length) == 0 then "  none"
+     else (.workflow_runs[] | "  \(.id)  \(.name)  \(.status)\(if .conclusion != null then "/\(.conclusion)" else "" end)") end)'
+  printf '%s' "$runs_branch" | jq -r --arg sha "$sha" --arg branch "$branch" '
+    [ .workflow_runs[] | select(.head_sha != $sha and .status != "completed") ] as $old
+    | "older heads of \($branch) still holding runs:",
+      (if ($old | length) == 0 then "  none"
+       else ($old[] | "  \(.id)  \(.name)  \(.status)  head \(.head_sha)") end)'
+}
+
+# mb_need_runs <json> <what>
+mb_need_runs() {
+  mb_need_jq "$1" "$2" \
+    '(.workflow_runs | type) == "array" and all(.workflow_runs[]; (.id | type) == "number" and (.name | type) == "string" and (.status | type) == "string" and (.head_sha | type) == "string")' \
+    "workflow_runs is missing, or a run lacks id, name, status or head_sha"
+}
+
+mb_cmd_rules() {
+  mb_parse "repo base" "$@"
+  [ -z "$P1" ] || mb_usage "rules takes no PR number; use --base <branch>"
+  mb_set_repo
+  local base=$O_BASE
+  if [ -z "$base" ]; then
+    mb_get "the repository" api "repos/{owner}/{repo}"
+    mb_check_repo "$MB_OUT" || mb_die "could not read the repository: $MB_ERR"
+    base=$(printf '%s' "$MB_OUT" | jq -r .default_branch)
+  fi
+  mb_rules_load "$base" || mb_die "could not read the rules of $base: $MB_ERR"
+  mb_rules_facts | jq -r --arg base "$base" '
+    "rules for \(.repo), base \($base):",
+    "merge methods allowed: \(if (.methods | length) == 0 then "none" else (.methods | join(" ")) end)",
+    "up-to-date branch required: \(if .uptodate then "yes" else "no" end)",
+    "required checks: \(if (.checks | length) == 0 then "none" else (.checks | join(", ")) end)",
+    "threads must be resolved: \(if .threads then "yes" else "no" end)"'
+}
+
+mb_cmd_blockers() {
+  mb_parse "repo" "$@"
+  mb_need_pr_number "blockers"
+  mb_set_repo
+  mb_pr_view "$P1"
+  mb_threads_fetch "$P1"
+  local base status rules_ok=1 facts='null' lines nb
+  base=$(printf '%s' "$PRJ" | jq -r .baseRefName)
+  status=$(printf '%s' "$PRJ" | jq -r .mergeStateStatus)
+  if mb_rules_load "$base"; then facts=$(mb_rules_facts); else rules_ok=0; fi
+  lines=$(jq -r -n "$MB_JQ_DEFS"'
+    ($pr | fromjson) as $p | ($threads | fromjson) as $t | ($facts | fromjson) as $f
+    | ($p.statusCheckRollup | map({n: cname, s: cstate})) as $c
+    | [ (if $p.isDraft then "blocker: draft pull request" else empty end),
+        (if $p.mergeStateStatus == "BEHIND"
+         then "blocker: branch is behind \($p.baseRefName)\(if $f != null and $f.uptodate then " and the base requires an up-to-date branch" else "" end)"
+         else empty end),
+        (if $p.mergeable == "CONFLICTING" or $p.mergeStateStatus == "DIRTY" then "blocker: merge conflict with \($p.baseRefName)" else empty end),
+        ($t | map(select(.isResolved | not)) | .[]
+          | "blocker: unresolved thread \(.id)  \(.path // "(no path)")\(if (.line // .originalLine) != null then ":\(.line // .originalLine)" else "" end)"),
+        (if $f != null
+         then ($f.checks[] as $r
+               | ([$c[] | select(.n == $r)]) as $m
+               | if ($m | length) == 0 then "blocker: required check not reported: \($r)"
+                 elif ($m | all(.s == "success")) then empty
+                 else "blocker: required check not passed: \($r) (\($m | map(.s) | join(", ")))" end)
+         else ($c[] | select(.s == "failure" or .s == "pending") | "check not passed (whether required is unread): \(.n) (\(.s))")
+         end)
+      ] | .[]' \
+    --arg pr "$PRJ" --arg threads "$THREADS" --arg facts "$facts")
+  [ -z "$lines" ] || printf '%s\n' "$lines"
+  nb=$(printf '%s\n' "$lines" | awk '/^blocker:/ { n++ } END { print n + 0 }')
+  if [ "$nb" -eq 0 ] && [ "$status" = "BLOCKED" ]; then
+    echo "unknown: $status"
+  fi
+  [ "$rules_ok" -eq 1 ] || echo "unread: rules ($MB_ERR)"
+  echo "state: mergeStateStatus=$status mergeable=$(printf '%s' "$PRJ" | jq -r .mergeable) pr=$(printf '%s' "$PRJ" | jq -r .state)"
+  echo "blockers stated: $nb (a list of facts, not a verdict that the PR can merge)"
+}
+
+# --- wait ----------------------------------------------------------------------------
+
+mb_wait_end() { # mb_wait_end <rc> <message>
+  echo "result: $2"
+  exit "$1"
+}
+
+mb_cmd_wait() {
+  mb_parse "repo head max-seconds settle-seconds interval" "$@"
+  mb_need_pr_number "wait"
+  local pr=$P1 head max=540 settle=120 interval=20 re='^[0-9a-fA-F]{7,40}$'
+  [ -n "$O_HEAD" ] || mb_usage "wait needs --head <sha>"
+  [[ $O_HEAD =~ $re ]] || mb_usage "--head takes a commit SHA (7 to 40 hex digits)"
+  head=$(printf '%s' "$O_HEAD" | tr 'A-F' 'a-f')
+  if [ -n "$O_MAX" ]; then mb_posint --max-seconds "$O_MAX"; max=$((10#$O_MAX)); fi
+  if [ -n "$O_SETTLE" ]; then mb_posint --settle-seconds "$O_SETTLE"; settle=$((10#$O_SETTLE)); fi
+  if [ -n "$O_INTERVAL" ]; then mb_posint --interval "$O_INTERVAL"; interval=$((10#$O_INTERVAL)); fi
+  mb_set_repo
+
+  local start now elapsed rem nap first=1 prev="" cur="" sha state req='[]' runs ev
+  local n_runs n_active n_failed n_req n_req_failed pending nonskipped ns_ok req_ok base lines changed
+  start=$(date +%s)
+  while :; do
+    now=$(date +%s); elapsed=$((now - start))
+    mb_pr_view "$pr"
+    sha=$(printf '%s' "$PRJ" | jq -r .headRefOid)
+    state=$(printf '%s' "$PRJ" | jq -r .state)
+    [ "$state" = "OPEN" ] || mb_wait_end 2 "pull request #$pr is $state; nothing to wait for"
+    case "$sha" in
+      "$head"*) ;;
+      *) mb_wait_end 3 "head moved to $sha; was waiting for $head. Re-review the new head, then wait on it" ;;
+    esac
+
+    if [ "$first" -eq 1 ]; then
+      first=0
+      base=$(printf '%s' "$PRJ" | jq -r .baseRefName)
+      if mb_rules_load "$base"; then
+        req=$(mb_rules_facts | jq -c .checks)
+      else
+        echo "note: required checks unreadable ($MB_ERR); passing on non-skipped checks only"
+      fi
+    fi
+
+    mb_get "workflow runs for $sha" api "repos/{owner}/{repo}/actions/runs?head_sha=$sha&per_page=100"
+    runs=$MB_OUT
+    mb_need_runs "$runs" "workflow runs for $sha"
+    n_runs=$(printf '%s' "$runs" | jq '.workflow_runs | length')
+    n_active=$(printf '%s' "$runs" | jq '[.workflow_runs[] | select(.status != "completed")] | length')
+    ev=$(printf '%s' "$PRJ" | jq -c --argjson req "$req" "$MB_JQ_DEFS"'
+      [.statusCheckRollup[] | {n: cname, s: cstate}] as $c
+      | ($c | map(select(.s != "skipped"))) as $ns
+      | { lines: ($c | map("check " + .n + ": " + .s)),
+          failed: ($c | map(select(.s == "failure") | .n)),
+          pending: ($c | map(select(.s == "pending")) | length),
+          nonskipped: ($ns | length),
+          ns_ok: ($ns | all(.s == "success")),
+          req_failed: [ $req[] as $r | $c[] | select(.n == $r and .s == "failure") | .n ],
+          req_ok: (($req | length) > 0 and all($req[]; . as $r | any($c[]; .n == $r and .s == "success"))) }')
+    n_failed=$(printf '%s' "$ev" | jq '.failed | length')
+    n_req=$(printf '%s' "$req" | jq 'length')
+    n_req_failed=$(printf '%s' "$ev" | jq '.req_failed | length')
+    pending=$(printf '%s' "$ev" | jq .pending)
+    nonskipped=$(printf '%s' "$ev" | jq .nonskipped)
+    ns_ok=$(printf '%s' "$ev" | jq .ns_ok)
+    req_ok=$(printf '%s' "$ev" | jq .req_ok)
+
+    # One line per change since the last look.
+    lines=$(printf '%s' "$ev" | jq -r '.lines[]')
+    cur=$(printf '%s\n%s' "$lines" "$(printf '%s' "$runs" | jq -r '.workflow_runs[] | "run " + .name + ": " + .status + (if .conclusion != null then "/" + .conclusion else "" end)')")
+    [ "$n_runs" -ne 0 ] || cur="no workflow run for $sha yet"
+    changed=$(printf '%s\n' "$cur" | PREV="$prev" awk 'BEGIN { n = split(ENVIRON["PREV"], a, "\n"); for (i = 1; i <= n; i++) seen[a[i]] = 1 } NF && !($0 in seen)')
+    [ -z "$changed" ] || printf '%s\n' "$changed" | sed "s/^/[${elapsed}s] /"
+    prev=$cur
+
+    if [ "$n_runs" -eq 0 ]; then
+      # No workflow run exists for this exact SHA: nothing in the other arms may call it a pass.
+      [ "$elapsed" -lt "$settle" ] || mb_wait_end 4 "no workflow run appeared for $sha in ${elapsed}s. Not a pass: the repository may have no workflow for this change; the agent decides"
+    elif [ "$n_req" -gt 0 ]; then
+      [ "$n_req_failed" -eq 0 ] || mb_wait_end 1 "a required check failed on $sha: $(printf '%s' "$ev" | jq -r '.req_failed | join(", ")')"
+      [ "$req_ok" != "true" ] || mb_wait_end 0 "every required check succeeded on $sha"
+      if [ "$elapsed" -ge "$settle" ] && [ "$n_active" -eq 0 ] && [ "$pending" -eq 0 ]; then
+        mb_wait_end 4 "runs finished on $sha but a required check never succeeded or never reported. Not a pass"
+      fi
+    else
+      [ "$n_failed" -eq 0 ] || mb_wait_end 1 "a check failed on $sha: $(printf '%s' "$ev" | jq -r '.failed | join(", ")')"
+      if [ "$n_active" -eq 0 ] && [ "$pending" -eq 0 ]; then
+        if [ "$nonskipped" -gt 0 ] && [ "$ns_ok" = "true" ]; then
+          mb_wait_end 0 "every non-skipped check succeeded on $sha ($nonskipped); required checks unreadable or none set"
+        fi
+        [ "$elapsed" -lt "$settle" ] || mb_wait_end 4 "runs finished on $sha but no non-skipped check succeeded (only skipped checks). Not a pass"
+      fi
+    fi
+
+    now=$(date +%s); elapsed=$((now - start)); rem=$((max - elapsed))
+    [ "$rem" -gt 0 ] || mb_wait_end 75 "limit of ${max}s reached on $sha; the state so far is above. Run mb wait again"
+    nap=$interval
+    [ "$nap" -le "$rem" ] || nap=$rem
+    sleep "$nap"
+  done
+}
+
+# --- reply and resolve ---------------------------------------------------------------
+
+MB_REPLY_Q='mutation($thread: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $thread, body: $body}) {
+    comment { id url }
+  }
+}'
+
+MB_RESOLVE_Q='mutation($thread: ID!) {
+  resolveReviewThread(input: {threadId: $thread}) {
+    thread { id isResolved }
+  }
+}'
+
+mb_need_thread_id() {
+  case "$P1" in
+    ''|*[!A-Za-z0-9_-]*) mb_usage "$1 needs a review thread id (PRRT_...)" ;;
+  esac
+}
+
+mb_cmd_reply() {
+  mb_parse "repo body-file" "$@"
+  mb_need_thread_id "reply"
+  [ -n "$O_BODY" ] || mb_usage "reply needs --body-file <file>; a body is never an argument"
+  [ -f "$O_BODY" ] && [ -r "$O_BODY" ] && [ -s "$O_BODY" ] || mb_usage "--body-file must name a readable, non-empty file"
+  mb_set_repo
+  mb_get "the reply to $P1" api graphql -f query="$MB_REPLY_Q" -f thread="$P1" -F body=@"$O_BODY"
+  mb_need_jq "$MB_OUT" "the reply to $P1" \
+    '(.data.addPullRequestReviewThreadReply.comment.id | type) == "string"' \
+    "data.addPullRequestReviewThreadReply.comment.id is missing"
+  printf '%s' "$MB_OUT" | jq -r '.data.addPullRequestReviewThreadReply.comment | "reply \(.id)\(if .url != null then "  \(.url)" else "" end)"'
+}
+
+mb_cmd_resolve() {
+  mb_parse "repo" "$@"
+  mb_need_thread_id "resolve"
+  mb_set_repo
+  mb_get "the resolve of $P1" api graphql -f query="$MB_RESOLVE_Q" -f thread="$P1"
+  mb_need_jq "$MB_OUT" "the resolve of $P1" \
+    '(.data.resolveReviewThread.thread.id | type) == "string" and (.data.resolveReviewThread.thread.isResolved | type) == "boolean"' \
+    "data.resolveReviewThread.thread.id or isResolved is missing"
+  printf '%s' "$MB_OUT" | jq -e '.data.resolveReviewThread.thread.isResolved == true' >/dev/null \
+    || mb_die "thread $P1 is still unresolved after the resolve call"
+  printf '%s' "$MB_OUT" | jq -r '.data.resolveReviewThread.thread | "resolved \(.id)"'
+}
+
+# --- dispatch ------------------------------------------------------------------------
+
+main() {
+  local cmd="${1:-help}"
+  [ $# -eq 0 ] || shift
+  case "$cmd" in
+    help|-h|--help) mb_cmd_help ;;
+    threads|checks|rules|blockers|wait|reply|resolve) "mb_cmd_$cmd" "$@" ;;
+    *) echo "mb: unknown verb '$cmd'" >&2; mb_cmd_help >&2; exit 2 ;;
+  esac
+}
+main "$@"

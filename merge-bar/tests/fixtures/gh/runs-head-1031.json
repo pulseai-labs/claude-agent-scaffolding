@@ -1,0 +1,37 @@
+{
+  "total_count": 1,
+  "workflow_runs": [
+    {
+      "id": 41344090802,
+      "name": "repository test suites",
+      "node_id": "WFR_kwLOSMv3ks8AAAAJoEzCsg",
+      "head_branch": "retire-ac",
+      "head_sha": "346080b0331055824b1cb88b01494ba057fcd4bb",
+      "path": ".github/workflows/tests.yml",
+      "display_title": "Retire architect-critic from the marketplace; ossify 1.33.1, workspace-init 0.10.2",
+      "run_number": 1566,
+      "event": "pull_request",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 296211281,
+      "check_suite_id": 112049700441,
+      "check_suite_node_id": "CS_kwDOSMv3ks8AAAAaFq6-WQ",
+      "url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/actions/runs/41344090802",
+      "html_url": "https://github.com/pulseai-labs/claude-agent-scaffolding/actions/runs/41344090802",
+      "pull_requests": [],
+      "created_at": "2026-11-01T19:54:22Z",
+      "updated_at": "2026-11-01T20:06:48Z",
+      "run_attempt": 1,
+      "referenced_workflows": [],
+      "run_started_at": "2026-11-01T19:54:22Z",
+      "jobs_url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/actions/runs/41344090802/jobs",
+      "logs_url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/actions/runs/41344090802/logs",
+      "check_suite_url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/check-suites/112049700441",
+      "artifacts_url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/actions/runs/41344090802/artifacts",
+      "cancel_url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/actions/runs/41344090802/cancel",
+      "rerun_url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/actions/runs/41344090802/rerun",
+      "previous_attempt_url": null,
+      "workflow_url": "https://api.github.com/repos/pulseai-labs/claude-agent-scaffolding/actions/workflows/296211281"
+    }
+  ]
+}

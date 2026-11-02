@@ -10,7 +10,8 @@ written when it was opened (`opening-a-pr`). Every finding is judged against tha
 against an ideal: the loop fixes what the bar says blocks, answers or records the rest, and
 merges a two-way door on the operator's explicit ack or under a standing order (see **Standing
 orders**) that binds this role and grants merge authority, and hands a one-way door to the merge holder. The loop is judgment; the shell is only for
-mechanical `git`/`gh` facts. Nothing here needs a manifest, a worktree, or any plugin state.
+mechanical `git`/`gh` facts, which `mb` (this plugin's `bin/`; `mb help` names merge-bar) prints. Without `mb`
+(Codex has no `bin/`; test `command -v mb` once), each `mb` call below has a plain `gh` equivalent: use it. Nothing here needs a manifest, a worktree, or any plugin state.
 
 **Standing orders.** A standing order is a written order in the project's memory bank
 (`08-governance.md`, `## Standing orders`) or, for any kind of order that section does not
@@ -60,12 +61,12 @@ Reviewers leave findings in two places, and each alone misses what the other
 carries; a third is the report of the `reviewing-a-pr` reviewer:
 
 - the **review + conversation stream** — review summaries, CI rollup, top-level
-  comments (`gh pr view --comments`, `gh pr checks`, review listings — the
+  comments (`gh pr view --comments`, `mb checks <PR>`, review listings — the
   `--comments` flag matters: the bare view omits top-level comments, and a
   finding that lives only there would silently miss the ledger);
 - the **inline line-level comments** — where review bots put nearly everything
-  (`gh api --paginate repos/{owner}/{repo}/pulls/{n}/comments`, or the
-  equivalent — paginated, because a second page of findings that never loads
+  (`mb threads <PR>` lists the unresolved threads with their ids; or `gh api --paginate
+  repos/{owner}/{repo}/pulls/{n}/comments` — paginated, because a second page of findings that never loads
   is a ledger hole wearing a clean look);
 - the **review report** (`reviewing-a-pr`, in the shape of its `references/report.md`) — a
   crew reviewer seat returns it; without crew, start it as a fresh-context subagent on a
@@ -138,7 +139,7 @@ Every ledger line ends in exactly one of these five dispositions:
 - **`invalid — <why>`** — the finding is wrong. The refutation is evidence-shaped — walked
   against the tree, quoted — never "disagree". Applies to blocking and non-blocking alike.
 - **`answered — <condition it fails>`** — the default for a non-blocking finding. Reply in the
-  review thread in one line naming which bar condition it does not meet. If it repeats a
+  review thread in one line naming which bar condition it does not meet (`mb reply <thread> --body-file <f>`). If it repeats a
   Known limit, quote the body line. A reviewer that does not read the PR body repeats
   Known limits: answer them, never fix them.
 - **`limit — [KL]`** — a non-blocking finding that names a real edge case of this PR worth
@@ -214,7 +215,7 @@ on the head that carries the final shape before the terminus ask.
 ## 4. Terminus — surface everything, then ask
 
 First resolve the review thread of every inline finding — each has its final disposition by
-now (GraphQL `resolveReviewThread`). A repository can require resolved threads to merge, and
+now (`mb resolve <thread>`; GraphQL `resolveReviewThread` without `mb`). A repository can require resolved threads to merge, and
 an open one blocks it as surely as a red check.
 
 Then, in one place, give the operator:
@@ -223,12 +224,12 @@ Then, in one place, give the operator:
 - the full disposition ledger,
 - CI state and per-reviewer status (ran / skipped / pending / stale),
 - a mergeability verdict: clean to merge, or exactly what still blocks —
-  **grounded in GitHub's own answer, fetched here** (`gh pr view --json
+  **grounded in GitHub's own answer, fetched here** (`mb blockers <PR>`, with `mb rules` for the
+  base's merge methods and up-to-date rule; else `gh pr view --json
   mergeable,mergeStateStatus,isDraft`): a draft, a conflict with the base, a
   branch the ruleset calls BEHIND, or a blocked review state each falsifies
-  "clean to merge" however green CI and the reviewers look, and discovering
-  that only after the operator acks is the loop soliciting an impossible
-  merge.
+  "clean to merge" however green CI and the reviewers look; found only after
+  the ack, it solicited an impossible merge.
 
 A one-way door, or a body with no `Door:` line (counted as one-way), is never merged by this
 skill — not under a standing order, not on the operator's explicit ack; an ack is answered
@@ -250,7 +251,9 @@ before merging, re-fetch every finding signal and the checks once more;
 any new finding re-enters §2 instead of merging. On a branch governed
 by a merge queue, required checks must be **finished** before accepting the
 ack — with checks still pending, `gh pr merge` does not merge, it *enables
-auto-merge*, and this lane never auto-merges. Never merge over an unresolved
+auto-merge*, and this lane never auto-merges. To wait for CI: `mb wait <PR> --head <oid>`, as a
+background command where the harness has one, then end the turn; it reads checks only. Exit 0 is the
+only pass; 1 a check failed, 3 head moved, 4 no run appeared, 75 limit reached (run it again). Never merge over an unresolved
 blocking finding, a stale or incomplete reviewer signal, or a red gate. If the operator
 leaves it open,
 report the PR URL and stop — the loop does not poll.
@@ -301,7 +304,7 @@ where they go.
 
 ## Anti-patterns
 
-- **Growing the loop into tooling.** No wrapper scripts, no state files — the ledger of
+- **Growing the loop into tooling.** No wrapper scripts beyond `mb`, no state files — the ledger of
   dispositions lives in the conversation and the terminus report.
 - **Judging a finding by its label.** "P1" and "nit" are the reviewer's words; the bar is yours.
 - **Editing straight down the ledger.** N findings are not N fixes. Classify first (§2.5).
