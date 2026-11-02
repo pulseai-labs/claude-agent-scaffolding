@@ -326,13 +326,16 @@ Next steps:
   1. cd /abs/path/{name}-ai && git status
   2. git commit -m "workspace-init: initial bootstrap (pair-with)"
   3. cd /abs/path/{name}-ai && claude      # Claude Code; on Codex, run `codex` in that directory instead
-  4. Continue into ossify only where it currently continues: `/ossify:adopt` targets projects
-     previously onboarded with the legacy scaffold stack — it reads that stack's roadmap state,
-     active-context cursor and legacy spec. A repository that carries product source at `HEAD`
-     but never used that stack has no supported ossify continuation yet (plain repos: #536);
-     `/ossify:start` sends such a repository here rather than onboarding it. (For a canonical
-     with no product source, history alone included on ossify 1.34.0 or later, `/ossify:start` does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
-     On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`. Continue into
+  4. Continue into ossify: a canonical that carries product source at `HEAD` goes to
+     `/ossify:adopt` (ossify 1.35.0 or later), with or without the legacy scaffold stack — it
+     reads that stack's roadmap state, active-context cursor and legacy spec only when they
+     exist. `/ossify:start` sends such a repository to adopt; for a canonical with no product
+     source, history alone included on ossify 1.34.0 or later, `/ossify:start` onboards it. On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     A canonical that holds a memory bank or `MASTER-SPEC.md` makes `/pair-workspace` abort; the
+     plain route does not need it — make an AI workspace yourself (an empty directory, `git init`)
+     and run `/ossify:adopt` there.
+     On ossify 1.35.0 or later, adopt replaces the marked `AGENTS.md` stub, carrying its
+     `## Git policy` and `## AI-trace filter` sections across. Continue into
      ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`,
      `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.
   5. Before `/ossify:adopt`, every participating tree must be clean: adoption refuses while any

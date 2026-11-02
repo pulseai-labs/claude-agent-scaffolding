@@ -245,7 +245,7 @@ for tok in 'The completion floor comes first' 'journey table is absent' \
            'per step it marks' 'operator-confirmed' 'the posture bone is absent' \
            'outside its four' 'no closed `Release 0`' 'its stub retrospective absent' \
            'lacks the per-station lines' 'no C2 result line for a declared repo' \
-           'a C2 result line per declared repo'; do
+           'a C2 result line per declared repo' 'a class P halt at C4, after C2 left zero `shipped` steps, is a halt'; do
   case "$_adopt6" in
     *"$tok"*) T_PASS=$((T_PASS+1)) ;;
     *) T_FAIL=$((T_FAIL+1)); echo "FAIL: adopt §6 no longer carries floor token '$tok'" ;;
@@ -1428,12 +1428,12 @@ _pin "$_r" "patch/SKILL.md does not repeat §2's changed-path re-check after rev
 # (#552) external-executor §4 no longer claims close fingerprints the four oids.
 _r=0; grep -Fq 'same four components' "$_OSSR/skills/work-item/references/external-executor.md" && _r=1
 _pin "$_r" "external-executor.md still claims work-item-close.md §2 fingerprints the four *_oid components - it computes none"
-# (#296) adopt: six gates (A0-A5), never "five", in every place that counts them.
+# (#296) adopt: the gates are A0-A5 (class P adds A6), never "five", in every place that counts them.
 _r=0
 for _f in "$_OSSR/skills/adopt/SKILL.md" "$_OSSR/commands/adopt.md" "$_OSSR/../.claude-plugin/marketplace.json"; do
   tr '\n' ' ' < "$_f" | grep -Eq 'five +(fail-closed|pre-flight) +gates|all five pass' && { _r=1; echo "  (#296 site: $(basename "$_f"))"; }
 done
-_pin "$_r" "adopt is still described with five gates where §3 defines six (A0-A5) - A0's OSS_STATE_FILE guard reads as preamble"
+_pin "$_r" "adopt is still described with five gates where §3 defines A0-A5 and A6 - A0's OSS_STATE_FILE guard reads as preamble"
 # (#397) doctor: the fix-finding route names the ONE write surface §1 defines.
 _r=0; grep -Fq 'two explicit-write surfaces' "$_OSSR/skills/doctor/SKILL.md" && _r=1
 _pin "$_r" "doctor/SKILL.md's fix-finding route excepts 'two explicit-write surfaces' - §1 defines exactly one"
@@ -2469,5 +2469,101 @@ pin "$_981_WC" 'identity` that is not a hex digest' \
   "#993 work-item-close §2: a non-hex identity halts before it reaches the shell"
 pin "$_981_WC" '**Without `--verdict`, after Layers 1 and 2, the close dispatches `ossify:verifier-agent`' \
   "#993 work-item-close §2: the dispatch sentence is conditional on no --verdict"
+
+# ---------------------------------------------------------------------------
+# adopt takes class P, a plain repo with product source and no legacy stack
+# (#536; design 2026-11-02 sections 3 and 4, operator rulings the same day).
+# Each rule is pinned where the actor reads it: the pointer in SKILL.md and the
+# depth in references/plain-repo.md; the old refusal wording is pinned absent.
+_AD2="$SKILLS/adopt/SKILL.md"
+_PR="$SKILLS/adopt/references/plain-repo.md"
+if [ -f "$_PR" ]; then T_PASS=$((T_PASS+1)); else T_FAIL=$((T_FAIL+1)); echo "FAIL: adopt/references/plain-repo.md is missing (#536)"; fi
+pin "$_AD2" '- **Class step — after A1.**' \
+  "adopt §3 has a class step right after A1 (#536)"
+pin "$_AD2" 'L and P never mix.' \
+  "adopt's class step keeps L and P apart (#536)"
+pin "$_PR" 'refuse, authoring nothing further, and route to **`/ossify:start`**' \
+  "plain-repo §1: no product source refuses and routes to /ossify:start (#536)"
+pin "$_PR" '3. **Yes, and no stack: class P.**' \
+  "plain-repo §1: source without a legacy stack is class P (#536)"
+pin "$_PR" 'A declared repo with no commit has no baseline SHA. If it holds files, stop and name it before anything is recorded:' \
+  "plain-repo §1: an unborn HEAD with files stops and is named, it does not route to /start (#536)"
+pin "$_PR" 'the operator commits them first (that is not "no product source", and it does not route to `/start`).' \
+  "plain-repo §1: an unborn HEAD is not the no-product-source answer (#536)"
+pin "$_PR" 'A product repo the declaration does not name refuses, and the refusal names the fix in the declaration'"'"'s own spelling.' \
+  "plain-repo §2: an undeclared product repo refuses and names the fix (#536)"
+pin "$_PR" 'A native `.ossify/topology.json` takes `.repos.<key>.root`' \
+  "plain-repo §2: the native-topology fix is .repos.<key>.root (#536)"
+pin "$_PR" '`.workspace/pairing.json` pairing manifest takes a top-level `{"root": "<absolute path>"}` entry under a fresh key' \
+  "plain-repo §2: the pairing-manifest fix is a top-level {root} entry (#536)"
+pin "$_PR" 'adopt does not edit a declaration it did not write.' \
+  "plain-repo §2: adopt never edits a declaration it did not write (#536)"
+pin "$_PR" 'never writes a byte in a product repo during A1.' \
+  "plain-repo §2: A1 writes nothing in a product repo (#536)"
+pin "$_PR" '**Check first** that the working directory is not a declared repo and is not inside one' \
+  "plain-repo §2: class P checks the working directory is no declared repo (#536)"
+pin "$_AD2" '--untracked-files=all` each. Any line, in any one — class P exempts only the topology A1 authored this run' \
+  "adopt A3 lists untracked files one by one and exempts only the authored topology (#536)"
+pin "$_PR" 'A3 exempts the exact path `.ossify/topology.json` in the AI workspace, and only when A1 authored it in this run.' \
+  "plain-repo §2: the A3 exemption is the exact topology path, A1-authored this run (#536)"
+pin "$_PR" 'exemption above is exact. Any other line refuses, as "work in flight"' \
+  "plain-repo §3: any other line than the exempt topology still refuses at A3 (#536)"
+pin "$_PR" 'git -C <root> worktree list --porcelain' \
+  "plain-repo §3: A4 lists linked worktrees for class P (#536)"
+pin "$_AD2" 'Class P records `A5: no legacy stack`.' \
+  "adopt A5 records a plain repo's absent cursor (#536)"
+pin "$_AD2" '- **A6 — something ships (class P only).**' \
+  "adopt has gate A6 for class P (#536)"
+pin "$_PR" '> nothing ships yet: this project is pre-skeleton. ossify cannot onboard it until one step works, or until the' \
+  "plain-repo §3: A6 refuses with the nothing-ships wording (#536)"
+pin "$_PR" 'None: refuse, before any state is written:' \
+  "plain-repo §3: A6 refuses before any state (#536)"
+pin "$_PR" '**C4 closes Release 0 only when at least one step is still `shipped` after C2**' \
+  "plain-repo §4: C4's rule for Release 0 (#536)"
+pin "$_PR" 'clean-checkout test is already re-marked `next` (C2), and harvested to the feature map then (C1'"'"'s harvest ran' \
+  "plain-repo §4: a step C2 re-marks next is harvested to the feature map (#536)"
+pin "$_AD2" 'A step it re-marks `next` is harvested to the feature map then' \
+  "adopt C2: a step re-marked next is harvested, for class L too (#536)"
+pin "$_PR" 'at C4, after C3, do not call `release_add`' \
+  "plain-repo §4: zero shipped steps after C2 mints no Release 0, and halts at C4 after C3 (#536)"
+pin "$_PR" 'names what to clear to retry: the file `oss state_path` prints and its `.base.json` sibling, `ADOPTION.md` moved' \
+  "plain-repo §4: the C2 halt's hand-off names the state file, its .base.json and ADOPTION.md (#536)"
+pin "$_PR" 'aside (C5 creates it only when absent), and C3'"'"'s uncommitted ADR files in the product repo (commit or remove' \
+  "plain-repo §4: the retry hand-off names C3's uncommitted ADR files (#536)"
+pin "$_AD2" 'a class P halt at C4, after C2 left zero `shipped` steps, is a halt,' \
+  "adopt's completion floor accepts the C4 halt after a zero-shipped C2 as a halt (#536)"
+pin "$_AD2" 'a workspace-init stub is replaced (`../start/references/occupied-destinations.md` §1a)' \
+  "adopt C5 replaces a workspace-init stub, not merges into it (#536)"
+pin "$_PR" 'is replaced, not merged, per `../../start/references/occupied-destinations.md` §1a, carrying its' \
+  "plain-repo §5: a workspace-init stub is replaced, carrying its policy sections (#536)"
+pin "$_PR" '`## Git policy` and `## AI-trace filter` sections verbatim' \
+  "plain-repo §5: Git policy and AI-trace filter carry over verbatim (#536)"
+pin "$_PR" 'Never write, move or delete one.' \
+  "plain-repo §5: a declared repo's own files are inputs, never written (#536)"
+pin "$_PR" 'each conflict with the AI workspace' \
+  "plain-repo §5: the adoption record lists the conflicts (#536)"
+pin "$_PR" 'elicited as `/start` §4 does' \
+  "plain-repo §6: Vision is elicited for class P (#536)"
+pin "$_PR" 'class P with no test suite runs `/start` §9 in full.' \
+  "plain-repo §6: only a class P repo with no test suite runs the full smoke (#536)"
+pin "$_AD2" 'Class P with no test suite: `/start` §9 in full.' \
+  "adopt §4: the full smoke is class P's, class L keeps the narrowed smoke (#536)"
+pin "$_PR" 'stay **uncommitted** in the product repo' \
+  "plain-repo §6: authored ADRs stay uncommitted and are named in the hand-off (#536)"
+pin "$_PR" 'mint scan with `dest_repo` set to that repo' \
+  "plain-repo §6: authored ADRs are numbered by the mint scan with dest_repo (#536)"
+pin "$_PR" 'that halt and C3'"'"'s collision halt (`SKILL.md` C3 1a) are the' \
+  "plain-repo §6: the floor allows the C2 halt and C3's collision halt (#536)"
+pin "$_AD2" 'refuse if the working directory is a declared repo' \
+  "adopt A1: class P refuses when run from a declared repo (#536)"
+pin "$SKILLS/start/SKILL.md" 'plain repo with product source alike (#536; ossify 1.35.0 or later)' \
+  "start §3's refusal names adopt as taking a plain repo (#536)"
+# The old refusal wording stays gone (each string was present at the base db0d0481 in the file named).
+_c="$(grep -c -F -- 'out of scope today' "$_AD2" || true)"
+_pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "adopt/SKILL.md still says 'out of scope today' (#536)"
+for _old in 'plain repos: #536' 'which today takes only a project onboarded'; do
+  _c="$(grep -c -F -- "$_old" "$SKILLS/start/SKILL.md" || true)"
+  _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "start/SKILL.md still says '$_old' (#536)"
+done
 
 t_summary

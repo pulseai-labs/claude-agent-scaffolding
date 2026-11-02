@@ -20,8 +20,8 @@ There is no N/A.
    the skill does not decide that silently. Where the fixture states the
    operator's answer, the skill follows it.
 3. **Route and record are true** - a refusal authors nothing, names what it
-   found, routes to `/ossify:adopt` and says adopt today takes only a project
-   onboarded with the legacy scaffold stack (plain repos: #536). A proceed
+   found, routes to `/ossify:adopt`, which takes a legacy-stack project and a plain
+   repo with product source alike (ossify 1.35.0 or later, #536). A proceed
    records each repo's history (repo, commit count, what is at `HEAD`) for the
    §13 hand-off; where the only history sits in a skipped `tooling_repo`, none
    is recorded. Routing a no-source repo to adopt, or dropping the history

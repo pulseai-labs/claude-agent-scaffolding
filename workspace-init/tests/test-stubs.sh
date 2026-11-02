@@ -83,7 +83,10 @@ test_A1_agents_md_writes_file_with_project_name() {
   # contains `/ossify:start`, so the bare substring would survive the route's
   # removal (measured — that mutation SURVIVED until this line named the route).
   assert_contains '- Canonical with no product source at `HEAD` (history alone is fine on ossify 1.34.0 or later): run `/ossify:start`' "$content" || return 1
-  assert_contains '- `/ossify:adopt` currently targets projects previously onboarded' "$content" || return 1
+  assert_contains '- Canonical with product source at `HEAD`, with or without the legacy scaffold stack: run `/ossify:adopt` (ossify 1.35.0 or later)' "$content" || return 1
+  # #536: adopt takes a plain repo now; the no-continuation wording is gone.
+  assert_not_contains 'plain repos: #536' "$content" || return 1
+  assert_not_contains 'no supported ossify continuation' "$content" || return 1
   assert_not_contains '/onboard' "$content" || return 1
   # #809: history alone no longer refuses /ossify:start.
   assert_not_contains 'carries source or history' "$content" || return 1

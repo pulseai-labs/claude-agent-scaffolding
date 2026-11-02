@@ -1,0 +1,1 @@
+{"scores": {"class_step": 4, "a1_route": 5, "a6_and_gates": 4, "c4_follows_c2": 4}, "pass": true, "notes": "A1 correctly refuses the undeclared shop-web, names the fix in the native `.repos.<key>.root` spelling, leaves the declaration unedited, writes no state and holds off the class step, A6 and C4; the class P prediction and the later gates are only briefly previewed."}

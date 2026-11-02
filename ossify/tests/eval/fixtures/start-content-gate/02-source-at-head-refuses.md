@@ -1,7 +1,7 @@
 ---
 scenario_id: 02-source-at-head-refuses
 expected_outcome: refuse-route-adopt
-expected_reason: Product source at HEAD (a Rust crate with src/ and tests/) refuses fail-fast, authors nothing and routes to /ossify:adopt, saying that adopt today takes only a project onboarded with the legacy scaffold stack (plain repos are #536).
+expected_reason: Product source at HEAD (a Rust crate with src/ and tests/) refuses fail-fast, authors nothing and routes to /ossify:adopt, which takes a project with the legacy scaffold stack and a plain repo with product source alike (ossify 1.35.0 or later, #536).
 ---
 The operator typed `/start` in `/home/dev/projects/pulsevision-ai`. The topology
 declares one repo, `canonical`, at `/home/dev/projects/pulsevision`. `git ls-tree

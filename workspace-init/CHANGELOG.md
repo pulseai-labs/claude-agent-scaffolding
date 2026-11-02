@@ -1,5 +1,12 @@
 # workspace-init changelog
 
+## 0.10.4 (2026-11-02)
+
+Routing prose follows ossify 1.35.0.
+
+### Changed
+- **`/ossify:adopt` takes a canonical with product source and no legacy stack (#536).** The Scenario A and C next steps, the fresh-bootstrap block, both READMEs and the AGENTS and README stubs say: a canonical with product source at `HEAD` goes to `/ossify:adopt` (ossify 1.35.0 or later), with or without the legacy scaffold stack; with no product source, `/ossify:start`. The Scenario A text notes that `/pair-workspace` aborts when the canonical holds a memory bank or `MASTER-SPEC.md`, and that the plain route does not need it: make an AI workspace by hand and run `/ossify:adopt` there. The AGENTS.md stub's adopt line says adopt replaces the stub, carrying `## Git policy` and `## AI-trace filter` across.
+
 ## 0.10.3 (2026-11-02)
 
 Routing prose follows ossify 1.34.0.
