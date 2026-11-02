@@ -2,7 +2,7 @@
 
 A brief is the whole contract the worker will ever see. The worker has no orchestration
 context, may be launched where the project's rules do not load, and the layer delivers this
-text verbatim (`layers/<layer>.md`) — no preamble, nothing prepended, nothing else.
+text verbatim, by file (`layers/<layer>.md`, Send) — no preamble, nothing prepended, nothing else.
 Every brief carries, in this order:
 
 1. Role, and "state your model in your first reply".
@@ -515,7 +515,7 @@ report file.
 ## Correction request (one send, no new session)
 
 A malformed, incomplete, or wrongly-shaped report from a live session is corrected in
-place, never by a new session: one send to that session, nothing else.
+place, never by a new session: one send to that session, nothing else — the body below by file (the layer's Send).
 
 ```text
 PROHIBITIONS: every seat-mods denial and narrower task limit wins. Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned; a worker's implementation plan is the top's to approve, and the merge follows run.merge_word. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted.

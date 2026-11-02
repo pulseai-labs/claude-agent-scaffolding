@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Fake sleep: records the argument and advances the fake clock; never waits.
+d=${MB_FAKE_DIR:?}
+echo "$1" >> "$d/sleeps"
+echo $(( $(cat "$d/clock" 2>/dev/null || echo 1000000) + $1 )) > "$d/clock"

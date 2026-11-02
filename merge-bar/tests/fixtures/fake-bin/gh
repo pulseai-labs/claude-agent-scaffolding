@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Fake `gh` for merge-bar's mb tests. Serves recorded fixtures from $MB_FAKE_DIR by call kind:
+#   pr view -> pr, api graphql -> threads | reply | resolve, api .../actions/runs?head_sha= -> runs-head,
+#   api .../actions/runs?branch= -> runs-branch, api .../rules/branches/ -> rules, api repos/{owner}/{repo} -> repo.
+# The Nth call of a kind serves <kind>.<N>.json when present, else <kind>.json. A <kind>.fail or
+# <kind>.<N>.fail file is printed to stderr and the call exits 1 (a gh that could not read).
+d=${MB_FAKE_DIR:?MB_FAKE_DIR is not set}
+{ printf 'gh'; for a in "$@"; do printf ' [%s]' "$a"; done; printf '\n'; } >> "$d/gh.log"
+kind=
+case "$1 $2" in
+  "pr view") kind=pr ;;
+  "api graphql")
+    case "$*" in
+      *addPullRequestReviewThreadReply*) kind=reply ;;
+      *resolveReviewThread*) kind=resolve ;;
+      *) kind=threads ;;
+    esac ;;
+  "api repos/{owner}/{repo}/actions/runs?head_sha="*) kind=runs-head ;;
+  "api repos/{owner}/{repo}/actions/runs?branch="*) kind=runs-branch ;;
+  "api repos/{owner}/{repo}/rules/branches/"*) kind=rules ;;
+  "api repos/{owner}/{repo}") kind=repo ;;
+  *) echo "fake gh: unexpected call: $*" >&2; exit 99 ;;
+esac
+n=$(( $(cat "$d/count.$kind" 2>/dev/null || echo 0) + 1 ))
+echo "$n" > "$d/count.$kind"
+if [ "$kind" = reply ]; then
+  for a in "$@"; do case "$a" in body=@*) cat "${a#body=@}" > "$d/reply.body" ;; esac; done
+fi
+for f in "$d/$kind.$n.fail" "$d/$kind.fail"; do
+  if [ -f "$f" ]; then cat "$f" >&2; exit 1; fi
+done
+if [ -f "$d/$kind.$n.json" ]; then cat "$d/$kind.$n.json"
+elif [ -f "$d/$kind.json" ]; then cat "$d/$kind.json"
+else echo "fake gh: no fixture for $kind (call $n)" >&2; exit 98
+fi

@@ -50,8 +50,8 @@ Each field exists because a measured case needs it:
 - `model_shows:` — where the launched model is verified, both read by the layer's
   Read: `banner` the emitted stream; `screen` the rendered screen — a
   status-bar agent returns nothing on the default read.
-- `brief_delivery:` — `inject` is the ordinary dispatch; `file` writes the brief to
-  a file and sends one line pointing at it, for an agent whose composer fragments injects.
+- `brief_delivery:` — absent means `file`: the brief is written to a file and one line points at it (the layer's Send); `inject` sends the text as a shell argument.
+  A seat on another machine states `inject` — its file would sit on the wrong machine, a known limit — and an entry naming such a `host:` without it is a config defect named at approval.
 - `host:` — the machine this seat runs on; absent, this machine. A value is a machine
   name the layer file's Machines step accepts, and one that step does not know halts the
   run rather than being guessed at. A seat runs elsewhere only when the operator names one
@@ -76,7 +76,7 @@ command: omp-seat spine-driver --via omp-deepseek-go
 expected_model: DeepSeek V4.1 Flash (OpenCode Go)
 effort: max
 model_shows: screen
-brief_delivery: inject
+brief_delivery: file
 can: subagents
 note: OMP coordinator (omp-roles). seat-mods and molt run as OMP extensions; mark the pane SEAT_MODS_ROLE=coordinator (the layer's `Seat marking`) and add SEAT_MODS_ALLOW=<each hosting repo>/.worktrees (colon-separated roots) to its export: omp task children (implementer, seat-reviewer) inherit the env, and the implementer must write the item worktree; herdr-restore relaunches the --via wrapper without omp-seat, its two extensions or its exports — release a restored OMP seat and relaunch through omp-seat.
 ```
@@ -223,7 +223,7 @@ command: my-coder
 expected_model: my-model-1
 effort: (agent default)
 model_shows: banner
-brief_delivery: inject
+brief_delivery: file
 can: slash-commands
 ```
 

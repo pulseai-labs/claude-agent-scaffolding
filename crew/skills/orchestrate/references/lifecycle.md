@@ -74,8 +74,8 @@ Every command's syntax comes from the layer's guide.
    item that classifies nowhere — is `contract`. One implementer per worktree. Items
    within a round may run in parallel; their merges are serial.
 3. **Launch.** The seat launch — pane creation, the readiness wait, the banner read that
-   confirms the model, then the brief delivered as `brief_delivery` says (inject or
-   file) on the send route the layer file fixes after that read — from its second
+   confirms the model, then the brief delivered as `brief_delivery` says (`file`,
+   unless the entry states `inject`) on the send route the layer file fixes after that read — from its second
    detection ask where the layer has one — is `roles.md`'s "The launch," with any
    undetected-seat path in the layer file. An implementer, verifier or reviewer seat's launch also
    runs the guarded-seat export `roles.md`'s launch block states, before its
