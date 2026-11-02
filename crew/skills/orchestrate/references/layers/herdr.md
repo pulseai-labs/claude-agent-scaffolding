@@ -135,7 +135,7 @@ file's send, filled by the dispatcher.
   prompt` is documented to honour bracketed paste); a seat set to `brief_delivery: inject` is reported to the operator. No turn-start check.
 - **By file:** a brief, a correction request or any message past one line is written to
   `<run dir>/scratch/<role>-<n>.brief-<k>` (absolute, this machine, outside every worktree, one file per
-  send); the send is `herdr agent prompt <pane> 'Read <path> and follow it.'`, so no free text reaches a shell. A one-line
+  send); the send is `herdr agent prompt <pane> 'Read <path> and follow it.'` (a single quote in the path is written `'\''`), so no free text reaches a shell. A one-line
   nudge stays inline, as `PING:` pins. `inject` prompts the text, for a seat on another machine, whose file would sit on the wrong machine — a known limit.
 
 **The turn-start check.** Acceptance of input is not the start of a turn, as herdr's guide
