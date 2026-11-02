@@ -77,6 +77,22 @@ jobs:
       - name: code-judo suite
         run: bash code-judo/run-tests.sh
 
+      - name: Install dagr 0.3.1 (contract v3)
+        # crew's tests/test-crew-run.sh runs the real `dagr check --strict` and fails, never skips,
+        # without it. Pinned to herdr-dagr's v0.3.1 linux-musl asset and its sha256 (the release's own
+        # dagr-x86_64-unknown-linux-musl.sha256 file says the same). Update the URL and the digest together.
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/dagr"
+          mkdir -p "$dir/download"
+          curl -fsSL -o "$dir/download/dagr.tar.gz" \
+            https://github.com/aemrebarut/herdr-dagr/releases/download/v0.3.1/dagr-x86_64-unknown-linux-musl.tar.gz
+          echo "d70cbdf4ce69218b681ca56ecfdc280380489f67c84f539eed8149ba07920188  $dir/download/dagr.tar.gz" | sha256sum -c -
+          tar xzf "$dir/download/dagr.tar.gz" -C "$dir" dagr
+          rm -rf "$dir/download"
+          echo "$dir" >> "$GITHUB_PATH"
+          "$dir/dagr" --version | grep -F "contract v3"
+
       - name: crew suite
         run: bash crew/run-tests.sh
 

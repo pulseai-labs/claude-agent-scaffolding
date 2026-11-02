@@ -9,11 +9,13 @@ Every command's syntax comes from the layer's guide.
    lint), and the layer's health check. Then bind or create the run's `run.json` for the
    objective — **binding** an existing one is naming its path, with no CLI call,
    and you continue from the one the operator names when resuming. **Creating**
-   one is dagr's producer contract, never a bare write: resolve the `dagr`
-   validator first (`dagr --skill`) and, with none available, do not start
-   writing run files at all. That contract is the rule for every write of the
-   file, not only its first: the complete document goes to a temp file beside
-   the target, `dagr check --strict` it, and the rename over `run.json` — `mv`,
+   one is dagr's producer contract, never a bare write: with no `dagr` validator
+   (`dagr --skill`), start no run file at all. That contract is the rule for every
+   write of the file, not only its first, and `crew-run` runs it (`crew-run help`):
+   `open` an attempt, `settle` one, `send-back`, or `commit <file>` for one you built.
+   With no `crew-run` on PATH (Codex has no plugin `bin/`), or a file not `"dagr": 3`,
+   write the loop by hand: the complete document to a temp file beside the target,
+   `dagr check --strict` it, and the rename over `run.json` — `mv`,
    which this command allows — lands only once that check is clean. A created run records
    `run.merge_word` — `standing` unless the brief or the operator sets a merge gate for this run,
    then `operator`. A session that
@@ -93,7 +95,7 @@ Every command's syntax comes from the layer's guide.
    nested `run.json` the same way, and an operator's `brief:` is sent as a copy carrying the slots and the ping step, never edited in place (`briefs.md`).
    The full locator records `pane`, `machine` (a local seat's too), `report` and molt's `status` path,
    so an attempt whose brief never arrived never looks live.
-   Every dispatch — a launch or a new brief to a retained seat — opens its attempt with `phase: recorded`
+   Every dispatch — a launch or a new brief to a retained seat — opens its attempt (`crew-run open`) with `phase: recorded`
    and its full locator before the brief goes, notes the generation the doorbell compares
    (`completion.md`), and sets `phase: delivered` once the send is confirmed.
 4. **Plan gate, planned work only.** The planned implementer's brief says: write your

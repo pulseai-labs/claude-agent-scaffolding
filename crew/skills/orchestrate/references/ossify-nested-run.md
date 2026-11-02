@@ -24,8 +24,7 @@ the layer prepends nothing to a brief — among them `RUN_JSON`, the path of a `
 it writes and owns, separate from yours. dagr keeps one run per file and
 links no run to another, so *nested* names the session hierarchy, not anything
 dagr records. The spine session is that file's single writer and you never write
-it; it lints every write with `dagr check --strict` before the write replaces the
-file, as dagr's producer contract requires.
+it; its writes take `lifecycle.md` step 1's loop.
 
 - every item task, and each round's barrier, is recorded in `RUN_JSON`, never in your `run.json`;
 - the spine session is the orchestrator of its own run, so it launches, sends to, waits

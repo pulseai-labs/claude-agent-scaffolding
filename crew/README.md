@@ -1,6 +1,6 @@
 # crew
 
-The orchestrator/worker session model over herdr or Orca. One prose skill, no runtime library.
+The orchestrator/worker session model over herdr or Orca. One prose skill, one small bash writer for the run file (`bin/crew-run`), no runtime library.
 
 One orchestrator session keeps its context for decisions and dispatches everything else
 to worker sessions launched by seat name through the project's layer — the seats defined in the
@@ -173,7 +173,11 @@ with no background timer keeps the wait/ping fallback, never a rolling foregroun
 
 ## The run's state
 
-A run's state lives in a dagr `run.json` the plugin's prose owns and no binary writes.
+A run's state lives in a dagr `run.json`. `bin/crew-run` (bash and jq) takes the attempt transitions
+(`open`, `settle`, `send-back`) and any whole document (`commit`), each ending in dagr's producer loop: a temp file
+beside the run file, `dagr check --strict`, and the rename only when clean (exit 0 written, 1 findings, 2 refused).
+OMP gets it on `PATH` through the marketplace's `bin-path` loader. Codex has no plugin `bin/`, and a file that is not
+`"dagr": 3` is outside the writer: there the loop is written by hand (`references/lifecycle.md`, step 1).
 **Binding** an existing one is naming its path — and rebinding its `run.orchestrator`
 block to the binding session's own pane — and one run is one file per objective. **Creating** one is dagr's producer contract — a temp-file
 write, `dagr check --strict`, then the rename (`references/lifecycle.md`, step 1). The top
@@ -199,8 +203,8 @@ launcher's mode is autonomic's live `AUTONOMIC_EFFECTIVE_MODE`, never its record
 stale after a failed write. Since 0.2.11, the suite `tests/test-launch-site-marking.sh` selects the launch
 shapes its own header lists and fails a selected site whose own paragraph or list item
 carries no seat-mods marking clause (the layer's `Seat marking`); the shapes it does not select are named under
-NOT COVERED in that header. Test tooling only — no shipped behaviour changes. That hook is the only deterministic code a run executes: a run
-has **no `lib/`, no state directory, no parser** — `agents.md` and `roles.md` are read as
+NOT COVERED in that header. Test tooling only — no shipped behaviour changes. That hook and `crew-run` are the only deterministic code a run executes: a run
+has **no `lib/`, no state directory of its own, no parser** — `agents.md` and `roles.md` are read as
 prose and nothing parses them. The suites and the eval harness under `tests/` are
 build-and-test tooling; the plugin never runs them on a user's path.
 
@@ -231,8 +235,8 @@ has one fixed path.
 - The **`herdr-dagr`** plugin's `dagr` binary on PATH, to create and lint the run's
   `run.json`: dagr's producer contract resolves that validator *before* anything is
   written, and with none available the run starts no run file — not an unvalidated one.
-- `jq` on PATH for the context-ceiling hook; without it the hook reports the figure as
-  unavailable.
+- `jq` on PATH for the context-ceiling hook and `crew-run`; without it the hook reports the figure as
+  unavailable and `crew-run` cannot run.
 - The agents named in `~/.claude/crew/agents.md` resolvable where their pane
   runs; one that is not shows `command not found` and stops that dispatch.
 - The review command (`/code-review` by default, or the agent's `review:`) available to the reviewer session. If it is unavailable, the

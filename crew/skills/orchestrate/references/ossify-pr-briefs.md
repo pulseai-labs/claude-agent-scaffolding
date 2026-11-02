@@ -137,8 +137,7 @@ TASK: drive PR_NUMBER to a merge on the top's word, or a one-way door to step 6'
      binds an existing `run.json` rewrites `run.orchestrator` to its own address from
      the layer's Identity — dagr's stable-agent fallback otherwise — in the same producer loop every other
      write takes. On creation and on continue/rebind, write `run.orchestrator.machine` beside the pane
-     — this server's machine, per MECHANICS — and `run.orchestrator.session` from the layer's Identity, as step 1 of `lifecycle.md` beside MECHANICS says. Stay its single writer, as dagr's producer contract (`dagr --skill`)
-     says, linting every write with `dagr check --strict` before it replaces the file.
+     — this server's machine, per MECHANICS — and `run.orchestrator.session` from the layer's Identity, as step 1 of `lifecycle.md` beside MECHANICS says. Stay its single writer, writing as that step says.
      Nothing of yours goes in the top's run.json.
   2. Decide your startup branches BEFORE any seat exists. MERGE_EXECUTOR must read
      exactly `session` or `operator` — a missing, invalid or unknown assignment is
