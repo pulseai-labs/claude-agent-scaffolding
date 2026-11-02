@@ -224,7 +224,7 @@ review-ledger line per merged PR. No `lib/` code, no state change.
 Since 1.35.0 (#536), `/ossify:adopt` takes a plain existing-source repo, class P: product source at `HEAD` and no
 scaffold-dev legacy stack. The operator makes an AI workspace (an empty directory, `git init`) and runs `/ossify:adopt`
 there; A1 authors `.ossify/topology.json` with the repos the operator names, and a product repo a resolved topology does
-not declare refuses with the fix. A class step after A1 decides G/H (to `/ossify:start`), L (the legacy path, unchanged)
+not declare refuses with the fix. A class step after A1 decides G/H (to `/ossify:start`), L (the legacy path, which also gains the C5 stub row, the C2 re-harvest and `--untracked-files=all` in A3)
 or P. Class P adds gate A6 (the operator names a step that works from a clean checkout today, else adoption refuses
 before any state), probes `git worktree list --porcelain` and `status --untracked-files=all`, and closes Release 0 only
 while a step is still `shipped` after C2; zero left halts with the record written. A workspace-init `AGENTS.md` stub is
