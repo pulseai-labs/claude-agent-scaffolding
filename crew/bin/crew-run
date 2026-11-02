@@ -1,0 +1,433 @@
+#!/usr/bin/env bash
+# crew-run - a small writer for crew's dagr run.json (#754). Plugin: crew.
+#
+# Four verbs: open, settle, send-back, commit. Each reads the run file, applies one change,
+# stamps the times from the clock, appends the events, and ends in the same step: dagr's
+# producer loop - write a temp file beside the target, `dagr check --strict` it, rename it over
+# the target only when it is clean. A failed verb leaves the run file byte-identical and no temp
+# file behind. Each run file has one owning seat, but that seat can issue two calls at once, so
+# every verb holds a lock file beside the run file (RUN.lock) from its read to its rename. A lock
+# is never taken over automatically. `commit` also refuses a candidate older than the run file;
+# it cannot see a change made between the seat's own read and its candidate's write.
+#
+# Code under docs/conventions/skill-first.md question 2: mechanical work on a closed input (our
+# run file's versioned schema, ids we mint); free text is only ever a jq --arg value.
+#
+# It never decides. The outcome, the evidence tier, the cause and the locator come from the seat
+# as arguments; free text reaches the document only as a `jq --arg` value and is never parsed.
+# The transition verbs read a v3 file ("dagr": 3) and refuse any other; `commit` takes any
+# version dagr accepts.
+#
+# dagr is found by the producer contract's order: $DAGR_BIN, PATH, $HERDR_PLUGIN_ROOT. The
+# contract's `cargo run` fallback is a cold build and is never used. A dagr whose `--version`
+# does not say "contract v3" is refused, so a dagr upgrade is loud.
+#
+# Exit codes: 0 written; 1 the linter found findings (run file untouched); 2 refused or bad usage.
+#
+# bash 3.2 and jq 1.6 compatible: no bash 4 arrays or expansions, no jq 1.7 builtins, and every
+# jq `if` has its `else`.
+set -euo pipefail
+
+# An exported shell function named jq or dagr must not stand in for the binaries.
+unset -f jq dagr 2>/dev/null || true
+
+die() { echo "crew-run: $*" >&2; exit 2; }
+usage() { echo "crew-run: $* (try: crew-run help)" >&2; exit 2; }
+
+TMP=""
+ERRF=""
+LOCK=""
+cleanup() {
+  if [ -n "$TMP" ]; then rm -f "$TMP"; fi
+  if [ -n "$ERRF" ]; then rm -f "$ERRF"; fi
+  if [ -n "$LOCK" ]; then rm -f "$LOCK"; fi
+}
+trap cleanup EXIT
+trap 'exit 130' INT HUP
+trap 'exit 143' TERM
+
+crew_run_help() {
+  cat <<'EOF'
+crew-run - a small writer for crew's dagr run.json. Every verb ends in dagr's producer loop:
+a temp file beside the run file, `dagr check --strict`, then the rename. Exit 0 written, 1 the
+linter found findings (run file untouched), 2 refused or bad usage.
+
+  crew-run open      --run FILE --task T --actor A --pane P --machine M --report PATH
+                     [--status PATH] [--seen-hash H --seen-identity I] [--model M]
+                     [--cause TYPE [--ref ATTEMPT] [--by X] [--reason R]]
+      A new attempt T·aN: phase recorded, its locator, liveness, cause (initial when n is 1,
+      else --cause is required); the task moves to working. Prints the attempt id.
+  crew-run settle    --run FILE --task T --attempt T·aN --outcome done|failed|rejected|
+                     settled_unverified|lost [--tier verified|reported|heuristic|asserted]
+                     [--receipt R] [--reason R] [--ended-at TIMESTAMP]
+      Ends a working attempt and moves the task to match (lost: the task fails; it carries no
+      outcome, so no --tier). A canceled task, and a task whose latest attempt is a different
+      one, keep their state. --ended-at is when the work stopped (default now).
+  crew-run send-back --run FILE --task T --attempt T·aN --review R·aM --by X --reason R
+                     --tier TIER [--receipt R] --actor A --pane P --machine M --report PATH
+                     [--status PATH] [--seen-hash H --seen-identity I] [--model M]
+      The review attempt R·aM settles done (left as it is when already done), the reviewed
+      attempt T·aN settles rejected (it may be working or done), and a new attempt opens with
+      cause {sent_back, by, ref R·aM, reason}. Prints the new attempt id.
+  crew-run commit    --run FILE CANDIDATE
+      The loop for a document you built yourself: check CANDIDATE, rename it over FILE.
+      CANDIDATE sits beside FILE; FILE may not exist yet. A failed check leaves CANDIDATE.
+      Refresh generated_at in it yourself.
+
+--run defaults to $DAGR_RUN. The phase flip to delivered, liveness updates, gates, directives and
+plan edits stay hand edits: build the document with jq and `crew-run commit` it.
+EOF
+}
+
+# --- options ---------------------------------------------------------------------------
+
+OPT_NAMES="run task attempt actor model pane machine report status seen_hash seen_identity cause ref by reason outcome tier receipt ended_at review"
+POS=""
+
+init_opts() {
+  local n
+  for n in $OPT_NAMES; do printf -v "O_$n" '%s' ""; done
+}
+
+# parse <allowed names, hyphenated, "@" = one positional argument> <args...>
+parse() {
+  local allowed=" $1 " name var
+  shift
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --*)
+        name=${1#--}
+        case "$allowed" in *" $name "*) ;; *) usage "unknown option $1" ;; esac
+        [ $# -ge 2 ] || usage "$1 needs a value"
+        var="O_${name//-/_}"
+        printf -v "$var" '%s' "$2"
+        shift 2 ;;
+      *)
+        case "$allowed" in *" @ "*) ;; *) usage "unexpected argument $1" ;; esac
+        [ -z "$POS" ] || usage "one argument only, got a second: $1"
+        POS=$1
+        shift ;;
+    esac
+  done
+}
+
+need() {
+  local n v
+  for n in "$@"; do
+    v="O_${n//-/_}"
+    [ -n "${!v}" ] || usage "--$n is required"
+  done
+}
+
+in_set() { # <value> <word>... - 0 when the value is one of the words
+  local v=$1 w
+  shift
+  for w in "$@"; do [ "$v" = "$w" ] && return 0; done
+  return 1
+}
+
+check_tier() { in_set "$1" verified reported heuristic asserted || usage "--tier takes verified, reported, heuristic or asserted, not '$1'"; }
+
+check_seen() {
+  if [ -n "$O_seen_hash$O_seen_identity" ]; then need seen-hash seen-identity; fi
+}
+
+# --- dagr ------------------------------------------------------------------------------
+
+DAGR=""
+find_dagr() {
+  local c
+  if [ -n "${DAGR_BIN:-}" ]; then
+    [ -f "$DAGR_BIN" ] && [ -x "$DAGR_BIN" ] || die "DAGR_BIN is $DAGR_BIN, which is not an executable file"
+    DAGR=$DAGR_BIN
+  elif c=$(command -v dagr 2>/dev/null) && [ -f "$c" ] && [ -x "$c" ]; then
+    DAGR=$c
+  elif [ -n "${HERDR_PLUGIN_ROOT:-}" ]; then
+    for c in "$HERDR_PLUGIN_ROOT/target/release/dagr" "$HERDR_PLUGIN_ROOT/bin/dagr"; do
+      if [ -f "$c" ] && [ -x "$c" ]; then DAGR=$c; break; fi
+    done
+  fi
+  [ -n "$DAGR" ] || die "no dagr: set DAGR_BIN, put dagr on PATH, or run inside a herdr pane (HERDR_PLUGIN_ROOT); write no run file by hand either"
+  local v re='contract v3([^0-9]|$)'
+  v=$("$DAGR" --version 2>/dev/null) || die "$DAGR --version failed"
+  [[ $v =~ $re ]] || die "$DAGR is not contract v3 (it says: $v); the run file is left alone"
+}
+
+# check_and_rename <candidate> <target>: the one end every verb shares. Clean means exit 0 AND
+# an empty findings array; no output at exit 0 is no verdict, never a pass.
+check_and_rename() {
+  local cand=$1 target=$2 out rc=0
+  ERRF=$(mktemp "${TMPDIR:-/tmp}/crew-run.err.XXXXXX") || die "mktemp failed"
+  out=$("$DAGR" check "$cand" --strict --json 2>"$ERRF") || rc=$?
+  case "$rc" in
+    0)
+      # jq 1.6 answers 0 to `jq -e` on empty input, so silence is checked here, not left to jq.
+      [ -n "$out" ] || die "dagr exited 0 with no output; that is no verdict, so $target is unchanged"
+      if printf '%s' "$out" | jq -e 'type == "array" and length == 0' >/dev/null 2>&1; then
+        :
+      elif printf '%s' "$out" | jq -e 'type == "array"' >/dev/null 2>&1; then
+        rc=1
+      else
+        die "dagr exited 0 with no findings array; that is no verdict, so $target is unchanged"
+      fi ;;
+    1) ;;
+    *) die "dagr could not check $cand (exit $rc: $(head -n 1 "$ERRF")); $target is unchanged" ;;
+  esac
+  if [ "$rc" -eq 1 ]; then
+    echo "crew-run: dagr check --strict found findings; $target is unchanged" >&2
+    if ! printf '%s' "$out" | jq -r '.[] | "  \(.level | ascii_upcase) \(.code) \(.path) - \(.msg)"' >&2 2>/dev/null; then
+      printf '%s\n' "$out" >&2
+    fi
+    exit 1
+  fi
+  mv -f -- "$cand" "$target" || die "could not rename $cand over $target"
+}
+
+# --- the document ----------------------------------------------------------------------
+
+RUN=""
+load_run() {
+  RUN=${O_run:-${DAGR_RUN:-}}
+  [ -n "$RUN" ] || usage "--run FILE is required (or set DAGR_RUN)"
+  [ ! -d "$RUN" ] || die "$RUN is a directory, not a run file"
+}
+
+# lock_run: hold RUN.lock from the read to the rename. The lock is a file bash itself creates
+# with noclobber (O_EXCL), so one caller wins whatever mkdir or coreutils the host has; the
+# loser waits up to CREW_RUN_LOCK_WAIT seconds (default 30), then refuses. A lock is never taken
+# over: a holder killed with SIGKILL leaves it, and the refusal names its pid and whether that pid
+# still runs, so the seat can judge and remove it.
+lock_run() {
+  local l="$RUN.lock" pid tries=0 max
+  max=$(( ${CREW_RUN_LOCK_WAIT:-30} * 5 ))
+  [ -d "$(dirname "$RUN")" ] || die "no directory for $RUN"
+  while ! ( set -o noclobber; printf '%s\n' "$$" > "$l" ) 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge "$max" ]; then
+      pid=$(cat "$l" 2>/dev/null || true)
+      if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+        die "$l is held by pid $pid, which is not running on this host; $RUN is unchanged. If no crew-run is running, remove $l"
+      fi
+      die "another crew-run holds $l (pid ${pid:-unknown}); $RUN is unchanged. If no crew-run is running, remove $l"
+    fi
+    sleep 0.2
+  done
+  LOCK=$l
+}
+
+read_v3() {
+  [ -f "$RUN" ] || die "run file not found: $RUN"
+  [ -s "$RUN" ] || die "$RUN is empty"
+  jq -e 'type == "object"' "$RUN" >/dev/null 2>&1 || die "$RUN is not a JSON object"
+  jq -e '.dagr == 3' "$RUN" >/dev/null 2>&1 \
+    || die "$RUN is not a dagr 3 file (its \"dagr\" is $(jq -c '.dagr' "$RUN")); continue by hand and commit it"
+  jq -e '(.tasks | type) == "array"' "$RUN" >/dev/null 2>&1 || die "$RUN has no tasks array"
+}
+
+NOW=""
+stamp() { NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ); }
+
+PRELUDE='
+def atts: (.attempts // []);
+def ids: [.tasks[] | atts[] | .id];
+def tsk($id): [.tasks[] | select(.id == $id)];
+def holders($aid): [.tasks[] | select(any(atts[]; .id == $aid))];
+def opt($k; $v): if $v == "" or $v == null then {} else {($k): $v} end;
+def mapt($tid; f): .tasks |= map(if .id == $tid then f else . end);
+def mapa($tid; $aid; f): mapt($tid; .attempts = ((.attempts // []) | map(if .id == $aid then f else . end)));
+def ev($type; $tid; $aid; $who; $detail):
+  {at: $now, type: $type, task: $tid, attempt: $aid} + opt("actor"; $who) + opt("detail"; $detail);
+def addev($e): .events = ((.events // []) + [$e]);
+def tmap($r): if $r == "lost" then "failed" else $r end;
+def tstate($tid; $aid; $s):
+  mapt($tid; if ((.attempts // []) | .[-1].id) == $aid and .state != "canceled" then .state = $s else . end);
+def settle($tid; $aid; $r; $tr; $receipt; $reason; $ended):
+  mapa($tid; $aid;
+      (if .state == "working" then $ended else (.ended_at // $ended) end) as $e
+    | .state = $r
+    | .ended_at = $e
+    | (if $r == "lost" then del(.outcome)
+       else .outcome = ({result: $r, evidence: $tr} + opt("reason"; $reason) + opt("receipt"; $receipt)) end))
+  | tstate($tid; $aid; tmap($r));
+def newatt($tid; $cause):
+  ((((tsk($tid)[0] | atts) | map(.n) | max) // 0) + 1) as $n
+  | {id: ($tid + "·a" + ($n | tostring)), n: $n, cause: $cause, actor: $actor}
+    + opt("model"; $model)
+    + {locator: ({pane: $pane, machine: $machine, report: $report}
+                 + opt("status"; $status)
+                 + (if $haveseen then {seen: {hash: $seenh, identity: $seeni}} else {} end)),
+       state: "working", phase: "recorded", started_at: $now,
+       liveness: {prompt_acknowledged: false, last_output_at: $now, queued_input: 0}};
+def begin($tid; $att):
+  mapt($tid; .state = "working" | .attempts = ((.attempts // []) + [$att]))
+  | addev(ev("attempt_started"; $tid; $att.id; $att.actor; ""));
+'
+
+# transact <jq program> <jq flags...>: the program yields {refuse: msg} or {ok: document, id: id}.
+# The candidate is written beside the run file, checked, and renamed; the run file changes only
+# at that rename.
+transact() {
+  local prog=$1 res msg dir base
+  shift
+  res=$(jq -c --arg now "$NOW" "$@" "$PRELUDE $prog" "$RUN") || die "jq failed on $RUN"
+  [ -n "$res" ] || die "jq produced nothing from $RUN"
+  msg=$(printf '%s' "$res" | jq -r '.refuse // empty') || die "jq failed reading its own result"
+  [ -z "$msg" ] || die "$msg"
+  dir=$(dirname "$RUN")
+  base=$(basename "$RUN")
+  TMP=$(mktemp "$dir/.$base.XXXXXX") || die "could not create a temp file beside $RUN"
+  cp -p "$RUN" "$TMP" || die "could not copy $RUN to $TMP"
+  printf '%s' "$res" | jq '.ok' > "$TMP" || die "could not write $TMP"
+  check_and_rename "$TMP" "$RUN"
+  TMP=""
+  printf '%s' "$res" | jq -r '.id'
+}
+
+seen_flag() { if [ -n "$O_seen_hash" ]; then echo true; else echo false; fi; }
+
+# --- verbs -----------------------------------------------------------------------------
+
+verb_open() {
+  parse "run task actor model pane machine report status seen-hash seen-identity cause ref by reason" "$@"
+  load_run
+  need task actor pane machine report
+  check_seen
+  [ -z "$O_cause" ] || in_set "$O_cause" initial sent_back gate_failed followup superseded \
+    || usage "--cause takes initial, sent_back, gate_failed, followup or superseded, not '$O_cause'"
+  find_dagr
+  lock_run
+  read_v3
+  stamp
+  transact '
+    tsk($task) as $ts
+    | ($ts[0] | atts) as $ats
+    | ((($ats | map(.n) | max) // 0) + 1) as $n
+    | (if $ctype == "" then (if $n == 1 then "initial" else null end) else $ctype end) as $ct
+    | if ($ts | length) == 0 then {refuse: ("unknown task " + $task)}
+      elif ($ts | length) > 1 then {refuse: ("task " + $task + " is declared more than once")}
+      elif $ts[0].state == "canceled" then {refuse: ("task " + $task + " is canceled; reopen it by hand and commit")}
+      elif any($ats[]; .state == "working") then {refuse: ("task " + $task + " already has a working attempt")}
+      elif $ct == null then {refuse: ("attempt " + ($n | tostring) + " of " + $task + " needs --cause")}
+      elif $ct == "initial" and ($cref != "" or $cby != "" or $creason != "") then {refuse: "--cause initial takes no --ref, --by or --reason"}
+      elif $ct != "initial" and $cref == "" then {refuse: ("--cause " + $ct + " needs --ref")}
+      elif $ct != "initial" and (ids | any(.[]; . == $cref) | not) then {refuse: ("unknown attempt " + $cref)}
+      else
+        newatt($task; ({type: $ct} + (if $ct == "initial" then {} else {ref: $cref} + opt("by"; $cby) + opt("reason"; $creason) end))) as $att
+        | {ok: (begin($task; $att) | .generated_at = $now), id: $att.id}
+      end' \
+    --arg task "$O_task" --arg actor "$O_actor" --arg model "$O_model" --arg pane "$O_pane" \
+    --arg machine "$O_machine" --arg report "$O_report" --arg status "$O_status" \
+    --argjson haveseen "$(seen_flag)" --arg seenh "$O_seen_hash" --arg seeni "$O_seen_identity" \
+    --arg ctype "$O_cause" --arg cref "$O_ref" --arg cby "$O_by" --arg creason "$O_reason"
+}
+
+verb_settle() {
+  parse "run task attempt outcome tier receipt reason ended-at" "$@"
+  load_run
+  need task attempt outcome
+  in_set "$O_outcome" done failed rejected settled_unverified lost \
+    || usage "--outcome takes done, failed, rejected, settled_unverified or lost, not '$O_outcome'"
+  if [ "$O_outcome" = lost ]; then
+    [ -z "$O_tier$O_receipt" ] || usage "a lost attempt carries no outcome: drop --tier and --receipt"
+  else
+    need tier
+    check_tier "$O_tier"
+  fi
+  local re='^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$'
+  [ -z "$O_ended_at" ] || [[ $O_ended_at =~ $re ]] || usage "--ended-at takes YYYY-MM-DDTHH:MM:SSZ"
+  find_dagr
+  lock_run
+  read_v3
+  stamp
+  transact '
+    tsk($task) as $ts
+    | ($ts[0] | atts | map(select(.id == $attempt))) as $tas
+    | if ($ts | length) == 0 then {refuse: ("unknown task " + $task)}
+      elif ($ts | length) > 1 then {refuse: ("task " + $task + " is declared more than once")}
+      elif ($tas | length) == 0 then {refuse: ("task " + $task + " has no attempt " + $attempt)}
+      elif ($tas | length) > 1 then {refuse: ("attempt " + $attempt + " is declared more than once")}
+      elif $tas[0].state != "working" then {refuse: ("attempt " + $attempt + " is already " + ($tas[0].state | tostring) + ", not working")}
+      else
+        {ok: (settle($task; $attempt; $outcome; $tier; $receipt; $reason; $ended)
+              | addev(ev("attempt_settled"; $task; $attempt; $tas[0].actor; (if $reason != "" then $reason else $outcome end)))
+              | .generated_at = $now),
+         id: $attempt}
+      end' \
+    --arg task "$O_task" --arg attempt "$O_attempt" --arg outcome "$O_outcome" --arg tier "$O_tier" \
+    --arg receipt "$O_receipt" --arg reason "$O_reason" --arg ended "${O_ended_at:-$NOW}"
+}
+
+verb_send_back() {
+  parse "run task attempt review by reason tier receipt actor model pane machine report status seen-hash seen-identity" "$@"
+  load_run
+  need task attempt review by reason tier actor pane machine report
+  check_tier "$O_tier"
+  check_seen
+  find_dagr
+  lock_run
+  read_v3
+  stamp
+  transact '
+    tsk($task) as $ts
+    | ($ts[0] | atts | map(select(.id == $attempt))) as $tas
+    | holders($review) as $rts
+    | ($rts[0] | atts | map(select(.id == $review))) as $rs
+    | if ($ts | length) == 0 then {refuse: ("unknown task " + $task)}
+      elif ($ts | length) > 1 then {refuse: ("task " + $task + " is declared more than once")}
+      elif ($tas | length) == 0 then {refuse: ("task " + $task + " has no attempt " + $attempt)}
+      elif ($rts | length) == 0 then {refuse: ("unknown attempt " + $review)}
+      elif ($rts | length) > 1 or ($rs | length) > 1 then {refuse: ("attempt " + $review + " is declared more than once")}
+      elif $review == $attempt then {refuse: "the review attempt and the reviewed attempt are the same"}
+      elif $ts[0].state == "canceled" then {refuse: ("task " + $task + " is canceled; reopen it by hand and commit")}
+      elif ($tas[0].state != "working" and $tas[0].state != "done") then {refuse: ("attempt " + $attempt + " is " + ($tas[0].state | tostring) + "; only a working or done attempt is sent back")}
+      elif ($rs[0].state != "working" and $rs[0].state != "done") then {refuse: ("review attempt " + $review + " is " + ($rs[0].state | tostring) + "; it must be working or done")}
+      elif any(($ts[0] | atts)[]; .state == "working" and .id != $attempt) then {refuse: ("task " + $task + " has another working attempt")}
+      else
+        (if $rs[0].state == "working"
+         then settle($rts[0].id; $review; "done"; $tier; $receipt; ""; $now)
+              | addev(ev("attempt_settled"; $rts[0].id; $review; $rs[0].actor; "review of " + $attempt))
+         else . end)
+        | settle($task; $attempt; "rejected"; $tier; $receipt; $reason; $now)
+        | addev(ev("attempt_settled"; $task; $attempt; $by; "sent back: " + $reason))
+        | newatt($task; {type: "sent_back", by: $by, ref: $review, reason: $reason}) as $att
+        | {ok: (begin($task; $att) | .generated_at = $now), id: $att.id}
+      end' \
+    --arg task "$O_task" --arg attempt "$O_attempt" --arg review "$O_review" --arg by "$O_by" \
+    --arg reason "$O_reason" --arg tier "$O_tier" --arg receipt "$O_receipt" --arg actor "$O_actor" \
+    --arg model "$O_model" --arg pane "$O_pane" --arg machine "$O_machine" --arg report "$O_report" \
+    --arg status "$O_status" --argjson haveseen "$(seen_flag)" --arg seenh "$O_seen_hash" \
+    --arg seeni "$O_seen_identity"
+}
+
+verb_commit() {
+  local cdir tdir
+  parse "run @" "$@"
+  load_run
+  [ -n "$POS" ] || usage "commit needs the candidate file"
+  [ -f "$POS" ] || die "candidate not found: $POS"
+  tdir=$(dirname "$RUN")
+  [ -d "$tdir" ] || die "no directory for $RUN"
+  cdir=$(cd "$(dirname "$POS")" && pwd -P)
+  [ "$cdir" = "$(cd "$tdir" && pwd -P)" ] || die "the candidate must sit in the run file's directory, so the rename is atomic"
+  [ ! "$POS" -ef "$RUN" ] || die "the candidate and the run file are the same file"
+  find_dagr
+  lock_run
+  [ ! "$RUN" -nt "$POS" ] || die "$RUN changed after $POS was written; rebuild it from the current file"
+  check_and_rename "$POS" "$RUN"
+  echo "committed $RUN"
+}
+
+# --- dispatch --------------------------------------------------------------------------
+
+init_opts
+if [ $# -eq 0 ]; then crew_run_help >&2; exit 2; fi
+verb=$1
+shift
+case "$verb" in
+  help|-h|--help) crew_run_help ;;
+  open) verb_open "$@" ;;
+  settle) verb_settle "$@" ;;
+  send-back) verb_send_back "$@" ;;
+  commit) verb_commit "$@" ;;
+  *) usage "unknown verb $verb" ;;
+esac

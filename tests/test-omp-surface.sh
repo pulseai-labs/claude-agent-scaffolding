@@ -113,7 +113,7 @@ check_module() { # $1=root $2=plugins (spec B §5.1 check 6)
     [ -f "$f" ] || continue
     cmp -s "$f" "$r/omp/bin-path.ts" || echo "module: ${f#"$r"/} differs from omp/bin-path.ts"
   done
-  for p in $2 $OMP_ONLY; do   # OMP-only plugins are never in $2 but ship bin/ (omp-roles)
+  for p in $2 $OMP_ONLY $OMP_SHARED; do   # OMP-only plugins are never in $2 but ship bin/ (omp-roles); crew ships one too (crew-run)
     if [ -d "$r/$p/bin" ] && [ ! -f "$r/$p/omp/bin-path.ts" ]; then echo "module: $p has bin/ but ships no omp/bin-path.ts"; fi
   done
 }
@@ -237,6 +237,7 @@ control root-manifest   "root plugin.json present"  'printf "{}\n" > ossify/plug
 control module-drift    "module: ossify/omp/bin-path.ts differs" 'printf "// drift\n" >> ossify/omp/bin-path.ts'
 control module-missing  "module: ossify has bin/"   'rm ossify/omp/bin-path.ts'
 control module-missing-omp-only "module: omp-roles has bin/" 'rm omp-roles/omp/bin-path.ts'
+control module-missing-shared "module: crew has bin/ but ships no omp/bin-path.ts" 'mkdir -p crew/bin'
 control agent-missing-implementer "agent: omp-roles/agents/implementer.md missing" 'rm omp-roles/agents/implementer.md'
 control agent-missing-seat-reviewer "agent: omp-roles/agents/seat-reviewer.md missing" 'rm omp-roles/agents/seat-reviewer.md'
 for key in name description tools; do

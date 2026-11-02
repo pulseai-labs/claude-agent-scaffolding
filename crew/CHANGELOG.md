@@ -2,6 +2,18 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.11.0
+
+**`crew-run`, a small writer for the run file (#754).** `bin/crew-run` (bash and jq, `crew-run help`) writes the transitions that fail the linter most: `open` a new attempt (phase `recorded`, its full locator, liveness, an optional `--cause`; the task moves to `working`), `settle` an attempt (`--outcome` and `--tier`; the task moves to match), `send-back` (the review settles `done`, the reviewed attempt `rejected`, a new attempt opens with `cause {sent_back, by, ref, reason}`), and `commit <file>` (the existing loop for a document the seat built). Every verb stamps its times from the clock, appends its events, and ends in dagr's producer loop: a temp file beside the run file, `dagr check --strict`, the rename only when clean. Exit 0 written, 1 linter findings (run file untouched), 2 refused or bad usage. It never decides: outcome, tier, cause and locator are arguments, and free text reaches the file only as a `jq --arg` value.
+
+- **Behaviour change: crew no longer says "no binary writes".** `crew/README.md`, the marketplace entries (Claude Code and OMP), the Claude Code and Codex manifests and the root README row state it. Codex has no plugin `bin/`, so on Codex the loop stays a hand loop.
+- **`lifecycle.md` step 1 keeps the one copy of the hand loop** and names the four verbs; the spine and work-PR briefs and `ossify-nested-run.md` point there instead of restating the lint rule. The skill text is 3 bytes shorter overall (the `crew-run` pointers cost what the restated rules saved).
+- **A dagr that is not contract v3 is refused**, so a dagr upgrade is loud; dagr is found by the producer contract's order (`$DAGR_BIN`, PATH, `$HERDR_PLUGIN_ROOT`) and never by `cargo run`. The transition verbs refuse a file that is not `"dagr": 3`; `commit` takes any version dagr accepts.
+- **Overlapping calls lose nothing.** Every verb holds `RUN.lock`, a file bash creates with noclobber, from its read to its rename; a second call waits up to `CREW_RUN_LOCK_WAIT` seconds (30), then refuses. A lock is never taken over: a holder killed with SIGKILL leaves it, and the refusal says whether its pid still runs. `commit` refuses a candidate older than the run file, and a `--run` that is a directory.
+- **`/crew:orchestrate` allows `Bash(crew-run:*)`.** `omp/bin-path.ts` ships in crew, byte-identical to the marketplace's, so OMP puts `bin/` on `PATH`.
+- **Known limits:** a phase flip to `delivered`, liveness ticks, gates, directives (no directive verb: E172 stays) and plan edits stay hand edits, committed with `crew-run commit`. dagr's `$HERDR_PLUGIN_ROOT` fallback looks for `target/release/dagr` and then `bin/dagr`, where an installed herdr-dagr keeps its binary.
+- **New check:** `tests/test-crew-run.sh` runs every verb through the real `dagr check --strict` (dagr missing is a failure, never a skip), covers each refusal and exit code, the lookup order, a whole lifecycle with a retry, a send-back and a rebind by `commit`, and 14 linter classes (E150, W209, E112, E132, E133, E142, E170, E181, W203, W207, E140, E141, W204, W208) as a hand-built document dagr rejects against the verb's result. CI installs dagr 0.3.1 from the pinned, checksum-verified release asset before the crew suite.
+
 ## 0.10.0
 
 **Briefs go by file on both layers (#752).** The orchestrator writes a brief, a correction request or any message past one line to `<run dir>/scratch/<role>-<n>.brief-<k>` and sends one fixed line, `Read <path> and follow it.`; the free text never travels as a shell argument. A one-line nudge, such as the `PING:` form, stays inline.
