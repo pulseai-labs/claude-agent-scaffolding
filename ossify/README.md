@@ -280,7 +280,8 @@ Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and
 OMP read it directly. Neither writes `CLAUDE.md`. `/start` replaces a
 workspace-init stub (marker on line 1) without asking; `adopt` merges its loop
-section into an `AGENTS.md` that exists and authors one that does not. `doctor`'s
+section into an `AGENTS.md` that exists (a marked stub it replaces, policy sections carried)
+and authors one that does not. `doctor`'s
 interop check fails on a leftover `CLAUDE.md` at the AI workspace root or in
 `.claude/`, and its repair — offered only on the operator's explicit yes, after
 showing every change, and never committed — moves or merges that file into

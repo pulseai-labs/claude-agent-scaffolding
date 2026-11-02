@@ -20,9 +20,9 @@ never an input. `git -C <root> ls-tree -r --name-only HEAD` and `git -C <root> r
 propose: show what you found, and the operator confirms whether `HEAD` holds product (not docs, a dead prototype
 or a bare scaffold). Ask in order; the first yes decides.
 
-1. **Does any declared repo carry product source at `HEAD`?** No: refuse, authoring nothing further, and route to
-   **`/ossify:start`** (class G, no history; class H, history only). The topology A1 may have just authored stays,
-   uncommitted, and `/start` resolves it.
+1. **Does any declared repo carry product source at `HEAD`?** No: refuse, authoring nothing further, and route to **`/ossify:start`**
+   (class G, no history; class H, history only). The topology A1 may have just authored stays, uncommitted, and
+   `/start` resolves it. A declared repo with no commit is not this answer: see the unborn-`HEAD` rule below.
 2. **Yes, and the project has a scaffold-dev stack** (a roadmap state or an active-context cursor): **class L**.
    Look where A5 looks: the manifest-routed roadmap state (`well_known_paths.roadmap_state`) and memory bank's
    `05-active-context.md`; a native topology routes neither, so look at the conventional
@@ -34,24 +34,29 @@ or a bare scaffold). Ask in order; the first yes decides.
 L and P never mix: the stack's roadmap state and cursor live in the AI workspace, so the stack is project-wide. A
 repo the stack never covered is a C2 gap under L, not a second adoption.
 
-A declared repo with no commit has no baseline SHA. Stop and name it before anything is recorded: the operator
-commits its files first, or leaves a repo with no files out of the declaration.
+A declared repo with no commit has no baseline SHA. If it holds files, stop and name it before anything is recorded:
+the operator commits them first (that is not "no product source", and it does not route to `/start`). A repo with
+no files at all is left out of the declaration.
 
 Record `Class: P` (or `L`) in the adoption record.
 
 ## 2. A1 on class P — two routes
 
 Class P runs in an **AI workspace the operator made**: an empty directory beside the product repo, `git init`,
-with `/adopt` started from it. Adoption never makes a product repo its own AI workspace, and never writes a
-byte in a product repo during A1.
+with `/adopt` started from it. Adoption never makes a product repo its own AI workspace, and
+never writes a byte in a product repo during A1.
+**Check first** that the working directory is not a declared repo and is not inside one
+(compare `git rev-parse --show-toplevel` with each declared or operator-named root). If it is, refuse
+before authoring anything, and name the fix: make an AI workspace beside the product repo and run `/adopt` there.
 
 - **No topology on the walk-up path:** ask which repos hold the product, confirm each root against a checkout that
   carries its code, and author `.ossify/topology.json` with each (A1's nothing-found authoring, schema and name
   rules as `/start` §3 states them).
 - **A topology already resolves** (a `/pair-workspace` workspace): use it, and ask which repos hold the product.
-  A product repo the declaration does not name refuses, and the refusal names the fix: a top-level `{"root":
-  "<absolute path>"}` entry under a fresh key (`[a-z][a-z0-9_-]*`) in the declaration (`lib/manifest.sh` reads any such key as a repo).
-  adopt does not edit a declaration it did not write.
+  A product repo the declaration does not name refuses, and the refusal names the fix in the declaration's own spelling.
+  A native `.ossify/topology.json` takes `.repos.<key>.root` (`lib/manifest.sh` reads only `.repos` there); a
+  `.workspace/pairing.json` pairing manifest takes a top-level `{"root": "<absolute path>"}` entry under a fresh key
+  (`[a-z][a-z0-9_-]*`), which the pairing shape reads as a repo. adopt does not edit a declaration it did not write.
 
 The plain route does not need `/pair-workspace`, which declares one canonical and aborts when that repo holds a
 memory bank or `MASTER-SPEC.md`.
@@ -70,8 +75,8 @@ On a re-run after a refusal the file is no longer "this run's": delete it (A1 re
   get the operator's confirmation that none holds work in flight. The `.worktrees` probe is class L's.
 - **A5:** record `A5: no legacy stack` among the gates passed.
 - **A6 — something ships.** Class P only, after A5 and before `oss init`. Ask the operator to name at least one
-  journey step that works from a clean checkout today, and how they know (a command, or a run they watched). None:
-  refuse, before any state is written:
+  journey step that works from a clean checkout today, and how they know (a command, or a run they watched).
+  None: refuse, before any state is written:
 
   > nothing ships yet: this project is pre-skeleton. ossify cannot onboard it until one step works, or until the
   > operator decides the code is a prototype and archives it.
@@ -87,13 +92,15 @@ planning doc, its spec), then elicit the steps with the operator as `/start` §5
 checkout.
 
 **C4 closes Release 0 only when at least one step is still `shipped` after C2**, in any repo. A step that fails its
-clean-checkout test is already re-marked `next` (C2). The release description drops `under <legacy-stack>`.
+clean-checkout test is already re-marked `next` (C2), and harvested to the feature map then (C1's harvest ran
+before C2), or the completion floor refuses. The release description drops `under <legacy-stack>`.
 
-**Zero steps left `shipped`** (a stated known limit): do not call `release_add`. Write the adoption record to that
-point (class, gates, baseline table, the C1 table, every C2 result and gap), then halt. The hand-off names the
-state to remove to retry: the file `oss state_path` prints and its `.base.json` sibling, and `ADOPTION.md` moved aside (C5 creates it only when
-absent). It says what happened: A6 asked, C2 found the checkout disagrees. The completion floor does not apply to
-this halt: it is a halt with its record written, not a completion.
+**Zero steps left `shipped`** (a stated known limit): at C4, after C3, do not call `release_add`. Write the adoption
+record to that point (class, gates, baseline table, the C1 table, every C2 result and gap), then halt. The hand-off
+names what to clear to retry: the file `oss state_path` prints and its `.base.json` sibling, `ADOPTION.md` moved
+aside (C5 creates it only when absent), and C3's uncommitted ADR files in the product repo (commit or remove
+them: A3 refuses them on retry). It says what happened: A6 asked, C2 found the checkout disagrees. The
+completion floor does not apply to this halt: it is a halt with its record written, not a completion.
 
 ## 5. C5 on class P
 
@@ -111,9 +118,10 @@ this halt: it is a halt with its record written, not a completion.
 ## 6. Other stations that differ
 
 - **Vision:** elicited as `/start` §4 does, after reading the README and §5's inputs. Class L still confirms.
-- **Smoke:** a repo with no test suite runs `/start` §9 in full. A repo with one keeps the narrowed smoke.
+- **Smoke:** class P with no test suite runs `/start` §9 in full. A repo with one keeps the narrowed smoke.
 - **C3:** a repo with no `docs/adr/` gets the forced-enumeration questions as today. An answer that names a real
   decision gets an ADR from `bones-registry.md` §3's mint scan with `dest_repo` set to that repo, minted
   `Accepted`. These files land after the baseline SHA and stay **uncommitted** in the product repo; the hand-off
   names them for the operator to commit.
-- **Floor:** C2 may leave zero `shipped` steps (§4); that halt is the only outcome besides completion.
+- **Floor:** C2 may leave zero `shipped` steps (§4); that halt and C3's collision halt (`SKILL.md` C3 1a) are the
+  outcomes besides completion.

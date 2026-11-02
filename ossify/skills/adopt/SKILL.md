@@ -72,8 +72,9 @@ cursor on a boundary — with every change committed in the repo it touched. The
   station, so ask the operator which repos hold the product and confirm each
   root against a checkout that actually carries its code — every gate below,
   and C3's project-wide ADR scan, iterates exactly this set. Class P runs in
-  an operator-made AI workspace and authors the topology there, in both routes
-  (`references/plain-repo.md` §2).
+  an operator-made AI workspace (refuse if the working directory is a declared repo
+  or inside one) and authors the topology there when none resolves; a resolved
+  topology is used as it stands (`references/plain-repo.md` §2).
 - **Class step — after A1.** Product source at `HEAD` in a declared repo
   (not a `tooling_repo`) decides it: none → `/start`; a legacy stack → class
   L, below; neither → class P (`references/plain-repo.md` §1). L and P never mix.
@@ -84,9 +85,8 @@ cursor on a boundary — with every change committed in the repo it touched. The
 - **A3 — every tree adoption will edit is clean, tracked and untracked.**
   Sweep every repo the topology declares (A1 only confirms it resolves) plus
   the AI workspace: `git -C "$(oss repo_root <name>)" status --porcelain
-  --untracked-files=all` each. Any line, in any one — class P exempts only the
-  topology A1 authored this run — is work in flight; refuse, naming the legacy
-  stack's slice close. Each declared repo, never the AI workspace, must also
+  --untracked-files=all` each. Any line, in any one — class P exempts only the topology A1 authored this run —
+  is work in flight; refuse, naming the legacy stack's slice close. Each declared repo, never the AI workspace, must also
   be on its default branch — require it where the manifest declares one
   (`boundary-audit.md`'s own precedent); else name the checked-out branch and
   get the operator's confirmation before proceeding.
@@ -131,7 +131,7 @@ into the state it creates. Nothing hand-authors `project-state.json`.
 - **Risk gates — derive from existing constraints** (`/start` §8 owns the
   families and the control menu); mint with `oss risk_gate_add`.
 - **Smoke — narrowed** (`/start` §9) to **unverified external pins** —
-  shipped tests already cover the code's own claims. No test suite: `/start` §9 in full.
+  shipped tests already cover the code's own claims. Class P with no test suite: `/start` §9 in full.
 - **Spike — unchanged** (`/start` §9a). Rarely fires on an adopted project.
 - **Posture — unchanged** (`/start` §10 + `references/posture-block.md`): a
   genuine open decision, unaffected by prior code.
@@ -168,7 +168,8 @@ The current cut is the union of the `shipped` journey steps. Validating it is
 the one place to be slow — it is the only step that establishes what is
 actually true rather than what a document claims. **Where checkout and legacy
 spec disagree, the checkout wins, and the gap is a recorded finding** — never a
-silent re-mark. Record what the pass did as the adoption record's C2 result line (§6, #367):
+silent re-mark. A step it re-marks `next` is harvested to the feature map then
+(C1's harvest already ran), or the completion floor refuses. Record what the pass did as the adoption record's C2 result line (§6, #367):
 a list of no gaps is not evidence that the pass ran.
 
 ### C3 — Bones back-derived from every repo's ADR directory, aggregated
@@ -294,7 +295,7 @@ Refuse to declare completion, naming the station that never ran, when:
 - the posture bone is absent, or `posture` is null or outside its four
   values — posture **is** a bone and always gets set (§4).
 - no closed `Release 0` in state, or its stub retrospective absent — C4
-  never finished (a class P halt at C2 with zero `shipped` steps is a halt,
+  never finished (a class P halt at C4, after C2 left zero `shipped` steps, is a halt,
   not a completion: `references/plain-repo.md` §4), and `plan-release` would plan the greenfield
   `Release 0`, not Release 1.
 - the adoption record lacks the per-station lines its row requires — a zero

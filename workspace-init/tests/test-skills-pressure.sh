@@ -163,9 +163,10 @@ test_printed_skill_routes_point_to_ossify() {
   # skills, not slash commands.
   assert_contains 'on Codex, invoke the corresponding ossify skill' "$dual_sec" || return 1
 
-  # S8 round 2 (G1): the Scenario A route must state today's truth — adoption targets
-  # projects that came from the legacy scaffold stack, and a plain existing-source
-  # repository has no supported continuation — instead of advertising the refusal.
+  # S8 round 2 (G1): the Scenario A route must state today's truth instead of
+  # advertising the refusal. Since #536 (ossify 1.35.0) a plain existing-source
+  # repository continues into adopt too, so the old "no supported ossify
+  # continuation" wording must stay absent; the adopt route is asserted below.
   assert_contains 'legacy scaffold stack' "$pair_sec" || return 1
   assert_not_contains 'no supported ossify continuation' "$pair_sec" || return 1
   # #536: a canonical with product source routes to adopt on ossify 1.35.0 or later, and

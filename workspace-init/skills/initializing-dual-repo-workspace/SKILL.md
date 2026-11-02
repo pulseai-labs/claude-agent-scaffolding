@@ -278,7 +278,7 @@ Next steps:
   4. /ossify:start                         # canonical with no product source (history alone is fine on ossify 1.34.0 or later); routes to /ossify:adopt (ossify 1.35.0 or later) if product source is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
                                            # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub, and
-                                           # adopt merges its loop section into AGENTS.md; continue into ossify 1.24.0
+                                           # adopt replaces a marked stub too (policy sections carried); continue into ossify 1.24.0
                                            # or later — on an older ossify, stop after pairing: do not run
                                            # /ossify:start, /ossify:adopt or the doctor repair until 1.24.0 is installed
 

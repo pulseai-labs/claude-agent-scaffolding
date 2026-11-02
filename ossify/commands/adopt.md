@@ -18,8 +18,8 @@ ARGS_FROM_CLAUDE="$ARGUMENTS" bash -c '
 Now load the skill body and follow it:
 
 **Read `${CLAUDE_PLUGIN_ROOT}/skills/adopt/SKILL.md` (in OMP: `skill://adopt`) end to end and follow it** —
-with the parsed project name. The skill body owns the whole ceremony: the six
-pre-flight gates, the six conversions (C1-C6), outputs reconciled where they exist and
+with the parsed project name. The skill body owns the whole ceremony: the
+pre-flight gates (A0-A5, and A6 for a plain repo), the six conversions (C1-C6), outputs reconciled where they exist and
 authored where they do not, and the adoption record. Every gate refuses fail-closed,
 and nothing in a legacy stack's state files is ever written. A plain repo with no
 legacy stack is class P: the skill's `references/plain-repo.md`.

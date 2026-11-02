@@ -1,0 +1,1 @@
+{"scores": {"class_step": 5, "a1_route": 4, "a6_and_gates": 5, "c4_follows_c2": 4}, "pass": true, "notes": "The output correctly refuses at A3 because the leftover topology is not this run's, names the delete-or-commit fix, writes no state, and treats class P properly. A1 and C4 are only indirectly shown, since the skill correctly held off on both."}
