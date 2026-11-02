@@ -1,0 +1,1 @@
+{"scores": {"source_decides": 5, "operator_confirms": 5, "route_and_record": 5}, "pass": true, "notes": "Skips ferrite-tools as a tooling_repo, finds no commits or files in ferrite so correctly asks nothing, records no history, does not invoke adopt, and continues the ceremony."}
