@@ -97,8 +97,12 @@ for field in 'command:' 'expected_model:' 'effort:' 'model_shows:' 'brief_delive
 done
 present "$CONFIG_MD" 'model_shows: banner' "banner is a documented value"
 present "$CONFIG_MD" 'model_shows: screen' "screen is a documented value"
-present "$CONFIG_MD" 'brief_delivery: inject' "inject is a documented value"
+pin "$CONFIG_MD" 'absent means `file`' "file is the default delivery (#752)"
+pin "$CONFIG_MD" '`inject` sends the text as a shell argument' "inject is a documented value, and says what it does"
+pin "$CONFIG_MD" 'A seat on another machine states `inject`' "a seat on another machine keeps inject, the stated known limit (#752)"
 present "$CONFIG_MD" 'brief_delivery: file' "file delivery is a documented value"
+pin "$PLUGIN_ROOT/skills/orchestrate/references/lifecycle.md" 'delivered as `brief_delivery` says (`file`, unless the entry states `inject`)' \
+  "the launch step delivers by file unless the entry states inject (#752)" flat
 present "$CONFIG_MD" 'absent, `/code-review <PR> <LEVEL>`.' "a reviewer with no review: field runs /code-review"
 present "$CONFIG_MD" '| reviewer | its agent'"'"'s `review:` command, else `/code-review` | `slash-commands` when that command is a slash command |' "the reviewer's can: need follows its review command"
 
