@@ -2,6 +2,14 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.10.0
+
+**Briefs go by file on both layers (#752).** The orchestrator writes a brief, a correction request or any message past one line to `<run dir>/scratch/<role>-<n>.brief-<k>` and sends one fixed line, `Read <path> and follow it.`; the free text never travels as a shell argument. A one-line nudge, such as the `PING:` form, stays inline.
+
+- **Behaviour change: `brief_delivery` now defaults to `file`.** An entry with no value used to mean `inject`; it now means `file`. An entry that states `inject` or `file` keeps its meaning. `config.md`, `lifecycle.md` and both layer files carry the change, and `layers/orca.md` gains the by-file send it lacked.
+- **Known limit: a seat with `host:` on another machine keeps `inject`.** Its file would sit on the wrong machine and no layer has a copy step, so such an entry states `inject` and its brief still travels as a shell argument. An entry that names such a host without it is a config defect named at approval.
+- **New check:** `tests/test-brief-by-file.sh` fails if a layer file, template or shared reference shows a brief placeholder as a send's argument, and passes on the fixed pointer line.
+
 ## 0.9.2
 
 **The shipped role list no longer names `triage` (#1023).** baton 0.14.0 removed that stage, so `config.md` lists only baton's `driver`. A project file that still fills a `triage` row is harmless: baton ignores it.
