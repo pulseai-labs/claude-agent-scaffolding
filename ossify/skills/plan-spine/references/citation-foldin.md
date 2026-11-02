@@ -70,7 +70,12 @@ spec that changed the bone. When a spine adds, modifies, or re-scopes a bone:
 
 1. Re-run §2 over **every open spine's specs** — including spines planned in a
    previous session that have not closed.
-2. Fix the citations that moved.
+2. Fix the citations that moved - **except in the spec of an item with a dispatch recorded and not
+   yet `complete`** (`branch`, `worktree_path` and `base_sha` set; read it with `oss get`). That spec
+   is what close compares against its dispatch-time blob id (`spec_oid`), so an in-place edit halts
+   its close as `halt:spec-changed`. Record the moved citation for that item and apply it after the
+   item closes, or re-plan the item through `planned` and a fresh dispatch (which records the new
+   spec's id).
 3. Say what changed, so the affected spines' plans get re-read rather than
    silently drifting.
 

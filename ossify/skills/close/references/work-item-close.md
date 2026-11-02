@@ -160,7 +160,7 @@ run §1, and the `finish-merge` row of `round-orchestration.md` §2b runs it its
 
 ```bash
 now_oid="$(oss spec_oid "$spec")" || { echo "close: cannot hash $spec for $wi - halt"; exit 1; }
-rec_oid="$(oss get ".work_items[] | select(.id==\"$wi\") | .spec_oid")"
+rec_oid="$(oss get ".work_items[] | select(.id==\"$wi\") | .spec_oid")" || { echo "close: cannot read $wi's recorded spec value from state - halt"; exit 1; }
 spec_note=""
 if [ -z "$rec_oid" ] || [ "$rec_oid" = "null" ]; then
   spec_note="no dispatch-time spec value for $wi: the spec check did not run"

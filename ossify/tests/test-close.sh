@@ -317,6 +317,13 @@ t_assert_contains "$T_OUT" "$SO_REC" "spec check: ...and the id dispatched"
 t_assert_contains "$T_OUT" "restore the dispatched spec" "spec check: ...route 1, restore"
 t_assert_contains "$T_OUT" "work_item_status $SO_WI planned" "spec check: ...route 2, return the item to planned"
 [ -e "$SO_GATE" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: a changed spec still reached the gate"; } || T_PASS=$((T_PASS+1))
+# an unreadable state is a halt (fails closed), not the "did not run" note
+rm -f "$SO_GATE"; printf 'not json' > "$TMP/so-bad-state"
+t_capture bash -c "set -uo pipefail; cd '$TMP/ws'; export PATH='$HERE/../bin':\$PATH OSS_STATE_FILE='$TMP/so-bad-state'; wi='$SO_WI'; spec='$SO_SPEC'; . '$SO_BLOCK'; : > '$SO_GATE'"
+t_assert_rc 1 "spec check: an unreadable state halts"
+t_assert_contains "$T_OUT" "cannot read $SO_WI's recorded spec value from state" "spec check: ...with the named read error"
+case "$T_OUT" in *"did not run"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: a state read error printed the did-not-run note";; *) T_PASS=$((T_PASS+1));; esac
+[ -e "$SO_GATE" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: an unreadable state still reached the gate"; } || T_PASS=$((T_PASS+1))
 # the finish-merge row runs the same block with spec set from the spine dir, then the gate
 t_capture bash -c "set -uo pipefail; cd '$TMP/ws'; export PATH='$HERE/../bin':\$PATH; wi='$SO_WI'; spec_dir='$MATCHES'; spec=\"\$spec_dir/work-\$wi/spec.md\"; . '$SO_BLOCK'; echo GATE"
 t_assert_rc 1 "spec check: the finish-merge spelling (spec from the spine dir) halts on a mismatch too"

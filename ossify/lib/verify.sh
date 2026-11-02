@@ -358,8 +358,10 @@ oss_verify_spec_oid() { # $1=spec-path ; echoes the 40-hex blob id
   [ -f "$1" ] && [ -r "$1" ] || { echo "oss: spec_oid: '$1' is not a readable file" >&2; return 2; }
   local d oid
   d="$(mktemp -d)" || { echo "oss: spec_oid: cannot make a scratch directory" >&2; return 1; }
-  oid="$(cd "$d" && GIT_CEILING_DIRECTORIES="$d" env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY -u GIT_INDEX_FILE -u GIT_DEFAULT_HASH \
-    git hash-object --no-filters --stdin < "$1")" || { rmdir "$d" 2>/dev/null; echo "oss: spec_oid: git hash-object failed on '$1'" >&2; return 1; }
+  # The redirect is on the OUTER subshell, so the file opens in the caller's directory (a
+  # relative path works); the `cd` into the scratch directory happens after it is open.
+  oid="$( (cd "$d" && GIT_CEILING_DIRECTORIES="$d" env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY -u GIT_INDEX_FILE -u GIT_DEFAULT_HASH \
+    git hash-object --no-filters --stdin) < "$1")" || { rmdir "$d" 2>/dev/null; echo "oss: spec_oid: git hash-object failed on '$1'" >&2; return 1; }
   rmdir "$d" 2>/dev/null || true
   case "$oid" in
     *[!0-9a-f]*|'') echo "oss: spec_oid: git printed an unexpected id for '$1'" >&2; return 1 ;;

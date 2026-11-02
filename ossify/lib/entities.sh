@@ -443,16 +443,16 @@ oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path
   # (even empty - the guard then refuses it) from absent; the key goes into the payload ONLY
   # when given, which is what set_work_item_exec's set-if-given assignment reads.
   #
-  # The shape check (lowercase hex, 40 for sha1 or 64 for sha256) is on the ARGUMENT, before
+  # The shape check (exactly 40 lowercase hex: `oss spec_oid` always prints sha1) is on the ARGUMENT, before
   # the lock: nothing in state is disputed, and oss_state_mutate maps any guard rc other
   # than 7 to rc 4, so a shape refusal inside the guard could not answer rc 2 (usage).
   if [ -n "${6+x}" ]; then
     case "$6" in
       *[!0-9a-f]*|'') bad=1 ;;
-      *) case "${#6}" in 40|64) bad=0 ;; *) bad=1 ;; esac ;;
+      *) case "${#6}" in 40) bad=0 ;; *) bad=1 ;; esac ;;
     esac
     if [ "$bad" -ne 0 ]; then
-      echo "oss: work_item_exec spec-oid for '$wi' is not a blob id - expected 40 or 64 lowercase hex characters, as \"oss spec_oid <spec-path>\" prints" >&2
+      echo "oss: work_item_exec spec-oid for '$wi' is not a blob id - expected 40 lowercase hex characters (a sha1; 64 is refused), as \"oss spec_oid <spec-path>\" prints" >&2
       return 2
     fi
   fi
