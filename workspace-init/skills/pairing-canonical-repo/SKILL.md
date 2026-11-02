@@ -331,7 +331,7 @@ Next steps:
      active-context cursor and legacy spec. A repository that carries product source at `HEAD`
      but never used that stack has no supported ossify continuation yet (plain repos: #536);
      `/ossify:start` sends such a repository here rather than onboarding it. (For a canonical
-     with no product source, history alone included, `/ossify:start` does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     with no product source, history alone included on ossify 1.34.0 or later, `/ossify:start` does onboard it.) On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
      On ossify 1.24.0 or later, adopt merges its loop section into `AGENTS.md`. Continue into
      ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`,
      `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.

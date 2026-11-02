@@ -25,7 +25,7 @@ canonical — see the manifest's `routing` block for the full table.
 
 ## Continue with ossify
 
-- Canonical with no product source at `HEAD` (history alone is fine): run `/ossify:start` (on Codex or OMP, the `start` skill).
+- Canonical with no product source at `HEAD` (history alone is fine on ossify 1.34.0 or later): run `/ossify:start` (on Codex or OMP, the `start` skill).
 - `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that carries product source at `HEAD` without that stack has no supported ossify continuation yet (plain repos: #536). On ossify 1.24.0 or later, adopt merges its loop section into this `AGENTS.md`. Continue into ossify 1.24.0 or later: on an older ossify, stop after pairing — do not run `/ossify:start`, `/ossify:adopt` or the `doctor` repair until 1.24.0 is installed.
 
 ## Git policy

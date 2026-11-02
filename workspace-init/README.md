@@ -1,6 +1,6 @@
 # workspace-init
 
-**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once topology bootstrap; after pairing, continue with ossify — install it alongside first (**Install** below) — starting with `/ossify:start` for a canonical with no product source (history alone is fine). `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that carries product source at `HEAD` without that stack has no supported ossify continuation yet (plain repos: #536).
+**Bootstrap a dual-repo workspace (AI workspace + canonical repo) with pairing manifest and AI-trace commit-msg filter.** Run-once topology bootstrap; after pairing, continue with ossify — install it alongside first (**Install** below) — starting with `/ossify:start` for a canonical with no product source (history alone is fine on ossify 1.34.0 or later). `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack — a canonical that carries product source at `HEAD` without that stack has no supported ossify continuation yet (plain repos: #536).
 
 ## What it does
 
@@ -187,7 +187,7 @@ The hook itself lives in `.git/hooks/commit-msg`, which is **not tracked by git*
 - Skills: [`skills/`](./skills/) — the three flows (fresh, Scenario A, Scenario C). Each skill states its preconditions, its tasks in order, its rollback rules and the next-steps block it prints; worked examples sit beside each one.
 - Library: [`lib/`](./lib/) — the `wi` verbs the skills call (`bin/wi --list` prints them): the manifest schema and resolver in `lib/manifest.sh`, preflight and the directory skeleton in `lib/skeleton.sh`, the trace filter in `lib/trace-filter.sh`, rollback in `lib/rollback.sh`.
 - Changelog: [`CHANGELOG.md`](./CHANGELOG.md).
-- Lifecycle continuation: [`ossify`](../ossify/) — `/ossify:start` for a canonical with no product source (history alone is fine); `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack, so a canonical that carries product source at `HEAD` without that stack has no supported ossify continuation yet.
+- Lifecycle continuation: [`ossify`](../ossify/) — `/ossify:start` for a canonical with no product source (history alone is fine on ossify 1.34.0 or later); `/ossify:adopt` currently targets projects previously onboarded with the legacy scaffold stack, so a canonical that carries product source at `HEAD` without that stack has no supported ossify continuation yet.
 
 ## License
 
