@@ -125,23 +125,23 @@ PING_SEND=herdr agent prompt <that pane>
 This is the one statement of how the orchestrator sends a seat anything; other files say "send" and mean this. The slot `PING_SEND` a brief's `PING:` and `MOLT:` lines carry is this
 file's send, filled by the dispatcher.
 
-- **Detected:** `herdr agent prompt <pane> "<text>"`. herdr prepends nothing: it submits
+- **Detected:** `herdr agent prompt <pane> '<line>'`. herdr prepends nothing: it submits
   the text and Enter as one submission, and what it adds to a seat is environment such as
   `HERDR_PANE_ID`, never prompt text. A message that starts work takes the turn-start
   check below. A local slash command (`/context`, `/clear`) settles without a turn, so it
   is sent plain, without that `--wait`, and its one reply read with `herdr pane read`.
-  `brief_delivery: inject` prompts the brief itself; `file` writes it to an absolute path
-  the seat can read and prompts one line pointing there.
-- **Undetected:** no `agent` command reaches the pane; they accept only a pane hosting a
-  detected agent. Write the message to a file the seat can read and send a one-line
-  pointer with `herdr pane run <pane> "<line>"` (the line and Enter); only `agent prompt`
-  is documented to honour bracketed paste. A seat set to `brief_delivery: inject` is
-  reported to the operator. This path has no turn-start check.
+- **Undetected:** no `agent` command reaches the pane; they accept only a pane hosting a detected
+  agent. Send the by-file line with `herdr pane run <pane> '<line>'` (the line and Enter; only `agent
+  prompt` is documented to honour bracketed paste); a seat set to `brief_delivery: inject` is reported to the operator. No turn-start check.
+- **By file:** a brief, a correction request or any message past one line is written to
+  `<run dir>/scratch/<role>-<n>.brief-<k>` (absolute, this machine, outside every worktree, one file per
+  send); the send is `herdr agent prompt <pane> 'Read <path> and follow it.'` (a single quote in the path is written `'\''`), so no free text reaches a shell. A one-line
+  nudge stays inline, as `PING:` pins. `inject` prompts the text, for a seat on another machine, whose file would sit on the wrong machine — a known limit.
 
 **The turn-start check.** Acceptance of input is not the start of a turn, as herdr's guide
 says of a successful submission; herdr's own check runs inside the send:
 
-    herdr agent prompt <pane> "<brief>" --wait --until working --until blocked --timeout <ms>
+    herdr agent prompt <pane> '<line>' --wait --until working --until blocked --timeout <ms>
 
 From a non-working state, `--wait` requires an observed `working` or `blocked` within five
 seconds of submission, and `--until working --until blocked` returns at that first

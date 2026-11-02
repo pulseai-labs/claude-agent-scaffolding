@@ -77,7 +77,7 @@ brief template's `PING:` and `MOLT:` lines carry their own role word inside the 
 tag is what tells a receiving session a seat's message apart from the operator's typing.
 
 **Sends that stay untagged.** What crew sends down to a worker — a brief, a plan-gate
-reply, a correction request, a `/context` — is delivered verbatim, no preamble, and
+reply, a correction request, a `/context` — is delivered verbatim (past one line, by file: the layer's Send), no preamble, and
 carries no tag (`briefs.md`); the worker's re-ping after a correction is sent up, and
 carries the tag. A local slash command is untagged too — the rotation resume
 (`/ossify:handoff-resume <path>` to a Claude Code top, `skill://handoff-resume <path>`

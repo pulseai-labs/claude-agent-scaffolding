@@ -84,6 +84,13 @@ receipt and never resends, and an ambiguous transport failure is reissued with
 again (`roles.md`) — read the state it left. A local slash command settles without a turn:
 sent without the turn-start proof, its reply read with the screen read.
 
+**By file.** A brief, a correction request or any message past one line is written to
+`<run dir>/scratch/<role>-<n>.brief-<k>` — absolute, on this host (a terminal of this host reads
+it), outside every worktree, one file per send — and the send is
+`orca terminal send --terminal <h> --enter --text 'Read <path> and follow it.'` (a single quote in the path is written `'\''`): no free text reaches
+a shell. A one-line nudge stays inline, as `PING:` pins. `brief_delivery: inject` sends the text
+itself, for a seat on another host, whose file would sit on the wrong machine — a known limit.
+
 ## Read
 
 `orca terminal read --terminal <h> --screen --json` → `.result.terminal.tail[]`, with
