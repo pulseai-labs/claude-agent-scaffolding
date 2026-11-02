@@ -343,8 +343,9 @@ mb_cmd_blockers() {
   base=$(printf '%s' "$PRJ" | jq -r .baseRefName)
   status=$(printf '%s' "$PRJ" | jq -r .mergeStateStatus)
   if mb_rules_load "$base"; then facts=$(mb_rules_facts); else rules_ok=0; fi
-  lines=$(jq -r -n "$MB_JQ_DEFS"'
-    ($pr | fromjson) as $p | ($threads | fromjson) as $t | ($facts | fromjson) as $f
+  # On stdin, never argv: a PR's threads can pass Linux's 128 KiB limit on one argument.
+  lines=$(printf '%s\n%s\n%s\n' "$PRJ" "$THREADS" "$facts" | jq -r -s "$MB_JQ_DEFS"'
+    .[0] as $p | .[1] as $t | .[2] as $f
     | ($p.statusCheckRollup | map({n: cname, s: cstate})) as $c
     | [ (if $p.isDraft then "blocker: draft pull request" else empty end),
         (if $p.mergeStateStatus == "BEHIND"
@@ -361,8 +362,7 @@ mb_cmd_blockers() {
                  else "blocker: required check not passed: \($r) (\($m | map(.s) | join(", ")))" end)
          else ($c[] | select(.s == "failure" or .s == "pending") | "check not passed (whether required is unread): \(.n) (\(.s))")
          end)
-      ] | .[]' \
-    --arg pr "$PRJ" --arg threads "$THREADS" --arg facts "$facts")
+      ] | .[]')
   [ -z "$lines" ] || printf '%s\n' "$lines"
   nb=$(printf '%s\n' "$lines" | awk '/^blocker:/ { n++ } END { print n + 0 }')
   if [ "$nb" -eq 0 ] && [ "$status" = "BLOCKED" ]; then
@@ -430,7 +430,7 @@ mb_cmd_wait() {
           nonskipped: ($ns | length),
           ns_ok: ($ns | all(.s == "success")),
           req_failed: [ $req[] as $r | $c[] | select(.n == $r and .s == "failure") | .n ],
-          req_ok: (($req | length) > 0 and all($req[]; . as $r | any($c[]; .n == $r and .s == "success"))) }')
+          req_ok: (($req | length) > 0 and all($req[]; . as $r | [$c[] | select(.n == $r)] | length > 0 and all(.s == "success"))) }')
     n_failed=$(printf '%s' "$ev" | jq '.failed | length')
     n_req=$(printf '%s' "$req" | jq 'length')
     n_req_failed=$(printf '%s' "$ev" | jq '.req_failed | length')

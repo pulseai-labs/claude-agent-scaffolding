@@ -210,6 +210,13 @@ scn blk-check
 edit pr.json "$OPEN | .mergeStateStatus = \"BLOCKED\" | $PENDING"
 run blockers 1031
 has "a pending required check is a blocker" "$OUT" "blocker: required check not passed: repository test suites (pending)"
+# A thread body past Linux's 128 KiB limit on one argument must not abort the verb.
+scn blk-large
+edit pr.json "$OPEN | .mergeStateStatus = \"BLOCKED\""
+edit threads.json '.data.repository.pullRequest.reviewThreads.nodes[0].isResolved = false | .data.repository.pullRequest.reviewThreads.nodes[0].comments.nodes[0].body = ("x" * 200000)'
+run blockers 1031
+rc_is "a 200 KB thread body: rc 0" 0
+has "...and the thread is still stated" "$OUT" "blocker: unresolved thread"
 scn blk-clean
 edit pr.json "$OPEN"
 run blockers 1031
@@ -275,6 +282,11 @@ scn w-skipped-req
 edit pr.json "$OPEN | del(.statusCheckRollup[0])"
 run wait 1031 --head "$HEAD1"
 rc_is "required check never reported, only a skipped one: rc 4" 4
+# Two rollup entries share the required name, one green and one still running.
+scn w-dup
+edit pr.json "$OPEN | .statusCheckRollup += [.statusCheckRollup[0] | (.status = \"IN_PROGRESS\" | .conclusion = \"\")]"
+run wait 1031 --head "$HEAD1" --max-seconds 1 --interval 1
+rc_is "a required name with one entry still running is no pass: rc 75" 75
 # A check failed.
 scn w-fail
 edit pr.json "$OPEN | .statusCheckRollup[0] |= (.conclusion = \"FAILURE\")"
