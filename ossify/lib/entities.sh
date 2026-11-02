@@ -430,17 +430,39 @@ oss_entity_set_release_status() { # $1=state $2=release-id $3=status
     "$(jq -n --arg r "$rel" --arg st "$st" --arg ts "$(_oss_now)" '{release:$r,status:$st,at:$ts}')"
 }
 
-oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path $5=base-sha
-  local sf="$1" wi="$2"
+oss_entity_set_work_item_exec() { # $1=state $2=wi-id $3=branch $4=worktree-path $5=base-sha [$6=spec-oid]
+  local sf="$1" wi="$2" bad
   # The read and the one kept clause are a guard, evaluated inside
   # oss_state_mutate's lock (#528/#529) - the same `$5` slot the abandonment
-  # guard uses. set_work_item_exec's op and payload are untouched: this is a
+  # guard uses. The guard is a
   # precondition, and the clause it keeps (a payload that records no dispatch at
   # all, on an item that records one) is the one the abandonment guard's
   # soundness rests on.
-  oss_state_mutate "$sf" set_work_item_exec \
-    "$(jq -n --arg w "$wi" --arg b "$3" --arg p "$4" --arg s "$5" \
-      '{work_item:$w,branch:$b,worktree_path:$p,base_sha:$s}')" \
+  #
+  # 1.36.0 (#434): the optional 6th parameter is the spec's blob id. `${6+x}` tells "given"
+  # (even empty - the guard then refuses it) from absent; the key goes into the payload ONLY
+  # when given, which is what set_work_item_exec's set-if-given assignment reads.
+  #
+  # The shape check (exactly 40 lowercase hex: `oss spec_oid` always prints sha1) is on the ARGUMENT, before
+  # the lock: nothing in state is disputed, and oss_state_mutate maps any guard rc other
+  # than 7 to rc 4, so a shape refusal inside the guard could not answer rc 2 (usage).
+  if [ -n "${6+x}" ]; then
+    case "$6" in
+      *[!0-9a-f]*|'') bad=1 ;;
+      *) case "${#6}" in 40) bad=0 ;; *) bad=1 ;; esac ;;
+    esac
+    if [ "$bad" -ne 0 ]; then
+      echo "oss: work_item_exec spec-oid for '$wi' is not a blob id - expected 40 lowercase hex characters (a sha1; 64 is refused), as \"oss spec_oid <spec-path>\" prints" >&2
+      return 2
+    fi
+  fi
+  local payload
+  payload="$(jq -n --arg w "$wi" --arg b "$3" --arg p "$4" --arg s "$5" \
+      '{work_item:$w,branch:$b,worktree_path:$p,base_sha:$s}')" || return 4
+  if [ -n "${6+x}" ]; then
+    payload="$(printf '%s' "$payload" | jq -c --arg o "$6" '. + {spec_oid:$o}')" || return 4
+  fi
+  oss_state_mutate "$sf" set_work_item_exec "$payload" \
     "" _oss_entity_guard_wi_exec
 }
 

@@ -1,4 +1,4 @@
-# ossify (v1.35.0)
+# ossify (v1.36.0)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -230,6 +230,16 @@ before any state), probes `git worktree list --porcelain` and `status --untracke
 while a step is still `shipped` after C2; zero left halts with the record written. A workspace-init `AGENTS.md` stub is
 replaced, not merged, for both classes. The product repo's own `CLAUDE.md`, `.claude/`, spec and memory bank are inputs,
 never written. Depth: `skills/adopt/references/plain-repo.md`. No `lib/` code.
+
+Since 1.36.0 (#434), work-item close checks that `spec.md` is the spec that was dispatched. `oss work_item_exec` takes an optional fifth
+argument, the spec's blob id from the new `oss spec_oid <path>` (always sha1, from one fixed hashing context, so dispatch and close agree
+whatever repository they run in); round orchestration §3 passes it, and the value is recorded in the same journal entry as the dispatch.
+It is set if given and kept if absent, so a four-argument call never erases it and journal entries written before 1.36.0 replay byte-identical.
+Before every gate run, `work-item-close.md` §1 compares the recorded id with the spec now. Equal continues; an item with no recorded id
+prints a note, writes it into `verify.md`, and closes; a different spec halts `halt:spec-changed`, with no verifier, merge or PR. There are
+two ways out, both the operator's: restore the dispatched spec and re-run close, or return the item to `planned` and re-dispatch it. The
+recorded value changes only through a new dispatch. The two crash-repair rows that re-call `work_item_exec` record the spec as it is at repair
+and say so. Verb: `oss spec_oid <path>`. No state schema bump.
 
 Since 1.34.0 (#809), `/ossify:start`'s canonical-content gate refuses on product source at `HEAD`, not on
 history. A declared repo with commits and nothing at `HEAD` that is product (class H) proceeds as

@@ -282,6 +282,67 @@ t_assert_rc 1 "verdict identity: a file added after the verdict halts"
 rm -f "$VI_WT/stray"
 _vd_run "$VD_ID"; t_assert_rc 0 "verdict identity: removing it restores the match"
 
+# #434: close compares the spec with the blob id recorded at dispatch, before the gate.
+# Executed from the shipped block (work-item-close.md §1). The fixture records the id through
+# the real dispatcher, the way round-orchestration.md §3 does, and a sentinel line written
+# AFTER the block stands for "the gate ran": a halt must stop before it.
+SO_WI="$(bash "$OSS" work_item_add "$SP" "spec oid fixture")"
+SO_DIR="$MATCHES/work-$SO_WI"; mkdir -p "$SO_DIR"
+SO_SPEC="$SO_DIR/spec.md"; printf '## 5. Acceptance criteria\n- [ ] AC-1 auto: `true` → expected: exit 0\n' > "$SO_SPEC"
+SO_BLOCK="$TMP/so-block.sh"
+_extract_block "$VI_WIC" 'now_oid=' "$SO_BLOCK"
+SO_GATE="$TMP/so-gate-ran"
+_so_run() { rm -f "$SO_GATE"; t_capture bash -c "set -uo pipefail; cd '$TMP/ws'; export PATH='$HERE/../bin':\$PATH; wi='$SO_WI'; spec='$SO_SPEC'; . '$SO_BLOCK'; printf '%s' \"\$spec_note\" > '$TMP/so-note'; : > '$SO_GATE'"; }
+# absent: a visible note, not a halt, and the note is kept for verify.md
+_so_run
+t_assert_rc 0 "spec check: an item with no recorded spec_oid still closes"
+t_assert_contains "$T_OUT" "no dispatch-time spec value for $SO_WI: the spec check did not run" "spec check: ...and the note is printed"
+t_assert_eq "no dispatch-time spec value for $SO_WI: the spec check did not run" "$(cat "$TMP/so-note")" "spec check: ...and held in \$spec_note for verify.md"
+[ -e "$SO_GATE" ] && T_PASS=$((T_PASS+1)) || { T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: the absent case did not reach the gate"; }
+# recorded and equal: silent, continues
+bash "$OSS" work_item_exec "$SO_WI" "work/$SO_WI" "$TMP/wt-so" "sha-so" "$(bash "$OSS" spec_oid "$SO_SPEC")" >/dev/null
+_so_run
+t_assert_rc 0 "spec check: an unchanged spec passes"
+t_assert_eq "" "$T_OUT" "spec check: ...silently"
+t_assert_eq "" "$(cat "$TMP/so-note")" "spec check: ...with no note"
+# different: the named halt, both ids, both routes, and the gate is never reached
+SO_REC="$(bash "$OSS" spec_oid "$SO_SPEC")"
+cp "$SO_SPEC" "$TMP/so-spec.orig"; printf -- '- [ ] AC-2 auto: `true` → expected: exit 0\n' >> "$SO_SPEC"
+SO_NOW="$(bash "$OSS" spec_oid "$SO_SPEC")"
+_so_run
+t_assert_rc 1 "spec check: an edited spec halts"
+t_assert_contains "$T_OUT" "halt:spec-changed" "spec check: ...with the named halt"
+t_assert_contains "$T_OUT" "$SO_NOW" "spec check: ...naming the id of the spec as it is now"
+t_assert_contains "$T_OUT" "$SO_REC" "spec check: ...and the id dispatched"
+t_assert_contains "$T_OUT" "restore the dispatched spec" "spec check: ...route 1, restore"
+t_assert_contains "$T_OUT" "work_item_status $SO_WI planned" "spec check: ...route 2, return the item to planned"
+[ -e "$SO_GATE" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: a changed spec still reached the gate"; } || T_PASS=$((T_PASS+1))
+# an unreadable state is a halt (fails closed), not the "did not run" note
+rm -f "$SO_GATE"; printf 'not json' > "$TMP/so-bad-state"
+t_capture bash -c "set -uo pipefail; cd '$TMP/ws'; export PATH='$HERE/../bin':\$PATH OSS_STATE_FILE='$TMP/so-bad-state'; wi='$SO_WI'; spec='$SO_SPEC'; . '$SO_BLOCK'; : > '$SO_GATE'"
+t_assert_rc 1 "spec check: an unreadable state halts"
+t_assert_contains "$T_OUT" "cannot read $SO_WI's recorded spec value from state" "spec check: ...with the named read error"
+case "$T_OUT" in *"did not run"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: a state read error printed the did-not-run note";; *) T_PASS=$((T_PASS+1));; esac
+[ -e "$SO_GATE" ] && { T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: an unreadable state still reached the gate"; } || T_PASS=$((T_PASS+1))
+# the finish-merge row runs the same block with spec set from the spine dir, then the gate
+t_capture bash -c "set -uo pipefail; cd '$TMP/ws'; export PATH='$HERE/../bin':\$PATH; wi='$SO_WI'; spec_dir='$MATCHES'; spec=\"\$spec_dir/work-\$wi/spec.md\"; . '$SO_BLOCK'; echo GATE"
+t_assert_rc 1 "spec check: the finish-merge spelling (spec from the spine dir) halts on a mismatch too"
+case "$T_OUT" in *GATE*) T_FAIL=$((T_FAIL+1)); echo "FAIL: spec check: finish-merge reached the gate after a mismatch";; *) T_PASS=$((T_PASS+1));; esac
+# the dispatcher's recorded value is unchanged by the failed close (no in-place refresh)
+t_assert_eq "$SO_REC" "$(bash "$OSS" get ".work_items[] | select(.id==\"$SO_WI\") | .spec_oid")" "spec check: the halt did not touch the recorded value"
+# restored: equal again
+cp "$TMP/so-spec.orig" "$SO_SPEC"
+_so_run
+t_assert_rc 0 "spec check: the restored spec passes again"
+t_assert_eq "" "$T_OUT" "spec check: ...silently (so the halt above was caused by the edit)"
+# a repair re-dispatch with 4 arguments keeps the value, so the check still sees the edit
+bash "$OSS" work_item_exec "$SO_WI" "work/$SO_WI" "$TMP/wt-so2" "sha-so2" >/dev/null
+printf 'x\n' >> "$SO_SPEC"; _so_run
+t_assert_rc 1 "spec check: after a 4-argument re-dispatch the recorded id is still compared"
+cp "$TMP/so-spec.orig" "$SO_SPEC"
+# the fixture item must not leave an incomplete item behind for the spine-close tests below
+bash "$OSS" work_item_status "$SO_WI" complete >/dev/null
+
 # Layer 2 - report cross-check. Assert the LIB's real message; the
 # `[report cross-check]` prefix is the skill's surfacing convention and appears
 # in no lib, so a ceremony grepping for it would find nothing forever.

@@ -247,6 +247,8 @@ The §4 record is what a **finished** item returns. Four checks, all terminal:
 A malformed, non-accepted or moved record halts the round — never a degrade into
 the nested path, no stop-and-reinvoke step, and the operator owns the recovery.
 
+§5a checks the record against the tree; close now also checks the tree against the spec value recorded at dispatch (`work-item-close.md` §1, #434), so an executor that edits `spec.md` and declares the edited blob still halts at close.
+
 Records that pass are fed into close **in declared decomposition order, never
 arrival order** — `round-orchestration.md` §7's rule, unchanged and doubly
 relevant here because a concurrent caller makes out-of-order arrival the normal

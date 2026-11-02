@@ -341,3 +341,30 @@ EOF
   [ -z "$missing" ] || { echo "oss: report does not account for:$missing" >&2; return 1; }
   return 0
 }
+
+# 1.36.0 (#434): the blob id of a spec file - skill-first question 2 (mechanical, closed
+# input: a file we author, hashed by a fixed git command).
+#
+# THE HASHING CONTEXT IS FIXED, not the caller's. A bare `git hash-object` follows the
+# repository in the working directory: sha1 outside one, the repository's own object format
+# inside one (a sha256 repo gives a 64-character id). Dispatch and close run from different
+# directories, so the same file could hash two ways and read as a changed spec. This runs
+# inside a fresh empty scratch directory that is its own git ceiling (no repository to
+# discover), with the git environment that could select one unset. The id is therefore
+# always sha1 (40 hex), whatever repository the caller is in. `--no-filters --stdin` hashes
+# the bytes as they are on disk: no clean filter or text conversion from a .gitattributes
+# can hide a difference, and no path reaches attribute lookup.
+oss_verify_spec_oid() { # $1=spec-path ; echoes the 40-hex blob id
+  [ -f "$1" ] && [ -r "$1" ] || { echo "oss: spec_oid: '$1' is not a readable file" >&2; return 2; }
+  local d oid
+  d="$(mktemp -d)" || { echo "oss: spec_oid: cannot make a scratch directory" >&2; return 1; }
+  # The redirect is on the OUTER subshell, so the file opens in the caller's directory (a
+  # relative path works); the `cd` into the scratch directory happens after it is open.
+  oid="$( (cd "$d" && GIT_CEILING_DIRECTORIES="$d" env -u GIT_DIR -u GIT_WORK_TREE -u GIT_OBJECT_DIRECTORY -u GIT_INDEX_FILE -u GIT_DEFAULT_HASH \
+    git hash-object --no-filters --stdin) < "$1")" || { rmdir "$d" 2>/dev/null; echo "oss: spec_oid: git hash-object failed on '$1'" >&2; return 1; }
+  rmdir "$d" 2>/dev/null || true
+  case "$oid" in
+    *[!0-9a-f]*|'') echo "oss: spec_oid: git printed an unexpected id for '$1'" >&2; return 1 ;;
+  esac
+  printf '%s\n' "$oid"
+}

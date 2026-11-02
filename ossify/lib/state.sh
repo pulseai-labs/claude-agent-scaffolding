@@ -244,10 +244,15 @@ _oss_apply_op() { # $1=op $2=payload-json
       jq --argjson p "$payload" '(.work_items[] | select(.id == $p.work_item) | .title) = $p.title' ;;
     set_release_status)
       jq --argjson p "$payload" '(.releases[] | select(.id == $p.release) | .status) = $p.status' ;;
+    # 1.36.0 (#434): spec_oid is SET-IF-GIVEN. Only a payload that carries the key touches
+    # it, so a journal entry written before 1.36.0 replays byte-identical (an unconditional
+    # `.spec_oid = $p.spec_oid` would create the key as null on replay), and a 4-argument
+    # re-dispatch never erases a recorded value.
     set_work_item_exec)
       jq --argjson p "$payload" '
         (.work_items[] | select(.id == $p.work_item)) |=
-          (.branch = $p.branch | .worktree_path = $p.worktree_path | .base_sha = $p.base_sha)' ;;
+          (.branch = $p.branch | .worktree_path = $p.worktree_path | .base_sha = $p.base_sha
+           | if ($p | has("spec_oid")) then .spec_oid = $p.spec_oid else . end)' ;;
     set_work_item_pr)
       jq --argjson p "$payload" '(.work_items[] | select(.id == $p.work_item) | .pr_url) = $p.pr_url' ;;
     # #133: the base each hosting repo's spine branch was cut from, recorded at

@@ -724,4 +724,41 @@ for c in "node --test; echo done" "(cd x && node --test)" "node --test|tee o" "n
 done
 t_capture oss_verify_auto_step "$TMP" "node() { printf '# pass 0\n'; }; node --test" "exit 0"; t_assert_rc 1 "#922: exit 0 on a zero-test node --test run fails as vacuous"
 
+# --- 1.36.0 (#434): oss spec_oid, one fixed hashing context ------------------------------
+# The expected id is computed from the file's bytes with `git hash-object` under a
+# scratch dir OUTSIDE this test's helper - the contents "blob 6\0hello\n" have a known id.
+OID_F="$TMP/oid-spec.md"; printf 'hello\n' > "$OID_F"
+t_capture oss_verify_spec_oid "$OID_F"
+t_assert_rc 0 "spec_oid: hashes a readable file"
+t_assert_eq "ce013625030ba8dba906f756967f9e9ca394464a" "$T_OUT" "spec_oid: the id of 'hello\\n' is the well-known git blob id (sha1, 40 hex)"
+OID_OUT="$(cd / && oss_verify_spec_oid "$OID_F")"
+OID_REPO="$TMP/oid-repo1"; mkdir "$OID_REPO"; git -C "$OID_REPO" init -q
+t_assert_eq "$OID_OUT" "$(cd "$TMP" && oss_verify_spec_oid "oid-spec.md")" "spec_oid: a RELATIVE path hashes the same file (the file opens before the cd into the scratch dir)"
+t_assert_eq "$OID_OUT" "$(cd "$OID_REPO" && oss_verify_spec_oid "../oid-spec.md")" "spec_oid: a ../ relative path from inside a repo gives the same id"
+OID_IN="$(cd "$OID_REPO" && oss_verify_spec_oid "$OID_F")"
+t_assert_eq "$OID_OUT" "$OID_IN" "spec_oid: the same id inside a git repo as outside one"
+if git init -q --object-format=sha256 "$TMP/oid-repo256" 2>/dev/null; then
+  # CONTROL: a bare hash-object in a sha256 repo DOES give another id, so the equality below is not vacuous.
+  BARE256="$(cd "$TMP/oid-repo256" && git hash-object --no-filters "$OID_F")"
+  t_assert_eq "64" "${#BARE256}" "spec_oid control: a bare git hash-object inside a sha256 repo prints 64 hex"
+  t_assert_eq "$OID_OUT" "$(cd "$TMP/oid-repo256" && oss_verify_spec_oid "$OID_F")" "spec_oid: ...and the verb still prints the sha1 id from inside that repo"
+  t_assert_eq "$OID_OUT" "$(cd "$TMP/oid-repo256" && GIT_DIR="$TMP/oid-repo256/.git" oss_verify_spec_oid "$OID_F")" "spec_oid: ...even with GIT_DIR pointing at it"
+else
+  echo "SKIP: git init --object-format=sha256 unavailable - skipped 3 assertions: 'spec_oid control: a bare git hash-object inside a sha256 repo prints 64 hex', 'spec_oid: ...and the verb still prints the sha1 id from inside that repo', 'spec_oid: ...even with GIT_DIR pointing at it'"
+fi
+# --no-filters: a .gitattributes clean/text filter in the repo cannot change the id.
+printf '* text eol=crlf\n' > "$OID_REPO/.gitattributes"; printf 'a\r\nb\r\n' > "$OID_REPO/crlf.md"
+t_assert_eq "$(cd / && oss_verify_spec_oid "$OID_REPO/crlf.md")" "$(cd "$OID_REPO" && oss_verify_spec_oid "$OID_REPO/crlf.md")" "spec_oid: a .gitattributes eol filter does not change the id"
+t_assert_eq "1" "$(cd "$OID_REPO" && [ "$(git hash-object crlf.md)" != "$(oss_verify_spec_oid "$OID_REPO/crlf.md")" ] && echo 1 || echo 0)" "spec_oid control: a filtered git hash-object DOES differ, so the line above can fail"
+printf 'hello!\n' > "$OID_F"
+t_assert_eq "1" "$([ "$(oss_verify_spec_oid "$OID_F")" != "$OID_OUT" ] && echo 1 || echo 0)" "spec_oid: a one-byte edit changes the id"
+t_capture oss_verify_spec_oid "$TMP/no-such-spec.md"
+t_assert_rc 2 "spec_oid: a missing file is rc 2"
+t_capture bash "$HERE/../bin/oss" spec_oid
+t_assert_rc 2 "spec_oid: no argument is rc 2 through the dispatcher"
+t_capture bash "$HERE/../bin/oss" spec_oid "$OID_F" extra
+t_assert_rc 2 "spec_oid: two arguments is rc 2 through the dispatcher"
+t_capture bash "$HERE/../bin/oss" spec_oid "$OID_F"
+t_assert_rc 0 "spec_oid: works under the dispatcher's set -euo pipefail"
+
 rm -rf "$TMP"; t_summary

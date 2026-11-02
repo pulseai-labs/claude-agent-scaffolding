@@ -163,6 +163,46 @@ t_capture "$OSS" doctor
 unset OSS_STATE_FILE
 t_assert_contains "$T_OUT" "ok: replay" "dispatcher: oss doctor reports replay clean on the G2 fixture too"
 
+# --- 1.36.0 (#434): set_work_item_exec's spec_oid is SET-IF-GIVEN. Live states are
+# hand-built by literal jq (the G1/G2 rule: never by calling _oss_apply_op, which would
+# be a tautology). An entry journaled BEFORE 1.36.0 has no spec_oid key and must replay
+# to a record with no spec_oid key at all (an unconditional assignment would add a null);
+# an entry that carries one must replay to a record that holds it; and a later entry
+# without one must leave the recorded value alone.
+H1BASE="$TMP/h1base.json"
+jq -n '{schema_version:4,
+  project:{name:"h1",posture:null,composition_root:null,overlay_wiring:null},
+  counters:{demo_line:1},
+  releases:[],spines:[],
+  work_items:[{id:"r0.s1.w1",spine:"r0.s1",title:"t",target_repo:"canonical",status:"planned"}],
+  demo_ledger:[],bones:[],risk_gates:[],fakes:[],
+  feature_map:[],patch_records:[],class_overrides:[],veto_dispositions:[],
+  close_records:[],mutations:[]}' > "$H1BASE"
+cp "$H1BASE" "$H1BASE.base.json"
+H1OLD='{"seq":0,"op":"set_work_item_exec","ts":"2026-01-01T00:00:00Z","payload":{"work_item":"r0.s1.w1","branch":"work/a","worktree_path":"/wt/a","base_sha":"b1"}}'
+jq --argjson m "$H1OLD" '.mutations += [$m] | (.work_items[0]) |= (.branch="work/a" | .worktree_path="/wt/a" | .base_sha="b1")' \
+  "$H1BASE" > "$H1BASE.tmp" && mv "$H1BASE.tmp" "$H1BASE"
+t_capture oss_state_replay "$H1BASE"
+t_assert_rc 0 "replay reconstructs a pre-1.36.0 set_work_item_exec payload with no spec_oid key and adds none (#434)"
+t_capture oss_state_read "$H1BASE" '.work_items[0] | has("spec_oid")'
+t_assert_eq "false" "$T_OUT" "setup sanity: the hand-built live record never had the key either (#434)"
+H1NEW='{"seq":1,"op":"set_work_item_exec","ts":"2026-01-02T00:00:00Z","payload":{"work_item":"r0.s1.w1","branch":"work/b","worktree_path":"/wt/b","base_sha":"b2","spec_oid":"0123456789abcdef0123456789abcdef01234567"}}'
+jq --argjson m "$H1NEW" '.mutations += [$m] | (.work_items[0]) |= (.branch="work/b" | .worktree_path="/wt/b" | .base_sha="b2" | .spec_oid="0123456789abcdef0123456789abcdef01234567")' \
+  "$H1BASE" > "$H1BASE.tmp" && mv "$H1BASE.tmp" "$H1BASE"
+t_capture oss_state_replay "$H1BASE"
+t_assert_rc 0 "replay reconstructs a set_work_item_exec payload that carries spec_oid (#434)"
+H1KEEP='{"seq":2,"op":"set_work_item_exec","ts":"2026-01-03T00:00:00Z","payload":{"work_item":"r0.s1.w1","branch":"work/c","worktree_path":"/wt/c","base_sha":"b3"}}'
+jq --argjson m "$H1KEEP" '.mutations += [$m] | (.work_items[0]) |= (.branch="work/c" | .worktree_path="/wt/c" | .base_sha="b3")' \
+  "$H1BASE" > "$H1BASE.tmp" && mv "$H1BASE.tmp" "$H1BASE"
+t_capture oss_state_replay "$H1BASE"
+t_assert_rc 0 "replay keeps a recorded spec_oid across a later entry that carries none (#434)"
+t_capture oss_state_read "$H1BASE" '.work_items[0].spec_oid'
+t_assert_eq "0123456789abcdef0123456789abcdef01234567" "$T_OUT" "setup sanity: the hand-built live record kept the value too (#434)"
+# CONTROL: the comparison can fail - a live record that DROPPED the value is drift (rc 5).
+jq '(.work_items[0]) |= del(.spec_oid)' "$H1BASE" > "$H1BASE.tmp" && mv "$H1BASE.tmp" "$H1BASE"
+t_capture oss_state_replay "$H1BASE"
+t_assert_rc 5 "...and a live record missing the kept spec_oid is drift, so the replay checks above can fail (#434)"
+
 # ---------------------------------------------------------------------------
 # G3: a CORRUPT JOURNAL must never be rebuilt into the empty base skeleton.
 #

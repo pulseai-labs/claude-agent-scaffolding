@@ -15,7 +15,7 @@ execution lane, holding a `complete` return (`work-item/references/round-orchest
 You need **`spec.md`**, **`report.md`** and the **worktree**. Nothing in state
 holds a spec path, a report path, or a slug — a work item is
 `{spine, title, target_repo, status, created_at, id, branch, worktree_path,
-base_sha}` — so the docs paths are reconstructed, and the reconstruction is where
+base_sha, spec_oid}` — so the docs paths are reconstructed, and the reconstruction is where
 this layer most easily goes silently wrong.
 
 **The worktree is the easy one**: state holds it, written by the execution lane.
@@ -150,6 +150,33 @@ path problem, and the recovery menu sends someone to fix code that is fine.
 Carry `$spec`, `$report` and `$wt` forward as absolute paths. Nothing below
 re-derives them, and nothing anywhere in this layer `cd`s (SKILL.md §3).
 
+### The spec is the one dispatched (#434)
+
+The work-item contract forbids an implementer to edit `spec.md`, and the gate below judges the
+work against it. Round orchestration §3 records the spec's blob id in state when it dispatches
+(`spec_oid`); compare it with the spec as it is now, **before every gate run**. This block runs
+on every route that reaches §2: plain close, `--pr`, `--verdict` and the external re-entry all
+run §1, and the `finish-merge` row of `round-orchestration.md` §2b runs it itself.
+
+```bash
+now_oid="$(oss spec_oid "$spec")" || { echo "close: cannot hash $spec for $wi - halt"; exit 1; }
+rec_oid="$(oss get ".work_items[] | select(.id==\"$wi\") | .spec_oid")" || { echo "close: cannot read $wi's recorded spec value from state - halt"; exit 1; }
+spec_note=""
+if [ -z "$rec_oid" ] || [ "$rec_oid" = "null" ]; then
+  spec_note="no dispatch-time spec value for $wi: the spec check did not run"
+  echo "$spec_note"
+elif [ "$now_oid" != "$rec_oid" ]; then
+  echo "halt:spec-changed - $wi's spec.md is $now_oid, the spec dispatched was $rec_oid. No verifier ran, nothing merged, no PR opened. Two ways out, both yours: (1) the spec should not have changed - restore the dispatched spec (find it in the AI workspace's git history, git log -- $spec, or in the planning record), then re-run close; (2) the spec changed on purpose - \"oss\" work_item_status $wi planned, save or discard the staged work, remove the item's worktree, and re-run the round so round-orchestration.md §3 dispatches it again and records the new spec's id. There is no route that refreshes the recorded value in place - halt"
+  exit 1
+fi
+```
+
+- **Equal** continues. **No `spec_oid` in state** is a visible note, not a halt: an item dispatched
+  before 1.36.0, or by a four-argument `work_item_exec`, still closes. `$spec_note` is carried into
+  `verify.md` (§2), so a reader of the gate record sees that the check did not run.
+- **A repaired dispatch records the spec as it was at repair** (`round-orchestration.md` §2b's
+  `adopt` and `halt:base-unknown` rows say so when they write it); it is the one stated limit.
+
 ---
 
 ## 2. The gate
@@ -244,7 +271,8 @@ fires the `[fidelity]` halt. **Every completed verifier pass writes
 `<work-item-dir>/verify.md`** — `$(dirname "$report")` on Route A, `$wi_dir` on
 Route B — and echoes it in the close summary: the `verifier:` line, one result
 line per layer (L1, L2, L3, L4, mutation; `not run` in an `--external-executor`
-lane), then the findings and any `stayed-green` or `undetermined` mutation
+lane), then `$spec_note` from §1 when it is non-empty (a line of its own, so it is never
+read as a finding and never begins with a verdict tag), then the findings and any `stayed-green` or `undetermined` mutation
 result. Each halting verdict is one line that begins with its tag, or with `- `
 and then the tag (`[fidelity] <file>:<line> - <claim>`); only a halting finding
 is tagged `[fidelity]`, a declared one is written as `fidelity`. The summary is a message,

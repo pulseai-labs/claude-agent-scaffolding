@@ -783,6 +783,43 @@ oss_entity_set_work_item_status "$S" "$WP" complete >/dev/null
 t_capture oss_entity_set_work_item_pr "$S" "$WP" "$PRU"
 t_assert_rc 7 "work_item_pr refuses a COMPLETE item (not active)"
 
+# ---------------------------------------------------------------------------
+# 1.36.0 (#434): work_item_exec's optional 5th argument, the spec's blob id.
+# Set if given, keep if absent; the shape is checked by the guard (rc 2).
+# ---------------------------------------------------------------------------
+SO1="$(printf '1234abcd%.0s' 1 2 3 4 5)"      # 40 hex
+SO2="$(printf 'f0e1d2c3%.0s' 1 2 3 4 5)"      # a second 40-hex id
+SO64="$(printf 'f0e1d2c3%.0s' 1 2 3 4 5 6 7 8)"   # 64 hex: a sha256 id, which oss spec_oid never prints
+WSO="$(oss_entity_add_work_item "$S" r0.s1 "spec oid")"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WSO" "work/$WSO" "$TMP/.worktrees/$WSO" "sha-so"
+t_assert_rc 0 "spec_oid: a 4-argument dispatch is accepted"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WSO\") | has(\"spec_oid\")"
+t_assert_eq "false" "$T_OUT" "spec_oid: ...and records no spec_oid key (not a null one)"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WSO" "work/$WSO" "$TMP/.worktrees/$WSO" "sha-so" "$SO1"
+t_assert_rc 0 "spec_oid: a 5-argument dispatch with a 40-hex id is accepted"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WSO\") | .spec_oid"
+t_assert_eq "$SO1" "$T_OUT" "spec_oid: ...and the id is recorded"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WSO" "work/$WSO-b" "$TMP/.worktrees/$WSO-b" "sha-so2"
+t_assert_rc 0 "spec_oid: a later 4-argument re-dispatch is accepted"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WSO\") | [.branch, .spec_oid] | join(\" \")"
+t_assert_eq "work/$WSO-b $SO1" "$T_OUT" "spec_oid: ...the dispatch fields changed and the recorded id was KEPT (a 4-argument call never erases it)"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WSO" "work/$WSO-c" "$TMP/.worktrees/$WSO-c" "sha-so3" "$SO2"
+t_assert_rc 0 "spec_oid: a second 40-hex id is accepted"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WSO\") | .spec_oid"
+t_assert_eq "$SO2" "$T_OUT" "spec_oid: ...and a 5-argument call REPLACES the recorded id"
+N_SO="$(oss_state_read "$S" '.mutations | length')"
+for bad in "" "abc" "$SO64" "${SO1^^}" "${SO1}0" "zz${SO1:2}" "$SO1 "; do
+  t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WSO" "work/x" "$TMP/.worktrees/x" "sha-x" "$bad"
+  t_assert_rc 2 "spec_oid: a malformed id '$bad' is refused at rc 2"
+done
+t_assert_eq "$N_SO" "$(oss_state_read "$S" '.mutations | length')" "spec_oid: ...and no refused call journaled anything"
+t_capture oss_state_read "$S" ".work_items[] | select(.id==\"$WSO\") | .spec_oid"
+t_assert_eq "$SO2" "$T_OUT" "spec_oid: ...nor changed the recorded id"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WSO" b w s "$SO1" extra
+t_assert_rc 2 "spec_oid: a sixth argument is a usage error"
+t_capture env OSS_STATE_FILE="$S" "$OSS" work_item_exec "$WSO" "" "" "" "$SO1"
+t_assert_rc 7 "spec_oid: CONTROL - a wipe of the dispatch fields is still refused when a spec id rides along"
+
 cd "$HERE"
 rm -rf "$TMP"
 t_summary

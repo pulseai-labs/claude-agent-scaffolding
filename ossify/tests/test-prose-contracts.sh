@@ -2566,4 +2566,54 @@ for _old in 'plain repos: #536' 'which today takes only a project onboarded'; do
   _pin "$([ "$_c" = 0 ] && echo 0 || echo 1)" "start/SKILL.md still says '$_old' (#536)"
 done
 
+# --- #434: close checks the spec against its dispatch-time blob id ---------------------
+_434_WC="$SKILLS/close/references/work-item-close.md"
+_434_RO="$SKILLS/work-item/references/round-orchestration.md"
+_434_EX="$SKILLS/work-item/references/external-executor.md"
+pin "$_434_WC" 'halt:spec-changed - $wi'"'"'s spec.md is $now_oid, the spec dispatched was $rec_oid.' \
+  "#434 work-item-close §1: the halt is named and carries both ids"
+pin "$_434_WC" '(1) the spec should not have changed - restore the dispatched spec (find it in the AI workspace'"'"'s git history' \
+  "#434 work-item-close §1: route 1, restore the dispatched spec from history or the planning record"
+pin "$_434_WC" '(2) the spec changed on purpose - \"oss\" work_item_status $wi planned, save or discard the staged work, remove the item'"'"'s worktree, and re-run the round' \
+  "#434 work-item-close §1: route 2, planned, save or discard, remove the worktree, re-run the round"
+pin "$_434_WC" 'spec_note="no dispatch-time spec value for $wi: the spec check did not run"' \
+  "#434 work-item-close §1: an absent value is a visible note, not a halt"
+pin "$_434_WC" 'then `$spec_note` from §1 when it is non-empty' \
+  "#434 work-item-close §2: the note survives into verify.md"
+pin "$_434_WC" 'before every gate run' \
+  "#434 work-item-close §1: the check runs before every gate run"
+pin "$_434_WC" 'the `finish-merge` row of `round-orchestration.md` §2b runs it itself' \
+  "#434 work-item-close §1: the finish-merge row runs the block too"
+pin "$_434_RO" '"$(git -C "$wt" rev-parse HEAD)" "$spec_oid"' \
+  "#434 round-orchestration §3: the dispatch passes spec_oid as the fifth argument"
+pin "$_434_RO" 'spec_oid="$(oss spec_oid "$spine_dir_abs/work-<wi-id>/spec.md")"' \
+  "#434 round-orchestration §3: the dispatch computes spec_oid with the one helper"
+pin "$_434_RO" 'add the fifth argument `"$(oss spec_oid "<the item'"'"'s spec.md, §3'"'"'s path>")"` and print `spec value recorded at repair, not at dispatch` (the dispatch-time spec was never recorded' \
+  "#434 round-orchestration: the adopt repair row prints the recorded-at-repair note"
+pin "$_434_RO" 'ONLY when state holds no `spec_oid` for the item; when it holds one, call with the four arguments above, so the dispatch-time value is kept' \
+  "#434 round-orchestration: the base-unknown row passes spec_oid only when state holds none"
+pin "$_434_RO" 'and halt if that read errors. Pass the fifth argument' \
+  "#434 round-orchestration: the base-unknown row reads the recorded value and halts on a read error"
+pin "$_434_RO" 'a recorded value is kept by the four-argument call' \
+  "#434 round-orchestration: the adopt row keeps a recorded value"
+pin "$_434_RO" 'it runs `work-item-close.md` §1'"'"'s spec-check block itself' \
+  "#434 round-orchestration: the finish-merge row runs the spec check before its gate"
+pin "$_434_RO" '| `halt:spec-changed`' "#434 round-orchestration: halt:spec-changed has a repair row"
+pin "$_434_EX" 'close now also checks the tree against the spec value recorded at dispatch' \
+  "#434 external-executor: §5a checks the record against the tree, close checks the tree against dispatch"
+pin "$_434_WC" 'cannot read $wi'"'"'s recorded spec value from state - halt' \
+  "#434 work-item-close §1: a failed read of the recorded value halts (fails closed)"
+pin "$SKILLS/plan-spine/references/citation-foldin.md" 'except in the spec of an item with a dispatch recorded and not' \
+  "#434 citation-foldin §3: a dispatched, not-yet-complete item's spec is not edited in place"
+pin "$_434_WC" 'There is no route that refreshes the recorded value in place' \
+  "#434 work-item-close §1: the halt says there is no in-place refresh"
+# NEGATIVE: no refresh route exists anywhere - not in the prose, not as a verb.
+for _f in "$_434_WC" "$_434_RO" "$_434_EX"; do
+  for _needle in 'oss spec_refresh' 'spec_oid_refresh' 'refresh the spec' 're-record the spec' 'oss work_item_spec'; do
+    absent_981 "$_f" "$_needle" "#434 no refresh route: '$_needle' is not in ${_f##*/}"
+  done
+done
+_434_VERB="$(bash "$HERE/../bin/oss" spec_refresh 2>&1 || true)"
+case "$_434_VERB" in *"unknown subcommand"*) _pin 0 "#434 no refresh route: oss has no spec_refresh verb";; *) _pin 1 "#434 no refresh route: oss spec_refresh is not an unknown subcommand";; esac
+
 t_summary

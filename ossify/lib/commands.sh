@@ -228,7 +228,19 @@ oss_cmd_spine_rename()     { _oss_need_exact 2 spine_rename "<spine> <new-name>"
 oss_cmd_work_item_rename() { _oss_need_exact 2 work_item_rename "<wi-id> <new-title>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_rename_work_item "$sf" "$1" "$2"; }
 oss_cmd_work_item_status() { _oss_need 2 work_item_status "<wi-id> <status>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_work_item_status "$sf" "$1" "$2"; }
 oss_cmd_release_status()   { _oss_need 2 release_status "<release> <status>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_release_status "$sf" "$1" "$2"; }
-oss_cmd_work_item_exec()   { _oss_need 4 work_item_exec "<wi-id> <branch> <worktree> <base-sha>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_work_item_exec "$sf" "$1" "$2" "$3" "$4"; }
+# 1.36.0 (#434): an optional 5th argument, the spec's blob id (`oss spec_oid <path>`).
+# Given, it is recorded in the same journal entry as the dispatch; absent, a recorded
+# value is kept. `$#` decides "given", so an empty 5th argument is refused, not skipped.
+oss_cmd_work_item_exec() {
+  _oss_need 4 work_item_exec "<wi-id> <branch> <worktree> <base-sha> [spec-oid]" "$@" || return 2
+  [ "$#" -le 5 ] || { echo "oss: work_item_exec takes at most 5 argument(s) - usage: oss work_item_exec <wi-id> <branch> <worktree> <base-sha> [spec-oid]" >&2; return 2; }
+  local sf; sf="$(_oss_resolve_state)" || return $?
+  if [ "$#" -eq 5 ]; then oss_entity_set_work_item_exec "$sf" "$1" "$2" "$3" "$4" "$5"
+  else oss_entity_set_work_item_exec "$sf" "$1" "$2" "$3" "$4"; fi
+}
+# 1.36.0 (#434): the blob id of a spec file, from one fixed hashing context, so the id
+# recorded at dispatch and the id compared at close always use the same algorithm.
+oss_cmd_spec_oid()         { _oss_need_exact 1 spec_oid "<spec-path>" "$@" || return 2; oss_verify_spec_oid "$1"; }
 oss_cmd_work_item_pr()     { _oss_need_exact 2 work_item_pr "<wi-id> <pr-url>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_work_item_pr "$sf" "$1" "$2"; }
 oss_cmd_spine_base_set()   { _oss_need 3 spine_base_set "<spine-id> <repo-key> <base-branch>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_spine_base "$sf" "$1" "$2" "$3"; }
 oss_cmd_spine_base_reset() { _oss_need 3 spine_base_reset "<spine-id> <repo-key> <base-branch>" "$@" || return 2; local sf; sf="$(_oss_resolve_state)" || return $?; oss_entity_set_spine_base_reset "$sf" "$1" "$2" "$3"; }
