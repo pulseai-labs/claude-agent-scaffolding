@@ -4,7 +4,7 @@ Distilled from SPEC §4. Read this when authoring rules or interpreting findings
 
 ## Primary threat — compromised marketplace plugin (common-pattern subset)
 
-User runs `/plugin install some-thing`. Plugin's files land in `~/.claude/plugins/cache/<name>/<version>/` and are activated for subsequent sessions where the user enables them. Attacker now has hooks, agent prompts, slash commands, and MCP configs that run / influence Claude on every session.
+User runs `/plugin install some-thing`. Plugin's files land in `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` and are activated for subsequent sessions where the user enables them. Attacker now has hooks, agent prompts, slash commands, and MCP configs that run / influence Claude on every session.
 
 **v0.1 catches:** direct `curl ... | bash`, plain-text exfiltration in agent prompts, missing MCP auth, untrusted endpoint URLs, broad permission grants the attacker can leverage, plaintext credentials in plugin files.
 
@@ -40,20 +40,43 @@ The audit reads files that, per the threat model, may be attacker-controlled. Th
    - $PWD/.claude-plugin/marketplace.json if present
 
 2. ENABLED_PLUGINS_SET:
-   a. Parse $PWD/.claude/settings.json for "enabledPlugins" array (or whatever
-      Claude Code's current settings key is — pinned by Phase-0 discovery test).
-   b. Parse $HOME/.claude/settings.json for same key.
-   c. Union the two; project-local takes precedence on conflicting state.
-   d. Resolve each plugin name to filesystem path:
-      - First: $HOME/.claude/plugins/cache/<plugin>/<active-version>/
-      - Fallback (local-dev): $HOME/.claude/plugins/local/<plugin>/
-        Scan with "[local-dev]" prefix on findings (supports marketplace
-        operator's pre-publish dogfood use case)
-      - If neither resolves: emit PROVENANCE-002 High finding
+   a. Read "enabledPlugins" from three files, in this order: $HOME/.claude/settings.json,
+      $PWD/.claude/settings.json, $PWD/.claude/settings.local.json. Claude Code writes an
+      object map, {"<plugin>@<marketplace>": true|false}; only boolean values count. An
+      array of names (older files, fixtures) reads as each name true. Malformed JSON or
+      an absent key reads as empty (SETTINGS-PARSE is the rule engine's concern).
+   b. Merge by key, the later file wins: a project `false` disables a user `true`. The
+      set is the keys left at true. Identity is the whole key, plugin@marketplace, so two
+      marketplaces with one plugin name stay distinct.
+   c. A value that holds entries yet yields none (a string, an array of non-strings, an
+      object of non-booleans) prints one warning naming the shape. This format belongs to
+      another tool and can change; an audit that skips every plugin must not read as clean.
+   d. An unreadable settings file, or an unreadable or unrecognised
+      installed_plugins.json, makes the set unknown: the enumeration stops (rc 2). It
+      never reads as empty.
+   e. Resolve each key to a filesystem path:
+      - First: $HOME/.claude/plugins/installed_plugins.json. Take this project's `local`,
+        else `project`, entry (its projectPath equals the project root, compared as
+        physical paths), else the `user` entry. Use its installPath only if it is a
+        directory physically inside $HOME/.claude/plugins/ (a `..`, a symlink out, a
+        relative or missing path fails the guard). A project's settings never contribute
+        a path.
+      - With no entry, for plugin@marketplace: $HOME/.claude/plugins/cache/<marketplace>/<plugin>/
+        with its `.active` version or its only version. Any part holding `/` or `..` is refused.
+      - A bare name (array form): $HOME/.claude/plugins/cache/<name>/<version>/, then
+        $HOME/.claude/plugins/local/<name>/ (local-dev), with the same refusal.
+      - If none resolves: PROVENANCE-002, a High finding that names the plugin and
+        why. The engine records it in state and reports it like any finding, so a later
+        audit that resolves it removes it from the report.
+   f. A finding's id for a plugin file drops the version:
+      @plugin:<plugin>@<marketplace>:<path inside the plugin>.
 
 3. SCAN_SET = PROJECT_TARGETS ∪ files-under-each-ENABLED_PLUGIN-path
 
 4. PARANOID_CANDIDATES (counted but not scanned by default):
-   - Directories under $HOME/.claude/plugins/cache/ not in ENABLED_PLUGINS_SET
+   - Keys in installed_plugins.json, plus each cache/<marketplace>/<plugin> directory
+     (as plugin@marketplace), not at true in the enabled set; a `false` key is a
+     candidate. `temp_git_*` (a clone in progress) is skipped. The older flat
+     cache/<name>/<version> layout lists <name>.
    - If count > 0, emit INFO-PARANOID-001 with the count
 ```

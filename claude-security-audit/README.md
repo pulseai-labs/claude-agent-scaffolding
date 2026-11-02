@@ -63,7 +63,7 @@ The plugin ships `hooks/session-start-reminder.sh` but does NOT register it. To 
 {
   "hooks": {
     "SessionStart": [
-      { "command": "bash $HOME/.claude/plugins/cache/claude-security-audit/0.1.0/hooks/session-start-reminder.sh" }
+      { "command": "bash $HOME/.claude/plugins/cache/<marketplace>/claude-security-audit/<version>/hooks/session-start-reminder.sh" }
     ]
   }
 }

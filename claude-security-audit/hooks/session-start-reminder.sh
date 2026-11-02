@@ -37,11 +37,23 @@ fi
 NOW_EPOCH="$(date -u +%s)"
 DAYS_AGO=$(( (NOW_EPOCH - LAST_EPOCH) / 86400 ))
 
+# The current set comes from the same library the audit uses, so the note
+# compares like with like: user, project and local settings, an object map or an
+# array. An unreadable set is unknown, so no change is claimed.
 SNAPSHOT_NAMES="$(jq -r '.last_audit.enabled_plugins_snapshot[]?.name // empty' "$STATE_FILE" 2>/dev/null | sort -u)"
-CURRENT_NAMES="$(jq -r '.enabledPlugins[]? // empty' "$PWD/.claude/settings.json" 2>/dev/null | sort -u)"
 PLUGIN_DELTA=""
-if [[ "$SNAPSHOT_NAMES" != "$CURRENT_NAMES" ]]; then
-  PLUGIN_DELTA=" Note: enabled-plugin set changed since then."
+_HOOK_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")/../lib" 2>/dev/null && pwd)"
+if [[ -n "$_HOOK_LIB" && -f "$_HOOK_LIB/helpers.sh" && -f "$_HOOK_LIB/enumerate-targets.sh" ]]; then
+  # shellcheck source=/dev/null
+  source "$_HOOK_LIB/helpers.sh"
+  # shellcheck source=/dev/null
+  source "$_HOOK_LIB/enumerate-targets.sh"
+  if CURRENT_RAW="$(csa_enum_enabled_plugins "$PWD" 2>/dev/null)"; then
+    CURRENT_NAMES="$(printf '%s\n' "$CURRENT_RAW" | sort -u)"
+    if [[ "$SNAPSHOT_NAMES" != "$CURRENT_NAMES" ]]; then
+      PLUGIN_DELTA=" Note: enabled-plugin set changed since then."
+    fi
+  fi
 fi
 
 printf 'claude-security-audit: last audit %d days ago.%s Run /security-audit when ready.\n' "$DAYS_AGO" "$PLUGIN_DELTA"

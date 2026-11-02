@@ -144,7 +144,21 @@ csa_state_record_audit() {
 
   # Build finding counts and findings registry updates from findings_jsonl.
   local counts_critical=0 counts_high=0 counts_medium=0 counts_low=0 counts_info=0
-  local enabled_plugins_snapshot="[]"
+  # The enabled set this audit saw, as [{"name": "plugin@marketplace"}, ...]:
+  # the SessionStart reminder compares it with the current set. An unreadable
+  # set is unknown, not empty, so it refuses the write (#424).
+  local enabled_plugins_snapshot="[]" enabled_names
+  if ! declare -F csa_enum_enabled_plugins >/dev/null 2>&1 && [[ -f "${CSA_LIB_DIR:-}/enumerate-targets.sh" ]]; then
+    # shellcheck source=/dev/null
+    source "${CSA_LIB_DIR}/enumerate-targets.sh"
+  fi
+  if declare -F csa_enum_enabled_plugins >/dev/null 2>&1; then
+    enabled_names="$(csa_enum_enabled_plugins "$root" 2>/dev/null)" || {
+      printf 'csa: cannot read the enabled-plugin set; no audit state written\n' >&2
+      return 2
+    }
+    enabled_plugins_snapshot="$(printf '%s\n' "$enabled_names" | jq -R -s -c 'split("\n") | map(select(length > 0) | {name: .})')" || return 2
+  fi
 
   # Parse findings_jsonl: update findings registry in state.
   if [[ -n "$findings_jsonl" ]]; then
@@ -213,14 +227,16 @@ csa_state_record_audit() {
   local display_id_prefix="SA-${report_basename}"
 
   # Update last_audit and append to audit_history.
-  state="$(printf '%s' "$state" | jq \
+  # The snapshot grows with the enabled set, so it reaches jq on stdin after the
+  # state, never as an argv value (#424).
+  state="$(printf '%s\n%s\n' "$state" "$enabled_plugins_snapshot" | jq -s \
     --arg now "$now" \
     --arg report_path "$report_path" \
     --arg display_id_prefix "$display_id_prefix" \
     --argjson finding_counts "$finding_counts" \
-    --argjson enabled_plugins_snapshot "$enabled_plugins_snapshot" \
     --arg focus "$focus" \
     --argjson run_index "$run_index" '
+    .[1] as $enabled_plugins_snapshot | .[0] |
     .last_audit = {
       date: $now,
       report_path: $report_path,
