@@ -9,7 +9,7 @@ Ossify already owns five ways to resolve uncertainty — four instrument docs
 (`research.md`, `smoke-test-pass.md`, `spike-contract.md`, `prototype.md`)
 plus a grill (`challenge`) — and wayfinder adds none of its own. A
 ticket's type says which of those five its uncertainty is, or that it
-carries no uncertainty at all and just wants doing.
+carries no uncertainty at all and records work done outside the map (`task`).
 
 ---
 
@@ -77,8 +77,8 @@ doesn't. A `spike` needs a person once, before it starts: its contract's go (§3
 judgment: which built variant feels right, how the operator actually
 answers a question the interview predicted differently. `task` carries no
 uncertainty: it records manual work that must happen outside the map before a
-decision can move. The session never does that work ("plan, don't do",
-`references/working.md` §2); it resolves the ticket by recording where and by
+decision can move. Absent a `Notes` override, the session never does that work ("plan, don't
+do", `references/working.md` §2); it resolves the ticket by recording where and by
 whom the work was done (a PR, an issue, a commit, or the operator's word), and
 only a person can say it is done — so `task` is HITL too.
 
