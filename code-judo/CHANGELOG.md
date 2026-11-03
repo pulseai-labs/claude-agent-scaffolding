@@ -2,6 +2,14 @@
 
 All notable changes to the `code-judo` plugin.
 
+## 0.2.4
+
+Wording patch to the 0.2.3 grill (#1065). The triage sentence on a destinationless defer now says
+what it meant: the agent's own lean is `defer`, which is always asked, and the policy's
+`<accept|defer>` digest never carries `defer` here. The "not ready to build" ending is scoped to the
+in-plugin protocol, not to whichever resolver fires. The remedy says it is a reply in the same
+conversation, what survives (settled items), and that a fresh run keeps nothing. Prose only.
+
 ## 0.2.3
 
 `deepen-architecture`'s in-plugin grill ends on every path (#391). A **defer** settles an agenda item
