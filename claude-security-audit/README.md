@@ -8,7 +8,7 @@ Static-analysis security audit for Claude Code and Codex project configurations 
 
 - **Plaintext secrets** in `CLAUDE.md`, `AGENTS.md`, `.claude/`, and `.codex/` files (API keys, JWTs, GitHub PATs, AWS keys, env-var-shaped leaks)
 - **Permission misconfigurations** including the high-impact **schema-validation** check that catches typo'd field names like `"allowed"` instead of `"allow"` (which Claude Code silently ignores → user has no enforcement)
-- **Hook injection** patterns (curl|bash, rm -rf, unbounded eval, plaintext network exfiltration)
+- **Hook injection** patterns (curl|bash, rm -rf, unbounded eval, plaintext network exfiltration) in hook scripts **and in hook commands declared in JSON**: the project's `.claude/settings.json` and `.claude/settings.local.json`, and an enabled plugin's `hooks/hooks.json` and `.claude-plugin/plugin.json`. A hook entry that cannot be read is a High finding (HOOK-005); hooks of another type are counted (HOOK-006); every report states how many hook entries were checked, flagged, not inspected and unreadable
 - **MCP server misconfiguration** (untrusted endpoints, missing auth, env-var leaks)
 - **Prompt injection** in agent definitions and slash commands (common patterns)
 - **Marketplace integrity** (non-HTTPS URLs, malformed marketplace.json, Claude `.claude-plugin/` manifests, Codex `.agents/plugins/` and `.codex-plugin/` manifests)
@@ -20,6 +20,15 @@ v0.1 uses bash + jq + regex (no AST). A determined adversary who obfuscates payl
 
 **Treat a clean audit as:** "doesn't trip our v0.1 common-pattern rules."
 **NOT as:** "this plugin/config is safe to trust."
+
+**Hook limits.** The hook patterns are the same common-pattern regexes everywhere, so obfuscation (base64, `eval` of a variable, a split string) still gets through; the "clean audit" caveat above covers hook commands too. Also not read:
+- a handler script outside `.claude/hooks/` and outside the plugin directory (the command that calls it is checked);
+- `http`, `prompt`, `agent` and `mcp_tool` hooks (counted, not inspected);
+- user-level `~/.claude/settings.json` hooks (the audit is project-scoped);
+- hooks declared in skill or agent frontmatter, inline hooks in a marketplace entry, managed-policy hooks, and Codex or OpenCode hook formats;
+- a plugin installed outside the `cache/<marketplace>/<plugin>/<version>/` layout (a `local/` plugin, or an install record that points elsewhere): its `hooks/hooks.json` and `plugin.json` are not read as hook entries;
+- a `plugin.json` hooks path that is a symlink, escapes the plugin root or is missing: reported as HOOK-005, not followed;
+- `rm -rf "$HOME"/x`: HOOK-002 matches only `rm -rf` of an absolute path, in files and in hook entries alike.
 
 Realistic v0.1 value:
 1. Catching accidental friendly-fire (secrets committed to CLAUDE.md)

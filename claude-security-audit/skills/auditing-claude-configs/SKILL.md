@@ -18,11 +18,11 @@ v0.1 catches **common, unobfuscated patterns**. A determined adversary who obfus
 1. Parse `$ARGUMENTS` for flags: `--focus <aspect>`, `--verbose`, `--show-suppressed`. Set `focus` to the selected aspect, or `all` when absent; `/secrets-scan` and `/permissions-review` set their respective focus.
 2. **First-run gitignore bootstrap** (only if `.claude/audits/state.json` does not yet exist): `csa state_bootstrap_gitignore` to add `.claude/audits/` to `.gitignore` (idempotent; covers nested git repos, missing gitignore, unwritable files — see references/auto-fix-policy.md).
 3. Resolve scan targets: `csa enum_targets_all "$PWD"` (project `.claude/`, `CLAUDE.md`, `.claude-plugin/marketplace.json`, Codex surfaces such as `.codex/`, `AGENTS.md`, `.agents/plugins/marketplace.json`, `.codex-plugin/plugin.json`, readable `~/.codex/config.toml`, plus enabled Claude plugins per the algorithm in references/threat-model.md §enumerate).
-4. Run the deterministic rule engine: `csa rule_engine_scan_all "$PWD" "$focus"` iterates concrete targets × applicable rules.
+4. Run the deterministic rule engine: `csa rule_engine_scan_all "$PWD" "$focus"` iterates concrete targets × applicable rules. Keep its stderr line `csa: hook-coverage ...` (printed for `all` and `hooks` scans) for step 8.
 5. Compute durable `finding_uid` (no line number) + per-run `dedup_fingerprint`: `csa finding_uid <...>` / `csa dedup_fingerprint <...>` (per scanner finding).
 6. Tag scanner findings NEW vs PERSISTED via `csa baseline_tag <findings>` against state.json's `findings` registry.
 7. Filter suppressed scanner findings via `csa suppress_filter <findings>` (unless `--show-suppressed`).
-8. Write the scanner report file `.claude/audits/<date>-<NN>.md` and return chat summary via `csa report_render_markdown` + `csa report_render_chat`.
+8. Write the scanner report file `.claude/audits/<date>-<NN>.md` and return chat summary via `csa report_render_markdown` + `csa report_render_chat`; pass the hook-coverage line from step 4 as `metadata.scope_summary`.
 9. Update `state.json` with `csa state_record_audit`, passing step 1's `focus` as its fifth argument so a focused scan ages only its own aspect (last-audit-date, scanner findings registry with GC per references/severity-rubric.md §GC, `self_integrity.state_mtime_at_last_audit` per references/auto-fix-policy.md §tamper).
 10. If any rules failed to load, emit prominent chat banner: `"⚠ N rule(s) failed to load; results incomplete. See report for SCANNER-001 findings."`
 11. Emit chat summary inline (per references/severity-rubric.md §chat-summary-format).

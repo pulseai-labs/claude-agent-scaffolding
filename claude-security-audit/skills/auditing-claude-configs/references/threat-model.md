@@ -6,9 +6,15 @@ Distilled from SPEC §4. Read this when authoring rules or interpreting findings
 
 User runs `/plugin install some-thing`. Plugin's files land in `~/.claude/plugins/cache/<marketplace>/<plugin>/<version>/` and are activated for subsequent sessions where the user enables them. Attacker now has hooks, agent prompts, slash commands, and MCP configs that run / influence Claude on every session.
 
-**v0.1 catches:** direct `curl ... | bash`, plain-text exfiltration in agent prompts, missing MCP auth, untrusted endpoint URLs, broad permission grants the attacker can leverage, plaintext credentials in plugin files.
+**v0.1 catches:** direct `curl ... | bash` (in hook scripts, and in hook commands declared in JSON: see Hook entries below), plain-text exfiltration in agent prompts, missing MCP auth, untrusted endpoint URLs, broad permission grants the attacker can leverage, plaintext credentials in plugin files.
 
 **v0.1 does NOT catch (v0.2 with AST):** base64-encoded payloads, eval indirection, dynamic command construction, splice-via-includes, deliberately-malformed regex bait, prompt-injection that uses semantic encoding rather than literal exfiltration strings.
+
+## Hook entries declared in JSON (0.3.0)
+
+A hook command can live in JSON rather than a script: the project's `.claude/settings.json` and `.claude/settings.local.json`, an enabled plugin's `hooks/hooks.json`, and an inline or path-referenced `hooks` field of its `.claude-plugin/plugin.json`. The audit walks exactly those files (never a nested `.claude/**/settings.json`, never a plugin's `fixtures/` or `tests/` copy) with `jq`, reads only `.hooks.<Event>[i].hooks[j]` entries (so a URL in `env` or a `permissions` string never reaches a hook pattern), decodes the command (JSON escapes, plus exec-form `args`), and runs the HOOK-001 to HOOK-004 patterns on the whole decoded command. Each piece it cannot read is a High HOOK-005 finding; hooks of type `http`, `prompt`, `agent`, `mcp_tool` or a later type are counted (one HOOK-006 Info finding per file). The engine prints `csa: hook-coverage checked=N flagged=N not-inspected=N unreadable=N`, and the report header carries it, so a zero-finding report still says what was not read.
+
+This keeps the no-LLM boundary below: the walk is a mechanical check on open input that can only add a stop, so no model reads hook text and nothing is approved (skill-first question 3). A `plugin.json` hooks path is resolved inside the plugin root with a physical containment check; no handler path is parsed out of command text. User-level `~/.claude/settings.json` hooks are not read.
 
 ## Secondary threats — the realistic v0.1 primary value
 

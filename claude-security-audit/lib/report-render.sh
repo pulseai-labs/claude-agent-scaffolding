@@ -202,12 +202,15 @@ csa_report_render_chat() {
       printf '### %s (%d)\n' "$label" "$count"
       local f
       for f in "${sev_findings[@]}"; do
-        local did rule_id file line_no
+        local did rule_id file line_no jpath
         did="$(printf '%s' "$f" | jq -r '.display_id // "SA-unknown"')"
         rule_id="$(printf '%s' "$f" | jq -r '.rule_id // ""')"
         file="$(printf '%s' "$f" | jq -r '.file // ""')"
         line_no="$(printf '%s' "$f" | jq -r '.line // ""')"
-        if [[ -n "$line_no" ]]; then
+        jpath="$(printf '%s' "$f" | jq -r '(.context | objects | .json_path) // ""')"
+        if [[ -n "$jpath" ]]; then
+          printf -- '- %s \xe2\x80\x94 %s at %s#%s\n' "$did" "$rule_id" "$file" "$jpath"
+        elif [[ -n "$line_no" ]]; then
           printf -- '- %s \xe2\x80\x94 %s at %s:%s\n' "$did" "$rule_id" "$file" "$line_no"
         else
           printf -- '- %s \xe2\x80\x94 %s at %s\n' "$did" "$rule_id" "$file"
@@ -267,7 +270,7 @@ csa_report_render_markdown() {
     if [[ -n "$findings_jsonl" ]]; then
       while IFS= read -r finding; do
         [[ -z "$finding" ]] && continue
-        local did rule_id file line_no offset preview fuid state sev
+        local did rule_id file line_no offset preview fuid state sev jpath
         did="$(printf '%s' "$finding" | jq -r '.display_id // "SA-unknown"')"
         rule_id="$(printf '%s' "$finding" | jq -r '.rule_id // ""')"
         file="$(printf '%s' "$finding" | jq -r '.file // ""')"
@@ -280,7 +283,12 @@ csa_report_render_markdown() {
 
         printf -- '### [%s] %s (%s) \xe2\x80\x94 %s\n\n' "$state" "$did" "$sev" "$rule_id"
         printf '**Rule:** %s\n' "$rule_id"
-        printf '**File:** %s:%s:%s\n' "$file" "$line_no" "$offset"
+        jpath="$(printf '%s' "$finding" | jq -r '(.context | objects | .json_path) // ""')"
+        if [[ -n "$jpath" ]]; then
+          printf '**File:** %s#%s\n' "$file" "$jpath"
+        else
+          printf '**File:** %s:%s:%s\n' "$file" "$line_no" "$offset"
+        fi
         printf '**Preview:** `%s`\n' "$preview"
         printf '**finding_uid:** `%s`\n\n' "$fuid"
         printf -- '---\n\n'

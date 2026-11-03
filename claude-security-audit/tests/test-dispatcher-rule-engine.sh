@@ -6,6 +6,11 @@ _csa_failed=0
 _tmp="$(mktemp -d "${TMPDIR:-/tmp}/csa-dispatch.XXXXXX")"
 trap 'rm -rf "$_tmp"' EXIT
 
+# #427: a hooks-aspect scan prints one `csa: hook-coverage ...` line on stderr. These
+# tests merge stderr into stdout to catch every stray note, so that one expected line
+# is dropped (blank lines and every other stderr line stay).
+_drop_hook_coverage() { printf '%s\n' "$1" | grep -v '^csa: hook-coverage' || true; }
+
 # assert_dispatcher_jsonl_contains <output> <rule-id>
 # The dispatcher emits JSONL: every nonempty line must be one JSON object.
 assert_dispatcher_jsonl_contains() {
@@ -35,6 +40,7 @@ test_dispatcher_scans_clean_project_without_harness_environment() {
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" all 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
 
   assert_eq "0" "$ec" "dispatcher scan exit code" || return 1
   [[ "$out" != *"SCANNER-001"* ]] || {
@@ -58,6 +64,7 @@ test_dispatcher_finds_secret_control_without_harness_environment() {
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" all 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
 
   assert_eq "0" "$ec" "dispatcher control scan exit code" || return 1
   assert_dispatcher_jsonl_contains "$out" "SECRETS-001"
@@ -72,12 +79,14 @@ test_dispatcher_skips_nonexecutable_extensionless_handler() {
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" enum_targets_all "$project" 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
   assert_eq "0" "$ec" "non-executable handler enumeration exit code" || return 1
   assert_eq "" "$out" "non-executable handler enumeration output" || return 1
 
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" hooks 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
   assert_eq "0" "$ec" "non-executable handler hooks scan exit code" || return 1
   assert_eq "" "$out" "non-executable handler hooks scan output"
 }
@@ -94,6 +103,7 @@ test_dispatcher_finds_secret_in_executable_extensionless_handler() {
     out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
       -u PLUGIN_ROOT HOME=/nonexistent \
       "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" "$focus" 2>&1)" || ec=$?
+      out="$(_drop_hook_coverage "$out")"
     assert_eq "0" "$ec" "extensionless handler $focus scan exit code" || return 1
     assert_dispatcher_jsonl_contains "$out" "SECRETS-001" || return 1
   done
@@ -108,6 +118,7 @@ test_dispatcher_skips_nonexecutable_hook_document() {
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" hooks 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
   assert_eq "0" "$ec" "non-executable hook document scan exit code" || return 1
   assert_eq "" "$out" "non-executable hook document scan output"
 }
@@ -122,6 +133,7 @@ test_dispatcher_rejects_unknown_focus() {
     out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
       -u PLUGIN_ROOT HOME=/nonexistent \
       "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" "$focus" 2>&1)" || ec=$?
+      out="$(_drop_hook_coverage "$out")"
     assert_eq "2" "$ec" "unknown focus $focus exit code" || return 1
     assert_contains "$out" "Unknown rule aspect: $focus" \
       "unknown focus $focus diagnostic" || return 1
@@ -141,11 +153,13 @@ test_dispatcher_scans_dotted_executable_handler() {
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" hooks 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
   assert_eq "0" "$ec" "dotted handler hooks scan exit code" || return 1
   assert_dispatcher_jsonl_contains "$out" "HOOK-001" || return 1
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" secrets 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
   assert_eq "0" "$ec" "dotted handler secrets scan exit code" || return 1
   assert_dispatcher_jsonl_contains "$out" "SECRETS-001"
 }
@@ -160,6 +174,7 @@ test_dispatcher_skips_nonexecutable_dotted_file() {
   out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
     -u PLUGIN_ROOT HOME=/nonexistent \
     "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" hooks 2>&1)" || ec=$?
+    out="$(_drop_hook_coverage "$out")"
   assert_eq "0" "$ec" "non-executable dotted file hooks scan exit code" || return 1
   assert_eq "" "$out" "non-executable dotted file hooks scan output"
 }
@@ -177,10 +192,12 @@ test_dispatcher_rejects_newline_executable_extensionless_handler() {
       out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
         -u PLUGIN_ROOT HOME=/nonexistent \
         "$CSA_PLUGIN_ROOT/bin/csa" "$suffix" "$project" 2>&1)" || ec=$?
+        out="$(_drop_hook_coverage "$out")"
     else
       out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
         -u PLUGIN_ROOT HOME=/nonexistent \
         "$CSA_PLUGIN_ROOT/bin/csa" "$suffix" "$project" hooks 2>&1)" || ec=$?
+        out="$(_drop_hook_coverage "$out")"
     fi
     assert_eq "2" "$ec" "newline handler $suffix exit code" || return 1
     assert_contains "$out" "refusing newline-or-tab-containing executable hook handler" \
@@ -201,10 +218,12 @@ test_dispatcher_rejects_tab_executable_extensionless_handler() {
       out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
         -u PLUGIN_ROOT HOME=/nonexistent \
         "$CSA_PLUGIN_ROOT/bin/csa" "$suffix" "$project" 2>&1)" || ec=$?
+        out="$(_drop_hook_coverage "$out")"
     else
       out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
         -u PLUGIN_ROOT HOME=/nonexistent \
         "$CSA_PLUGIN_ROOT/bin/csa" "$suffix" "$project" hooks 2>&1)" || ec=$?
+        out="$(_drop_hook_coverage "$out")"
     fi
     assert_eq "2" "$ec" "tab handler $suffix exit code" || return 1
     assert_contains "$out" "refusing newline-or-tab-containing executable hook handler" \
@@ -270,6 +289,7 @@ test_dispatcher_scan_fails_on_unreadable_install_record() {
   printf '%s\n' '{"enabledPlugins":{"p@mk":true}}' > "$project/.claude/settings.json"
   printf '{ broken\n' > "$home/.claude/plugins/installed_plugins.json"
   out="$(env HOME="$home" "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" all 2>&1)" || ec=$?
+  out="$(_drop_hook_coverage "$out")"
   assert_eq "2" "$ec" "unknown install state stops the scan" || return 1
   assert_contains "$out" "installed_plugins.json" "the message names the record"
 }
@@ -281,6 +301,7 @@ test_dispatcher_resolves_plugin_through_install_record() {
   printf '%s\n' '{"enabledPlugins":{"p@mk":true}}' > "$project/.claude/settings.json"
   printf '{"version":2,"plugins":{"p@mk":[{"scope":"user","installPath":"%s/.claude/plugins/cache/mk/p/1.0.0"}]}}\n' "$home" > "$home/.claude/plugins/installed_plugins.json"
   out="$(env HOME="$home" "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" all 2>&1)" || ec=$?
+  out="$(_drop_hook_coverage "$out")"
   assert_eq "0" "$ec" "scan exit code" || return 1
   assert_dispatcher_jsonl_contains "$out" "HOOK-001"
 }

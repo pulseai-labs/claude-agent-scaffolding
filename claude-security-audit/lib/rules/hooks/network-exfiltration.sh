@@ -20,6 +20,12 @@ source "$_RULE_DIR/redact.sh" 2>/dev/null || true
 source "$_RULE_DIR/fingerprint.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
 source "$_RULE_DIR/helpers.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
+source "$_RULE_DIR/hook-entries.sh" 2>/dev/null || true
+
+RULE_NETWORK_RE='curl|wget|nc[[:space:]]|ssh[[:space:]]|scp[[:space:]]|rsync'
+RULE_SENSITIVE_RE='~/.ssh|~/.gnupg|~/.aws|/etc/passwd'
+
 
 detect() {
   local target_file="$1"
@@ -32,9 +38,7 @@ detect() {
   fi
   # Fire only when BOTH a network command AND a sensitive path reference are present
   local content; content="$(cat "$target_file" 2>/dev/null)"
-  local network_re='curl|wget|nc[[:space:]]|ssh[[:space:]]|scp[[:space:]]|rsync'
-  local sensitive_re='~/.ssh|~/.gnupg|~/.aws|/etc/passwd'
-  if [[ "$content" =~ $network_re ]] && [[ "$content" =~ $sensitive_re ]]; then
+  if [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; then
     # Emit a finding at line 1 (file-level rule)
     local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$content")"
     jq -nc \
@@ -47,4 +51,13 @@ detect() {
       --arg fuid "$fuid" \
       '{rule_id: $rule_id, file: $file, line: $line, offset: $offset, preview: $preview, severity: $severity, finding_uid: $fuid}'
   fi
+}
+
+# detect_text <entry-json> <file> — one decoded hook command: both regexes must
+# match the whole command. Skill-first question 3 (can only add a stop).
+detect_text() {
+  local entry="$1" target_file="$2" text
+  text="$(csa_hook_entry_command "$entry")" || return 1
+  [[ "$text" =~ $RULE_NETWORK_RE ]] && [[ "$text" =~ $RULE_SENSITIVE_RE ]] || return 1
+  csa_hook_entry_emit "$RULE_ID" "$RULE_SEVERITY" "$entry" "$target_file"
 }

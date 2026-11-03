@@ -20,6 +20,11 @@ source "$_RULE_DIR/redact.sh" 2>/dev/null || true
 source "$_RULE_DIR/fingerprint.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
 source "$_RULE_DIR/helpers.sh" 2>/dev/null || true
+# shellcheck source=/dev/null
+source "$_RULE_DIR/hook-entries.sh" 2>/dev/null || true
+
+RULE_PATTERN='eval[[:space:]]+"?\$'
+
 
 detect() {
   local target_file="$1"
@@ -30,7 +35,7 @@ detect() {
         && "$target_file" != */.opencode/*.ts && "$target_file" != */.opencode/*.mjs ]]; then
     return 0
   fi
-  grep -nE 'eval[[:space:]]+"?\$' "$target_file" 2>/dev/null \
+  grep -nE "$RULE_PATTERN" "$target_file" 2>/dev/null \
     | while IFS=: read -r line_no match; do
         local preview; preview="$(csa_redact "$match")"
         local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$match")"
@@ -44,4 +49,15 @@ detect() {
           --arg fuid "$fuid" \
           '{rule_id: $rule_id, file: $file, line: $line, offset: $offset, preview: $preview, severity: $severity, finding_uid: $fuid}'
       done
+}
+
+# detect_text <entry-json> <file> — one decoded hook command from a JSON hook
+# entry (settings, hooks/hooks.json, plugin.json). Matches the WHOLE command,
+# newlines included. Skill-first question 3: a check on open input that can
+# only add a stop.
+detect_text() {
+  local entry="$1" target_file="$2" text
+  text="$(csa_hook_entry_command "$entry")" || return 1
+  [[ "$text" =~ $RULE_PATTERN ]] || return 1
+  csa_hook_entry_emit "$RULE_ID" "$RULE_SEVERITY" "$entry" "$target_file"
 }
