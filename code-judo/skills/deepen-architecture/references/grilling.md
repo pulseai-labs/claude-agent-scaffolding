@@ -47,7 +47,7 @@ not tell the user to install anything.
 **Cadence differs between resolvers, and that is fine.** `ossify:challenge` and
 `ai-mentor:grill-me` ask one question at a time. The protocol below asks a whole round at a
 time. What must not differ is the agenda: whichever resolver fires, all five items above get
-settled before you stop.
+settled before you stop, or the grill ends "not ready to build" on an untracked defer (below).
 
 ## Recommendation policy
 
@@ -112,10 +112,11 @@ answers that are **given by the user**, **auto-applied under triage** (the stand
 the policy defines; waiting for an answer triage chose not to ask would stall the grill
 forever), or **deferred with a destination**. A defer settles an item only when the user names
 where it is tracked: an issue, or a file and the line that records it (the policy's deferred
-list). Ask once, and offer draft issue text; filing is the user's act, and you take their word
-for the destination. Then say what you understood — including the auto-applied answers, so the
+list). Ask in the batch where the user defers, and offer draft issue text; filing is the
+user's act, and you take their word for the destination. Then say what you understood — including the auto-applied answers, so the
 delegation is visible and can be reopened — and wait for them to confirm it before anything
 gets built.
 
-**A defer with no destination still ends the grill.** Say **"not ready to build"**, list each
-untracked defer, and stop; nothing gets built from it.
+**A defer with no destination still ends the grill.** Keep asking the other items; once they are
+settled, say **"not ready to build"**, list each untracked defer, and stop — nothing gets built.
+Say what unblocks it: a destination for the defer, or an answer in its place, on a re-run.
