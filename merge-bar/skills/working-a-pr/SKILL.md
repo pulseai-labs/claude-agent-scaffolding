@@ -191,9 +191,9 @@ fix diff and each prior class's closure. Your own sweep is a pre-push check, not
   fix commits wrote (check with `git blame` against the fix SHAs), stop. Do not start another round. Surface
   the findings, the fix commits they sit on, and three options for the operator: **narrow the
   Claim** — moving an edge into Known limits, only where it does not meet condition 1 —
-  **split the PR**, naming the parts, or **change the design**. Recommend the last when the
-  reviewer marked `Extends:` on two or more of the stop's blocking classes: each fix adds a
-  case to one mechanism that reads open input. Name the mechanism and the closed form that
+  **split the PR**, naming the parts, or **change the design**. Recommend the last when a stop's
+  blocking class, followed back through the posted reports' `Extends:` lines, makes a chain of
+  two or more: each fix adds a case to one mechanism that reads open input. Name the mechanism and the closed form that
   replaces it — refuse what it does not model, or an allowlist for a denylist; the change is
   new commits, reviewed as round 1 of the changed part. The operator chooses. Under a standing order (see **Standing orders**) that binds this role
   and settles the round stop, follow that order instead and record the

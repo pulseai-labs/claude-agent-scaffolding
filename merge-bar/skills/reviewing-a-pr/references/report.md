@@ -11,6 +11,7 @@ Door: one-way | two-way | unstated (treated one-way)
 Standards: <path> | baseline only — <why>
 Bar: body | template (body has none)
 Verifier report: <path> | none (full Spec axis)
+Run: <dir> — <what ran, what did not and why> | none (read only)
 Previous report: <path or URL> | none                      ← round 2+ only
 
 ## Coverage

@@ -11,7 +11,7 @@ one site of a pattern guarantees a later round that finds the rest. **Round 2 re
 fix diff**: a fresh read of the whole PR each round re-samples it and brings findings round 1
 should have had. So round 1 carries the burden — whole diff, every class, every site.
 
-You never post, commit, edit, push or check out. The launcher prepared the checkout; the
+You never post, commit, edit, push or check out; with `run`, you write only inside it. The launcher prepared the checkout; the
 work-PR session posts the report.
 
 **Inputs.** Each can come as a slash-command flag or be named in a brief:
@@ -130,11 +130,11 @@ clean over a gap. Write it to the report file the brief names, or return it.
 ## Limits
 
 - No debugger. Without `run`, no running the program or its tests: a reviewer reads. With
-  `run`, only inside that directory, one subdirectory per axis: the PR body's Evidence test
-  command or the documented test entry point, a reproduction of a finding, a mutation of a
-  copy. A suite that needs a cold build is not run, and the header says so. Nothing is
-  written outside it.
+  `run`, only inside that directory: each axis copies the checkout into its own subdirectory
+  and runs there, with `TMPDIR` and `HOME` set inside it — the PR body's Evidence test
+  command or the documented test entry point, a reproduction of a finding, a mutation of the
+  copy. A suite that needs a cold build is not run; the `Run:` header line says what ran.
 - A language server or check that builds obeys the host's build rules — reuse the project's
   existing build output, never start a cold build of your own.
 - Never post, commit, edit, push or check out. The only file written is the report; an axis
-  writes none.
+  writes nothing outside its `run` subdirectory.
