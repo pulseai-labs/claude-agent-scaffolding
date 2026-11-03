@@ -330,6 +330,30 @@ test_uid_differs_after_char_200_and_survives_reformat() {
   assert_eq "$u1" "$u3" "reformatting does not change the uid" || return 1
 }
 
+test_uid_differs_under_a_long_json_path() {
+  # #1058 r1 C3: csa_finding_uid redacts its match (200-char cap, 32+ char runs
+  # masked), so a long event key must not push the command digest out.
+  _mk
+  local ev; ev="E$(printf 'k%.0s' $(seq 1 260))"
+  jq -n --arg e "$ev" --arg c 'eval $A' '{hooks:{($e):[{hooks:[{type:"command",command:$c}]}]}}' > "$_P/.claude/settings.json"
+  local u1; u1="$(_scan | _hook_findings | jq -r 'select(.rule_id=="HOOK-003") | .finding_uid')"
+  jq -n --arg e "$ev" --arg c 'eval $B' '{hooks:{($e):[{hooks:[{type:"command",command:$c}]}]}}' > "$_P/.claude/settings.json"
+  local u2; u2="$(_scan | _hook_findings | jq -r 'select(.rule_id=="HOOK-003") | .finding_uid')"
+  [[ "$u1" == FUID-* && "$u2" == FUID-* ]] || { printf '    no uid: %s %s\n' "$u1" "$u2" >&2; return 1; }
+  [[ "$u1" != "$u2" ]] || { printf '    two commands under one long json path share a uid\n' >&2; return 1; }
+}
+
+test_hook005_uid_differs_for_long_refs() {
+  _mk
+  local a; a="$(printf 'a%.0s' $(seq 1 250))"
+  _plugin pz mk .claude-plugin/plugin.json <<<"{\"name\":\"pz\",\"hooks\":\"../$a/x.json\"}"
+  local u1; u1="$(_scan | _hook_findings | jq -r 'select(.rule_id=="HOOK-005") | .finding_uid')"
+  _plugin pz mk .claude-plugin/plugin.json <<<"{\"name\":\"pz\",\"hooks\":\"../$a/y.json\"}"
+  local u2; u2="$(_scan | _hook_findings | jq -r 'select(.rule_id=="HOOK-005") | .finding_uid')"
+  [[ "$u1" == FUID-* && "$u2" == FUID-* ]] || { printf '    no uid: %s %s\n' "$u1" "$u2" >&2; return 1; }
+  [[ "$u1" != "$u2" ]] || { printf '    two long refs share a HOOK-005 uid\n' >&2; return 1; }
+}
+
 # --- 5. rules ---------------------------------------------------------------------
 
 test_rules_share_one_pattern_between_detect_and_detect_text() {
@@ -419,6 +443,8 @@ csa_test_run test_user_level_settings_hooks_not_read                    || _csa_
 csa_test_run test_uid_differs_after_char_200_and_survives_reformat      || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_rules_share_one_pattern_between_detect_and_detect_text || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_hook005_and_hook006_detect_never_matches              || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_uid_differs_under_a_long_json_path               || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_hook005_uid_differs_for_long_refs                    || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_markdown_and_chat_show_json_path_and_coverage         || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_dispatcher_path_finds_hook_and_prints_coverage        || _csa_failed=$((_csa_failed + 1))
 

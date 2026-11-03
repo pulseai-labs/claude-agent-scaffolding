@@ -37,7 +37,9 @@ detect_text() {
   why="$(printf '%s' "$entry" | jq -r '.inconclusive // ""')"
   preview="$(csa_redact "hook entry not read: $why")"
   sep="$(printf '\xe2\x90\x9f')"
-  fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "${jp}${sep}${why}")"
+  # Hash first: csa_finding_uid redacts its match (200-character cap), and both
+  # parts can be long and attacker-chosen.
+  fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$(csa_sha256 "${jp}${sep}${why}" | cut -c1-24)")"
   jq -nc --arg rule_id "$RULE_ID" --arg file "$target_file" --arg preview "$preview" \
     --arg severity "$RULE_SEVERITY" --arg fuid "$fuid" --arg jp "$jp" --arg why "$why" \
     '{rule_id: $rule_id, file: $file, line: 0, offset: 0, preview: $preview, severity: $severity, finding_uid: $fuid, context: {json_path: $jp, reason: $why}}'

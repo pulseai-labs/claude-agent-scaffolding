@@ -170,17 +170,20 @@ csa_hook_entry_command() {
 
 # csa_hook_entry_emit <rule_id> <severity> <entry-json> <file> — one finding for
 # a command entry. line 0, offset 0, context.json_path. The preview is the
-# redacted command. The uid takes json_path plus the sha256 of the FULL decoded
-# command (not the text), so csa_redact's 200-character cap never makes two
-# different commands share a uid, and reformatting the file changes nothing.
+# redacted command. The uid takes the first 24 hex characters of the sha256 of
+# json_path plus the FULL decoded command, short enough that csa_redact (which
+# csa_finding_uid applies) neither masks nor truncates it: two different commands
+# never share a uid however long the path, and reformatting the file changes nothing.
 csa_hook_entry_emit() {
   local rule_id="$1" sev="$2" entry="$3" file="$4" text jp preview digest fuid sep
   text="$(csa_hook_entry_command "$entry")" || return 1
   jp="$(printf '%s' "$entry" | jq -r '.json_path // ""')"
   preview="$(csa_redact "$text")"
-  digest="$(csa_sha256 "$text")"
   sep="$(printf '\xe2\x90\x9f')"
-  fuid="$(csa_finding_uid "$rule_id" "$file" "${jp}${sep}${digest}")"
+  digest="$(csa_sha256 "${jp}${sep}${text}")"
+  # 24 hex characters: under csa_redact's 32-character mask and 200-character cap,
+  # so the whole digest reaches the uid however long the json path is.
+  fuid="$(csa_finding_uid "$rule_id" "$file" "${digest:0:24}")"
   jq -nc --arg rule_id "$rule_id" --arg file "$file" --arg preview "$preview" \
     --arg severity "$sev" --arg fuid "$fuid" --arg jp "$jp" \
     '{rule_id: $rule_id, file: $file, line: 0, offset: 0, preview: $preview, severity: $severity, finding_uid: $fuid, context: {json_path: $jp}}'
