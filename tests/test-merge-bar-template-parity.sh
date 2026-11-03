@@ -52,14 +52,14 @@ else
   fail "ossify's template block is byte-identical to merge-bar's - copy merge-bar's block into ossify/skills/work-pr/references/pr-body.md"
 fi
 
-# spine close hard-codes the bar's lead line and four conditions in its fields
+# spine close hard-codes the bar's lead line, four conditions and stopping line in its fields
 # check (#1056): the block cannot read pr-body.md at run time, so the copy is
-# pinned here. Extracted first and shaped (five lines), so two empty
+# pinned here. Extracted first and shaped (six lines), so two empty
 # extractions cannot compare equal.
 SC="$ROOT/ossify/skills/close/references/spine-close.md"
-awk '/^A finding blocks this PR only if it:$/{f=1} f{print} /^4\. /{if (f) exit}' "$T/theirs" > "$T/bar-theirs"
-awk '/^        done <<.BAR_EOF.$/{f=1; next} f && /^BAR_EOF$/{exit} f' "$SC" > "$T/bar-sc"
-if [[ "$(wc -l < "$T/bar-theirs")" -eq 5 ]] && cmp -s "$T/bar-theirs" "$T/bar-sc"; then
+awk '/^A finding blocks this PR only if it:$/{f=1} f{print} /^Everything else is non-blocking\.$/{if (f) exit}' "$T/theirs" > "$T/bar-theirs"
+awk '/^ +[^#]* <<.BAR_EOF.$/{f=1; next} f && /^BAR_EOF$/{exit} f' "$SC" > "$T/bar-sc"
+if [[ "$(wc -l < "$T/bar-theirs")" -eq 6 ]] && cmp -s "$T/bar-theirs" "$T/bar-sc"; then
   pass "spine-close.md's hard-coded bar lines equal the template's"
 else
   fail "spine-close.md's hard-coded bar lines (BAR_EOF heredoc) differ from the template's bar lines - copy them from merge-bar's pr-body.md"
