@@ -281,9 +281,54 @@ describe("ossify-spine recipe", () => {
     ]);
   });
 
-  test("a spine PR round clears the operator file with the review", () => {
-    const run = (loadRecipe().stages.spine_work as SessionStage).outcomes[0].run;
-    expect(run).toEqual([["rm", "-f", `${OUT}/review.md`, `${OUT}/round-done`, `${OUT}/operator.md`]]);
+  test("a spine PR round keeps the review and the operator file, then clears the signals (#1045)", () => {
+    const run = (loadRecipe().stages.spine_work as SessionStage).outcomes[0].run!;
+    // the signals' absence is state (spine_review and spine_wait read review.md): still removed, last
+    expect(run).toHaveLength(3);
+    expect(run[2]).toEqual(["rm", "-f", `${OUT}/review.md`, `${OUT}/round-done`, `${OUT}/operator.md`]);
+    expect(run[0].slice(0, 2)).toEqual(["sh", "-c"]);
+    expect(run[0].slice(3)).toEqual(["sh", OUT]);
+    expect(run[1].slice(3)).toEqual(["sh", OUT, "operator", ".md"]);
+  });
+
+  test("the round's run hooks, executed: review-prev.md is the last review, operator.md is archived once per round (#1045)", () => {
+    const run = (loadRecipe().stages.spine_work as SessionStage).outcomes[0].run!;
+    const dir = mkdtempSync(join(tmpdir(), "baton-round-"));
+    const exec = () => {
+      for (const argv of run) {
+        const argvHere = argv.map((a) => a.replaceAll(OUT, dir));
+        const p = Bun.spawnSync(argvHere, { stdout: "pipe", stderr: "pipe" });
+        expect([argvHere[0], p.exitCode, p.stderr.toString()]).toEqual([argvHere[0], 0, ""]);
+      }
+    };
+    const put = (f: string, t: string) => writeFileSync(join(dir, f), t);
+    const ls = () => readdirSync(dir).sort();
+    // round 1: a review and a ruling
+    put("review.md", "verdict: block\nhead: a1\n"); put("round-done", ""); put("operator.md", "ruling one");
+    exec();
+    expect(ls()).toEqual(["operator-1.md", "review-prev.md"]);
+    expect(readFileSync(join(dir, "review-prev.md"), "utf8")).toBe("verdict: block\nhead: a1\n");
+    expect(readFileSync(join(dir, "operator-1.md"), "utf8")).toBe("ruling one");
+    // round 2: a newer review replaces the previous one; a second ruling does not overwrite the first
+    put("review.md", "verdict: block\nhead: b2\n"); put("round-done", ""); put("operator.md", "ruling two");
+    exec();
+    expect(ls()).toEqual(["operator-1.md", "operator-2.md", "review-prev.md"]);
+    expect(readFileSync(join(dir, "review-prev.md"), "utf8")).toBe("verdict: block\nhead: b2\n");
+    expect(readFileSync(join(dir, "operator-1.md"), "utf8")).toBe("ruling one");
+    expect(readFileSync(join(dir, "operator-2.md"), "utf8")).toBe("ruling two");
+    // round 3: no ruling, no review file: the hooks still succeed and the previous review is kept
+    put("round-done", "");
+    exec();
+    expect(ls()).toEqual(["operator-1.md", "operator-2.md", "review-prev.md"]);
+    expect(readFileSync(join(dir, "review-prev.md"), "utf8")).toBe("verdict: block\nhead: b2\n");
+    rmSync(dir, { recursive: true });
+  });
+
+  test("spine_review is told the previous review's fixed path, after the PR argument (#1045)", () => {
+    const msg = (loadRecipe().stages.spine_review as SessionStage).message;
+    expect(msg).toContain(` previous: ${OUT}/review-prev.md Then read`);
+    expect(brief("spine-review.md")).toContain("A missing file means round 1");
+    expect(brief("spine-work.md")).toContain("write it into the PR body");
   });
 
   test("land merges by plan (a)'s order", () => {

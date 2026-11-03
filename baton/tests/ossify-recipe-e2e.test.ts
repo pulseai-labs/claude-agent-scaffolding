@@ -343,14 +343,15 @@ test("a two-item round runs to the second spine close", async () => {
   expect(v.request.message).toContain("verifier-agent");
   expect(v.request.message).toContain(`Verdict file: ${out(W1, "verdict.json")}.`);
   expect(v.claim?.env).toMatchObject({ BATON_ROLE: "verifier", OSSIFY_VERIFY_WORKTREE: join(root, "wt", W1), SEAT_MODS_ROLE: "verifier" });
-  expect(host.of(SPINE_UNIT, "spine_review")[0].request.message.startsWith(`/review ${prUrl(SPINE_UNIT)} Then read`)).toBe(true);
+  expect(host.of(SPINE_UNIT, "spine_review")[0].request.message.startsWith(`/review ${prUrl(SPINE_UNIT)} previous: ${out(SPINE_UNIT, "review-prev.md")} Then read`)).toBe(true);
   expect(moves("lane")).toEqual(["lane>lane_wait", "lane_wait>lane", "lane>spine_open", "spine_open>done"]);
   expect(moves(SPINE_UNIT)).toEqual(["spine_review>spine_wait", "spine_wait>spine_ack", "spine_ack>spine_finish", "spine_finish>done"]);
   expect(host.of("lane", "lane")).toHaveLength(2);
   // One notice names the spine PR: the ask to merge it.
   const log = readFileSync(join(state, "notify.log"), "utf8").split("\n").filter((l) => l.includes(prUrl(SPINE_UNIT)));
   expect(log).toHaveLength(1);
-  expect(log[0]).toContain("then merge it (the phone's Merge button, or by hand)");
+  expect(log[0]).toContain("then merge it only where the project's governance grants that, else ask the operator");
+  expect(log[0]).not.toContain("phone");
   expect(readState().spines[0].status).toBe("closed");
   expect(readdirSync(join(state, "claims"))).toEqual([]);
 });

@@ -284,7 +284,7 @@
       "cwd": "{param.repo}",
       "launch_dir": "worktree",
       "title": "spine review {param.spine}",
-      "message": "{agent.review} {unit.vars.pr_url} Then read {param.briefs}/common.md and {param.briefs}/spine-review.md, and write {run.dir}/out/{unit.id}/review.md whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA, then the findings. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "{agent.review} {unit.vars.pr_url} previous: {run.dir}/out/{unit.id}/review-prev.md Then read {param.briefs}/common.md and {param.briefs}/spine-review.md, and write {run.dir}/out/{unit.id}/review.md whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA, then the findings. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "reviewer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
@@ -328,7 +328,7 @@
             { "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "mergeable" } }
           ],
           "to": "spine_ack",
-          "notify": "Spine {param.spine} PR {unit.vars.pr_url} passed review and is green and mergeable: read its needs-you list and any CodeRabbit thread newer than the last push, then merge it (the phone's Merge button, or by hand)."
+          "notify": "Spine {param.spine} PR {unit.vars.pr_url} passed review and is green and mergeable: read its needs-you list and any CodeRabbit thread newer than the last push, then merge it only where the project's governance grants that, else ask the operator."
         }
       ]
     },
@@ -356,7 +356,7 @@
         {
           "when": [{ "file": "{run.dir}/out/{unit.id}/round-done" }],
           "to": "spine_review",
-          "run": [["rm", "-f", "{run.dir}/out/{unit.id}/review.md", "{run.dir}/out/{unit.id}/round-done", "{run.dir}/out/{unit.id}/operator.md"]]
+          "run": [["sh", "-c", "[ -e \"$1/review.md\" ] || exit 0; cp -f -- \"$1/review.md\" \"$1/review-prev.md\"", "sh", "{run.dir}/out/{unit.id}"], ["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"], ["rm", "-f", "{run.dir}/out/{unit.id}/review.md", "{run.dir}/out/{unit.id}/round-done", "{run.dir}/out/{unit.id}/operator.md"]]
         }
       ]
     },
