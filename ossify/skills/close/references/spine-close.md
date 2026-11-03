@@ -233,8 +233,8 @@ CRLF line endings, a missing heading, the seven headings out of template order, 
 Merge bar section lacking any of the template's six lines (the lead line, the four
 conditions, `Everything else is non-blocking.`) or carrying an extra numbered line,
 a template bar line repeated, or no filled `Door: one-way` or `Door: two-way` line under
-Merge danger (the word, then the line's end or any character that is not a letter, digit, `_` or
-`-`; `or`-forms such as `one-way or two-way` and `two-wayfoo` are unfilled); the bar and
+Merge danger (the word, then the line's end or any character that is not an ASCII letter or
+digit, `_` or `-`; `one-way or two-way` and `two-wayfoo` are unfilled); the bar and
 the Door line are read under their own headings only. The check runs
 per repo: a repo landed earlier in the same pass keeps its PR, and the re-run resumes it. Known limit: a
 stopping rule written in the raising-line slot, after `Everything else is
@@ -457,7 +457,7 @@ $repo:$merge_sha"
         # (the template is stdin, the fields file the second input), and prints
         # the first problem, or nothing. A filled Door line is `Door: one-way`
         # or `Door: two-way` then the line's end or any character that is not
-        # a letter, digit, `_` or `-`; the unfilled forms `one-way or two-way`
+        # an ASCII letter or digit, `_` or `-`; the unfilled forms `one-way or two-way`
         # (either order), `two-wayfoo` and `two-way-ish` fail. A template bar
         # line occurring twice under Merge bar is reported as `dup:`.
         pr_bad="$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); for (i = 1; i <= n; i++) head["## " w[i]] = 1 }
