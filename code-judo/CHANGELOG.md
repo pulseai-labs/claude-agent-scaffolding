@@ -2,6 +2,15 @@
 
 All notable changes to the `code-judo` plugin.
 
+## 0.2.3
+
+`deepen-architecture`'s in-plugin grill ends on every path (#391). A **defer** settles an agenda item
+only when the user names where it is tracked — an issue, or a file and the line that records it;
+the skill offers draft issue text and files nothing. A defer with no destination is asked rather than
+auto-applied, and if one stays untracked the grill ends with "not ready to build" and nothing gets
+built. Before this, a defer was neither an answer nor an auto-applied item, so the grill asked again
+or stopped against its own done rule. The shared recommendation policy is unchanged. Prose only.
+
 ## 0.2.2
 
 `deep-review` gains counterweights to abstraction, adapted from `DietrichGebert/ponytail` (MIT).
