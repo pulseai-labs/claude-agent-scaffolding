@@ -232,7 +232,9 @@ block halts before that repo's push, naming the file and the piece, on a file wi
 CRLF line endings, a missing heading, the seven headings out of template order, a
 Merge bar section lacking any of the template's six lines (the lead line, the four
 conditions, `Everything else is non-blocking.`) or carrying an extra numbered line,
-or no filled `Door: one-way` or `Door: two-way` line under Merge danger; the bar and
+a template bar line repeated, or no filled `Door: one-way` or `Door: two-way` line under
+Merge danger (the word, then the line's end or any character that is not a letter, digit, `_` or
+`-`; `or`-forms such as `one-way or two-way` and `two-wayfoo` are unfilled); the bar and
 the Door line are read under their own headings only. The check runs
 per repo: a repo landed earlier in the same pass keeps its PR, and the re-run resumes it. Known limit: a
 stopping rule written in the raising-line slot, after `Everything else is
@@ -453,18 +455,21 @@ $repo:$merge_sha"
           || { echo "close: $pr_ff has the seven headings out of template order - fix the fields file - halt"; exit 1; }
         # One pass reads the bar and the Door line each under its own heading
         # (the template is stdin, the fields file the second input), and prints
-        # the first problem, or nothing. Door ends at the line's end or at a
-        # dash, colon, comma, period, semicolon or paren after the word, so
-        # `one-way or two-way` and `two-wayfoo` fail.
+        # the first problem, or nothing. A filled Door line is `Door: one-way`
+        # or `Door: two-way` then the line's end or any character that is not
+        # a letter, digit, `_` or `-`; the unfilled forms `one-way or two-way`
+        # (either order), `two-wayfoo` and `two-way-ish` fail. A template bar
+        # line occurring twice under Merge bar is reported as `dup:`.
         pr_bad="$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); for (i = 1; i <= n; i++) head["## " w[i]] = 1 }
                        NR == FNR { req[++r] = $0; want[$0] = 1; next }
                        $0 in head { sec = $0; next }
-                       sec == "## Merge bar" && ($0 in want) { seen[$0] = 1 }
+                       sec == "## Merge bar" && ($0 in want) { if (seen[$0]++ && d == "") d = $0 }
                        sec == "## Merge bar" && !($0 in want) && $0 ~ /^[0-9]+[a-z]*[.)] / && x == "" { x = $0 }
-                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([ ]*$|[ ]*(-|—|–|:|,|;|\.|\())/ { door = 1 }
+                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way +or +(one|two)-way/ { door = 1 }
                        END {
                          for (i = 1; i <= r; i++) if (!(req[i] in seen)) { print "line:" req[i]; exit }
                          if (x != "") { print "extra:" x; exit }
+                         if (d != "") { print "dup:" d; exit }
                          if (!door) print "door"
                        }' - "$pr_ff" <<'BAR_EOF'
 A finding blocks this PR only if it:
@@ -474,10 +479,11 @@ A finding blocks this PR only if it:
 4. opens a security hole — injection, authentication bypass, or an exposed secret.
 Everything else is non-blocking.
 BAR_EOF
-)"
+)" || { echo "close: the fields check could not run awk on $pr_ff - halt"; exit 1; }
         case "$pr_bad" in
           line:*) echo "close: $pr_ff lacks the merge-bar line '${pr_bad#line:}' under '## Merge bar' - copy the template's Merge bar block word for word - halt"; exit 1;;
           extra:*) echo "close: $pr_ff has the numbered line '${pr_bad#extra:}' in its Merge bar, which the template does not - the bar is the template's four conditions - halt"; exit 1;;
+          dup:*) echo "close: $pr_ff repeats the merge-bar line '${pr_bad#dup:}' under '## Merge bar' - the bar is the template's lines once each - halt"; exit 1;;
           door) echo "close: $pr_ff has no 'Door: one-way' or 'Door: two-way' line under '## Merge danger' - fill the Merge danger field - halt"; exit 1;;
         esac
       fi

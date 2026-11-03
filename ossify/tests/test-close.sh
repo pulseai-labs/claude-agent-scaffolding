@@ -1475,7 +1475,7 @@ t_assert_eq 0 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
   "P1: with no \$pr_fields (merge-bar absent) the PR body carries no merge-bar fields"
 
 # A full valid per-repo fields file (1.36.3, #1056): the seven headings in
-# template order, the four-condition bar, a filled Door line. Each halt case
+# template order, the six-line bar, a filled Door line. Each halt case
 # below breaks exactly one piece of it.
 _valid_fields() {
   cat <<'FIELDS_EOF'
@@ -1594,6 +1594,19 @@ _fields_halt doorelsewhere "$_door_msg" '/^Door: /d; s/^None\.$/Door: two-way/'
 # bare Door line is as valid as one with an explanation
 _fields_ok oneway 's/^Door: two-way/Door: one-way/'
 _fields_ok doorbare 's/^Door: two-way.*/Door: two-way/'
+# #1063 C1/C2: any non-word character ends the word; qualified lines from real
+# merged bodies pass, the unfilled forms still fail (adjacent controls)
+_fields_ok doorq1 's/^Door: two-way.*/Door: one-way after the tag - releases the plugin./'
+_fields_ok doorq2 's/^Door: two-way.*/Door: two-way for the code - a revert undoes it./'
+_fields_ok doorq3 's/^Door: two-way.*/Door: one-way once released. A tag is public./'
+_fields_ok doorem 's/^Door: two-way.*/Door: two-way — a revert undoes it./'
+_fields_ok doorbang 's/^Door: two-way.*/Door: two-way!/'
+_fields_ok doorparen 's/^Door: two-way.*/Door: two-way)/'
+_fields_ok doortab "s/^Door: two-way.*/Door: two-way$(printf '\t')because/"
+_fields_halt dooror2 "$_door_msg" 's/^Door: two-way.*/Door: two-way or one-way - pick one/'
+_fields_halt doorish "$_door_msg" 's/^Door: two-way.*/Door: two-way-ish/'
+# #1063 C3: a template bar line repeated under Merge bar halts naming the line
+_fields_halt_f dupbar "repeats the merge-bar line '2. makes the Claim above false;'" "awk '{print} /^2\\. /{print}'"
 # #1063 C4: the fields file is a seat's Write-tool output, LF by contract; a CRLF
 # file (a Windows editor or tool touched it) halts naming the line endings
 # instead of reporting "lacks the heading" for a heading that is visibly there
