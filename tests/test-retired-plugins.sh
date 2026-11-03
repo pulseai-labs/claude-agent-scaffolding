@@ -33,7 +33,8 @@ export LC_ALL=C
 # a gate that matches its own source can never go green.
 AUTO_NAME="auto"'nomic'
 CRITIC_NAME="architect"'-critic'
-RETIRED="$AUTO_NAME $CRITIC_NAME"
+BOT_NAME="bot-on"'-openbot'
+RETIRED="$AUTO_NAME $CRITIC_NAME $BOT_NAME"
 
 # The tree-wide pattern for one name (git grep -E, case-insensitive). The name itself is also
 # the directory and the catalog entry's name; the pattern is what the content sweep looks for.
@@ -41,6 +42,7 @@ pattern_for() {
   case "$1" in
     "$AUTO_NAME") printf '%s' "$AUTO_NAME" ;;
     "$CRITIC_NAME") printf '%s' "architect"'[-_ ]?critic([^[:alnum:]]|$)|critiquing'"-spec([^[:alnum:]]|$)" ;; # bounded on a letter or digit: a longer word is valid text, and the capitals-with-underscore variable form still hits
+    "$BOT_NAME") printf '%s' "bot"'[-_ ]?on[-_ ]?'"openbot" ;; # the plugin's name only: a bare word openbot is baton's valid history (the OpenBot-bridge spike its picker, Orca host and fixtures cite) and a test there asserts the skill names no such thing
     *) printf '%s' "$1" ;;
   esac
 }

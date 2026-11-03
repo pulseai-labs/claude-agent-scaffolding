@@ -1,2 +1,0 @@
-verdict: approve
-head: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
