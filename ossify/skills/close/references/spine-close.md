@@ -228,8 +228,14 @@ named by the repo as `landing_repos` lists it, and set `pr_fields_dir` to that
 directory. The block loads the repo's file into `$pr_fields` per PR, with
 `cat` — never as a quoted literal: the text routinely carries backticks, `$` and
 apostrophes, which a shell assignment would run or break on. Right after the load, the
-block halts before that repo's push on a file missing a heading, the bar's four
-conditions or a filled `Door:` line, naming the file and the piece. The check runs
+block halts before that repo's push, naming the file and the piece, on a file with
+CRLF line endings, a missing heading, the seven headings out of template order, a
+Merge bar section lacking any of the template's six lines (the lead line, the four
+conditions, `Everything else is non-blocking.`) or carrying an extra numbered line,
+a template bar line repeated, or no filled `Door: one-way` or `Door: two-way` line under
+Merge danger (the word, then the line's end or any character that is not an ASCII letter or
+digit, `_` or `-`; `one-way or two-way` and `two-wayfoo` are unfilled); the bar and
+the Door line are read under their own headings only. The check runs
 per repo: a repo landed earlier in the same pass keeps its PR, and the re-run resumes it. Known limit: a
 stopping rule written in the raising-line slot, after `Everything else is
 non-blocking.`, passes; `working-a-pr` still judges by all four conditions. Without merge-bar,
@@ -423,18 +429,22 @@ $repo:$merge_sha"
     else
       # merge-bar's fields load per repo, so each PR carries only its own
       # repo's Known limits - and BEFORE the push, so a missing file halts
-      # with nothing published.
+      # that repo with nothing of its own published (an earlier repo in this pass
+      # may already be pushed).
       pr_fields=""
       if [ -n "${pr_fields_dir:-}" ]; then
         pr_fields="$(cat "$pr_fields_dir/$repo")" \
           || { echo "close: no merge-bar fields file for $repo in $pr_fields_dir - write it or unset pr_fields_dir - halt"; exit 1; }
         # A seat wrote that file, so the pieces the merge bar depends on are
-        # checked here, before the push (#1056): seven headings in template
-        # order, the four-condition bar whole, a filled Door line. Whole-line
-        # matches only; a miss is a halt naming the file and the piece. The
-        # bar lines are copied from the template (a root parity test keeps
-        # them equal), because the template file is not reachable from here.
+        # checked here, before the push (#1056): LF line endings, seven headings
+        # in template order, the bar's six lines whole and under its own heading,
+        # a filled Door line under Merge danger. Whole-line matches only; a miss
+        # is a halt naming the file and the piece. The bar lines are copied from
+        # the template (a root parity test keeps them equal), because the
+        # template file is not reachable from here.
         pr_ff="$pr_fields_dir/$repo"
+        awk 'index($0, "\r") { found = 1 } END { exit !found }' "$pr_ff" \
+          && { echo "close: $pr_ff has CRLF line endings - rewrite it with LF line endings - halt"; exit 1; }
         for pr_h in 'Claim' 'Scope' 'Known limits' 'Merge danger' 'Merge bar' 'Evidence' 'Closes'; do
           grep -Fxq -- "## $pr_h" "$pr_ff" \
             || { echo "close: $pr_ff lacks the heading '## $pr_h' - fix the fields file - halt"; exit 1; }
@@ -443,18 +453,39 @@ $repo:$merge_sha"
                   i <= n && $0 == ("## " w[i]) { i++ }
                   END { print (i > n) ? "ok" : "no" }' "$pr_ff")" = ok ] \
           || { echo "close: $pr_ff has the seven headings out of template order - fix the fields file - halt"; exit 1; }
-        while IFS= read -r pr_l; do
-          grep -Fxq -- "$pr_l" "$pr_ff" \
-            || { echo "close: $pr_ff lacks the merge-bar line '$pr_l' - copy the template's Merge bar block word for word - halt"; exit 1; }
-        done <<'BAR_EOF'
+        # One pass reads the bar and the Door line each under its own heading
+        # (the template is stdin, the fields file the second input), and prints
+        # the first problem, or nothing. A filled Door line is `Door: one-way`
+        # or `Door: two-way` then the line's end or any character that is not
+        # an ASCII letter or digit, `_` or `-`; the unfilled forms `one-way or two-way`
+        # (either order), `two-wayfoo` and `two-way-ish` fail. A template bar
+        # line occurring twice under Merge bar is reported as `dup:`.
+        pr_bad="$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); for (i = 1; i <= n; i++) head["## " w[i]] = 1 }
+                       NR == FNR { req[++r] = $0; want[$0] = 1; next }
+                       $0 in head { sec = $0; next }
+                       sec == "## Merge bar" && ($0 in want) { if (seen[$0]++ && d == "") d = $0 }
+                       sec == "## Merge bar" && !($0 in want) && $0 ~ /^[0-9]+[a-z]*[.)] / && x == "" { x = $0 }
+                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way +or +(one|two)-way/ { door = 1 }
+                       END {
+                         for (i = 1; i <= r; i++) if (!(req[i] in seen)) { print "line:" req[i]; exit }
+                         if (x != "") { print "extra:" x; exit }
+                         if (d != "") { print "dup:" d; exit }
+                         if (!door) print "door"
+                       }' - "$pr_ff" <<'BAR_EOF'
 A finding blocks this PR only if it:
 1. rejects valid input, or corrupts or loses state, on a path this PR touches;
 2. makes the Claim above false;
 3. breaks the test suite;
 4. opens a security hole — injection, authentication bypass, or an exposed secret.
+Everything else is non-blocking.
 BAR_EOF
-        grep -Eq '^Door: (one-way|two-way)' "$pr_ff" \
-          || { echo "close: $pr_ff has no 'Door: one-way' or 'Door: two-way' line - fill the Merge danger field - halt"; exit 1; }
+)" || { echo "close: the fields check could not run awk on $pr_ff - halt"; exit 1; }
+        case "$pr_bad" in
+          line:*) echo "close: $pr_ff lacks the merge-bar line '${pr_bad#line:}' under '## Merge bar' - copy the template's Merge bar block word for word - halt"; exit 1;;
+          extra:*) echo "close: $pr_ff has the numbered line '${pr_bad#extra:}' in its Merge bar, which the template does not - the bar is the template's four conditions - halt"; exit 1;;
+          dup:*) echo "close: $pr_ff repeats the merge-bar line '${pr_bad#dup:}' under '## Merge bar' - the bar is the template's lines once each - halt"; exit 1;;
+          door) echo "close: $pr_ff has no 'Door: one-way' or 'Door: two-way' line under '## Merge danger' - fill the Merge danger field - halt"; exit 1;;
+        esac
       fi
       git -C "$repo_root" push -u "$remote_name" "$spine_branch" \
         || { echo "close: cannot push '$spine_branch' to '$remote_name' in $repo - halt"; exit 1; }

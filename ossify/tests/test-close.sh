@@ -1475,7 +1475,7 @@ t_assert_eq 0 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
   "P1: with no \$pr_fields (merge-bar absent) the PR body carries no merge-bar fields"
 
 # A full valid per-repo fields file (1.36.3, #1056): the seven headings in
-# template order, the four-condition bar, a filled Door line. Each halt case
+# template order, the six-line bar, a filled Door line. Each halt case
 # below breaks exactly one piece of it.
 _valid_fields() {
   cat <<'FIELDS_EOF'
@@ -1524,41 +1524,93 @@ t_assert_eq "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" "$(cat "$PR_STATE/push
 t_assert_eq 1 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
   "P1b: ...and the PR body carries the Merge bar heading"
 
-# P1g-P1m. #1056: the seat-written fields file is checked before the push. Each
-# case breaks ONE piece of the valid file and asserts a halt naming the file and
-# the piece, with nothing pushed and no PR opened (modelled on P1c). P1b above is
-# the adjacent control: the unbroken file passes.
-_fields_halt() { # $1=case label $2=piece the message must name $3=sed expr breaking the valid file
+# P1g-P1-crlf. #1056, #1063: the seat-written fields file is checked before the
+# push. Each case breaks ONE piece of the valid file and asserts a halt whose
+# MESSAGE names the file and the piece (an exit code alone cannot tell which check
+# fired - a mutant that moves the halt to another check keeps rc 1), with nothing
+# pushed and no PR opened (modelled on P1c). P1b above is the adjacent control:
+# the unbroken file passes. $3 is a filter command run on the valid file.
+_fields_halt_f() { # $1=case label $2=message fragment the halt must carry $3=filter command
   _pr_fixture "p1-$1"
   mkdir -p "$PR_STATE/fields"
-  _valid_fields | sed -e "$3" > "$PR_STATE/fields/canonical"
+  _valid_fields | eval "$3" > "$PR_STATE/fields/canonical"
   t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
     "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields_dir='$PR_STATE/fields'; . '$MERGE_BLOCK'"
-  t_assert_rc 1 "P1-$1: a fields file with $2 halts the close"
+  t_assert_rc 1 "P1-$1: this fields file halts the close"
   t_assert_contains "$T_OUT" "$PR_STATE/fields/canonical" "P1-$1: ...naming the file"
-  t_assert_contains "$T_OUT" "$2" "P1-$1: ...naming the missing piece"
+  t_assert_contains "$T_OUT" "$2" "P1-$1: ...with the message for THIS piece"
   t_assert_eq 0 "$( [ -f "$PR_STATE/create_args" ] && echo 1 || echo 0 )" "P1-$1: ...and no PR is opened"
   t_assert_eq 0 "$(git --git-dir="$PR_ORIGIN" rev-parse --verify -q "refs/heads/$PR_BRANCH" >/dev/null && echo 1 || echo 0)" \
     "P1-$1: ...and the spine branch never reaches origin"
 }
-_fields_halt heading '## Known limits' '/^## Known limits$/d'
-_fields_halt heading2 '## Closes' '/^## Closes$/d'
+_fields_halt() { _fields_halt_f "$1" "$2" "sed -e '$3'"; }
+_fields_halt heading "lacks the heading '## Known limits'" '/^## Known limits$/d'
+_fields_halt heading2 "lacks the heading '## Closes'" '/^## Closes$/d'
+# the heading list names all seven: a file without Merge danger must say so, not
+# fall through to the order check's message
+_fields_halt heading3 "lacks the heading '## Merge danger'" '/^## Merge danger$/d'
+# a heading with text after it is not the heading: caught by the presence check
+# (the order check would also halt, with a different message)
+_fields_halt headingx "lacks the heading '## Known limits'" 's/^## Known limits$/## Known limits (none)/'
 # out of order: Scope and Claim swapped by renaming the headings in place
 _fields_halt order 'template order' 's/^## Claim$/## TMPH/; s/^## Scope$/## Claim/; s/^## TMPH$/## Scope/'
-_fields_halt cond3 'breaks the test suite' '/^3\. breaks the test suite;$/d'
-_fields_halt cond2 'makes the Claim above false' 's/^2\. makes the Claim above false;$/2. makes the Claim false;/'
+_fields_halt cond3 "lacks the merge-bar line '3. breaks the test suite;'" '/^3\. breaks the test suite;$/d'
+_fields_halt cond2 "lacks the merge-bar line '2. makes the Claim above false;'" 's/^2\. makes the Claim above false;$/2. makes the Claim false;/'
 # a condition with text appended contains the template line but is not it: whole-line match only
-_fields_halt cond4 'opens a security hole' 's/^\(4\. opens a security hole.*\)$/\1 Not after round 2./'
-_fields_halt raise 'A finding blocks this PR only if it:' 's/^A finding blocks this PR only if it:$/A finding blocks this PR after round 2 only if it:/'
-_fields_halt nodoor 'Door:' '/^Door: /d'
-_fields_halt unfilled 'Door:' 's/^Door: .*/Door: <one-way or two-way> - what a revert would not undo/'
-# adjacent control for the Door check: one-way is as valid as two-way
-_pr_fixture p1-oneway
-mkdir -p "$PR_STATE/fields"
-_valid_fields | sed -e 's/^Door: two-way/Door: one-way/' > "$PR_STATE/fields/canonical"
-t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
-  "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields_dir='$PR_STATE/fields'; . '$MERGE_BLOCK'"
-t_assert_rc 0 "P1-oneway: a one-way Door line passes the fields check"
+_fields_halt cond4 "lacks the merge-bar line '4. opens a security hole" 's/^\(4\. opens a security hole.*\)$/\1 Not after round 2./'
+_fields_halt raise "lacks the merge-bar line 'A finding blocks this PR only if it:'" 's/^A finding blocks this PR only if it:$/A finding blocks this PR after round 2 only if it:/'
+# #1063 C2: the stopping line is part of the bar, and the bar is read under ITS
+# heading, not from anywhere in the file
+_fields_halt noelse "lacks the merge-bar line 'Everything else is non-blocking.'" '/^Everything else is non-blocking\.$/d'
+_bar_in_claim() { # the r0.s1 shape: lead + four conditions under ## Claim, only the stopping line left under ## Merge bar
+  _valid_fields | sed -n '/^A finding blocks/,/^4\. /p' > "$PR_STATE/barlines"
+  _valid_fields | sed -e '/^## Merge bar$/,/^## Evidence$/{/^A finding blocks/d;/^[1-4]\. /d;}' -e "/^## Claim\$/r $PR_STATE/barlines"
+}
+_fields_halt_f scope "lacks the merge-bar line 'A finding blocks this PR only if it:'" '_bar_in_claim'
+_fields_halt_f extra "numbered line '3a. also blocks a typo.'" "awk '{print} /^4\\. /{print \"3a. also blocks a typo.\"}'"
+# adjacent control: a numbered line under ANOTHER heading is not a bar line (the
+# extra-line check must stay scoped to ## Merge bar)
+_door_msg="has no 'Door: one-way' or 'Door: two-way' line"
+_fields_ok() { # $1=case label $2=sed expr; the file must pass: PR opened, no Door halt
+  _pr_fixture "p1-$1"
+  mkdir -p "$PR_STATE/fields"
+  _valid_fields | sed -e "$2" > "$PR_STATE/fields/canonical"
+  t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+    "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields_dir='$PR_STATE/fields'; . '$MERGE_BLOCK'"
+  t_assert_rc 0 "P1-$1: this fields file passes the check"
+  case "$T_OUT" in *"$_door_msg"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P1-$1: the Door halt message appeared";; *) T_PASS=$((T_PASS+1));; esac
+  t_assert_eq 1 "$( [ -f "$PR_STATE/create_args" ] && echo 1 || echo 0 )" "P1-$1: ...and the PR is opened"
+}
+_fields_ok extra-elsewhere 's/^The tier spine lands\.$/1. The tier spine lands./'
+_fields_halt nodoor "$_door_msg" '/^Door: /d'
+_fields_halt unfilled "$_door_msg" 's/^Door: .*/Door: <one-way or two-way> - what a revert would not undo/'
+# the Door line is anchored at the start (#1063 C3) and at the end (C2)
+_fields_halt doorlead "$_door_msg" 's/^Door: two-way/See Door: two-way/'
+_fields_halt doorboth "$_door_msg" 's/^Door: two-way.*/Door: one-way or two-way/'
+_fields_halt doortail "$_door_msg" 's/^Door: two-way.*/Door: two-wayfoo/'
+# a Door line under another heading is not the Merge danger's
+_fields_halt doorelsewhere "$_door_msg" '/^Door: /d; s/^None\.$/Door: two-way/'
+# adjacent controls for the Door check: one-way is as valid as two-way, and a
+# bare Door line is as valid as one with an explanation
+_fields_ok oneway 's/^Door: two-way/Door: one-way/'
+_fields_ok doorbare 's/^Door: two-way.*/Door: two-way/'
+# #1063 C1/C2: any non-word character ends the word; qualified lines from real
+# merged bodies pass, the unfilled forms still fail (adjacent controls)
+_fields_ok doorq1 's/^Door: two-way.*/Door: one-way after the tag - releases the plugin./'
+_fields_ok doorq2 's/^Door: two-way.*/Door: two-way for the code - a revert undoes it./'
+_fields_ok doorq3 's/^Door: two-way.*/Door: one-way once released. A tag is public./'
+_fields_ok doorem 's/^Door: two-way.*/Door: two-way — a revert undoes it./'
+_fields_ok doorbang 's/^Door: two-way.*/Door: two-way!/'
+_fields_ok doorparen 's/^Door: two-way.*/Door: two-way)/'
+_fields_ok doortab "s/^Door: two-way.*/Door: two-way$(printf '\t')because/"
+_fields_halt dooror2 "$_door_msg" 's/^Door: two-way.*/Door: two-way or one-way - pick one/'
+_fields_halt doorish "$_door_msg" 's/^Door: two-way.*/Door: two-way-ish/'
+# #1063 C3: a template bar line repeated under Merge bar halts naming the line
+_fields_halt_f dupbar "repeats the merge-bar line '2. makes the Claim above false;'" "awk '{print} /^2\\. /{print}'"
+# #1063 C4: the fields file is a seat's Write-tool output, LF by contract; a CRLF
+# file (a Windows editor or tool touched it) halts naming the line endings
+# instead of reporting "lacks the heading" for a heading that is visibly there
+_fields_halt_f crlf "CRLF" "awk '{ printf \"%s\\r\\n\", \$0 }'"
 
 # P1c. A fields directory with no file for this repo halts before the push: a
 # PR opened without its repo's fields would reach review with no merge bar.
