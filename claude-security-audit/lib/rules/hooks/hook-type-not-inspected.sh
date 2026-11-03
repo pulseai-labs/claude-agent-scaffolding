@@ -31,6 +31,8 @@ detect() { return 1; }
 
 # detect_text <entries-jsonl> <file> — one Info finding per file with per-type
 # counts. Skill-first question 3: a mechanical report that can only add a stop.
+# json_path "hooks" names the key the entries sit under, so a report prints
+# file#hooks and not file:0:0.
 detect_text() {
   local entries="$1" target_file="$2" counts preview fuid
   counts="$(printf '%s\n' "$entries" | jq -rs '
@@ -38,8 +40,10 @@ detect_text() {
     | group_by(.) | map("\(.[0])=\(length)") | join(", ")' 2>/dev/null)"
   [[ -n "$counts" ]] || return 1
   preview="$(csa_redact "hook entries not inspected: $counts")"
-  fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$counts")"
+  # Hash first, as HOOK-005 does: the counts hold attacker-chosen type names, and
+  # csa_finding_uid redacts and caps its match at 200 characters.
+  fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$(csa_sha256 "$counts" | cut -c1-24)")"
   jq -nc --arg rule_id "$RULE_ID" --arg file "$target_file" --arg preview "$preview" \
     --arg severity "$RULE_SEVERITY" --arg fuid "$fuid" --arg counts "$counts" \
-    '{rule_id: $rule_id, file: $file, line: 0, offset: 0, preview: $preview, severity: $severity, finding_uid: $fuid, context: {types: $counts}}'
+    '{rule_id: $rule_id, file: $file, line: 0, offset: 0, preview: $preview, severity: $severity, finding_uid: $fuid, context: {types: $counts, json_path: "hooks"}}'
 }

@@ -172,8 +172,10 @@ csa_hook_entry_command() {
 # a command entry. line 0, offset 0, context.json_path. The preview is the
 # redacted command. The uid takes the first 24 hex characters of the sha256 of
 # json_path plus the FULL decoded command, short enough that csa_redact (which
-# csa_finding_uid applies) neither masks nor truncates it: two different commands
-# never share a uid however long the path, and reformatting the file changes nothing.
+# csa_finding_uid applies) neither masks nor truncates it, so path and command
+# length never hide a difference. csa_finding_uid itself keeps 32 bits (8 hex
+# characters), so two different commands share a uid only by a 32-bit collision
+# (about 1 in 4.3 billion per pair); reformatting the file changes nothing.
 csa_hook_entry_emit() {
   local rule_id="$1" sev="$2" entry="$3" file="$4" text jp preview digest fuid sep
   text="$(csa_hook_entry_command "$entry")" || return 1
