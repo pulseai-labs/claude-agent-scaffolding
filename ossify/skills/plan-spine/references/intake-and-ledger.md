@@ -15,6 +15,8 @@ label `from:<requesting-project>` (for example `from:pulse-guard-ai`). The label
 the queue. The requester creates it the first time it files one; nothing else
 registers it.
 
+`<owner/repo>` is the repository the call targets, read from its own checkout: `gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner -q .nameWithOwner`. `<repo-root>` is that repository's checkout, not the directory you are in: a PR lives in the canonical even when you run from the AI workspace. On an ossify project, `oss repo_root canonical` (or `ai_workspace`) gives it. Never build the name from a folder name: an AI workspace's folder and its GitHub repo often differ.
+
 List the open requests — every open issue with a label that starts `from:`:
 
 ```bash

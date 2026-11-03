@@ -1400,7 +1400,9 @@ _pin "$_r" "patch/SKILL.md §4 checks only origin's fetch URL - a non-GitHub pus
 
 # #619 round 2 - two review findings, each pinned red before its fix.
 # (6c) patch §4: push and fetch URLs are compared host-and-all (gh's `url`), not by owner/repo.
-_r=1; grep -Fq -- '--json url' "$_PS" && ! grep -Fq -- '--json nameWithOwner' "$_PS" && _r=0
+# #755: §1 now names the repo with `--json nameWithOwner`, so the check reads §4 alone.
+_s4="$(awk '/^## 4\. /{f=1;next} /^## 5\. /{f=0} f' "$_PS")"
+_r=1; printf '%s\n' "$_s4" | grep -Fq -- '--json url' && ! printf '%s\n' "$_s4" | grep -Fq -- '--json nameWithOwner' && _r=0
 _pin "$_r" "patch/SKILL.md §4 compares origin URLs by nameWithOwner - two GitHub hosts with one owner/repo pass"
 # (3b) release-close: patch tags are fetched from origin, the remote /ossify:patch pushes to.
 _r=1; grep -Fq 'fetch --tags origin' "$_RC" && ! grep -Fq 'fetch --tags <remote>' "$_RC" && _r=0

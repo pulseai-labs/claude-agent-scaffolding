@@ -25,7 +25,7 @@ to the repo the fix goes into, so pass that repo explicitly: a bare `gh issue vi
 resolves against whatever checkout this session is in, which may be the AI
 workspace or another project. If the invocation does not say which repo, ask.
 Every later `gh` call on the issue (§3's AC comment, §6's adoption comment) uses
-the same `--repo`.
+the same `--repo`. `<owner/repo>` is the repository the call targets, read from its own checkout: `gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner -q .nameWithOwner`. `<repo-root>` is that repository's checkout, not the directory you are in: a PR lives in the canonical even when you run from the AI workspace. On an ossify project, `oss repo_root canonical` (or `ai_workspace`) gives it. Never build the name from a folder name: an AI workspace's folder and its GitHub repo often differ.
 
 | The work | Lane |
 |---|---|
