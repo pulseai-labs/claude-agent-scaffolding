@@ -2,6 +2,12 @@
 # lib/rule-engine.sh — runs rule files against target files.
 # Per SPEC §8.1 (rule contract) and §12 (T2-G rule-load failure visibility).
 
+# The structural hook-entry reader (#427); bin/csa sources every lib, a test may not.
+if ! declare -F csa_hook_entries >/dev/null 2>&1; then
+  # shellcheck source=/dev/null
+  source "${CSA_LIB_DIR:-$(dirname "${BASH_SOURCE[0]:-$0}")}/hook-entries.sh" 2>/dev/null || true
+fi
+
 # csa_rule_run_one <rule_file> <target_file>
 # Sources rule in a subshell, calls detect, emits findings JSONL on stdout.
 # On source failure: emits SCANNER-001 (High).
@@ -37,6 +43,96 @@ csa_rule_run_one() {
   )
 }
 
+# _csa_hook_target_mode <target> — print `wrapped` or `plugin-manifest` when the
+# target is a JSON file whose hook entries are read structurally (#427); print
+# nothing otherwise. EXACT matches only: the project's own .claude/settings.json
+# and .claude/settings.local.json by full path (never a nested copy), and an
+# enabled plugin's hooks/hooks.json or .claude-plugin/plugin.json by normalized
+# id. A plugin's fixtures/ or tests/ copy, or a layout that does not normalize to
+# @plugin:<plugin>@<marketplace>: (a local/ plugin, an installPath outside the
+# cache), is not walked.
+_csa_hook_target_mode() {
+  local t="$1" root="${_CSA_ENGINE_ROOT:-${CSA_PROJECT_ROOT:-}}" n
+  if [[ -n "$root" ]]; then
+    root="${root%/}"
+    if [[ "$t" == "$root/.claude/settings.json" || "$t" == "$root/.claude/settings.local.json" ]]; then
+      printf 'wrapped'
+      return 0
+    fi
+  fi
+  [[ "$t" == *.json ]] || return 0
+  declare -F csa_normalize_path >/dev/null 2>&1 || return 0
+  n="$(csa_normalize_path "$t")"
+  local re_h='^@plugin:[^:/]+@[^:/]+:hooks/hooks\.json$'
+  local re_m='^@plugin:[^:/]+@[^:/]+:\.claude-plugin/plugin\.json$'
+  if [[ "$n" =~ $re_h ]]; then
+    printf 'wrapped'
+  elif [[ "$n" =~ $re_m ]]; then
+    printf 'plugin-manifest'
+  fi
+  return 0
+}
+
+# _csa_hook_entries_file <target> <mode> — print the path of a file holding the
+# walked entries of one target. With a run cache (_CSA_HOOK_CACHE_DIR, set by
+# csa_rule_engine_scan_all) the target is walked once per run, however many rules
+# read it; the run cleans the cache up. Without one the file is a temp the
+# caller removes (printed second line `tmp`).
+_csa_hook_entries_file() {
+  local target="$1" mode="$2" cf
+  if [[ -n "${_CSA_HOOK_CACHE_DIR:-}" ]]; then
+    cf="$_CSA_HOOK_CACHE_DIR/$(csa_sha256 "$target")"
+    if [[ ! -f "$cf" ]]; then
+      csa_hook_entries "$target" "$mode" > "$cf.tmp" 2>/dev/null
+      printf '%s\n' "$target" > "$cf.target"
+      mv "$cf.tmp" "$cf"
+    fi
+    printf '%s\n' "$cf"
+  else
+    cf="$(mktemp "${TMPDIR:-/tmp}/csa-hook-entries.XXXXXX")" || return 1
+    csa_hook_entries "$target" "$mode" > "$cf" 2>/dev/null
+    printf '%s\ntmp\n' "$cf"
+  fi
+}
+
+# _csa_rule_run_text <rule_file> <target> <mode>
+# Runs in the rule's subshell (detect_text is defined). Feeds each walked entry
+# to detect_text; a rule that sets RULE_TEXT_SCOPE=file gets all of the file's
+# entries in one call. Same result contract as detect: exit 1 with no output is
+# no match; any other non-zero is SCANNER-002.
+_csa_rule_run_text() {
+  local rule_file="$1" target="$2" mode="$3" info cf tmp="" entry out ec
+  info="$(_csa_hook_entries_file "$target" "$mode")" || return 0
+  cf="$(printf '%s\n' "$info" | sed -n 1p)"
+  [[ "$(printf '%s\n' "$info" | sed -n 2p)" == "tmp" ]] && tmp="$cf"
+  if [[ "${RULE_TEXT_SCOPE:-entry}" == "file" ]]; then
+    entry="$(cat "$cf")"
+    if [[ -n "$entry" ]]; then
+      _csa_rule_text_once "$rule_file" "$target" "$entry"
+    fi
+  else
+    while IFS= read -r entry; do
+      [[ -z "$entry" ]] && continue
+      _csa_rule_text_once "$rule_file" "$target" "$entry"
+    done < "$cf"
+  fi
+  [[ -n "$tmp" ]] && rm -f "$tmp"
+  return 0
+}
+
+_csa_rule_text_once() {
+  local rule_file="$1" target="$2" entry="$3" out ec=0
+  out="$(detect_text "$entry" "$target" 2>/dev/null)" || ec=$?
+  if [[ "$ec" -eq 1 && -z "$out" ]]; then
+    return 0
+  elif [[ "$ec" -ne 0 ]]; then
+    jq -nc --arg rid "SCANNER-002" --arg f "$target" --arg r "$rule_file" \
+      '{rule_id: $rid, file: $f, line: 0, offset: 0, preview: "detect_text() failed", severity: "high", context: {failed_rule: $r, exit_code: '"$ec"'}}'
+  elif [[ -n "$out" ]]; then
+    printf '%s\n' "$out"
+  fi
+}
+
 # csa_rule_run_many <rule_file> <targets_file>
 # Source rule ONCE in a subshell, iterate targets_file, call detect per target.
 # More efficient than calling csa_rule_run_one per target (amortizes source cost).
@@ -54,10 +150,21 @@ csa_rule_run_many() {
         '{rule_id: $rid, file: $f, line: 0, offset: 0, preview: "rule has no detect() function", severity: "high"}'
       return 0
     fi
+    local has_text=0
+    declare -f detect_text >/dev/null && has_text=1
     while IFS= read -r target_line; do
       [[ -z "$target_line" ]] && continue
       local target="${target_line##*$'\t'}"
-      local out ec=0
+      local out ec=0 mode=""
+      # A hook-bearing JSON target goes to detect_text, one decoded entry at a
+      # time (#427). Any other target, or a rule with no detect_text, is detect.
+      if [[ "$has_text" -eq 1 ]]; then
+        mode="$(_csa_hook_target_mode "$target")"
+      fi
+      if [[ -n "$mode" ]]; then
+        _csa_rule_run_text "$rule_file" "$target" "$mode"
+        continue
+      fi
       out="$(detect "$target" 2>/dev/null)" || ec=$?
       if [[ "$ec" -eq 1 && -z "$out" ]]; then
         continue
@@ -105,6 +212,8 @@ _csa_target_matches_aspect() {
         return 0
       fi
       [[ "$target" == */.claude/hooks/* && -x "$target" ]] && return 0
+      # Hook entries declared in JSON: settings, a plugin's hooks.json / plugin.json (#427).
+      [[ -n "$(_csa_hook_target_mode "$target")" ]] && return 0
       return 1
       ;;
     marketplace)
@@ -187,6 +296,35 @@ _csa_enum_stderr_to_findings() {
   return 0
 }
 
+# _csa_hook_coverage_line <cache_dir> <findings_file>
+# Prints `csa: hook-coverage checked=N flagged=N not-inspected=N unreadable=N` on stderr.
+# checked: command entries read and matched against the HOOK patterns; flagged:
+# those of them with at least one finding; not-inspected: entries
+# of another type; unreadable: entries (or files) that could not be read. A
+# clean count cannot come from the findings, so it travels as this line and the
+# skill hands it to the report header.
+_csa_hook_coverage_line() {
+  local cache="$1" findings="$2" all t target c
+  all="$(mktemp "${TMPDIR:-/tmp}/csa-hook-cov.XXXXXX")"
+  for t in "$cache"/*.target; do
+    [[ -f "$t" ]] || continue
+    target="$(cat "$t")"
+    c="${t%.target}"
+    jq -c --arg f "$target" '. + {file: $f}' "$c" >> "$all" 2>/dev/null
+  done
+  if ! jq -nr --slurpfile e "$all" --slurpfile f "$findings" '
+      ([$f[] | objects | select((.context | objects | .json_path? // null) != null)
+        | (.file + "\u001f" + .context.json_path)] | map({key: ., value: true}) | from_entries) as $flagged
+      | [$e[] | select(.type == "command" and has("text"))] as $cmd
+      | "csa: hook-coverage checked=\($cmd | length)"
+        + " flagged=\([$cmd[] | select($flagged[.file + "\u001f" + .json_path])] | length)"
+        + " not-inspected=\([$e[] | select(has("inconclusive") | not) | select(.type != "command")] | length)"
+        + " unreadable=\([$e[] | select(has("inconclusive"))] | length)"' >&2 2>/dev/null; then
+    printf 'csa: hook-coverage unavailable\n' >&2
+  fi
+  rm -f "$all"
+}
+
 # csa_rule_engine_scan_all <project_root> [<focus>]
 # Discovers all rule files (filtered by focus aspect), runs the matrix.
 # Uses aspect-based pre-filtering to reduce rule×target cross-product.
@@ -210,6 +348,9 @@ csa_rule_engine_scan_all() {
     rm -f "$findings_out" "$targets_file"
     return 2
   fi
+  # Hook entries walked by the hooks aspect are cached per target for this run.
+  _CSA_ENGINE_ROOT="$root"
+  _CSA_HOOK_CACHE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/csa-hook-cache.XXXXXX")"
   # On success enumeration's stderr still carries two things that must not be
   # lost: PROVENANCE-002 lines (an enabled plugin that did not resolve is a
   # High finding, not a note) and `csa:` warnings (an enabledPlugins shape the
@@ -236,6 +377,11 @@ csa_rule_engine_scan_all() {
     rm -f "$rule_targets_file"
   done < <(find "$rules_glob" -name '*.sh' -type f 2>/dev/null)
   cat "$findings_out"
+  if [[ "$focus" == "all" || "$focus" == "hooks" ]]; then
+    _csa_hook_coverage_line "$_CSA_HOOK_CACHE_DIR" "$findings_out"
+  fi
+  rm -rf "$_CSA_HOOK_CACHE_DIR"
+  unset _CSA_HOOK_CACHE_DIR _CSA_ENGINE_ROOT
   scanner_002_count="$(grep -c 'SCANNER-002' "$findings_out" 2>/dev/null || true)"
   if [[ "$scanner_002_count" -ge 3 ]]; then
     printf '⚠ %d rule(s) failed during scan; results incomplete. See SCANNER-002 findings.\n' "$scanner_002_count" >&2

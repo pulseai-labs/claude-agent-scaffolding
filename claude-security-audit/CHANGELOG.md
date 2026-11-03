@@ -1,5 +1,26 @@
 # claude-security-audit changelog
 
+## 0.3.0 (2026-11-03)
+
+**Hook commands declared in JSON are now audited (#427).** Before, a `curl ... | bash` in `.claude/settings.json`, or in an enabled plugin's `hooks/hooks.json`, gave zero findings: the hook rules read only scripts. Expect new findings, on first-party plugins too, the first time you audit after upgrading.
+
+Skill-first question 3 (`docs/conventions/skill-first.md`): reading hook entries from JSON is mechanical work on open input (attacker-written command text), allowed as code because it can only add a stop and never approves anything. What it misses goes on to your own reading exactly as before. No model reads hook text.
+
+### Added
+- **`csa_hook_entries <file> <wrapped|plugin-manifest>`** (`lib/hook-entries.sh`) walks `.hooks.<Event>[i].hooks[j]` with `jq` and emits one JSON line per entry. `command` entries are decoded (JSON escapes; exec-form `args` joined into the checked text); other types are counted; each unreadable piece is an inconclusive line with its `json_path`. A `plugin.json` `hooks` field may be an inline event map, a path inside the plugin root (physical containment check; `./hooks/hooks.json` is a target already and is skipped) or an array of both.
+- **Exact targets only:** the project's `.claude/settings.json` and `.claude/settings.local.json`, and a plugin's `hooks/hooks.json` and `.claude-plugin/plugin.json`. Never a nested `.claude/**/settings.json`, a plugin's `fixtures/` or `tests/` copy, or a plugin's root `settings.json`.
+- **HOOK-001 to HOOK-004 read decoded commands** through a new `detect_text` entry point (one pattern per rule, shared with the file `detect`; HOOK-004 shares its two regexes). A match is a finding at line 0 with `context.json_path`; the `finding_uid` is built from the path and the sha256 of the full decoded command, so two commands equal for 200 characters get different ids and reformatting the file changes nothing.
+- **HOOK-005 `hook-entry-unreadable`** (High): a malformed file or a hook entry of the wrong shape is a finding, so a hook that went unread never reads as a clean audit.
+- **HOOK-006 `hook-type-not-inspected`** (Info): one finding per file with per-type counts for `http`, `prompt`, `agent`, `mcp_tool` and later hook types.
+- **A coverage line.** The engine prints `csa: hook-coverage checked=N flagged=N not-inspected=N unreadable=N` on stderr, the skill passes it to the report as `scope_summary`, and the report header prints it. `checked` counts every command entry matched against the HOOK patterns, and `flagged` those of them with a finding.
+- Reports print `file#<json_path>` instead of `file:0:0` for a finding with a `context.json_path`.
+
+### Known limits
+- The patterns are the same common-pattern regexes as before; obfuscation still gets through. HOOK-003 matches only `rm -rf` of an absolute path, so `rm -rf "$HOME"/x` is missed, in files and in hook entries alike; no pattern was widened.
+- A handler script outside `.claude/hooks/` and the plugin directory is not read (the command that calls it is checked). `http`, `prompt` and `agent` hooks are counted, not inspected.
+- User-level `~/.claude/settings.json` hooks are not read. Hooks in skill or agent frontmatter, inline hooks in a marketplace entry, managed-policy hooks, and Codex or OpenCode hook formats are not read.
+- A plugin whose files do not normalize to `@plugin:<plugin>@<marketplace>:` (a `local/` plugin, an install record pointing outside the cache layout) has its JSON hooks unread.
+
 ## 0.2.0 (2026-11-02)
 
 **Audits now scan your enabled plugins, so a first real run reports more.** On a real Claude Code install the scanner read no enabled plugin at all, and said nothing about it: a clean audit and a skipped one looked the same (#825). Expect new findings, on first-party plugins too, the first time you audit after upgrading.
