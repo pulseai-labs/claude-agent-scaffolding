@@ -22,7 +22,7 @@ carries no uncertainty at all and just wants doing.
 | `spike` | AFK once its contract has a go (§3) | `start/references/spike-contract.md` | technical — build a falsifier |
 | `prototype` | HITL | `start/references/prototype.md` | experiential — a person chooses |
 | `grilling` | HITL | `challenge` interview + `start/references/domain-modeling.md` | none; it is the grill |
-| `task` | either | no instrument | none; manual work unblocking a decision |
+| `task` | HITL | none — the operator reports the work done elsewhere | none; records manual work done outside the map |
 
 Resolver paths are read cross-skill relative to the plugin root —
 `skills/start/references/<file>`. This is the
@@ -76,8 +76,11 @@ doesn't. A `spike` needs a person once, before it starts: its contract's go (§3
 `grilling` are HITL because the thing under resolution *is* a person's
 judgment: which built variant feels right, how the operator actually
 answers a question the interview predicted differently. `task` carries no
-uncertainty at all — it is manual work unblocking the decision — so its
-mode is whatever the work itself needs, not a property of the type.
+uncertainty: it records manual work that must happen outside the map before a
+decision can move. The session never does that work ("plan, don't do",
+`references/working.md` §2); it resolves the ticket by recording where and by
+whom the work was done (a PR, an issue, a commit, or the operator's word), and
+only a person can say it is done — so `task` is HITL too.
 
 **The falsifier is the boundary.** If a check could fail, the ticket is a
 `spike`. If the answer requires a person comparing built variants, it is a
