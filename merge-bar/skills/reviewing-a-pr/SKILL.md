@@ -1,6 +1,6 @@
 ---
 name: reviewing-a-pr
-description: Use when reviewing a PR, re-reviewing one after a fix push, or seated as a PR's reviewer — reports every defect as a class with every site in the repo, each sorted against the merge bar in the PR's own body, both axes (standards, and the Claim or spec) in parallel fresh-context subagents, coverage stated per file; round 2+ reviews only the fix diff plus each prior class's closure. Reports only — never posts, commits, edits or checks out.
+description: Use when reviewing a PR, re-reviewing one after a fix push, or seated as a PR's reviewer — reports every defect as a class with every site in the repo, each sorted against the merge bar in the PR's own body, both axes (standards, and the Claim or spec) in parallel fresh-context subagents, coverage stated per file; round 2+ reviews only the fix diff plus each prior class's closure. Reports only — never posts, commits, edits or checks out (with `run`, writes only inside that directory).
 ---
 
 # Reviewing a pull request — classes against its merge bar
@@ -11,8 +11,8 @@ one site of a pattern guarantees a later round that finds the rest. **Round 2 re
 fix diff**: a fresh read of the whole PR each round re-samples it and brings findings round 1
 should have had. So round 1 carries the burden — whole diff, every class, every site.
 
-You never post, commit, edit, push or check out; with `run`, you write only inside it. The launcher prepared the checkout; the
-work-PR session posts the report.
+You never post, commit, edit, push or check out; with `run`, the one carve-out is writes inside that
+directory. The launcher prepared the checkout; the work-PR session posts the report.
 
 **Inputs.** Each can come as a slash-command flag or be named in a brief:
 
@@ -65,9 +65,9 @@ steps 3–4, the Limits below, `run` if set, and its own instruction:
   the diff do what the spec or plan says, item by item — each item's result for the report's
   `## Spec` — and nothing outside Scope?
 
-Each returns its classes in the report shape and every file of the diff marked `read` or
-`not read — <why>`. With no subagent tool, run the axes one after the other, each from the
-diff, never from the other's findings.
+Each returns its classes in the report shape, every file of the diff marked `read` or `not read
+— <why>`, and, with `run`, what it ran and what it showed. With no subagent tool, run the axes
+one after the other, each from the diff, never from the other's findings.
 
 **Merging.** A class both axes return is one entry, `Axis: Standards, Claim/Spec`, with the
 union of their sites. Nothing else is reranked, dropped or downgraded across axes.
@@ -129,12 +129,17 @@ clean over a gap. Write it to the report file the brief names, or return it.
 
 ## Limits
 
-- No debugger. Without `run`, no running the program or its tests: a reviewer reads. With
-  `run`, only inside that directory: each axis extracts the checkout's files, never its `.git`
-  (`git archive HEAD | tar -x -C <subdir>`), into its own subdirectory and runs there, with `TMPDIR` and `HOME` set inside it — the PR body's Evidence test
-  command or the documented test entry point, a reproduction of a finding, a mutation of the
-  copy. A suite that needs a cold build is not run; the `Run:` header line says what ran.
+- No debugger. Without `run`, no running the program or its tests: a reviewer reads. With `run`
+  (a directory outside any git repository, else git in the extract resolves to that repository),
+  only inside it: each axis extracts the checkout's files, never its `.git`, into its own
+  subdirectory (`mkdir -p <subdir> && git archive HEAD | tar -x -C <subdir>`) and runs there,
+  with `TMPDIR` and `HOME` set inside it — the PR body's Evidence test command or the documented
+  test entry point, a reproduction of a finding, a mutation of the copy. A suite that needs a
+  cold build is not run; the `Run:` header line says what ran, from the axes' returns.
+- Naming `run` is the launcher's statement that the PR's code and Evidence command are trusted
+  (not a fork or unknown author). It limits writes, not the network: the launcher must enforce
+  any network limit, the skill cannot.
 - A language server or check that builds obeys the host's build rules — reuse the project's
   existing build output, never start a cold build of your own.
-- Never post, commit, edit, push or check out. The only file written is the report; an axis
-  writes nothing outside its `run` subdirectory.
+- Never post, commit, edit, push or check out. The only files written are the report and, with
+  `run`, an axis's own subdirectory of it.
