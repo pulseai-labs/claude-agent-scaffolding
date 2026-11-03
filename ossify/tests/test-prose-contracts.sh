@@ -2259,6 +2259,11 @@ pin "$_PRW_LOOP" "that binds this role names" \
 pin "$_PRW_WP" "Never auto-merge." \
   "work-pr/SKILL.md's merge rail lost 'Never auto-merge' - a merge queue's auto-merge stays forbidden (#869 disposition 2)"
 
+# merge-bar 0.10.1 / ossify 1.36.5 (#1061 C8, C9) - the fallback loop's second exit offers the
+# design change at every stop and recommends it on one mechanism over open input, as merge-bar's stop does.
+pin "$_PRW_LOOP" 'design — offered at every such stop, recommended when every fix extends one' \
+  "loop.md's second exit does not offer the design change at every stop (#1061 C9)"
+
 # --- /close <wi-id> --pr: the work item's PR instead of a local merge --------------
 # Control first: the default path (section 4's local merge) is byte-for-byte what it
 # was. The new arm may not edit it, and the pin counts the line exactly once, so a

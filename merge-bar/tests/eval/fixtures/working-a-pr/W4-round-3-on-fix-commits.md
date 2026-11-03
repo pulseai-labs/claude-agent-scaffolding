@@ -1,7 +1,7 @@
 ---
 scenario_id: W4-round-3-on-fix-commits
 expected_outcome: round-3-stop
-expected_reason: at round 3 two blocking findings sit on lines written by the round-1 and round-2 fix commits, so the loop stops before a fourth round and asks the operator to choose between narrowing the Claim and splitting the PR
+expected_reason: at round 3 two blocking findings sit on lines written by the round-1 and round-2 fix commits, so the loop stops before a fourth round and asks the operator to choose between narrowing the Claim, splitting the PR and changing the design
 ---
 Working PR #202 ("lock-free state writes"). Round 1: one blocking finding (a lost update on
 concurrent writes), fixed in `a1b2c3d`. Round 2: one blocking finding on a line `a1b2c3d`

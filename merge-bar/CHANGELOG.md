@@ -2,6 +2,15 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.10.1
+
+**Prose and tests only (#1061, follow-up to #1060).**
+
+- `reviewing-a-pr`: the description and the two write rules name the `run` carve-out; naming `run` is the launcher's statement that the PR's code and Evidence command are trusted, and the launcher, not the skill, must enforce any network limit; the `run` directory must be outside any git repository; the extract's subdirectory is made with `mkdir -p` first; each axis returns what it ran, so the `Run:` header line has a source.
+- `/merge-bar:review-pr` stays reports-only and takes no `run`; the command and the README say so, and that a launcher invoking the skill may name a scratch directory.
+- Eval fixture W4 expects three options at the round-3 stop. Its committed result predates that and is stale until the fixture is re-run.
+- New `tests/test-prose-pins.sh` pins `working-a-pr`'s "change the design" option and the `run` trust and network sentence. ossify 1.36.5 aligns its bundled loop's second exit.
+
 ## 0.10.0
 
 **Prose only (#1047, #1055).**
