@@ -5,14 +5,14 @@
 Follow-ups to 0.3.0 (#1059). No new rule; one reading of the coverage line changes.
 
 ### Fixed
-- **A trailing slash on the project root no longer skips settings hooks.** `csa rule_engine_scan_all "<p>/"` enumerated `<p>//.claude/settings.json`, which the exact-path test never matched, so the project's settings hooks were not read and nothing said so. The engine now strips trailing slashes from the root once (`/` itself stays).
+- **A trailing slash on the project root no longer skips settings hooks.** `csa rule_engine_scan_all "<p>/"` enumerated `<p>//.claude/settings.json`, which the exact-path test never matched, so the project's settings hooks were not read and nothing said so. The engine now strips trailing slashes from the root once. This holds for any root other than `/`; for `/` itself the settings hooks are still skipped, as before 0.3.1.
 - **A failing `detect_text` is no longer counted as checked.** Its SCANNER-002 now names the entry's `json_path`, and the coverage line counts that entry under `unreadable`, not `checked`.
 - **HOOK-006 prints `file#hooks`, not `file:0:0`,** and the chat summary, which hides Info, adds one line (`N file(s) declare hooks the audit does not inspect (HOOK-006, Info; pass --verbose)`) so an unchecked `http` or `prompt` hook is no longer invisible in chat.
 - **HOOK-006's `finding_uid` hashes the per-type counts first,** as HOOK-005 does, so a long type name no longer hides a later change to the counts.
 - **Wording:** the `finding_uid` is 32 bits, so two different hook commands share an id only by a 32-bit collision; 0.3.0's "never share an id" is corrected.
 
 ### Tests
-- A real `\u` escape in the decoding tests, a `detect` versus `detect_text` verdict comparison on one command, a test that the json path is part of the entry digest, and the two tests that read the scan through a pipe now fail when the scan fails or prints malformed output.
+- A real `\u` escape in the decoding tests, a `detect` versus `detect_text` verdict comparison on one command, a test that the json path is part of the entry digest, and a `_scan_checked` helper (the scan's status is captured before any pipe) used by the tests that read the scan for a positive result and by the `&` and nested-settings controls, with a test that makes its failed-scan and malformed-output arms run. The roughly 25 older "0 findings" assertions still read the scan through a pipe and do not fail on a failed scan.
 
 ## 0.3.0 (2026-11-03)
 

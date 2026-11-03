@@ -338,8 +338,9 @@ _csa_hook_coverage_line() {
 # Emits SCANNER-002 banner on stderr if 3+ SCANNER-002 findings emerge.
 csa_rule_engine_scan_all() {
   local root="$1"; local focus="${2:-all}"
-  # Trailing slashes off, "/" itself kept: targets are enumerated as "$root/.claude/...",
-  # and _csa_hook_target_mode compares them to that exact path (#1059 C2).
+  # Trailing slashes off: targets are enumerated as "$root/.claude/...", and
+  # _csa_hook_target_mode compares them to that exact path (#1059 C2). Holds for any root
+  # other than "/"; for "/" itself the settings hooks are still skipped, as before 0.3.1.
   while [[ "$root" == ?*/ ]]; do root="${root%/}"; done
   if ! _csa_rule_engine_validate_focus "$focus"; then
     return 2
