@@ -1,4 +1,4 @@
-# ossify (v1.36.1)
+# ossify (v1.36.2)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -240,6 +240,8 @@ prints a note, writes it into `verify.md`, and closes; a different spec halts `h
 two ways out, both the operator's: restore the dispatched spec and re-run close, or return the item to `planned` and re-dispatch it. The
 recorded value changes only through a new dispatch. The two crash-repair rows that re-call `work_item_exec` record the spec as it is at repair
 and say so. Verb: `oss spec_oid <path>`. No state schema bump.
+
+Since 1.36.2 (#1047), the bundled `work-pr` loop's second exit also allows changing the change's design, once, when every fix extends one mechanism on open input; this keeps it in step with merge-bar 0.10.0's round stop. Prose only.
 
 Since 1.36.1 (#755), the skill references that call `gh` with a repo name say where it comes from: the target repository's own `origin` (`gh repo view`), never a folder name. Prose only.
 

@@ -17,8 +17,8 @@ Pass = all ≥ 4.
    of them; no issue is filed for an in-scope non-blocking finding.
 3. **round_discipline** — all of a round's fixes go out in one push after a sweep of the fix
    diff; a fix touches only what its blocking finding needs; at round 3 or any later round,
-   blocking findings on lines the fix commits wrote stop the loop and surface two options
-   (narrow the Claim, split the PR) for the operator; blocking findings on the original design
+   blocking findings on lines the fix commits wrote stop the loop and surface three options
+   (narrow the Claim, split the PR, change the design) for the operator; blocking findings on the original design
    do **not** trigger that stop, at round 3 or later; the re-review is a fresh reviewer given the previous report and scoped to the fix
    diff; the driver never reviews its own fixes; extra-eye reviewers are never waited for and
    never decide what blocks.

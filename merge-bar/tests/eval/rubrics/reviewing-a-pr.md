@@ -37,7 +37,8 @@ Pass = all ≥ 4.
    `template (body has none)`), Verifier report (its path, with the Claim/Spec axis narrowed
    to the Claim and citing the report, or `none (full Spec axis)` with the diff checked
    against the spec or plan the PR names); a missing input is a fallback the header states,
-   never a refusal to review; the reviewer posts, commits, edits and checks out nothing.
+   never a refusal to review; the reviewer posts, commits, edits and checks out nothing, and
+   runs code only when a `run` directory is named, only inside it (default: reads only).
 
 ## Output format
 `{"scores":{"class_complete":N,"bar_sorted":N,"coverage_stated":N,"round_scope":N,"inputs_resolved":N},"pass":true|false,"notes":"<one sentence>"}`. JSON only.
