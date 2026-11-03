@@ -228,8 +228,9 @@ named by the repo as `landing_repos` lists it, and set `pr_fields_dir` to that
 directory. The block loads the repo's file into `$pr_fields` per PR, with
 `cat` — never as a quoted literal: the text routinely carries backticks, `$` and
 apostrophes, which a shell assignment would run or break on. Right after the load, the
-block halts, before the push, on a file missing a heading, the bar's four
-conditions or a filled `Door:` line, naming the file and the piece. Known limit: a
+block halts before that repo's push on a file missing a heading, the bar's four
+conditions or a filled `Door:` line, naming the file and the piece. The check runs
+per repo: a repo landed earlier in the same pass keeps its PR, and the re-run resumes it. Known limit: a
 stopping rule written in the raising-line slot, after `Everything else is
 non-blocking.`, passes; `working-a-pr` still judges by all four conditions. Without merge-bar,
 leave `pr_fields_dir` unset. The block appends `$pr_fields` after the two
