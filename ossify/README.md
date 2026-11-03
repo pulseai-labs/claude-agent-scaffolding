@@ -1,4 +1,4 @@
-# ossify (v1.36.2)
+# ossify (v1.36.3)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -240,6 +240,8 @@ prints a note, writes it into `verify.md`, and closes; a different spec halts `h
 two ways out, both the operator's: restore the dispatched spec and re-run close, or return the item to `planned` and re-dispatch it. The
 recorded value changes only through a new dispatch. The two crash-repair rows that re-call `work_item_exec` record the spec as it is at repair
 and say so. Verb: `oss spec_oid <path>`. No state schema bump.
+
+Since 1.36.3 (#1056), spine close checks each seat-written merge-bar fields file before the push: the seven `##` headings in template order, the Merge bar's lead line and four conditions as whole lines, and a `Door: one-way` or `Door: two-way` line. A missing piece halts the close before that repo's push, naming the file and the piece; a repo landed earlier in the same pass keeps its PR, and the re-run resumes it. Known limit: a stopping rule written in the raising-line slot passes; `working-a-pr` still judges by all four conditions. Only where `pr_fields_dir` is set.
 
 Since 1.36.2 (#1047), the bundled `work-pr` loop's second exit also allows changing the change's design, once, when every fix extends one mechanism on open input; this keeps it in step with merge-bar 0.10.0's round stop. Prose only.
 

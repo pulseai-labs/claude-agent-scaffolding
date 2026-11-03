@@ -1474,6 +1474,40 @@ t_assert_eq "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" "$(cat "$PR_STATE/push
 t_assert_eq 0 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
   "P1: with no \$pr_fields (merge-bar absent) the PR body carries no merge-bar fields"
 
+# A full valid per-repo fields file (1.36.3, #1056): the seven headings in
+# template order, the four-condition bar, a filled Door line. Each halt case
+# below breaks exactly one piece of it.
+_valid_fields() {
+  cat <<'FIELDS_EOF'
+## Claim
+The tier spine lands.
+
+## Scope
+Touches: tier. Deliberately does not touch: the rest.
+
+## Known limits
+- None known - fixture.
+
+## Merge danger
+Door: two-way - a revert undoes all of it.
+Blast radius: the tier path.
+
+## Merge bar
+A finding blocks this PR only if it:
+1. rejects valid input, or corrupts or loses state, on a path this PR touches;
+2. makes the Claim above false;
+3. breaks the test suite;
+4. opens a security hole — injection, authentication bypass, or an exposed secret.
+Everything else is non-blocking.
+
+## Evidence
+Not run - fixture.
+
+## Closes
+None.
+FIELDS_EOF
+}
+
 # P1b. THE MERGE-BAR SEAM (1.13.0; per repo since 1.13.1, #614): with the six
 # fields composed into <pr_fields_dir>/<repo>, they land AFTER the two lines the
 # record pass reads, so the pushed-tip line is still the lineage guard's input.
@@ -1481,7 +1515,7 @@ t_assert_eq 0 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
 # still open the PR.
 _pr_fixture p1b
 mkdir -p "$PR_STATE/fields"
-printf '%s\n' '## Claim' 'The tier spine lands.' '' '## Merge bar' 'A finding blocks this PR only if it:' > "$PR_STATE/fields/canonical"
+_valid_fields > "$PR_STATE/fields/canonical"
 t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
   "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields_dir='$PR_STATE/fields'; . '$MERGE_BLOCK'"
 t_assert_rc 0 "P1b: the PR-arm pass runs clean with the merge-bar fields composed"
@@ -1489,6 +1523,42 @@ t_assert_eq "$(git -C "$PR_REPO" rev-parse "$PR_BRANCH")" "$(cat "$PR_STATE/push
   "P1b: the pushed-tip line still reaches the record pass with the merge-bar fields appended"
 t_assert_eq 1 "$(grep -c '^## Merge bar$' "$PR_STATE/create_args")" \
   "P1b: ...and the PR body carries the Merge bar heading"
+
+# P1g-P1m. #1056: the seat-written fields file is checked before the push. Each
+# case breaks ONE piece of the valid file and asserts a halt naming the file and
+# the piece, with nothing pushed and no PR opened (modelled on P1c). P1b above is
+# the adjacent control: the unbroken file passes.
+_fields_halt() { # $1=case label $2=piece the message must name $3=sed expr breaking the valid file
+  _pr_fixture "p1-$1"
+  mkdir -p "$PR_STATE/fields"
+  _valid_fields | sed -e "$3" > "$PR_STATE/fields/canonical"
+  t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+    "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields_dir='$PR_STATE/fields'; . '$MERGE_BLOCK'"
+  t_assert_rc 1 "P1-$1: a fields file with $2 halts the close"
+  t_assert_contains "$T_OUT" "$PR_STATE/fields/canonical" "P1-$1: ...naming the file"
+  t_assert_contains "$T_OUT" "$2" "P1-$1: ...naming the missing piece"
+  t_assert_eq 0 "$( [ -f "$PR_STATE/create_args" ] && echo 1 || echo 0 )" "P1-$1: ...and no PR is opened"
+  t_assert_eq 0 "$(git --git-dir="$PR_ORIGIN" rev-parse --verify -q "refs/heads/$PR_BRANCH" >/dev/null && echo 1 || echo 0)" \
+    "P1-$1: ...and the spine branch never reaches origin"
+}
+_fields_halt heading '## Known limits' '/^## Known limits$/d'
+_fields_halt heading2 '## Closes' '/^## Closes$/d'
+# out of order: Scope and Claim swapped by renaming the headings in place
+_fields_halt order 'template order' 's/^## Claim$/## TMPH/; s/^## Scope$/## Claim/; s/^## TMPH$/## Scope/'
+_fields_halt cond3 'breaks the test suite' '/^3\. breaks the test suite;$/d'
+_fields_halt cond2 'makes the Claim above false' 's/^2\. makes the Claim above false;$/2. makes the Claim false;/'
+# a condition with text appended contains the template line but is not it: whole-line match only
+_fields_halt cond4 'opens a security hole' 's/^\(4\. opens a security hole.*\)$/\1 Not after round 2./'
+_fields_halt raise 'A finding blocks this PR only if it:' 's/^A finding blocks this PR only if it:$/A finding blocks this PR after round 2 only if it:/'
+_fields_halt nodoor 'Door:' '/^Door: /d'
+_fields_halt unfilled 'Door:' 's/^Door: .*/Door: <one-way or two-way> - what a revert would not undo/'
+# adjacent control for the Door check: one-way is as valid as two-way
+_pr_fixture p1-oneway
+mkdir -p "$PR_STATE/fields"
+_valid_fields | sed -e 's/^Door: two-way/Door: one-way/' > "$PR_STATE/fields/canonical"
+t_capture env "GH_STATE=$PR_STATE" "PATH=$GHSTUB:$PR_SHIM:$PATH" bash -c \
+  "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields_dir='$PR_STATE/fields'; . '$MERGE_BLOCK'"
+t_assert_rc 0 "P1-oneway: a one-way Door line passes the fields check"
 
 # P1c. A fields directory with no file for this repo halts before the push: a
 # PR opened without its repo's fields would reach review with no merge bar.
