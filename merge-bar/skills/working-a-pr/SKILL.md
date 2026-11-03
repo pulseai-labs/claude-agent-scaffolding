@@ -33,7 +33,7 @@ is such a bar: §3.5 decides when rounds stop, never the body.
 
 - **The repo:** the one you are in, unless `--repo-root DIR` says otherwise —
   and with `--repo-root`, **every** `git`/`gh` command below runs against that
-  directory (run them from it, or `git -C <dir>` / `gh --repo <owner>/<repo>`):
+  directory (run them from it, or `git -C <dir>` / `gh --repo <owner>/<repo>`; `<owner>/<repo>` is the repository read from that checkout: `gh repo view "$(git -C <dir> remote get-url origin)" --json nameWithOwner -q .nameWithOwner`. Never build the name from a folder name: an AI workspace's folder and its GitHub repo often differ.):
   a bare `gh` in the invoking repo resolves the PR number against the wrong
   repository, and if both repos have that number, even the head verification
   checks the wrong one against itself. Not inside a git repo and no flag → say

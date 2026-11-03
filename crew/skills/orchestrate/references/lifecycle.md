@@ -137,7 +137,7 @@ Every command's syntax comes from the layer's guide.
 6. **Implementer finishes.** Its report file carries the completion body its
    brief defined — the commit SHAs and file count, each test command's pass and
    fail counts with the full output, the PR it opened with
-   its head SHA, and any open ids. Check the PR with one
+   its head SHA, and any open ids. `<owner/repo>` is the repository the call targets, read from its own checkout: `gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner -q .nameWithOwner`. `<repo-root>` is that repository's checkout, not the directory you are in: a PR lives in the canonical even when you run from the AI workspace. Never build the name from a folder name: an AI workspace's folder and its GitHub repo often differ. Check the PR with one
    `gh pr view <number> --repo <owner/repo>` and read CI from
    `commits/<sha>/check-runs` plus the commit statuses when the repo's CI reports
    through the Status API instead of Checks, never the status rollup, both fetched

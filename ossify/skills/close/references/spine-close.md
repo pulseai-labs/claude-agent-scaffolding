@@ -680,6 +680,7 @@ with or without merge-bar, and only once every hosting repo is recorded landed
 one feature can span spines not yet planned, and a spine can land without the
 work item that carried the request, so no spine knows when the request is done.
 For each request, comment
+(`<owner/repo>` is the repository the call targets, read from its own checkout: `gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner -q .nameWithOwner`. `<repo-root>` is that repository's checkout, not the directory you are in: a PR lives in the canonical even when you run from the AI workspace. On an ossify project, `oss repo_root canonical` (or `ai_workspace`) gives it. Never build the name from a folder name: an AI workspace's folder and its GitHub repo often differ.)
 `gh issue comment <n> --repo "<owner/repo>" --body "<spine-id> landed: <PR URLs or merge SHAs>"`.
 Then tell the operator which requests this spine touched, the other spines their
 `pulled in — <spine id>` comments name

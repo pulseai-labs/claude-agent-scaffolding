@@ -370,7 +370,7 @@ the release opened (its `created_at`:
 `oss get ".releases[] | select(.id==\"$rel\") | .created_at"`) with
 `git -C "<repo-root>" for-each-ref --sort=creatordate --format='%(creatordate:iso-strict) %(refname:short)' refs/tags`,
 and, on origin's repository, the merged PRs whose head branch starts `fix/` with
-`gh pr list --repo "<owner/repo>" --state merged --search "merged:>=<release-opened date>" --limit 1000 --json number,title,headRefName,mergedAt,url,closingIssuesReferences`.
+`gh pr list --repo "<owner/repo>" --state merged --search "merged:>=<release-opened date>" --limit 1000 --json number,title,headRefName,mergedAt,url,closingIssuesReferences`. `<owner/repo>` is the repository the call targets, read from its own checkout: `gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner -q .nameWithOwner`. `<repo-root>` is that repository's checkout, not the directory you are in: a PR lives in the canonical even when you run from the AI workspace. On an ossify project, `oss repo_root canonical` (or `ai_workspace`) gives it. Never build the name from a folder name: an AI workspace's folder and its GitHub repo often differ.
 If that returns 1000 rows, raise the limit: a truncated list drops patches. A repo
 with no `origin` (spine close's local arm, or another remote name the patch lane
 refuses) has nothing to fetch from and no PRs to list — skip the fetch and the

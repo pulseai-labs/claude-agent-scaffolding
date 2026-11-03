@@ -77,6 +77,8 @@ filled into its brief by the coordinator, and `ossify-briefs.md` does not restat
 
 ## Planned implementer
 
+`<owner/repo>` is the repository the call targets, read from its own checkout: `gh repo view "$(git -C "<repo-root>" remote get-url origin)" --json nameWithOwner -q .nameWithOwner`. `<repo-root>` is that repository's checkout, not the directory you are in: a PR lives in the canonical even when you run from the AI workspace. Never build the name from a folder name: an AI workspace's folder and its GitHub repo often differ.
+
 ```text
 PROHIBITIONS: every seat-mods denial and narrower task limit wins. Design/spec/release gates, product choices, credential values and Molt handoff remain operator-owned; a worker's implementation plan is the top's to approve, and the merge follows run.merge_word. No delete, branch-delete, force-push, no-verify, AI-trailer or guarded-merge exception is granted.
 

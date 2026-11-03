@@ -2,6 +2,10 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.9.1
+
+**Text only (#755).** `working-a-pr` says where the `gh --repo <owner>/<repo>` name comes from under `--repo-root`: that checkout's own `origin` (`gh repo view`), never a folder name. No code.
+
 ## 0.9.0
 
 `mb`: the PR loop's `gh` mechanics as one tested helper. (#750)

@@ -2,6 +2,10 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.11.1
+
+**Text only (#755).** `lifecycle.md`, `briefs.md` and `ossify-pr-briefs.md` say where a `gh --repo` name comes from: the target repository's own `origin` (`gh repo view`), read from that repository's checkout and never built from a folder name. The dispatcher fills `PR_REPO` the same way. No code.
+
 ## 0.11.0
 
 **`crew-run`, a small writer for the run file (#754).** `bin/crew-run` (bash and jq, `crew-run help`) writes the transitions that fail the linter most: `open` a new attempt (phase `recorded`, its full locator, liveness, an optional `--cause`; the task moves to `working`), `settle` an attempt (`--outcome` and `--tier`; the task moves to match), `send-back` (the review settles `done`, the reviewed attempt `rejected`, a new attempt opens with `cause {sent_back, by, ref, reason}`), and `commit <file>` (the existing loop for a document the seat built). Every verb stamps its times from the clock, appends its events, and ends in dagr's producer loop: a temp file beside the run file, `dagr check --strict`, the rename only when clean. Exit 0 written, 1 linter findings (run file untouched), 2 refused or bad usage. It never decides: outcome, tier, cause and locator are arguments, and free text reaches the file only as a `jq --arg` value.
