@@ -7,7 +7,8 @@ description: Use when asked to run, start, arm or hand off a planned ossify spin
 
 baton runs a planned ossify spine on a systemd timer, so this session keeps its tokens for
 decisions. Check, propose the exact `baton arm` command, and arm it only on the operator's yes.
-**After arming, spend no tokens on the run.** Questions reach the phone through bot-on-openbot.
+**After arming, hand the run to a lean successor** (§4): notices reach the project's orchestrator
+session, and nothing else watches the run.
 
 The commands, the arm example and the runbook are in the baton plugin's `README.md`
 ("Commands", "Example: an ossify spine"). Read them there.
@@ -23,17 +24,11 @@ Stop and report if any check fails. Do not arm around a failure.
   `<state>/runs/*/run.json` (state is `${BATON_STATE_DIR:-~/.local/state/baton}`). A run with
   `status` `armed` or `parked` and `params.repo` equal to this project's canonical root blocks.
   Runs of other projects do not block.
-- **The bridge is up.** `bot-on-openbot status` shows `service: active` and
-  `baton notify: … resolves`; baton's config (`${BATON_CONFIG:-~/.config/baton/config.json}`)
-  has a `notify` argv that runs `bot-on-openbot notify`; and bot-on-openbot is 0.2.0 or later
-  (`installed_plugins.json`). Without all three, questions do not reach the project's agent.
+- **The notifier is set.** baton's config (`${BATON_CONFIG:-~/.config/baton/config.json}`) has
+  `"notify": ["baton", "notify-orchestrator", "{key}", "{message}"]`. Without it a notice reaches
+  only `notify.log`. `fallback_notify` (an argv) is optional and is told to the operator.
 - **baton on `PATH`.** `~/.local/bin/baton` resolves to the installed baton's `bin/baton`: the
   timer runs that link.
-- **The project's agent.** The repo name comes from `git -C <canonical root> remote get-url
-  origin`. The agent is `agents[<repo>]` in `~/.config/bot-on-openbot/config.json` if set, else
-  `<repo>_autopilot`. List OpenBot's agents with that config's `cli` (default
-  `bun /opt/OpenBot/app/resources/cli/openbot-cli.mjs list`). If the agent is missing, questions
-  go to the default agent with a note. Report that. It does not stop.
 - **Orca knows both repos.** The AI workspace and the canonical appear in `orca repo list`.
   Their display names there are the values of the `ai_project` and `project` params.
 - **Who walks the `user:` lines.** `oss get '[.demo_ledger[] | select(.source_spine == "<spine>" and .type == "user")]'`,
@@ -114,23 +109,42 @@ approves a command they have seen. Show it once, short, and still wait.
 Write the seat file only after the yes: the approved seats as the README's JSON, at the
 `--seats` path (`mkdir -p "$HOME/baton-recipes/seats"`). Then run exactly the approved command.
 Confirm `<state>/runs/<run>/run.json` has `status` `armed` and
-`systemctl --user is-active baton.timer` says `active`. Then tell the operator: questions come
-to the project's agent (or the default agent) on the phone, and this session may be closed now.
-End the turn.
+`systemctl --user is-active baton.timer` says `active`. Then hand off (§4) and end the turn.
 
 ## 4. After arming
 
-- **No watching.** No polling, `sleep` loop, Monitor, wakeup, cron, `/loop`, push
-  notification, or a seat told to report back. "Keep an eye on it" is not a status request: run
-  no command. Answer in words that baton already watches the run and the phone gets every
-  question, and offer a status check when they ask for one.
-- **Status on request only.** `baton status <run>` or `baton report <run>`. Read
-  `out/<unit>/` files only when the operator asks about that unit. Do not read seat transcripts.
-- **A park, on request.** Point to the README runbook. The fallbacks are
-  `baton unpark <run> <unit> [--to <stage>]` and `baton disarm <run>`. A mistaken No on a unit
-  park asks again on its own (bot-on-openbot 0.2.1).
-- **The end.** The operator merges the spine PR. baton sees the merge and runs the second spine
-  close itself. Do not start `/ossify:close` beside it.
+- **Hand off.** Write a session handoff and start a lean successor (the top hands off by
+  spawning one). No polling, `sleep` loop, Monitor, cron or `/loop`: a notice is the wake.
+  "Keep an eye on it" is not a status request: run no command.
+- **Register.** Every top of the run, the successor first, runs `baton orchestrator <run>` as its
+  first step, and `baton orchestrator <run> --clear` before it stands down. It refuses outside an
+  Orca terminal. A run with no pointer sends notices to `fallback_notify`, or only to `notify.log`.
+- **Status on request.** `baton status <run>` or `baton report <run>`; read `out/<unit>/` files only
+  for the unit asked about. Never read seat transcripts.
+- **The end.** baton sees the spine PR's merge and runs the second spine close itself.
+  Do not start `/ossify:close` beside it.
+
+## Notices
+
+A line starting `[crew message baton] baton notice <key>` names a notice file: read it and
+`baton status <run>` (the run is the key's first segment), then act on the first row that fits.
+The README runbook has each command. Anything not in the table, or in doubt, is a question to the
+operator.
+
+| Notice | Decide alone | Ask the operator |
+|---|---|---|
+| Lane round barrier | run `/ossify:plan-spine` for the round, then unpark the lane | plan-spine's own questions; any scope change |
+| Implement stall, `before failed` | `baton unpark <run> <wi> --to implement` | raising the dispatch cap (no verb does it: the recipe's `max_launches` or a hook, the operator's); an item that keeps failing |
+| Verify stop | clear what the verifier named, unpark | a stop that names a spec or ADR change |
+| `land` red check | send the item back with the fix; rerun a flaky check once | none |
+| Spine PR round stop | rule it under the project's Round stop order, write the ruling to `operator.md` (the work-PR seat puts it in the PR body) | split the PR or change the design; a finding the order sends to the operator |
+| "passed review … merge it" | check the pass against the rulings; send a finding the order sends to a fix back to `spine_work` | the merge, unless the project's governance grants this session merge authority |
+| PR conflict | merge the base into the spine branch, move `review.md` to `review-prev.md`, unpark `--to spine_review` | a closed PR |
+| `spine_finish` stop on a `user:` line | prepare the walk and evidence | pass or fail |
+| Close harvest | present the candidates | accept |
+
+A notice with no run (`auth`, `down`) is the host's: report it, touch nothing. End each notice
+turn with the status block; `Waiting on` names baton's seat, or the operator.
 
 ## Red flags
 
@@ -138,6 +152,6 @@ End the turn.
 |---|---|
 | "On baton" means `/ossify:run-spine` here | It means `baton arm`. This session must not run the rounds. |
 | "They said just arm it" | Show the command once and wait for a yes. |
-| "One quick check before they leave" | Arming already checked. Run no command until asked. |
+| "One quick check before they leave" | Arming already checked. Run no command until a notice or a question. |
 | "This role has no row; the usual agent will do" | No default seat. Ask, and arm nothing. |
 | "The last run's seat file still fits" | Old runs are not the rule. Resolve the seats from crew's files. |

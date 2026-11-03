@@ -7,7 +7,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { stateDir } from "./state.ts";
 
-export type Config = { notify?: string[]; slots?: Record<string, number> };
+export type Config = { notify?: string[]; fallback_notify?: string[]; slots?: Record<string, number> };
 
 const NOTIFY_TIMEOUT_MS = 30_000;
 
@@ -15,7 +15,7 @@ export function configPath(): string {
   return process.env.BATON_CONFIG || join(homedir(), ".config", "baton", "config.json");
 }
 
-/** The config's `notify` and `slots`; a missing file is `{}`, a malformed one throws. */
+/** The config's `notify`, `fallback_notify` and `slots`; a missing file is `{}`, a malformed one throws. */
 export function readConfig(): Config {
   const path = configPath();
   if (!existsSync(path)) return {};
@@ -29,6 +29,13 @@ export function readConfig(): Config {
     }
     out.notify = n as string[];
   }
+  if (raw.fallback_notify !== undefined) {
+    const n = raw.fallback_notify;
+    if (!Array.isArray(n) || n.length === 0 || !n.every((x) => typeof x === "string")) {
+      throw new Error(`${path}: fallback_notify must be a non-empty argv list`);
+    }
+    out.fallback_notify = n as string[];
+  }
   if (raw.slots !== undefined) {
     const s = raw.slots as Record<string, unknown>;
     if (s === null || typeof s !== "object" || Array.isArray(s)) throw new Error(`${path}: slots must be an object`);
@@ -41,6 +48,11 @@ export function readConfig(): Config {
 }
 
 const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ");
+
+/** An argv with `{key}` and `{message}` rendered; the one rendering `notify` and `fallback_notify` share. */
+export function renderNotifyArgv(argv: string[], key: string, message: string): string[] {
+  return argv.map((a) => a.replace(/\{(message|key)\}/g, (_, n) => (n === "key" ? key : message)));
+}
 
 export async function notifyOnce(key: string, message: string): Promise<void> {
   const dir = stateDir();
@@ -59,7 +71,7 @@ export async function notifyOnce(key: string, message: string): Promise<void> {
   }
   if (!argv) return;
   try {
-    Bun.spawnSync(argv.map((a) => a.replace(/\{(message|key)\}/g, (_, n) => (n === "key" ? k : msg))), {
+    Bun.spawnSync(renderNotifyArgv(argv, k, msg), {
       stdout: "ignore", stderr: "ignore", timeout: NOTIFY_TIMEOUT_MS,
     });
   } catch {

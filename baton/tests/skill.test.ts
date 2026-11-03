@@ -96,6 +96,20 @@ describe("running-a-spine-on-baton", () => {
     expect(s).toContain('"Keep an eye on it" is not a status request');
     expect(s).toContain("Do not start `/ossify:close` beside it.");
   });
+
+  test("notices go to the orchestrator: no OpenBot, no spend-nothing line, a Notices section (#1045)", () => {
+    const s = skill();
+    expect(s).not.toMatch(/openbot|phone/i);
+    expect(s).not.toContain("spend no tokens on the run");
+    expect(s).toContain('"notify": ["baton", "notify-orchestrator", "{key}", "{message}"]');
+    expect(s).toContain("## Notices");
+    expect(s).toContain("`baton orchestrator <run>` as its\n  first step, and `baton orchestrator <run> --clear` before it stands down");
+    expect(s).toContain("[crew message baton] baton notice <key>");
+    // design 5, row 2: no verb raises the dispatch cap
+    expect(s).toContain("raising the dispatch cap (no verb does it");
+    // no default merge authority
+    expect(s).toContain("unless the project's governance grants this session merge authority");
+  });
 });
 
 describe("done-file briefs", () => {

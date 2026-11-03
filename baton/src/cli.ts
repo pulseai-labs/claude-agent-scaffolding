@@ -8,6 +8,7 @@ import { GhForge } from "./forge.ts";
 import { AnswerRefused, HostAuthError, HostDownError, type Host } from "./host.ts";
 import { hostKind, makeHost } from "./hosts/select.ts";
 import { notifyOnce } from "./notify.ts";
+import { notifyOrchestrator, setOrchestrator } from "./hosts/orchestrator.ts";
 import { CONTROL_BYTE, keysFor, parsePicker, textKeys } from "./picker.ts";
 import { isProtoName, own, PROTO_NAME_ERROR, RUN_ID_RE, recipeRoles, validate, type Recipe } from "./recipe.ts";
 import { validateRoleTable } from "./roles.ts";
@@ -26,6 +27,8 @@ const USAGE = [
   "       baton screen <run> <unit>",
   "       baton report <run>",
   "       baton tick [--run <id>]",
+  "       baton orchestrator <run> [--clear]",
+  "       baton notify-orchestrator <key> <message>",
   "       baton timer install|remove",
   "",
 ].join("\n");
@@ -53,6 +56,8 @@ export async function main(argv: string[]): Promise<number> {
     case "report": return reportCmd(rest);
     case "tick": return tickCmd(rest);
     case "timer": return timerCmd(rest);
+    case "orchestrator": return orchestratorCmd(rest);
+    case "notify-orchestrator": return rest.length === 2 ? notifyOrchestrator(rest[0], rest[1]) : usage();
   }
   return usage();
 }
@@ -707,6 +712,24 @@ async function tickCmd(args: string[]): Promise<number> {
     process.stderr.write(`baton tick: ${(e as Error).message}\n`);
     return 1;
   }
+}
+
+// ---- orchestrator -----------------------------------------------------------------------
+
+/** Register this Orca terminal as the run's orchestrator, or `--clear` the registration. */
+function orchestratorCmd(args: string[]): number {
+  const clear = args.includes("--clear");
+  const pos = args.filter((a) => a !== "--clear");
+  if (pos.length !== 1 || args.length - pos.length > 1 || pos[0].startsWith("--")) return usage();
+  const id = pos[0];
+  if (!RUN_ID_RE.test(id) || isProtoName(id)) return fail(`no such run: ${id}`);
+  try {
+    openStore().readRun(id);
+  } catch (e) {
+    return fail(runError(e, id));
+  }
+  const err = setOrchestrator(id, clear);
+  return err === undefined ? 0 : fail(err);
 }
 
 // ---- timer ----------------------------------------------------------------------------

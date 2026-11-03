@@ -190,8 +190,9 @@ Known limits:
 spine on baton. It runs a read-only preflight, shows the exact `baton arm` command for the
 example recipe with where each value came from and the seat table it resolved from crew's
 `.crew/roles.md` and `~/.claude/crew/agents.md` (see Seats), arms it only on the operator's yes, and then
-spends no tokens on the run: questions reach the phone through bot-on-openbot, and status is
-read only when the operator asks. It points here for the commands and the runbook. Claude Code
+hands the run to a lean successor session: baton's notices reach that orchestrator session (see
+`notify-orchestrator`), which rules or asks the operator by the skill's `## Notices` table, and
+status is read on request. It points here for the commands and the runbook. Claude Code
 only: baton has no Codex manifest.
 
 ## Commands
@@ -205,7 +206,23 @@ only: baton has no Codex manifest.
     baton answer <run> <unit> --park <at> --screen <n> <label>
     baton answer <run> <unit> --park <at> --screen-text <text> --question <line>
     baton screen <run> <unit>
+    baton orchestrator <run> [--clear]
+    baton notify-orchestrator <key> <message>
     baton timer install|remove
+
+`orchestrator` writes `<state>/runs/<run>/orchestrator`, `{handle, incarnation}` from
+`$ORCA_TERMINAL_HANDLE` and `$ORCA_RUNTIME_SOURCE_INCARNATION`, so the project's orchestrator
+session registers itself for the run (it refuses when either is unset, or the run does not exist);
+`--clear` removes it, and a session stands down that way first. `notify-orchestrator` is the
+config's `notify` argv, not a command to type: for a run-scoped key (the key's first segment is a
+run on this host) it writes the notice to `<state>/runs/<run>/notices/<key>.md` (mode 600), then
+sends the registered terminal one line, `[crew message baton] baton notice <key>: read <file> and
+follow running-a-spine-on-baton §Notices.`, with `orca terminal send --enter --wait-submit 5`. A
+queued receipt is a success. A host-wide key (`auth/<day>`, `down/<day>`), no pointer, an Orca
+restarted since the pointer was written (`orca status`'s `runtime.runtimeId` differs from the
+stored incarnation), or a failed send runs `fallback_notify` instead; the whole command stays
+inside the 30 s bound and always exits 0. A line sent while the operator is typing in that pane can
+join the operator's text.
 
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
 with rc 2.
@@ -354,10 +371,14 @@ does).
 Config is the optional `${BATON_CONFIG:-$HOME/.config/baton/config.json}`; every key is optional:
 
 - `host`: `"orca"` (the default and only value); `orca.cli` and `orca.launcher` (see Orca host).
-- `notify`: an argv run with no shell for each notice, `{message}` replaced by the notice text
+- `notify`: an argv run with no shell for each notice (the orchestrator's:
+  `["baton", "notify-orchestrator", "{key}", "{message}"]`), `{message}` replaced by the notice text
   and `{key}` by the notice's one-line key (a park's is `<run>/<unit>/park/<at>`), bounded at
   30 s; its failure never fails a tick. Each notice is sent once per key and is always appended
   to `<state>/notify.log`, which is the only sink when `notify` is unset.
+- `fallback_notify`: an optional argv, rendered like `notify`, that `notify-orchestrator` runs when a
+  notice cannot reach the orchestrator (a host-wide key, no pointer, a stale identity, a failed
+  send). It is a plain notifier such as `notify-send`; baton ships no other sink.
 - `slots`: per-slot caps on concurrent sessions across all runs (positive integers), over the
   recipe's `slots`, over the defaults `{"session": 2, "build": 1}`.
 
@@ -372,7 +393,8 @@ park names: a notice leaves the host, so the rendered arguments stay in the even
 
 ```json
 {
-  "notify": ["notify-send", "baton", "{message}"],
+  "notify": ["baton", "notify-orchestrator", "{key}", "{message}"],
+  "fallback_notify": ["notify-send", "baton", "{message}"],
   "slots": { "session": 3 }
 }
 ```
@@ -418,12 +440,15 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   again. The brief writes that wording; baton parses no stop text, and a notifier shows the file.
 - **After a gap stop**, send the item back to its implementer: `baton unpark <run> <wi> --to implement`.
 - **A reversal before the spine merges**: write it to `out/spine-pr/operator.md`, then
-  `baton unpark <run> spine-pr --to spine_work`; that round does it first and then removes the file.
+  `baton unpark <run> spine-pr --to spine_work`; that round does it first, and the round's end archives the file as `out/spine-pr/operator-<n>.md`
+  (the work-PR seat also writes the ruling into the PR body, which the reviewer reads). The previous
+  round's review stays as `out/spine-pr/review-prev.md`, which the next review is told as `previous:`.
 - **A spine PR conflict parks `spine-pr`** in `spine_wait`. Resolve it on the spine branch in the
-  canonical root (merge the base in; never rebase or force-push), push, delete
-  `out/spine-pr/review.md`, then `baton unpark <run> spine-pr --to spine_review`.
+  canonical root (merge the base in; never rebase or force-push), push, move
+  `out/spine-pr/review.md` to `review-prev.md`, then `baton unpark <run> spine-pr --to spine_review`.
 - **The spine PR ack.** On the "passed review … merge it" notice, read the PR's needs-you list, then
-  merge it (the phone's Merge button, or by hand); baton sees the merge and runs the second spine close.
+  merge it as the project's governance grants (otherwise the operator merges); baton sees the merge
+  and runs the second spine close.
 - **`--to spine_work` is refused while `spine-pr` has a live session** (a review is running): wait
   for the review to end, then unpark.
 - **A `land` park** names its reason. `run failed`: the canonical root is not on the spine branch

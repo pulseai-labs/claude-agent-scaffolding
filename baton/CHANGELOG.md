@@ -2,6 +2,29 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.15.0 - 2026-11-03
+
+Notices go to the project's orchestrator session, not the phone (#1045).
+
+- **Added: `baton notify-orchestrator <key> <message>`**, for the config's `notify` argv. The run is
+  the key's first segment when that is a run on this host. It writes the notice to
+  `<state>/runs/<run>/notices/<key>.md` (mode 600) and sends the registered terminal one
+  `[crew message baton]` line that names the file, with `orca terminal send --enter --wait-submit 5`;
+  no seat-written text is in the line. A queued receipt counts as sent. A host-wide key
+  (`auth/<day>`, `down/<day>`), no pointer, an Orca restarted since the pointer was written, or a
+  failed send runs `fallback_notify`. All of it stays inside notify.ts's 30 s bound.
+- **Added: `baton orchestrator <run> [--clear]`**, which writes or removes the run's pointer
+  `<state>/runs/<run>/orchestrator` (`{handle, incarnation}` from `$ORCA_TERMINAL_HANDLE` and
+  `$ORCA_RUNTIME_SOURCE_INCARNATION`; refused when either is unset or the run does not exist).
+- **Added: the config's optional `fallback_notify`**, an argv validated and rendered like `notify`.
+- **Changed: the example recipe keeps what a round learned.** `spine_work`'s outcome copies `review.md`
+  to `review-prev.md` and archives `operator.md` as `operator-<n>.md` before it removes the signal
+  files, and `spine_review` is told `previous: <that file>`; its brief says a missing file is round 1.
+  The work-PR brief has the seat write an operator ruling into the PR body. The `spine_ack` notice no
+  longer names a phone Merge button.
+- **Changed: the skill** has a `## Notices` section (what to do on each notice) and no longer says to
+  spend no tokens after arming or to rely on bot-on-openbot; the README drops OpenBot as the notice path.
+
 ## 0.14.0 - 2026-11-02
 
 A seat's question always reaches the operator: triage is removed (#1023).
