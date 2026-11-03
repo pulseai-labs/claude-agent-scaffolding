@@ -227,7 +227,11 @@ Known limits and Merge danger are the repo's. Write each repo's fields to `<fiel
 named by the repo as `landing_repos` lists it, and set `pr_fields_dir` to that
 directory. The block loads the repo's file into `$pr_fields` per PR, with
 `cat` — never as a quoted literal: the text routinely carries backticks, `$` and
-apostrophes, which a shell assignment would run or break on. Without merge-bar,
+apostrophes, which a shell assignment would run or break on. Right after the load, the
+block halts, before the push, on a file missing a heading, the bar's four
+conditions or a filled `Door:` line, naming the file and the piece. Known limit: a
+stopping rule written in the raising-line slot, after `Everything else is
+non-blocking.`, passes; `working-a-pr` still judges by all four conditions. Without merge-bar,
 leave `pr_fields_dir` unset. The block appends `$pr_fields` after the two
 lines the record pass reads — `spine close …` and `pushed-tip:` — never before
 them: the record pass takes the first `pushed-tip:` line as the lineage guard's
@@ -423,6 +427,33 @@ $repo:$merge_sha"
       if [ -n "${pr_fields_dir:-}" ]; then
         pr_fields="$(cat "$pr_fields_dir/$repo")" \
           || { echo "close: no merge-bar fields file for $repo in $pr_fields_dir - write it or unset pr_fields_dir - halt"; exit 1; }
+        # A seat wrote that file, so the pieces the merge bar depends on are
+        # checked here, before the push (#1056): seven headings in template
+        # order, the four-condition bar whole, a filled Door line. Whole-line
+        # matches only; a miss is a halt naming the file and the piece. The
+        # bar lines are copied from the template (a root parity test keeps
+        # them equal), because the template file is not reachable from here.
+        pr_ff="$pr_fields_dir/$repo"
+        for pr_h in 'Claim' 'Scope' 'Known limits' 'Merge danger' 'Merge bar' 'Evidence' 'Closes'; do
+          grep -Fxq -- "## $pr_h" "$pr_ff" \
+            || { echo "close: $pr_ff lacks the heading '## $pr_h' - fix the fields file - halt"; exit 1; }
+        done
+        [ "$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); i = 1 }
+                  i <= n && $0 == ("## " w[i]) { i++ }
+                  END { print (i > n) ? "ok" : "no" }' "$pr_ff")" = ok ] \
+          || { echo "close: $pr_ff has the seven headings out of template order - fix the fields file - halt"; exit 1; }
+        while IFS= read -r pr_l; do
+          grep -Fxq -- "$pr_l" "$pr_ff" \
+            || { echo "close: $pr_ff lacks the merge-bar line '$pr_l' - copy the template's Merge bar block word for word - halt"; exit 1; }
+        done <<'BAR_EOF'
+A finding blocks this PR only if it:
+1. rejects valid input, or corrupts or loses state, on a path this PR touches;
+2. makes the Claim above false;
+3. breaks the test suite;
+4. opens a security hole — injection, authentication bypass, or an exposed secret.
+BAR_EOF
+        grep -Eq '^Door: (one-way|two-way)' "$pr_ff" \
+          || { echo "close: $pr_ff has no 'Door: one-way' or 'Door: two-way' line - fill the Merge danger field - halt"; exit 1; }
       fi
       git -C "$repo_root" push -u "$remote_name" "$spine_branch" \
         || { echo "close: cannot push '$spine_branch' to '$remote_name' in $repo - halt"; exit 1; }
