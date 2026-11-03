@@ -130,8 +130,8 @@ clean over a gap. Write it to the report file the brief names, or return it.
 ## Limits
 
 - No debugger. Without `run`, no running the program or its tests: a reviewer reads. With
-  `run`, only inside that directory: each axis copies the checkout into its own subdirectory
-  and runs there, with `TMPDIR` and `HOME` set inside it — the PR body's Evidence test
+  `run`, only inside that directory: each axis extracts the checkout's files, never its `.git`
+  (`git archive HEAD | tar -x -C <subdir>`), into its own subdirectory and runs there, with `TMPDIR` and `HOME` set inside it — the PR body's Evidence test
   command or the documented test entry point, a reproduction of a finding, a mutation of the
   copy. A suite that needs a cold build is not run; the `Run:` header line says what ran.
 - A language server or check that builds obeys the host's build rules — reuse the project's
