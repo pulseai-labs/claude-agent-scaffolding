@@ -136,8 +136,9 @@ normal terminus. This one is categorical, not a round count:
 
 - **Rounds stop shrinking *and* the fixes are generating the findings.** When a
   round is mostly fallout from the previous round's own fixes, more rounds will
-  not converge; the shape of the change is wrong. Cut it or narrow it, and say
-  so — do not restructure twice.
+  not converge; the shape of the change is wrong. Cut it, narrow it, or change its
+  design when every fix extends one mechanism on open input — once; do not
+  restructure twice, and say so.
 - **A claim the change cannot honour ends the loop by being unclaimed.**
   Designing under review pressure at round N produces round N+1; a documented
   refusal is complete, an unhonoured promise is not. Unclaiming is two edits,

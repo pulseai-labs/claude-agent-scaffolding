@@ -32,6 +32,8 @@ Sites:
 <path:line> — <the defect at this site> — in scope | outside scope
 Closes: <prior C-id>  |  Still open: <sites>                ← round 2+ only
 New mechanism: yes — <what>                                ← round 2+, when it applies
+Extends: C<n>                                              ← round 2+, when it applies
+Reproduced: <command> — <what it showed>                   ← only when run, with `run` set
 ```
 
 - **Header.** Every line is filled; a fallback says which one and why (`Round: 1 — round 2
@@ -56,3 +58,5 @@ New mechanism: yes — <what>                                ← round 2+, when 
 - **Round 2+.** Each prior class gets `Closes:` or `Still open:`. A class new in the fix diff
   gets the next free `C<n>`. `New mechanism:` marks a fix that adds behaviour rather than
   closing a class — the work-PR session may cut or split it.
+- **Extends, Reproduced.** `working-a-pr`'s round stop reads `Extends:`. A class reasoned, not
+  run, has no `Reproduced:`, and a passing run never refutes a class by itself.

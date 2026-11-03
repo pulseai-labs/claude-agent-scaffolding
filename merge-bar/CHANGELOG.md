@@ -2,6 +2,14 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.10.0
+
+**Prose only (#1047, #1055).**
+
+- `working-a-pr`'s round stop offers a third option, **change the design**, recommended when the reviewer marked `Extends:` on two or more of the stop's blocking classes.
+- `reviewing-a-pr` takes an optional `run: <scratch dir>` input. Without it the reviewer reads, as before. With it, the reviewer may run the PR's test command, reproduce a finding or mutate a copy, only inside that directory, no cold build. The report gains optional `Reproduced:` and, in round 2+, `Extends: C<n>` lines.
+- ossify 1.36.2 aligns its bundled loop's second exit.
+
 ## 0.9.1
 
 **Text only (#755).** `working-a-pr` says where the `gh --repo <owner>/<repo>` name comes from under `--repo-root`: that checkout's own `origin` (`gh repo view`), never a folder name. No code.

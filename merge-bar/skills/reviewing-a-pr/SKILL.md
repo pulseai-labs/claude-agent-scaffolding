@@ -25,6 +25,7 @@ work-PR session posts the report.
 | `verifier` — the verifier's report for this PR | none |
 | `head` — the SHA the checkout must equal | the PR's `headRefOid` |
 | `body` — a file replacing the PR's body | the PR's current body |
+| `run` — a scratch directory the launcher names | none (read only) |
 
 ## 1. Resolve the inputs
 
@@ -57,7 +58,7 @@ A missing input is a fallback the header names, never a refusal to review.
 
 Dispatch both axes at once as fresh-context subagents (Agent tool on Claude Code, `task` on
 OMP). Each gets the **whole** diff under review — never split by file — the resolved inputs,
-steps 3–4, the Limits below, and its own instruction:
+steps 3–4, the Limits below, `run` if set, and its own instruction:
 
 - **Standards:** does the diff meet the standards file and the baseline?
 - **Claim/Spec:** is every Claim sentence true of the diff? With no verifier report, also: does
@@ -109,6 +110,9 @@ The diff under review is `<previous report's Head>..HEAD` — the fix diff. Then
 - **New mechanism.** A fix that adds behaviour rather than closing a class — a retry, a
   fallback, a new flag — is marked `New mechanism: yes — <what>`, so the work-PR session can
   cut it or split it out.
+- **Extends.** A new class that is another case of the same mechanism as a class in the
+  previous report (another spelling the parser misses, another input the matcher admits)
+  carries `Extends: C<n>`.
 - **Nothing else.** Every site of every class in the report is a line of the fix diff or a
   site of a prior class. A gap the fix leaves — new behaviour with no test — is pinned to the
   fix-diff lines that lack it, never to an untouched file; a point about code the fix diff did
@@ -125,7 +129,11 @@ clean over a gap. Write it to the report file the brief names, or return it.
 
 ## Limits
 
-- No debugger, and no running the program or its tests: a reviewer reads.
+- No debugger. Without `run`, no running the program or its tests: a reviewer reads. With
+  `run`, only inside that directory, one subdirectory per axis: the PR body's Evidence test
+  command or the documented test entry point, a reproduction of a finding, a mutation of a
+  copy. A suite that needs a cold build is not run, and the header says so. Nothing is
+  written outside it.
 - A language server or check that builds obeys the host's build rules — reuse the project's
   existing build output, never start a cold build of your own.
 - Never post, commit, edit, push or check out. The only file written is the report; an axis
