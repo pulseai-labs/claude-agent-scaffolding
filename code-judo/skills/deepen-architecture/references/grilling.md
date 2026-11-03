@@ -75,7 +75,8 @@ only how it renders on this surface is:
   next batch. Nothing this run produced can clear that bar; a question the card alone answers
   is `UNGROUNDED` and gets asked. **TOP SEVERITY on this surface is anything that moves
   the seam** — what sits behind it, or what the deepened interface promises. Those are always
-  asked, never auto-applied.
+  asked, never auto-applied. A defer with no recorded destination does not clear triage here
+  either: it is asked.
 - **Opt-outs.** `--neutral` (or *"no recommendations"*) drops the leans and asks cold. `--walk`
   keeps the leans but asks every question, disabling triage.
 
@@ -107,8 +108,14 @@ lookup in flight blocks only the questions downstream of it, not the whole batch
 
 **Done is when the agenda is settled**, not when you run out of questions. All five items —
 constraints, dependencies, module shape, what sits behind the seam, surviving tests — have
-answers that are either **given by the user** or **auto-applied under triage**, which is the
-standing delegation the policy defines: those are settled, not outstanding, and waiting for a
-user answer to a question triage decided not to ask would stall the grill forever. Then say
-what you understood — including the auto-applied answers, so the delegation is visible and can
-be reopened — and wait for them to confirm it before anything gets built.
+answers that are **given by the user**, **auto-applied under triage** (the standing delegation
+the policy defines; waiting for an answer triage chose not to ask would stall the grill
+forever), or **deferred with a destination**. A defer settles an item only when the user names
+where it is tracked: an issue, or a file and the line that records it (the policy's deferred
+list). Ask once, and offer draft issue text; filing is the user's act, and you take their word
+for the destination. Then say what you understood — including the auto-applied answers, so the
+delegation is visible and can be reopened — and wait for them to confirm it before anything
+gets built.
+
+**A defer with no destination still ends the grill.** Say **"not ready to build"**, list each
+untracked defer, and stop; nothing gets built from it.
