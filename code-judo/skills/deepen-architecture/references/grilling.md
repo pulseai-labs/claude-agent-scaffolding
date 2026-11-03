@@ -47,7 +47,8 @@ not tell the user to install anything.
 **Cadence differs between resolvers, and that is fine.** `ossify:challenge` and
 `ai-mentor:grill-me` ask one question at a time. The protocol below asks a whole round at a
 time. What must not differ is the agenda: whichever resolver fires, all five items above get
-settled before you stop, or the grill ends "not ready to build" on an untracked defer (below).
+settled before you stop. The "not ready to build" ending on an untracked defer (below) is the
+in-plugin protocol's own rule; the other two end by their own.
 
 ## Recommendation policy
 
@@ -75,8 +76,10 @@ only how it renders on this surface is:
   next batch. Nothing this run produced can clear that bar; a question the card alone answers
   is `UNGROUNDED` and gets asked. **TOP SEVERITY on this surface is anything that moves
   the seam** — what sits behind it, or what the deepened interface promises. Those are always
-  asked, never auto-applied. A defer with no recorded destination does not clear triage here
-  either: it is asked.
+  asked, never auto-applied. Triage skips only questions you decided not to ask, so no
+  user defer exists at that point: a destinationless `defer` there is your own lean. The skill
+  files nothing, so that lean is always asked, and the policy's `<accept|defer>` digest never
+  carries `defer` on this surface.
 - **Opt-outs.** `--neutral` (or *"no recommendations"*) drops the leans and asks cold. `--walk`
   keeps the leans but asks every question, disabling triage.
 
@@ -119,4 +122,6 @@ gets built.
 
 **A defer with no destination still ends the grill.** Keep asking the other items; once they are
 settled, say **"not ready to build"**, list each untracked defer, and stop — nothing gets built.
-Say what unblocks it: a destination for the defer, or an answer in its place, on a re-run.
+Say what unblocks it: a destination for the defer, or an answer in its place, as a reply in
+this conversation: the settled items stand and only the untracked defers reopen. A fresh run
+keeps nothing, since the skill stores no state; it starts again from the scan.
