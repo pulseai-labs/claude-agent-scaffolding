@@ -174,6 +174,16 @@ csa_report_render_chat() {
 
   printf '\n'
 
+  # HOOK-006 is Info, so the table hides it; say that hooks went unchecked (#1059).
+  if [[ "$verbose" != "true" && -n "$findings_jsonl" ]]; then
+    local n_unchecked
+    n_unchecked="$(printf '%s\n' "$findings_jsonl" | jq -s '[.[] | select(.rule_id == "HOOK-006" and (.state // "NEW") != "SUPPRESSED")] | length' 2>/dev/null || echo 0)"
+    if [[ "${n_unchecked:-0}" -gt 0 ]]; then
+      printf '%d %s hooks the audit does not inspect (HOOK-006, Info; pass --verbose).\n\n' "$n_unchecked" \
+        "$([[ "$n_unchecked" -eq 1 ]] && printf 'file declares' || printf 'files declare')"
+    fi
+  fi
+
   # List critical + high findings explicitly (non-suppressed only, unless verbose).
   local show_severities="critical high"
   if [[ "$verbose" == "true" ]]; then

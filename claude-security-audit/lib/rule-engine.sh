@@ -121,13 +121,16 @@ _csa_rule_run_text() {
 }
 
 _csa_rule_text_once() {
-  local rule_file="$1" target="$2" entry="$3" out ec=0
+  local rule_file="$1" target="$2" entry="$3" out jp ec=0
   out="$(detect_text "$entry" "$target" 2>/dev/null)" || ec=$?
   if [[ "$ec" -eq 1 && -z "$out" ]]; then
     return 0
   elif [[ "$ec" -ne 0 ]]; then
-    jq -nc --arg rid "SCANNER-002" --arg f "$target" --arg r "$rule_file" \
-      '{rule_id: $rid, file: $f, line: 0, offset: 0, preview: "detect_text() failed", severity: "high", context: {failed_rule: $r, exit_code: '"$ec"'}}'
+    # context.json_path names the entry when the call was for one (a file-scope
+    # call has several), so the coverage line can stop counting it as checked.
+    jp="$(printf '%s\n' "$entry" | jq -rs 'if length == 1 then (.[0].json_path? // "") else "" end' 2>/dev/null)" || jp=""
+    jq -nc --arg rid "SCANNER-002" --arg f "$target" --arg r "$rule_file" --arg jp "$jp" \
+      '{rule_id: $rid, file: $f, line: 0, offset: 0, preview: "detect_text() failed", severity: "high", context: ({failed_rule: $r, exit_code: '"$ec"'} + (if $jp == "" then {} else {json_path: $jp} end))}'
   elif [[ -n "$out" ]]; then
     printf '%s\n' "$out"
   fi
@@ -298,11 +301,12 @@ _csa_enum_stderr_to_findings() {
 
 # _csa_hook_coverage_line <cache_dir> <findings_file>
 # Prints `csa: hook-coverage checked=N flagged=N not-inspected=N unreadable=N` on stderr.
-# checked: command entries read and matched against the HOOK patterns; flagged:
-# those of them with at least one finding; not-inspected: entries
-# of another type; unreadable: entries (or files) that could not be read. A
-# clean count cannot come from the findings, so it travels as this line and the
-# skill hands it to the report header.
+# checked: command entries read and matched against the HOOK patterns by every
+# rule; flagged: those of them with at least one finding; not-inspected: entries
+# of another type; unreadable: entries (or files) that could not be read, plus
+# command entries whose match failed in a rule (SCANNER-002 naming the entry's
+# json_path), which are not checked. A clean count cannot come from the
+# findings, so it travels as this line and the skill hands it to the report header.
 _csa_hook_coverage_line() {
   local cache="$1" findings="$2" all t target c
   all="$(mktemp "${TMPDIR:-/tmp}/csa-hook-cov.XXXXXX")"
@@ -313,13 +317,16 @@ _csa_hook_coverage_line() {
     jq -c --arg f "$target" '. + {file: $f}' "$c" >> "$all" 2>/dev/null
   done
   if ! jq -nr --slurpfile e "$all" --slurpfile f "$findings" '
-      ([$f[] | objects | select((.context | objects | .json_path? // null) != null)
-        | (.file + "\u001f" + .context.json_path)] | map({key: ., value: true}) | from_entries) as $flagged
+      def key: .file + "\u001f" + .context.json_path;
+      def named: objects | select((.context | objects | .json_path? // null) != null);
+      ([$f[] | named | select(.rule_id == "SCANNER-002") | key] | map({key: ., value: true}) | from_entries) as $failed
+      | ([$f[] | named | select(.rule_id != "SCANNER-002") | key] | map({key: ., value: true}) | from_entries) as $flagged
       | [$e[] | select(.type == "command" and has("text"))] as $cmd
-      | "csa: hook-coverage checked=\($cmd | length)"
-        + " flagged=\([$cmd[] | select($flagged[.file + "\u001f" + .json_path])] | length)"
+      | [$cmd[] | select($failed[.file + "\u001f" + .json_path] | not)] as $ok
+      | "csa: hook-coverage checked=\($ok | length)"
+        + " flagged=\([$ok[] | select($flagged[.file + "\u001f" + .json_path])] | length)"
         + " not-inspected=\([$e[] | select(has("inconclusive") | not) | select(.type != "command")] | length)"
-        + " unreadable=\([$e[] | select(has("inconclusive"))] | length)"' >&2 2>/dev/null; then
+        + " unreadable=\([$e[] | select(has("inconclusive"))] | length + ($cmd | length) - ($ok | length))"' >&2 2>/dev/null; then
     printf 'csa: hook-coverage unavailable\n' >&2
   fi
   rm -f "$all"
@@ -331,6 +338,10 @@ _csa_hook_coverage_line() {
 # Emits SCANNER-002 banner on stderr if 3+ SCANNER-002 findings emerge.
 csa_rule_engine_scan_all() {
   local root="$1"; local focus="${2:-all}"
+  # Trailing slashes off: targets are enumerated as "$root/.claude/...", and
+  # _csa_hook_target_mode compares them to that exact path (#1059 C2). Holds for any root
+  # other than "/"; for "/" itself the settings hooks are still skipped, as before 0.3.1.
+  while [[ "$root" == ?*/ ]]; do root="${root%/}"; done
   if ! _csa_rule_engine_validate_focus "$focus"; then
     return 2
   fi

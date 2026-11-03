@@ -1,5 +1,19 @@
 # claude-security-audit changelog
 
+## 0.3.1 (2026-11-03)
+
+Follow-ups to 0.3.0 (#1059). No new rule; one reading of the coverage line changes.
+
+### Fixed
+- **A trailing slash on the project root no longer skips settings hooks.** `csa rule_engine_scan_all "<p>/"` enumerated `<p>//.claude/settings.json`, which the exact-path test never matched, so the project's settings hooks were not read and nothing said so. The engine now strips trailing slashes from the root once. This holds for any root other than `/`; for `/` itself the settings hooks are still skipped, as before 0.3.1.
+- **A failing `detect_text` is no longer counted as checked.** Its SCANNER-002 now names the entry's `json_path`, and the coverage line counts that entry under `unreadable`, not `checked`.
+- **HOOK-006 prints `file#hooks`, not `file:0:0`,** and the chat summary, which hides Info, adds one line (`N file(s) declare hooks the audit does not inspect (HOOK-006, Info; pass --verbose)`) so an unchecked `http` or `prompt` hook is no longer invisible in chat.
+- **HOOK-006's `finding_uid` hashes the per-type counts first,** as HOOK-005 does, so a long type name no longer hides a later change to the counts.
+- **Wording:** the `finding_uid` is 32 bits, so two different hook commands share an id only by a 32-bit collision; 0.3.0's "never share an id" is corrected.
+
+### Tests
+- A real `\u` escape in the decoding tests, a `detect` versus `detect_text` verdict comparison on one command, a test that the json path is part of the entry digest, and a `_scan_checked` helper (the scan's status is captured before any pipe) used by the tests that read the scan for a positive result and by the `&` and nested-settings controls, with a test that makes its failed-scan and malformed-output arms run. The roughly 25 older "0 findings" assertions still read the scan through a pipe and do not fail on a failed scan.
+
 ## 0.3.0 (2026-11-03)
 
 **Hook commands declared in JSON are now audited (#427).** Before, a `curl ... | bash` in `.claude/settings.json`, or in an enabled plugin's `hooks/hooks.json`, gave zero findings: the hook rules read only scripts. Expect new findings, on first-party plugins too, the first time you audit after upgrading.
@@ -9,7 +23,7 @@ Skill-first question 3 (`docs/conventions/skill-first.md`): reading hook entries
 ### Added
 - **`csa_hook_entries <file> <wrapped|plugin-manifest>`** (`lib/hook-entries.sh`) walks `.hooks.<Event>[i].hooks[j]` with `jq` and emits one JSON line per entry. `command` entries are decoded (JSON escapes; exec-form `args` joined into the checked text); other types are counted; each unreadable piece is an inconclusive line with its `json_path`. A `plugin.json` `hooks` field may be an inline event map, a path inside the plugin root (physical containment check; `./hooks/hooks.json` is a target already and is skipped) or an array of both.
 - **Exact targets only:** the project's `.claude/settings.json` and `.claude/settings.local.json`, and a plugin's `hooks/hooks.json` and `.claude-plugin/plugin.json`. Never a nested `.claude/**/settings.json`, a plugin's `fixtures/` or `tests/` copy, or a plugin's root `settings.json`.
-- **HOOK-001 to HOOK-004 read decoded commands** through a new `detect_text` entry point (one pattern per rule, shared with the file `detect`; HOOK-004 shares its two regexes). A match is a finding at line 0 with `context.json_path`; the `finding_uid` is built from 24 hex characters of the sha256 of the path and the full decoded command, short enough to pass `csa_redact` whole, so two different commands never share an id however long the command or path, and reformatting the file changes nothing.
+- **HOOK-001 to HOOK-004 read decoded commands** through a new `detect_text` entry point (one pattern per rule, shared with the file `detect`; HOOK-004 shares its two regexes). A match is a finding at line 0 with `context.json_path`; the `finding_uid` is built from 24 hex characters of the sha256 of the path and the full decoded command, short enough to pass `csa_redact` whole, so path and command length never hide a difference (the id itself is 32 bits, so two different commands share one only by a 32-bit collision), and reformatting the file changes nothing.
 - **HOOK-005 `hook-entry-unreadable`** (High): a malformed file or a hook entry of the wrong shape is a finding, so a hook that went unread never reads as a clean audit.
 - **HOOK-006 `hook-type-not-inspected`** (Info): one finding per file with per-type counts for `http`, `prompt`, `agent`, `mcp_tool` and later hook types.
 - **A coverage line.** The engine prints `csa: hook-coverage checked=N flagged=N not-inspected=N unreadable=N` on stderr, the skill passes it to the report as `scope_summary`, and the report header prints it. `checked` counts every command entry matched against the HOOK patterns, and `flagged` those of them with a finding.
