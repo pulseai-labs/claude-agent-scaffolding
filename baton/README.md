@@ -439,7 +439,12 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   (plan-spine for the spine), then `baton unpark <run> lane`. An unpark before the specs exist stops
   again. The brief writes that wording; baton parses no stop text, and a notifier shows the file.
 - **After a gap stop**, send the item back to its implementer: `baton unpark <run> <wi> --to implement`.
-- **A reversal before the spine merges**: write it to `out/spine-pr/operator.md`, then
+- **A ruling for a close, spine-open or spine-finish stop**: write it to (or append it to, when the
+  file is already there: a seat that stops again leaves it unarchived) `out/<unit>/operator.md`
+  (`<unit>` is the work item for a close, `lane` for spine-open, `spine-pr` for spine-finish), then
+  `baton unpark <run> <unit>`; the stage's end archives it as `operator-<n>.md`.
+- **A reversal before the spine merges**: write it to `out/spine-pr/operator.md` (the same file and
+  archive; append if one is there), then
   `baton unpark <run> spine-pr --to spine_work`; that round does it first, and the round's end archives the file as `out/spine-pr/operator-<n>.md`
   (the work-PR seat also writes the ruling into the PR body, which the reviewer reads). The previous
   round's review stays as `out/spine-pr/review-prev.md`, which the next review is told as `previous:`.

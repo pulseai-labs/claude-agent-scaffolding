@@ -2,6 +2,18 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.16.0 - 2026-11-04
+
+An orchestrator ruling reaches the close, spine-open and spine-finish stops (#1057).
+
+- **Changed: the example recipe.** The `close`, `spine_open` and `spine_finish` messages name
+  `Ruling file: <run>/out/<unit>/operator.md` (`out/lane/` for spine-open, `out/spine-pr/` for
+  spine-finish), and each outcome archives it as `operator-<n>.md` with the hook `spine_work` uses.
+  `spine_work`'s `Operator file:` label is now `Ruling file:` (same path). No engine change.
+- **Changed: the briefs.** `common.md` tells a seat to read a named Ruling file first, apply it, and
+  record it as the operator's; `spine-work.md` step 1 says Ruling file.
+- **Changed: the runbook and skill** say how to rule a close, spine-open or spine-finish stop.
+
 ## 0.15.0 - 2026-11-03
 
 Notices go to the project's orchestrator session, not the phone (#1045).
