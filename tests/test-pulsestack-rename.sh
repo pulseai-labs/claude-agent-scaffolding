@@ -17,6 +17,8 @@
 #   omp/**/*.test.ts         — the OMP tests build install records under the old marketplace to
 #                              prove both names resolve for one release.
 #   lines naming LEGACY_MARKETPLACE — the one constant that keeps the old name on purpose.
+#   lines marked "pre-rename" — prose that picks an install record names the old key as the
+#                              one-release fallback, the same window as LEGACY_MARKETPLACE.
 #   merge-bar/tests/test-mb.sh — asserts on text read from the recorded fixtures above.
 #   README.md migration lines ("Renamed from", "marketplace remove") — a move names both ends.
 #   paths under .claude/<old>/ — plugin-internal state paths keep their names this release (spec:
@@ -52,7 +54,7 @@ survivor() {
     omp/*.test.ts|omp/*/*.test.ts) return 0 ;;
     merge-bar/tests/test-mb.sh) return 0 ;;
   esac
-  case "$text" in *LEGACY_MARKETPLACE*) return 0 ;; esac
+  case "$text" in *LEGACY_MARKETPLACE*|*pre-rename*) return 0 ;; esac
   if [ "$file" = README.md ]; then
     case "$text" in *"Renamed from"*|*"marketplace remove"*) return 0 ;; esac
   fi
@@ -139,6 +141,11 @@ control namespace     "namespace: ossify/README.md" "printf 'Run /%s:deep-review
 control path-ref      "namespace: ossify/README.md" "printf 'See %s/README.md.\n' $O1 >> ossify/README.md"
 control old-key       "old-name: ossify/README.md" "printf 'Install ossify@%s.\n' $OLD_MKT >> ossify/README.md"
 control old-url       "old-name: ossify/README.md" "printf 'https://github.com/pulseai-labs/%s\n' $OLD_MKT >> ossify/README.md"
+# Adjacent control: a pre-rename fallback line is a survivor; the old-key control above, the same
+# key on an unmarked line, still turns red.
+d="$WORK/pre-rename"; make_fixture "$d"; (cd "$d" && printf 'Read ossify@pulsestack (pre-rename: ossify@%s).\n' "$OLD_MKT" >> ossify/README.md && git add -A)
+if findings "$d" | grep -Fq "ossify/README.md"; then fail "control pre-rename: a marked fallback line must not be a finding"
+else pass "control pre-rename stays green"; fi
 # Adjacent control: a survivor still passes, so the sweep is not just matching everything.
 d="$WORK/survivor"; make_fixture "$d"; (cd "$d" && printf 'Install ossify@%s.\n' "$OLD_MKT" >> ossify/CHANGELOG.md && git add -A)
 if findings "$d" | grep -Fq "ossify/CHANGELOG.md"; then fail "control survivor: CHANGELOG history must not be a finding"

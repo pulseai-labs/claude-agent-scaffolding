@@ -2,6 +2,12 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.17.2 - 2026-11-04
+
+The marketplace is renamed `pulsestack`. The arm skill reads plugin roots from the
+`ossify@pulsestack` and `baton@pulsestack` install records, and on a host that has not moved yet
+from the pre-rename keys. Prose only.
+
 ## 0.17.1 - 2026-11-04
 
 - **Fixed: the example recipe's moved-head loop (#1079 C2).** A review that passed with a `head:` line that
