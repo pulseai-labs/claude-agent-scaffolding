@@ -130,3 +130,25 @@ describe("done-file briefs", () => {
     expect(lastStep("prose only")).toBe("");
   });
 });
+
+// #1075 C2: a ruling file holds one ruling. Appending handed a relaunched seat the old ruling first,
+// and an unpark --to runs no outcome hook, so a left file reached the next close or spine-open seat.
+describe("a ruling file holds one ruling (#1075)", () => {
+  const readme = () => readFileSync(join(import.meta.dir, "..", "README.md"), "utf8").replace(/\s+/g, " ");
+  test("the runbook says replace, never append, and to move the file aside before an unpark --to", () => {
+    const r = readme();
+    expect(r).toContain("replacing any file already there: the file holds one ruling");
+    expect(r).toContain("a stage that names no Ruling file (`implement`, `regap`, `verify`, `correct`, `spine_review`), move any `operator.md` aside as the next free `operator-<n>.md`: `--to` runs no outcome hook");
+    expect(r).toContain("An implement, regap, verify or correct stop takes its ruling in the handoff's `## Clarifications`");
+    expect(r).toContain("replace any file there");
+    expect(r).not.toMatch(/append (it )?(to|if one)/);
+    expect("append it to, when").toMatch(/append (it )?(to|if one)/); // control: the probe matches the 0.16.0 wording
+  });
+  test("every skill row that writes operator.md says replace, and the close row says move it aside", () => {
+    const rows = skill().split("\n").filter((l) => l.startsWith("|") && l.includes("operator.md"));
+    expect(rows.length).toBe(3);
+    for (const row of rows) expect(row).toContain("replacing any");
+    const close = rows.find((l) => l.startsWith("| Close or spine-open stop |")) ?? "";
+    expect(close).toContain("move it aside before an unpark `--to` a stage that names no Ruling file");
+  });
+});

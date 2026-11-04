@@ -439,12 +439,18 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   (plan-spine for the spine), then `baton unpark <run> lane`. An unpark before the specs exist stops
   again. The brief writes that wording; baton parses no stop text, and a notifier shows the file.
 - **After a gap stop**, send the item back to its implementer: `baton unpark <run> <wi> --to implement`.
-- **A ruling for a close, spine-open or spine-finish stop**: write it to (or append it to, when the
-  file is already there: a seat that stops again leaves it unarchived) `out/<unit>/operator.md`
-  (`<unit>` is the work item for a close, `lane` for spine-open, `spine-pr` for spine-finish), then
-  `baton unpark <run> <unit>`; the stage's end archives it as `operator-<n>.md`.
+- **A ruling for a close, spine-open or spine-finish stop**: write the whole current ruling to
+  `out/<unit>/operator.md` (`<unit>` is the work item for a close, `lane` for spine-open, `spine-pr`
+  for spine-finish), replacing any file already there: the file holds one ruling, and a seat records
+  a ruling when it applies it. Then `baton unpark <run> <unit>`; the stage's end archives it as
+  `operator-<n>.md`. Before `baton unpark <run> <unit> --to` a stage that names no Ruling file
+  (`implement`, `regap`, `verify`, `correct`, `spine_review`), move any `operator.md` aside as the
+  next free `operator-<n>.md`: `--to` runs no outcome hook, and the next seat that reads the file
+  (close, spine-open, `spine_work` or spine-finish) would apply it. An implement, regap, verify or
+  correct stop takes its ruling in the handoff's `## Clarifications`; a lane round barrier is ruled
+  by planning the round.
 - **A reversal before the spine merges**: write it to `out/spine-pr/operator.md` (the same file and
-  archive; append if one is there), then
+  archive; replace any file there), then
   `baton unpark <run> spine-pr --to spine_work`; that round does it first, and the round's end archives the file as `out/spine-pr/operator-<n>.md`
   (the work-PR seat also writes the ruling into the PR body, which the reviewer reads). The previous
   round's review stays as `out/spine-pr/review-prev.md`, which the next review is told as `previous:`.
