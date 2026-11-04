@@ -213,4 +213,4 @@ change under test.
 
 `docs/conventions/` and `docs/assets/readme/` (the root README's pictures) are the only `docs/`
 content tracked here, because they are shipped convention and README images rather than process
-exhaust. Delivery differs per file; each file's header states its own.
+exhaust. Delivery differs per convention file; each one's header states its own.
