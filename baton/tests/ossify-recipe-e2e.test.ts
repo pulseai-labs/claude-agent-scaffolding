@@ -626,13 +626,59 @@ test("a head that moves after a passing review goes back to item_review and merg
   expect(pushed).toBe(true);
   expect(moves(W1)).toEqual([
     "implement>verify", "verify>close", "close>item_ready", "item_ready>item_review", "item_review>item_wait", "item_wait>land",
-    "land>item_review", "item_review>item_wait", "item_wait>land", "land>done",
+    "land>item_moved", "item_moved>item_review", "item_review>item_wait", "item_wait>land", "land>done",
   ]);
   expect(r.forge.merges).toEqual([{ url: prUrl(W1), head: HEAD1 }]); // never HEAD0
   expect(events().filter((e) => e.kind === "head moved")).toHaveLength(1);
   expect(host.of(W1, "item_review")).toHaveLength(2);
   expect(readFileSync(out(W1, "review-1.md"), "utf8")).toBe(reviewOf("pass", HEAD0));
   expect(unit(W1).parked).toBeUndefined();
+});
+
+const WRONG = "9".repeat(40);
+
+test("a passing review whose head never matches parks in item_moved after three reviews and never merges (#1079 C2)", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => put(out(u, "review.md"), reviewOf("pass", WRONG)) });
+  const r = rig(host);
+  await drive(r, 80, () => unit(W1)?.parked !== undefined);
+
+  expect(unit(W1).parked?.reason).toBe("outcome");
+  expect(unit(W1).stage).toBe("item_moved");
+  expect(host.of(W1, "item_review")).toHaveLength(3);
+  expect(existsSync(out(W1, "review-1.md")) && existsSync(out(W1, "review-2.md")) && existsSync(out(W1, "review.md"))).toBe(true);
+  expect(existsSync(out(W1, "review-3.md"))).toBe(false);
+  expect(moves(W1).filter((m) => m === "land>item_moved")).toHaveLength(3);
+  expect(r.forge.merges).toEqual([]);
+  expect(item(W1).status).toBe("active");
+});
+
+test("one moved head is legitimate: the second review matches and merges after two reviews, the cap does not fire early", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u, n) => put(out(u, "review.md"), reviewOf("pass", n === 1 ? WRONG : HEAD0)) });
+  const r = rig(host);
+  await drive(r, 60, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined);
+
+  expect(unit(W1).parked).toBeUndefined();
+  expect(host.of(W1, "item_review")).toHaveLength(2);
+  expect(moves(W1)).toContain("land>item_moved");
+  expect(moves(W1)).toContain("item_moved>item_review");
+  expect(r.forge.merges).toEqual([{ url: prUrl(W1), head: HEAD0 }]);
+});
+
+test("after the item_moved park, --to item_review runs one more review, and the next moved head parks at once", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => put(out(u, "review.md"), reviewOf("pass", WRONG)) });
+  const r = rig(host);
+  await drive(r, 80, () => unit(W1)?.parked !== undefined);
+  expect(host.of(W1, "item_review")).toHaveLength(3);
+
+  expect(await main(["unpark", "r1", W1, "--to", "item_review"])).toBe(0);
+  await drive(r, 40, () => unit(W1)?.parked !== undefined && host.of(W1, "item_review").length === 4);
+  expect(host.of(W1, "item_review")).toHaveLength(4);
+  expect(unit(W1).stage).toBe("item_moved");
+  expect(existsSync(out(W1, "review-3.md"))).toBe(true);
+  expect(r.forge.merges).toEqual([]);
 });
 
 test("review 3 blocking is a stop; --to land accepts the findings on the reviewed head, --to item_fix takes a ruling", async () => {
@@ -662,9 +708,12 @@ test("review 3 blocking is a stop; --to land accepts the findings on the reviewe
   // the accept route: land merges the head of the last review, and a head that moved since goes to review instead
   setHead(r, W1, HEAD2);
   expect(await main(["unpark", "r1", W1, "--to", "land"])).toBe(0);
-  await drive(r, 3, () => unit(W1)?.stage === "item_review" || r.forge.merges.length > 0);
+  await drive(r, 3, () => unit(W1)?.stage === "item_moved" || r.forge.merges.length > 0);
   expect(r.forge.merges).toEqual([]);
-  expect(moves(W1).at(-1)).toBe("land>item_review");
+  // review-2.md exists, so item_moved parks at once instead of sending the item to a fifth review
+  await drive(r, 3, () => unit(W1)?.parked !== undefined);
+  expect(unit(W1).stage).toBe("item_moved");
+  expect(moves(W1).at(-1)).toBe("land>item_moved");
 });
 
 test("review 3 blocking: --to land merges the reviewed head when it has not moved", async () => {
