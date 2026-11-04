@@ -167,7 +167,7 @@ control font        "svg-font: docs/assets/readme/zz.svg: 9" "printf '%s' '<svg>
 control size        "svg-size: docs/assets/readme/zz.svg" "head -c 51201 /dev/zero | tr '\\\\0' ' ' > docs/assets/readme/zz.svg"
 control summary     "summary-blank: line"                "printf '<details><summary>x</summary>\nraw\n</details>\n' >> README.md"
 control link        "link: ./no-such-dir/"               "printf 'See [x](./no-such-dir/).\n' >> README.md"
-control swap        "asset-theme: docs/assets/readme/ossify-skeleton-dark.svg" "sed -i 's/ossify-skeleton-dark.svg/TMPX/; s/ossify-skeleton-light.svg/ossify-skeleton-dark.svg/; s/TMPX/ossify-skeleton-light.svg/' README.md"
+control swap        "asset-theme: docs/assets/readme/ossify-skeleton-dark.svg" "sed 's/ossify-skeleton-dark.svg/TMPX/; s/ossify-skeleton-light.svg/ossify-skeleton-dark.svg/; s/TMPX/ossify-skeleton-light.svg/' README.md > t && mv t README.md"
 control order       "heading-order:"                     "awk '{ if (\$0 == \"## Install\") print \"## All plugins\"; else if (\$0 == \"## All plugins\") print \"## Install\"; else print }' README.md > t && mv t README.md"
 # Adjacent control: the copied tree itself is clean, so the gate is not just matching everything.
 d="$WORK/clean"; make_fixture "$d"
