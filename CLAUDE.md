@@ -211,5 +211,6 @@ an agent per fixture, then a judge against `rubrics/<surface>.md`, writing
 it. Treat a green aggregate as valid only when the results files were regenerated after the
 change under test.
 
-`docs/conventions/` is the only `docs/` content tracked here, because it is shipped convention
-rather than process exhaust. Delivery differs per file; each file's header states its own.
+`docs/conventions/` and `docs/assets/readme/` (the root README's pictures) are the only `docs/`
+content tracked here, because they are shipped convention and README images rather than process
+exhaust. Delivery differs per file; each file's header states its own.
