@@ -2,7 +2,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { semver } from 'bun'
 import { join } from 'node:path'
-import { installPaths } from './bin-path'
+import { installPaths, MARKETPLACE } from './bin-path'
 
 export const MODS = ['seat-mods', 'molt'] as const
 // Minimum supported versions: seat-mods must map seat-reviewer to the reviewer profile;
@@ -102,7 +102,7 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
   if (Object.hasOwn(ROLE_SKILL, o.role)) {
     const { plugin, min } = ROLE_SKILL[o.role]
     const root = omp.get(plugin)
-    if (root === undefined) return { error: `omp-seat: ${o.role} needs ${plugin} ${min} or later installed for omp (omp plugin install ${plugin}@claude-agent-scaffolding); looked in ${o.ompRecord}` }
+    if (root === undefined) return { error: `omp-seat: ${o.role} needs ${plugin} ${min} or later installed for omp (omp plugin install ${plugin}@${MARKETPLACE}); looked in ${o.ompRecord}` }
     const manifest = join(root, '.claude-plugin', 'plugin.json')
     let version: unknown
     try { version = JSON.parse(readFileSync(manifest, 'utf8')).version } catch (e) {

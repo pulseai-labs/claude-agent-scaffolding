@@ -1,4 +1,4 @@
-// User-level loader for claude-agent-scaffolding's OMP bin-path module.
+// User-level loader for pulsestack's OMP bin-path module.
 // Copy this file once into ~/.omp/agent/extensions/ (spec B §4.2). It holds no
 // logic that should change: it finds the module the installed plugins ship
 // (<plugin>/omp/bin-path.ts), imports the newest, and runs it — so updating
@@ -8,15 +8,17 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-export const LOADER_VERSION = 1;
-const MARKETPLACE = "claude-agent-scaffolding";
-const DOWNLOAD = "curl -fsSL https://raw.githubusercontent.com/pulseai-labs/claude-agent-scaffolding/main/omp/extensions/plugin-bin-path.ts --create-dirs -o ~/.omp/agent/extensions/plugin-bin-path.ts";
+export const LOADER_VERSION = 2;
+const MARKETPLACE = "pulsestack";
+// The pre-rename name, read for one release so a host that has not re-added the marketplace still loads.
+const LEGACY_MARKETPLACE = "claude-agent-scaffolding";
+const DOWNLOAD = "curl -fsSL https://raw.githubusercontent.com/pulseai-labs/pulsestack/main/omp/extensions/plugin-bin-path.ts --create-dirs -o ~/.omp/agent/extensions/plugin-bin-path.ts";
 
 function installPaths(record: string): string[] {
   try {
     const plugins = JSON.parse(readFileSync(record, "utf8"))?.plugins ?? {};
     return Object.entries(plugins).flatMap(([id, e]) => {
-      if (!id.endsWith(`@${MARKETPLACE}`)) return [];
+      if (!id.endsWith(`@${MARKETPLACE}`) && !id.endsWith(`@${LEGACY_MARKETPLACE}`)) return [];
       const pick = Array.isArray(e) ? (e.find((x: any) => x?.scope === "user") ?? e[0]) : undefined;
       return typeof pick?.installPath === "string" && pick.installPath ? [pick.installPath as string] : [];
     });

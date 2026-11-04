@@ -103,6 +103,27 @@ describe("installPaths", () => {
     });
     expect(installPaths(ompRecord)).toEqual(new Map([["ossify", user], ["molt", only]]));
   });
+  test("installPaths prefers pulsestack over the legacy name", () => {
+    const oldP = install("ossify", "1.0.0"), newP = install("ossify", "2.0.0");
+    for (const order of [["claude-agent-scaffolding", "pulsestack"], ["pulsestack", "claude-agent-scaffolding"]]) {
+      const paths: Record<string, string> = { "claude-agent-scaffolding": oldP, pulsestack: newP };
+      record(ompRecord, Object.fromEntries(order.map((m) => [id("ossify", m), [{ scope: "user", installPath: paths[m] }]])));
+      expect(installPaths(ompRecord)).toEqual(new Map([["ossify", newP]]));
+    }
+  });
+  test("installPaths reads a legacy-only record", () => {
+    const oldP = install("ossify", "1.0.0");
+    record(ompRecord, { [id("ossify", "claude-agent-scaffolding")]: [{ scope: "user", installPath: oldP }] });
+    expect(installPaths(ompRecord)).toEqual(new Map([["ossify", oldP]]));
+  });
+  test("installPaths ignores a marketplace named like an Object member", () => {
+    record(ompRecord, { [id("ossify", "toString")]: [{ scope: "user", installPath: install("ossify", "1.0.0") }] });
+    expect(installPaths(ompRecord)).toEqual(new Map());
+  });
+  test("installPaths ignores another marketplace", () => {
+    record(ompRecord, { [id("ossify", "other")]: [{ scope: "user", installPath: install("ossify", "1.0.0") }] });
+    expect(installPaths(ompRecord)).toEqual(new Map());
+  });
   test("an absent file gives an empty map", () => {
     expect(installPaths(ompRecord)).toEqual(new Map());
   });

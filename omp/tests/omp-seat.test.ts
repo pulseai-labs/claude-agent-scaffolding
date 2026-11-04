@@ -101,7 +101,7 @@ describe('planLaunch', () => {
     record(ompRecord, orchMods())
     const r = orch() as { error: string }
     expect(r.error).toContain('orchestrator needs crew 0.3.0 or later installed for omp')
-    expect(r.error).toContain('omp plugin install crew@claude-agent-scaffolding')
+    expect(r.error).toContain('omp plugin install crew@pulsestack')
     expect(r.error).toContain(ompRecord)
   })
   // crew's first release is 0.3.0, so no below-minimum `crew` version can exist: the value
