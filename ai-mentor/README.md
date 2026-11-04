@@ -30,15 +30,15 @@ All four auto-invoke on natural-language triggers — no slash command required.
 ## Install
 
 ```
-/plugin marketplace add github:draco28/claude-agent-scaffolding
-/plugin install ai-mentor@claude-agent-scaffolding
+/plugin marketplace add github:pulseai-labs/pulsestack
+/plugin install ai-mentor@pulsestack
 ```
 
 For local development:
 
 ```
-/plugin marketplace add /Volumes/master_ssd/projects/claude-agent-scaffolding
-/plugin install ai-mentor@claude-agent-scaffolding
+/plugin marketplace add /path/to/pulsestack
+/plugin install ai-mentor@pulsestack
 ```
 
 ## Migrating from v1.x

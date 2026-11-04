@@ -5,7 +5,7 @@
   "author": {
     "name": "Pras"
   },
-  "repository": "https://github.com/pulseai-labs/claude-agent-scaffolding",
+  "repository": "https://github.com/pulseai-labs/pulsestack",
   "license": "MIT",
   "keywords": [
     "code-review",
@@ -31,7 +31,7 @@
       "Where is this codebase shallow?",
       "Is this abstraction earning its keep?"
     ],
-    "websiteURL": "https://github.com/pulseai-labs/claude-agent-scaffolding/tree/main/code-judo",
+    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/code-judo",
     "brandColor": "#0F766E"
   }
 }

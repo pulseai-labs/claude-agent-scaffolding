@@ -5,7 +5,7 @@
   "author": {
     "name": "Pras"
   },
-  "repository": "https://github.com/draco28/claude-agent-scaffolding",
+  "repository": "https://github.com/pulseai-labs/pulsestack",
   "license": "MIT",
   "keywords": ["mentoring", "planning", "critique", "skills"],
   "skills": "./skills/",
@@ -21,7 +21,7 @@
       "Council me on this architecture decision.",
       "Explain this tradeoff in simpler terms."
     ],
-    "websiteURL": "https://github.com/draco28/claude-agent-scaffolding/tree/main/ai-mentor",
+    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/ai-mentor",
     "brandColor": "#2563EB"
   }
 }

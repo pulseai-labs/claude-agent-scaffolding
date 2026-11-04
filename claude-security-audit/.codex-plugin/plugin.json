@@ -5,8 +5,8 @@
   "author": {
     "name": "Pras"
   },
-  "homepage": "https://github.com/draco28/claude-agent-scaffolding/tree/main/claude-security-audit",
-  "repository": "https://github.com/draco28/claude-agent-scaffolding",
+  "homepage": "https://github.com/pulseai-labs/pulsestack/tree/main/claude-security-audit",
+  "repository": "https://github.com/pulseai-labs/pulsestack",
   "license": "MIT",
   "keywords": ["security", "audit", "marketplace", "secrets", "hooks"],
   "skills": "./skills/",
@@ -22,7 +22,7 @@
       "Scan this project for leaked credentials.",
       "Review Claude and Codex marketplace security."
     ],
-    "websiteURL": "https://github.com/draco28/claude-agent-scaffolding/tree/main/claude-security-audit",
+    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/claude-security-audit",
     "brandColor": "#DC2626"
   }
 }

@@ -351,7 +351,7 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
 
   # S8 round 4 (F1): the README hands off to ossify, so its own install path must
   # install it — a standalone reader must not reach an unregistered command.
-  assert_contains '/plugin install ossify@claude-agent-scaffolding' "$wi_readme" || return 1
+  assert_contains '/plugin install ossify@pulsestack' "$wi_readme" || return 1
   assert_contains 'install it alongside first' "$wi_readme" || return 1
 
   # Illustrative created_by values must be version-neutral, so substituting the

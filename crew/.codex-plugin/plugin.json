@@ -5,7 +5,7 @@
   "author": {
     "name": "Pras"
   },
-  "repository": "https://github.com/pulseai-labs/claude-agent-scaffolding",
+  "repository": "https://github.com/pulseai-labs/pulsestack",
   "license": "MIT",
   "keywords": [
     "orchestration",
@@ -32,7 +32,7 @@
       "Dispatch a worker seat for this task.",
       "Review PR 123 in a fresh seat."
     ],
-    "websiteURL": "https://github.com/pulseai-labs/claude-agent-scaffolding/tree/main/crew",
+    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/crew",
     "brandColor": "#1D4ED8"
   }
 }

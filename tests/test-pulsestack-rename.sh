@@ -13,6 +13,7 @@
 #   */CHANGELOG.md           — a changelog records the names a release shipped under.
 #   */tests/fixtures/*       — recorded `gh` and orca output; rewriting it would fake a recording.
 #   */tests/eval/evidence/*  — recorded eval runs, same reason.
+#   */tests/eval/fixtures/*  — eval scenarios that replay a recorded host state, paths included.
 #   omp/**/*.test.ts         — the OMP tests build install records under the old marketplace to
 #                              prove both names resolve for one release.
 #   lines naming LEGACY_MARKETPLACE — the one constant that keeps the old name on purpose.
@@ -45,7 +46,7 @@ survivor() {
   local file="$1" text="$2" old="${3:-}"
   case "$file" in
     */CHANGELOG.md|CHANGELOG.md) return 0 ;;
-    */tests/fixtures/*|*/tests/eval/evidence/*) return 0 ;;
+    */tests/fixtures/*|*/tests/eval/evidence/*|*/tests/eval/fixtures/*) return 0 ;;
     omp/*.test.ts|omp/*/*.test.ts) return 0 ;;
     merge-bar/tests/test-mb.sh) return 0 ;;
   esac

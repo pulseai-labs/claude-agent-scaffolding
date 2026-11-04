@@ -113,7 +113,7 @@ EOF
 
   local metadata_json
   metadata_json="$(jq -n '{
-    project: "claude-agent-scaffolding",
+    project: "pulsestack",
     date: "2026-05-25",
     run_of_day: 1,
     duration_seconds: 4.2,

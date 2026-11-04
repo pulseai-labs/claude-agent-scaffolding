@@ -66,7 +66,7 @@ fixtures test both modes — priors-rich and greenfield.
 
 | Fixture field | Value |
 |---|---|
-| Setup | Run from within this repo (`/Volumes/master_ssd/projects/claude-agent-scaffolding`) which has rich git history |
+| Setup | Run from within this repo (`/path/to/pulsestack`) which has rich git history |
 | Trigger | `council me on this idea: should I add a hook back to ai-mentor for ambient enforcement` |
 | Expected | The Historian section must quote at least one specific commit hash, file path, or branch name from this repo (e.g., references the v1.3 PreToolUse hook removal in commit `1d3c9e0`, or the SPEC's "Hook re-introduction" deferred-scope note) |
 | Status | RED |

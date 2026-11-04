@@ -72,7 +72,7 @@ wi_plugin_version() {
 #   - Claude Code sets ${CLAUDE_PLUGIN_DATA} per-process to the INVOKING
 #     plugin's data dir. Useless for cross-plugin resolution (SPEC §6.3).
 #   - Actual layout on disk: ~/.claude/plugins/data/<plugin>-<marketplace>/
-#     (e.g. ai-mentor-claude-agent-scaffolding).
+#     (e.g. ai-mentor-pulsestack).
 #   - But marketplace suffix is unknown at manifest-author time. Existing
 #     plugins (e.g. ai-mentor) all
 #     fall back to ${HOME}/.claude/plugins/data/<plugin> for their own data

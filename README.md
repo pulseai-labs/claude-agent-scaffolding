@@ -1,4 +1,4 @@
-# claude-agent-scaffolding
+# pulsestack
 
 Personal Claude Code and Codex plugin marketplace.
 
@@ -25,16 +25,16 @@ Most of the marketplace is designed to **compose without overlap**. Ordered by w
 ### Claude Code
 
 ```
-/plugin marketplace add github:draco28/claude-agent-scaffolding
-/plugin install workspace-init@claude-agent-scaffolding
-/plugin install ai-mentor@claude-agent-scaffolding
-/plugin install claude-security-audit@claude-agent-scaffolding
-/plugin install code-judo@claude-agent-scaffolding
-/plugin install crew@claude-agent-scaffolding
-/plugin install merge-bar@claude-agent-scaffolding
-/plugin install seat-mods@claude-agent-scaffolding
-/plugin install molt@claude-agent-scaffolding
-/plugin install baton@claude-agent-scaffolding
+/plugin marketplace add github:pulseai-labs/pulsestack
+/plugin install workspace-init@pulsestack
+/plugin install ai-mentor@pulsestack
+/plugin install claude-security-audit@pulsestack
+/plugin install code-judo@pulsestack
+/plugin install crew@pulsestack
+/plugin install merge-bar@pulsestack
+/plugin install seat-mods@pulsestack
+/plugin install molt@pulsestack
+/plugin install baton@pulsestack
 ```
 
 `workspace-init` is **optional** for ossify: `/ossify:start` and `/ossify:adopt`
@@ -43,8 +43,8 @@ dual-repo bootstrap and the AI-trace commit-msg filter; ossify reads its
 `pairing.json` as a fallback.
 
 ```
-/plugin install workspace-init@claude-agent-scaffolding
-/plugin install ossify@claude-agent-scaffolding
+/plugin install workspace-init@pulsestack
+/plugin install ossify@pulsestack
 ```
 
 ### Codex v0
@@ -62,7 +62,7 @@ Codex support is dual-published from the same repo through
   implementer subagent — Codex does not)
 
 ```
-codex plugin marketplace add github:draco28/claude-agent-scaffolding
+codex plugin marketplace add github:pulseai-labs/pulsestack
 ```
 
 ### OMP
@@ -71,14 +71,14 @@ OMP reads `.omp-plugin/marketplace.json`, which lists the five plugins whose pro
 the harness (`ossify`, `merge-bar`, `workspace-init`, `code-judo`, `ai-mentor`), the two
 mods (`seat-mods`, `molt`), the shared `crew` and the OMP-only `omp-roles`.
 
-    omp plugin marketplace add pulseai-labs/claude-agent-scaffolding
+    omp plugin marketplace add pulseai-labs/pulsestack
 
-    omp plugin install ossify@claude-agent-scaffolding   # and each plugin you want
+    omp plugin install ossify@pulsestack   # and each plugin you want
 
 OMP does not put a plugin's `bin/` on `PATH`. Install the extension that does, once per machine, in your
 user extension folder; OMP loads it in every session:
 
-    curl -fsSL --create-dirs https://raw.githubusercontent.com/pulseai-labs/claude-agent-scaffolding/main/omp/extensions/plugin-bin-path.ts \
+    curl -fsSL --create-dirs https://raw.githubusercontent.com/pulseai-labs/pulsestack/main/omp/extensions/plugin-bin-path.ts \
       -o ~/.omp/agent/extensions/plugin-bin-path.ts
 
 If you set `PI_CODING_AGENT_DIR`, the folder is `$PI_CODING_AGENT_DIR/extensions/` instead; change the `-o` path to match.
@@ -91,7 +91,7 @@ with `--no-extensions` needs `-e <that file>`.
 Guarded seats: install `omp-roles` and the two mods, then launch with `omp-seat` (the extensions load only
 through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, seat-mods 0.4.1 (the first release that maps `seat-reviewer` to the reviewer profile) and molt 0.3.0 (the first release with an OMP extension; with an older install it refuses with an "is missing" message).
 
-    omp plugin install omp-roles@claude-agent-scaffolding   # and seat-mods, molt
+    omp plugin install omp-roles@pulsestack   # and seat-mods, molt
     omp-seat worker --via omp -p "..."
 
 Last verified with omp 18.11.2 on 2026-10-17.
@@ -99,25 +99,25 @@ Last verified with omp 18.11.2 on 2026-10-17.
 ### Local Claude Code Development
 
 ```
-/plugin marketplace add /home/pras/personal/claude-agent-scaffolding
-/plugin install workspace-init@claude-agent-scaffolding
-/plugin install ai-mentor@claude-agent-scaffolding
-/plugin install claude-security-audit@claude-agent-scaffolding
-/plugin install code-judo@claude-agent-scaffolding
-/plugin install crew@claude-agent-scaffolding
-/plugin install merge-bar@claude-agent-scaffolding
+/plugin marketplace add /path/to/pulsestack
+/plugin install workspace-init@pulsestack
+/plugin install ai-mentor@pulsestack
+/plugin install claude-security-audit@pulsestack
+/plugin install code-judo@pulsestack
+/plugin install crew@pulsestack
+/plugin install merge-bar@pulsestack
 ```
 
 Ossify:
 
 ```
-/plugin install ossify@claude-agent-scaffolding
+/plugin install ossify@pulsestack
 ```
 
 ### Local Codex Development
 
 ```
-codex plugin marketplace add /home/pras/personal/claude-agent-scaffolding
+codex plugin marketplace add /path/to/pulsestack
 ```
 
 ## Quick start with `ai-mentor`

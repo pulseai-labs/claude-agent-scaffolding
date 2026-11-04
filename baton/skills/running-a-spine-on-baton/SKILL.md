@@ -48,7 +48,7 @@ Stop and report if any check fails. Do not arm around a failure.
 Work out every `--param` of the README's arm example:
 
 - Plugin roots come from `~/.claude/plugins/installed_plugins.json` `installPath` of
-  `ossify@claude-agent-scaffolding` and `baton@claude-agent-scaffolding`: the entry whose
+  `ossify@pulsestack` and `baton@pulsestack`: the entry whose
   `projectPath` is the AI workspace root, else the `user` entry. Never use a cache glob: the
   cache keeps old versions.
 - `ai_root` and `repo` (the canonical root) come from the AI workspace's

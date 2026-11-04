@@ -47,7 +47,7 @@ Via Claude Code marketplace:
 Via Codex marketplace:
 
 ```
-codex plugin marketplace add github:draco28/claude-agent-scaffolding
+codex plugin marketplace add github:pulseai-labs/pulsestack
 ```
 
 ## Usage

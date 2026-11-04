@@ -1,5 +1,5 @@
 {
-  "name": "claude-agent-scaffolding-codex",
+  "name": "pulsestack-codex",
   "interface": {
     "displayName": "Claude Agent Scaffolding for Codex"
   },

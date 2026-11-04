@@ -148,7 +148,7 @@ printf 'Codex dual-publish contract\n'
 assert_file "$MARKETPLACE" "Codex marketplace exists at .agents/plugins/marketplace.json"
 
 if [[ -f "$MARKETPLACE" ]]; then
-  assert_jq '.name == "claude-agent-scaffolding-codex"' "$MARKETPLACE" "marketplace has Codex-specific name"
+  assert_jq '.name == "pulsestack-codex"' "$MARKETPLACE" "marketplace has Codex-specific name"
   assert_jq '.interface.displayName == "Claude Agent Scaffolding for Codex"' "$MARKETPLACE" "marketplace has display name"
 
   for plugin in $V0_PLUGINS; do

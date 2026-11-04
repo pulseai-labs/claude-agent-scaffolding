@@ -1,4 +1,4 @@
-# claude-agent-scaffolding
+# pulsestack
 
 A **plugin marketplace** published to three surfaces: Claude Code (`/plugin install`, from
 `.claude-plugin/marketplace.json`), Codex (`.agents/plugins/marketplace.json`, the v0
