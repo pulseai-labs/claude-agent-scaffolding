@@ -331,7 +331,7 @@ test_is_version_name() {
   for v in 1.0.0 v2.1 0.1.8 1.0.0-beta.1 a0b04d9ddcca 58267944f921 unknown; do
     csa_is_version_name "$v" || { printf '    %s should be a version\n' "$v" >&2; rc=1; }
   done
-  for v in hooks skills agents ossify claude-security-audit 1 latest ''; do
+  for v in hooks skills agents ossify membrane 1 latest ''; do
     csa_is_version_name "$v" && { printf '    %s should not be a version\n' "$v" >&2; rc=1; }
   done
   return "$rc"

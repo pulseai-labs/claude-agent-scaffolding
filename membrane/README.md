@@ -1,4 +1,4 @@
-# claude-security-audit
+# membrane
 
 Static-analysis security audit for Claude Code and Codex project configurations and enabled plugins.
 
@@ -41,7 +41,7 @@ Realistic v0.1 value:
 Via Claude Code marketplace:
 
 ```
-/plugin install claude-security-audit
+/plugin install membrane
 ```
 
 Via Codex marketplace:
@@ -72,7 +72,7 @@ The plugin ships `hooks/session-start-reminder.sh` but does NOT register it. To 
 {
   "hooks": {
     "SessionStart": [
-      { "command": "bash $HOME/.claude/plugins/cache/<marketplace>/claude-security-audit/<version>/hooks/session-start-reminder.sh" }
+      { "command": "bash $HOME/.claude/plugins/cache/<marketplace>/membrane/<version>/hooks/session-start-reminder.sh" }
     ]
   }
 }
@@ -105,7 +105,7 @@ Critical findings **cannot be suppressed**; they must be remediated.
 
 ## Composition
 
-`claude-security-audit` is fully standalone. It runs in any Claude Code project, with or without other plugins. It has no integration with any other plugin in v0.1.
+`membrane` is fully standalone. It runs in any Claude Code project, with or without other plugins. It has no integration with any other plugin in v0.1.
 
 ## License
 

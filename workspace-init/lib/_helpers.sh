@@ -4,7 +4,7 @@
 # Source via: source "${WI_LIB_DIR}/_helpers.sh"
 #
 # Mirrors architect-critic/lib/_helpers.sh structure (ac_* → wi_*) and
-# claude-security-audit/lib/helpers.sh realpath-fallback pattern, but does NOT
+# membrane/lib/helpers.sh realpath-fallback pattern, but does NOT
 # use `set -e` — callers do explicit return-code checks.
 
 set -u

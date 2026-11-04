@@ -21,7 +21,6 @@
 #   README.md migration lines ("Renamed from", "marketplace remove") — a move names both ends.
 #   paths under .claude/<old>/ — plugin-internal state paths keep their names this release (spec:
 #                              internal names stay; a follow-up issue renames them).
-#   the `# <old>` .gitignore marker membrane's lib/state.sh writes into user repos — internal.
 #
 # Old names are assembled, not written, so this file never matches its own search, and this file
 # is not a survivor.
@@ -36,6 +35,9 @@ OLD_MKT="claude-agent"'-scaffolding'
 NEW_MKT="pulsestack"
 # old=new pairs
 PAIRS="code"'-judo=remodel ai'"-mentor=sage claude-security"'-audit=membrane'
+# Renamed plugins the OMP catalog does not list (it never listed the security audit; the OMP set
+# itself is owned by tests/test-omp-surface.sh).
+NOT_ON_OMP="membrane"
 
 PASS=0; FAIL=0
 pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
@@ -56,7 +58,6 @@ survivor() {
   fi
   if [ -n "$old" ]; then
     case "$text" in *".claude/$old/"*) return 0 ;; esac
-    case "$text" in "# $old"*) return 0 ;; esac
   fi
   return 1
 }
@@ -72,8 +73,10 @@ findings() (
     # 2
     for f in .claude-plugin/marketplace.json:.source .omp-plugin/marketplace.json:.source .agents/plugins/marketplace.json:.source.path; do
       src="${f#*:}"; f="${f%%:*}"
-      [ "$(jq -r --arg n "$new" ".plugins[] | select(.name == \$n) | $src" "$f" 2>/dev/null)" = "./$new" ] \
-        || echo "catalog: $f does not publish $new at ./$new"
+      case "$f / $NOT_ON_OMP " in .omp-plugin/*" $new "*) ;; *)
+        [ "$(jq -r --arg n "$new" ".plugins[] | select(.name == \$n) | $src" "$f" 2>/dev/null)" = "./$new" ] \
+          || echo "catalog: $f does not publish $new at ./$new" ;;
+      esac
       jq -e --arg n "$old" '[.plugins[] | select(.name == $n)] | length == 0' "$f" >/dev/null 2>&1 \
         || echo "catalog: $f still lists $old"
     done

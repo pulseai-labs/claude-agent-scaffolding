@@ -11,7 +11,7 @@ checks version and frontmatter parity across the two marketplaces. `seat-mods`, 
 and `baton` are deliberately absent from the Codex set — check the deferred list in
 `tests/test-codex-dual-publish.sh` before assuming a plugin ships everywhere.
 
-Shipped: `workspace-init`, `sage`, `claude-security-audit`, `ossify`,
+Shipped: `workspace-init`, `sage`, `membrane`, `ossify`,
 `remodel`, `crew`, `merge-bar`, `seat-mods`, `molt`, `baton`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session

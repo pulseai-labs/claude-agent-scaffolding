@@ -24,7 +24,7 @@ test_hook_prints_days_when_state_exists() {
   fi
   printf '{"last_audit":{"date":"%s"}}' "$five_days_ago" > "$tmp/.claude/audits/state.json"
   local out; out="$(cd "$tmp" && bash "$CSA_PLUGIN_ROOT/hooks/session-start-reminder.sh")"
-  assert_contains "$out" "claude-security-audit: last audit" || return 1
+  assert_contains "$out" "membrane: last audit" || return 1
   assert_contains "$out" "days ago" || return 1
 }
 

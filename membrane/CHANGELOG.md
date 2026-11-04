@@ -1,4 +1,17 @@
-# claude-security-audit changelog
+# membrane changelog
+
+Named `claude-security-audit` through 0.3.1.
+
+## 0.4.0
+
+Renamed from `claude-security-audit` to `membrane`, in the marketplace's rename to `pulsestack`.
+The commands are now `/membrane:security-audit` and its siblings, the install key is
+`membrane@pulsestack`, and the session-start reminder and the report footer name `membrane`.
+State files, the audit directory and the `# claude-security-audit` block the auto-fix writes into a
+project's `.gitignore` keep their names, so an existing audit history, baseline and suppressions
+carry over. To move: uninstall `claude-security-audit@claude-agent-scaffolding`, then install
+`membrane@pulsestack` (the root README's *Renamed from claude-agent-scaffolding* section has every
+step).
 
 ## 0.3.1 (2026-11-03)
 

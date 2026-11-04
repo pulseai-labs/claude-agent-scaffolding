@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# claude-security-audit OPT-IN SessionStart hook.
+# membrane OPT-IN SessionStart hook.
 #
 # This file ships with the plugin but is NOT declared in plugin.json's "hooks"
 # array. Default install has zero ambient surface (no hook fires on session start).
@@ -10,7 +10,7 @@
 # {
 #   "hooks": {
 #     "SessionStart": [
-#       { "command": "bash <plugin_install_dir>/claude-security-audit/hooks/session-start-reminder.sh" }
+#       { "command": "bash <plugin_install_dir>/membrane/hooks/session-start-reminder.sh" }
 #     ]
 #   }
 # }
@@ -56,4 +56,4 @@ if [[ -n "$_HOOK_LIB" && -f "$_HOOK_LIB/helpers.sh" && -f "$_HOOK_LIB/enumerate-
   fi
 fi
 
-printf 'claude-security-audit: last audit %d days ago.%s Run /security-audit when ready.\n' "$DAYS_AGO" "$PLUGIN_DELTA"
+printf 'membrane: last audit %d days ago.%s Run /security-audit when ready.\n' "$DAYS_AGO" "$PLUGIN_DELTA"

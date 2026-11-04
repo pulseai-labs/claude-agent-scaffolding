@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/baseline.sh — NEW/PERSISTED tagging for claude-security-audit.
+# lib/baseline.sh — NEW/PERSISTED tagging for membrane.
 # Requires: lib/helpers.sh, lib/state.sh
 # Bash 3.2+ compatible (macOS portability).
 

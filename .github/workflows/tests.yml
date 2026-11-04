@@ -67,12 +67,12 @@ jobs:
       - name: added-fixture check's own tests
         run: bash tests/test-added-fixture-results.sh
 
-      - name: claude-security-audit suite
+      - name: membrane suite
         # Skip the wall-clock perf benchmark on shared runners (flaky vs the homelab
         # reference machine); it still runs locally / on the homelab (#71).
         env:
           CSA_SKIP_PERF: "1"
-        run: bash claude-security-audit/run-tests.sh
+        run: bash membrane/run-tests.sh
 
       - name: remodel suite
         run: bash remodel/run-tests.sh

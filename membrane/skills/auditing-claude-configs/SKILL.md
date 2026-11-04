@@ -7,7 +7,7 @@ description: Static-analysis security audit for Claude Code and Codex project co
 
 Orchestrates the static-analysis security audit for Claude Code and Codex projects. Detection lives in `lib/rules/<aspect>/*.sh`; this skill body handles flow control, presentation, and the `/apply-fix` path.
 
-**Lib invocation contract:** call every lib function via the `csa` dispatcher (`claude-security-audit/bin/csa`, on `$PATH` because Claude Code adds each plugin's `bin/` automatically). The dispatcher's bash shebang forces a bash runtime for the libs even when the Bash tool subprocess is zsh (the macOS default). Form: `csa <fn-suffix> [args...]` resolves to `csa_<fn-suffix>`. Never `source` lib files directly from skill body — under zsh `${BASH_SOURCE[0]}` is unset and `${BASH_REMATCH[…]}` returns empty silently; the libs crash or silently corrupt state. Always go through `csa`. Use `csa --list` for discovery.
+**Lib invocation contract:** call every lib function via the `csa` dispatcher (`membrane/bin/csa`, on `$PATH` because Claude Code adds each plugin's `bin/` automatically). The dispatcher's bash shebang forces a bash runtime for the libs even when the Bash tool subprocess is zsh (the macOS default). Form: `csa <fn-suffix> [args...]` resolves to `csa_<fn-suffix>`. Never `source` lib files directly from skill body — under zsh `${BASH_SOURCE[0]}` is unset and `${BASH_REMATCH[…]}` returns empty silently; the libs crash or silently corrupt state. Always go through `csa`. Use `csa --list` for discovery.
 
 ## Scope honesty (read this before invoking)
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/apply-fix.sh — auto-fix orchestrator for claude-security-audit.
+# lib/apply-fix.sh — auto-fix orchestrator for membrane.
 # Two-flag system (RULE_AUTO_FIXABLE + RULE_MECHANICALLY_FIXABLE) with
 # 5-layer defense-in-depth per SPEC §9.2 (T2-H).
 # Requires: lib/helpers.sh, lib/state.sh

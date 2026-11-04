@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/suppress.sh — suppression management for claude-security-audit.
+# lib/suppress.sh — suppression management for membrane.
 # Requires: lib/helpers.sh, lib/state.sh
 # Bash 3.2+ compatible (macOS portability).
 

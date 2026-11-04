@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/state.sh — state persistence, tamper detection, and GC for claude-security-audit.
+# lib/state.sh — state persistence, tamper detection, and GC for membrane.
 # Requires: lib/helpers.sh (csa_sha256, csa_realpath, csa_sed_inplace)
 # Bash 3.2+ compatible (macOS portability).
 

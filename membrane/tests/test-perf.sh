@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test-perf.sh — Performance benchmark for claude-security-audit.
+# tests/test-perf.sh — Performance benchmark for membrane.
 # Reference machine: macOS Mac Mini M-series (Praveen's homelab).
 # Budget: ≤10s ideal for a ~200-file workload; ≤30s hard fail threshold.
 

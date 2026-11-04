@@ -30,7 +30,7 @@ not to collect nits.
 It is not a correctness review and not a security review. This plugin looks for nothing about
 bugs, breaking changes, or vulnerabilities, and ships nothing that does. That is a separate
 review with separate questions, and mixing the two into one pass makes both worse. Run
-whatever your project already uses for that axis — `claude-security-audit`, in this
+whatever your project already uses for that axis — `membrane`, in this
 marketplace, covers agent *configuration* rather than the product code under review.
 
 It produces **one report and one disposition pass, and never re-reviews its own fixes.** A

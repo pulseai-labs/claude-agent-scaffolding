@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lib/helpers.sh — cross-platform primitives for claude-security-audit.
+# lib/helpers.sh — cross-platform primitives for membrane.
 # Bash 3.2+ compatible (macOS portability).
 
 # csa_sha256 <string> — print the SHA-256 hex digest of the given string.

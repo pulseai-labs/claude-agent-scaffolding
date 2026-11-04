@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# bin/csa — dispatcher entry point for claude-security-audit
+# bin/csa — dispatcher entry point for membrane
 #
 # Why this exists: Claude Code's Bash tool on macOS runs under zsh by default
 # ($SHELL=zsh). Skill bodies that `source lib/*.sh` then inherit zsh, where
@@ -39,7 +39,7 @@ CSA_FIXTURES_DIR="${CSA_FIXTURES_DIR:-$PLUGIN_ROOT/fixtures}"
 export CSA_PLUGIN_ROOT CSA_LIB_DIR CSA_RULES_DIR CSA_FIXTURES_DIR
 
 # Source the conventional helpers first, then everything else in glob order.
-# claude-security-audit names its helpers file `helpers.sh` (no underscore prefix).
+# membrane names its helpers file `helpers.sh` (no underscore prefix).
 if [ -f "$_LIB_DIR/helpers.sh" ]; then
   # shellcheck source=/dev/null
   source "$_LIB_DIR/helpers.sh"

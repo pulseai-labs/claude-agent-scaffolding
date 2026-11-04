@@ -7,7 +7,7 @@ _csa_failed=0
 test_harness_loads() {
   [[ -n "$CSA_PLUGIN_ROOT" ]] || return 1
   [[ -d "$CSA_PLUGIN_ROOT/.claude-plugin" ]] || return 1
-  assert_eq "claude-security-audit" "$(jq -r .name "$CSA_PLUGIN_ROOT/.claude-plugin/plugin.json")" || return 1
+  assert_eq "membrane" "$(jq -r .name "$CSA_PLUGIN_ROOT/.claude-plugin/plugin.json")" || return 1
 }
 
 test_assertion_failures_are_loud() {

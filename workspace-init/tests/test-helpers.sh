@@ -7,7 +7,7 @@ source "$(dirname "$0")/_helpers.sh"
 source "$WI_LIB_DIR/_helpers.sh"
 
 # Shared sandbox — direct mktemp avoids the $() subshell trap-loss issue
-# (same pattern as claude-security-audit/tests/test-helpers.sh).
+# (same pattern as membrane/tests/test-helpers.sh).
 _WI_TMP="$(mktemp -d "${TMPDIR:-/tmp}/wi-helpers-test.XXXXXX")"
 trap 'rm -rf "$_WI_TMP"' EXIT
 

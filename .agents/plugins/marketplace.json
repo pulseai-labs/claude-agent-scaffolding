@@ -29,10 +29,10 @@
       "category": "Productivity"
     },
     {
-      "name": "claude-security-audit",
+      "name": "membrane",
       "source": {
         "source": "local",
-        "path": "./claude-security-audit"
+        "path": "./membrane"
       },
       "policy": {
         "installation": "AVAILABLE",
