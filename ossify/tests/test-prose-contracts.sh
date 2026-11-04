@@ -1449,15 +1449,16 @@ _pin "$_r" "entities.sh's active-clause refusal cites a doc that does not carry 
 # ...and decomposition.md §1 carries the caveat beside the reversal it qualifies.
 _r=1; grep -Fq 'only while its spine is still open' "$_OSSR/skills/plan-spine/references/decomposition.md" && _r=0
 _pin "$_r" "decomposition.md §1 states the planned-reversal route without the closed-spine caveat"
-# (#579.2) the 1.11.0 notes point at the predicate 1.12.0 replaced it with.
-_r=1; grep -Fq '1.12.0 replaces this predicate' "$_OSSR/README.md" && _r=0
-_pin "$_r" "ossify/README.md's 1.11.0 section still teaches the branch-or-worktree predicate as current"
-# (#579.3) ossify's README names the dropped refusal so it cannot be read as the shipped complete
-# clause. The root README no longer carries release notes (front-page redesign, 2026-11), so it is
-# held to the absence half only.
+# (#579.2) the 1.11.0 notes point at the predicate 1.12.0 replaced it with. ossify's release notes
+# moved from its README to CHANGELOG.md (README rewrite, 2026-11), so the history pins read there.
+_r=1; grep -Fq '1.12.0 replaces this predicate' "$_OSSR/CHANGELOG.md" && _r=0
+_pin "$_r" "ossify/CHANGELOG.md's 1.11.0 entry still teaches the branch-or-worktree predicate as current"
+# (#579.3) ossify's CHANGELOG names the dropped refusal so it cannot be read as the shipped complete
+# clause. Neither README carries release notes any more (front-page redesign and ossify README
+# rewrite, 2026-11), so both are held to the absence half only.
 _r=0
-grep -Fq 'landed-provenance refusal' "$_OSSR/README.md" || { _r=1; echo "  (#579.3 site: $_OSSR/README.md)"; }
-for _f in "$_OSSR/README.md" "$_OSSR/../README.md"; do
+grep -Fq 'landed-provenance refusal' "$_OSSR/CHANGELOG.md" || { _r=1; echo "  (#579.3 site: $_OSSR/CHANGELOG.md)"; }
+for _f in "$_OSSR/CHANGELOG.md" "$_OSSR/README.md" "$_OSSR/../README.md"; do
   grep -Fq 'the landed-item refusal' "$_f" && { _r=1; echo "  (#579.3 old name still in: $_f)"; }
 done
 _pin "$_r" "the 1.12.0 notes name the dropped refusal and the shipped complete clause identically - they assert and deny the same transition"
@@ -1684,9 +1685,9 @@ _r=1; grep -Fq 'each execution the lane did not request' "$_EX" \
 _pin "$_r" "external-executor.md §2a still leaves the gaps replacement on the caller's count list, or checks the count after incrementing (I2)"
 _r=1; grep -Fq 'neither gets a request' "$_EX" && _r=0
 _pin "$_r" "external-executor.md §2 no longer says a complete item gets no request (I1)"
-_r=1; grep -Fq 'on re-entry a request for a' "$_OSSR/README.md" \
-  && grep -Fq 'one this session has not executed' "$_OSSR/README.md" && _r=0
-_pin "$_r" "ossify/README.md's 1.14.0 note states the staged-result rule without its close-finished, not-executed-this-session scope (m1)"
+_r=1; grep -Fq 'on re-entry a request for a' "$_OSSR/CHANGELOG.md" \
+  && grep -Fq 'one this session has not executed' "$_OSSR/CHANGELOG.md" && _r=0
+_pin "$_r" "ossify/CHANGELOG.md's 1.14.0 entry states the staged-result rule without its close-finished, not-executed-this-session scope (m1)"
 
 # Fix round (#673), one pin per class of claim the round's findings named.
 _SC="$HERE/../skills/close/references/spine-close.md"
@@ -2063,19 +2064,21 @@ pin "$SKILLS/close/references/spine-close.md" 'Spine close never closes an intak
   "spine close never closes an intake request; the operator does (#631)"
 pin "$SKILLS/plan-spine/references/intake-and-ledger.md" 'The operator closes a request' \
   "intake §1 says the operator closes a request (#631)"
-for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/plan-spine/references/decomposition.md" "$HERE/../README.md" "$HERE/../../README.md"; do
+for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/references/intake-and-ledger.md" "$SKILLS/plan-spine/references/decomposition.md" "$HERE/../README.md" "$HERE/../CHANGELOG.md" "$HERE/../../README.md"; do
   _r=1; ! grep -Fq 'gh issue close <n>' "$_f" && ! grep -Fq 'withdrawn — <' "$_f" && ! grep -Fq '/permission' "$_f" && ! grep -Fq 'last carrying spine' "$_f" && ! grep -Fq 'closes an intake request only' "$_f" && _r=0
   _pin "$_r" "$(basename "$_f") still says spine close closes an intake request, or names withdrawn or a permission check (#631)"
 done
 # ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
-# The root README no longer carries release notes (front-page redesign, 2026-11): it is held to the
-# absence half only.
-for _f in "$HERE/../README.md"; do
+# The 1.23.0 note that advertises it moved to ossify's CHANGELOG.md (README rewrite, 2026-11).
+# Neither README carries release notes any more: both are held to the absence half only.
+for _f in "$HERE/../CHANGELOG.md"; do
   _r=1; grep -Fq "'#N'" "$_f" && ! grep -Fq '`N` or `#N`' "$_f" && _r=0
   _pin "$_r" "$_f advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"
 done
-_r=1; ! grep -Fq '`N` or `#N`' "$HERE/../../README.md" && _r=0
-_pin "$_r" "the root README advertises an unquoted #N (#631)"
+for _f in "$HERE/../README.md" "$HERE/../../README.md"; do
+  _r=1; ! grep -Fq '`N` or `#N`' "$_f" && _r=0
+  _pin "$_r" "$_f advertises an unquoted #N (#631)"
+done
 # CodeRabbit round 6 on PR #821: a split's halves landing is not the close
 # condition - another spine may carry the feature too.
 pin "$SKILLS/plan-spine/references/decomposition.md" 'and any other spine that carries the feature' \
