@@ -325,8 +325,10 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   # qualifier — the claim it replaced ("for existing source or history" alone)
   # is what the row must not carry back.
   # The front-page redesign moved the clause from the catalog row to the
-  # /ossify:adopt card, so it is pinned on the whole root README.
-  assert_contains 'with or without the legacy scaffold stack' "$(cat "$ROOT_README")" || return 1
+  # /ossify:adopt card, so it is pinned on the "How ossify works" section.
+  local cards
+  cards="$(awk '/^## How ossify works/,/^## How the plugins fit together/' "$ROOT_README")"
+  assert_contains 'with or without the legacy scaffold stack' "$cards" || return 1
   assert_not_contains 'plain repos: #536' "$row" || return 1
 
   # S8 round 1 (F3): the lifecycle overview above the table must not leave

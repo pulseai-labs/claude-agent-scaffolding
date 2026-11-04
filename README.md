@@ -18,7 +18,8 @@ OMP), from one marketplace.
 
 Instead of jumping straight to code, **ossify** builds a thin skeleton that runs end to end, then
 grows it spine by spine. Each work item is built test-first, checked by an agent that did not build
-it, and reviewed before it merges. The other plugins plug into that loop.
+it, and reviewed before it merges. Most of the other plugins plug into that loop; the rest work
+beside it.
 
 **[Install](#install)** · [How ossify works](#how-ossify-works) · [All plugins](#all-plugins)
 
@@ -37,7 +38,7 @@ it, and reviewed before it merges. The other plugins plug into that loop.
 <ul>
 <li>Map the user journey.</li>
 <li>Cut the skeleton: the thinnest slice that runs end to end.</li>
-<li>Set the risk gates to clear first.</li>
+<li>Record the risk gates: hazards whose harm a failed test cannot undo.</li>
 <li><code>adopt</code> takes existing code, with or without the legacy scaffold stack, and closes what already shipped as Release 0.</li>
 </ul>
 </td>
@@ -159,8 +160,8 @@ codex plugin marketplace add github:pulseai-labs/pulsestack
 <details>
 <summary><b>OMP</b></summary>
 
-OMP reads `.omp-plugin/marketplace.json`, which lists the five plugins whose procedures do not depend on
-the harness (`ossify`, `merge-bar`, `workspace-init`, `remodel`, `sage`), the two
+OMP reads `.omp-plugin/marketplace.json`, which lists the plugins whose procedures do not depend on
+the harness (`ossify`, `merge-bar`, `workspace-init`, `remodel`, `sage`), the
 mods (`seat-mods`, `molt`), the shared `crew` and the OMP-only `omp-roles`.
 
     omp plugin marketplace add pulseai-labs/pulsestack
@@ -180,7 +181,7 @@ and the loader warns with this command if it ever needs a new download. Without 
 are not found and the skills that need them say so. A session started
 with `--no-extensions` needs `-e <that file>`.
 
-Guarded seats: install `omp-roles` and the two mods, then launch with `omp-seat` (the extensions load only
+Guarded seats: install `omp-roles` and both mods, then launch with `omp-seat` (the extensions load only
 through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, seat-mods 0.4.1 (the first release that maps `seat-reviewer` to the reviewer profile) and molt 0.3.0 (the first release with an OMP extension; with an older install it refuses with an "is missing" message).
 
     omp plugin install omp-roles@pulsestack   # and seat-mods, molt
@@ -217,7 +218,7 @@ codex plugin marketplace add /path/to/pulsestack
 <details>
 <summary><b>Renamed from claude-agent-scaffolding: move a machine</b></summary>
 
-This marketplace had the name in the heading above until November 2026. Three plugins were renamed
+This marketplace had the name in the line above until November 2026. Three plugins were renamed
 with it: `code-judo` is now `remodel`, `ai-mentor` is now `sage`, and `claude-security-audit` is now
 `membrane`. Every other plugin keeps its name. Behaviour is unchanged; only install keys and command
 namespaces (`/remodel:…`, `/sage:…`, `/membrane:…`) moved. The old GitHub URL redirects here.

@@ -1452,11 +1452,12 @@ _pin "$_r" "decomposition.md §1 states the planned-reversal route without the c
 # (#579.2) the 1.11.0 notes point at the predicate 1.12.0 replaced it with.
 _r=1; grep -Fq '1.12.0 replaces this predicate' "$_OSSR/README.md" && _r=0
 _pin "$_r" "ossify/README.md's 1.11.0 section still teaches the branch-or-worktree predicate as current"
-# (#579.3) both READMEs name the dropped refusal so it cannot be read as the shipped complete clause.
+# (#579.3) ossify's README names the dropped refusal so it cannot be read as the shipped complete
+# clause. The root README no longer carries release notes (front-page redesign, 2026-11), so it is
+# held to the absence half only.
 _r=0
-# The root README no longer carries release notes (front-page redesign, 2026-11): ossify/README.md only.
-for _f in "$_OSSR/README.md"; do
-  grep -Fq 'landed-provenance refusal' "$_f" || { _r=1; echo "  (#579.3 site: $_f)"; }
+grep -Fq 'landed-provenance refusal' "$_OSSR/README.md" || { _r=1; echo "  (#579.3 site: $_OSSR/README.md)"; }
+for _f in "$_OSSR/README.md" "$_OSSR/../README.md"; do
   grep -Fq 'the landed-item refusal' "$_f" && { _r=1; echo "  (#579.3 old name still in: $_f)"; }
 done
 _pin "$_r" "the 1.12.0 notes name the dropped refusal and the shipped complete clause identically - they assert and deny the same transition"
@@ -2067,11 +2068,14 @@ for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/referenc
   _pin "$_r" "$(basename "$_f") still says spine close closes an intake request, or names withdrawn or a permission check (#631)"
 done
 # ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
-# The root README no longer carries release notes (front-page redesign, 2026-11): ossify/README.md only.
+# The root README no longer carries release notes (front-page redesign, 2026-11): it is held to the
+# absence half only.
 for _f in "$HERE/../README.md"; do
   _r=1; grep -Fq "'#N'" "$_f" && ! grep -Fq '`N` or `#N`' "$_f" && _r=0
   _pin "$_r" "$_f advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"
 done
+_r=1; ! grep -Fq '`N` or `#N`' "$HERE/../../README.md" && _r=0
+_pin "$_r" "the root README advertises an unquoted #N (#631)"
 # CodeRabbit round 6 on PR #821: a split's halves landing is not the close
 # condition - another spine may carry the feature too.
 pin "$SKILLS/plan-spine/references/decomposition.md" 'and any other spine that carries the feature' \

@@ -6,6 +6,7 @@
 #   entry-points   /ossify:start and /ossify:adopt both appear before the plugin hub;
 #   asset-missing  every docs/assets/readme/ file the README names exists;
 #   asset-twin     every -light.svg the README names has its -dark.svg, and the reverse;
+#   asset-theme    a -dark.svg only under a prefers-color-scheme: dark <source>; <img> takes -light;
 #   svg-size       every docs/assets/readme/*.svg is at most 51200 bytes (every install clones it);
 #   svg-unsafe     no <script, <foreignObject, @import, @font-face, or http(s) href in an SVG;
 #   svg-font       no font-size below 11 in an SVG (unreadable at phone width);
@@ -75,6 +76,17 @@ check_readme() (
     grep -qF "$twin" "$r" || echo "asset-twin: $ref has no $twin in README.md"
   done
 
+  # The dark variant only ever under a dark <source>; the <img> fallback is the light one.
+  grep -nE 'docs/assets/readme/[A-Za-z0-9._-]+-(dark|light)\.svg' "$r" | while IFS= read -r hit; do
+    ref="$(printf '%s' "$hit" | grep -oE 'docs/assets/readme/[A-Za-z0-9._-]+-(dark|light)\.svg' | head -1)"
+    case "$ref:$hit" in
+      *-dark.svg:*'<img'*) echo "asset-theme: $ref is the <img> fallback" ;;
+      *-dark.svg:*'prefers-color-scheme: dark'*) ;;
+      *-dark.svg:*) echo "asset-theme: $ref is not under a prefers-color-scheme: dark source" ;;
+      *-light.svg:*'prefers-color-scheme: dark'*) echo "asset-theme: $ref is under the dark source" ;;
+    esac
+  done
+
   for f in docs/assets/readme/*.svg; do
     [ -f "$f" ] || continue
     size="$(wc -c < "$f" | tr -d ' ')"
@@ -114,13 +126,28 @@ else
   printf '%s\n' "$out" | sed 's/^/        /'
 fi
 
-# Controls: copy the tree (tracked and untracked, ignored files left out) into scratch, plant one
-# defect, and require that fact's finding. A check whose control stays green is broken.
+# Controls: build a scratch tree (see make_fixture), plant one defect, and require that fact's
+# finding. A check whose control stays green is broken.
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
-make_fixture() {
-  mkdir -p "$1"
-  (cd "$ROOT" && git ls-files -z -co --exclude-standard | xargs -0 tar -cf - 2>/dev/null) | tar -xf - -C "$1"
+make_fixture() { # README.md and docs/assets/readme/ are real copies (controls edit them); every
+  # other top-level entry, and every other docs/ entry, is a symlink, so the link check still
+  # resolves and a control writes kilobytes, not a copy of the tree.
+  local e
   mkdir -p "$1/docs/assets/readme"
+  cp "$ROOT/README.md" "$1/README.md"
+  cp "$ROOT"/docs/assets/readme/* "$1/docs/assets/readme/" 2>/dev/null
+  for e in "$ROOT"/* "$ROOT"/.[!.]*; do
+    case "${e##*/}" in README.md|docs|.git|'.[!.]*') continue ;; esac
+    ln -s "$e" "$1/${e##*/}"
+  done
+  for e in "$ROOT"/docs/*; do
+    case "${e##*/}" in assets) continue ;; esac
+    ln -s "$e" "$1/docs/${e##*/}"
+  done
+  for e in "$ROOT"/docs/assets/*; do
+    case "${e##*/}" in readme) continue ;; esac
+    ln -s "$e" "$1/docs/assets/${e##*/}"
+  done
 }
 control() { # $1=label $2=expected finding text $3=planting command (run in the fixture dir)
   local d="$WORK/$1" o
@@ -140,6 +167,7 @@ control font        "svg-font: docs/assets/readme/zz.svg: 9" "printf '%s' '<svg>
 control size        "svg-size: docs/assets/readme/zz.svg" "head -c 51201 /dev/zero | tr '\\\\0' ' ' > docs/assets/readme/zz.svg"
 control summary     "summary-blank: line"                "printf '<details><summary>x</summary>\nraw\n</details>\n' >> README.md"
 control link        "link: ./no-such-dir/"               "printf 'See [x](./no-such-dir/).\n' >> README.md"
+control swap        "asset-theme: docs/assets/readme/ossify-skeleton-dark.svg" "sed -i 's/ossify-skeleton-dark.svg/TMPX/; s/ossify-skeleton-light.svg/ossify-skeleton-dark.svg/; s/TMPX/ossify-skeleton-light.svg/' README.md"
 control order       "heading-order:"                     "awk '{ if (\$0 == \"## Install\") print \"## All plugins\"; else if (\$0 == \"## All plugins\") print \"## Install\"; else print }' README.md > t && mv t README.md"
 # Adjacent control: the copied tree itself is clean, so the gate is not just matching everything.
 d="$WORK/clean"; make_fixture "$d"
