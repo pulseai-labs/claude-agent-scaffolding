@@ -74,8 +74,8 @@ jobs:
           CSA_SKIP_PERF: "1"
         run: bash claude-security-audit/run-tests.sh
 
-      - name: code-judo suite
-        run: bash code-judo/run-tests.sh
+      - name: remodel suite
+        run: bash remodel/run-tests.sh
 
       - name: Install dagr 0.3.1 (contract v3)
         # crew's tests/test-crew-run.sh runs the real `dagr check --strict` and fails, never skips,

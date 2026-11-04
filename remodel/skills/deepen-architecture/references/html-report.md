@@ -131,7 +131,7 @@ candidates.
 ## Candidate card
 
 The diagrams carry the weight. Prose is sparse, plain, and uses the glossary terms from
-`code-judo:codebase-design` without ceremony.
+`remodel:codebase-design` without ceremony.
 
 Each candidate is one `<article>`:
 
@@ -139,7 +139,7 @@ Each candidate is one `<article>`:
 - **Badge row** — recommendation strength (`Strong` = emerald, `Worth exploring` = amber,
   `Speculative` = slate), plus a tag for the dependency category: `in-process`,
   `local-substitutable`, `ports & adapters`, `mock`. The four categories are defined in
-  `code-judo:codebase-design` → `references/deepening.md`; classify before you tag.
+  `remodel:codebase-design` → `references/deepening.md`; classify before you tag.
 - **Files** — monospaced list, `font-mono text-sm`.
 - **Before / after diagram** — the centrepiece. Two columns, side by side. Patterns below.
 - **Problem** — one sentence. What hurts.
@@ -226,7 +226,7 @@ One larger card. Candidate name, one sentence on why, anchor link to its card. T
 ## Tone
 
 Plain English, concise — but the architectural nouns and verbs come straight from
-`code-judo:codebase-design`. Concision is not an excuse to drift.
+`remodel:codebase-design`. Concision is not an excuse to drift.
 
 **Use exactly:** module, interface, implementation, depth, deep, shallow, seam, adapter,
 leverage, locality.
@@ -248,4 +248,4 @@ are not in the glossary and they do not earn their place.
 
 No hedging, no throat-clearing, no "it's worth noting that…". If a sentence could be a
 bullet, make it a bullet. If a bullet could be cut, cut it. If a term is not in the
-`code-judo:codebase-design` glossary, reach for one that is before inventing a new one.
+`remodel:codebase-design` glossary, reach for one that is before inventing a new one.

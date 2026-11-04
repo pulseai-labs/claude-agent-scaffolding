@@ -12,7 +12,7 @@ and `baton` are deliberately absent from the Codex set — check the deferred li
 `tests/test-codex-dual-publish.sh` before assuming a plugin ships everywhere.
 
 Shipped: `workspace-init`, `ai-mentor`, `claude-security-audit`, `ossify`,
-`code-judo`, `crew`, `merge-bar`, `seat-mods`, `molt`, `baton`.
+`remodel`, `crew`, `merge-bar`, `seat-mods`, `molt`, `baton`.
 
 This repo is the **public canonical half** of a dual-repo project. Design specs, session
 handoffs, review records and process exhaust live in a private sibling workspace and must

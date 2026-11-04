@@ -1,6 +1,14 @@
 # Changelog
 
-All notable changes to the `code-judo` plugin.
+All notable changes to the `remodel` plugin (named `code-judo` through 0.2.4).
+
+## 0.3.0
+
+Renamed from `code-judo` to `remodel`, in the marketplace's rename to `pulsestack`. The commands
+are now `/remodel:deep-review`, `/remodel:deepen-architecture`, `/remodel:codebase-design` and
+`/remodel:domain-modeling`, and the install key is `remodel@pulsestack`. Behaviour is unchanged.
+To move: uninstall `code-judo@claude-agent-scaffolding`, then install `remodel@pulsestack` (the
+root README's *Renamed from claude-agent-scaffolding* section has every step).
 
 ## 0.2.4
 

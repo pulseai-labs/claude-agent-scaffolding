@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# code-judo — invocation and frontmatter lint
+# remodel — invocation and frontmatter lint
 #
 # Every skill declares its invocation posture on three surfaces, and this
 # asserts they agree. Posture is DERIVED from the description users read; the
@@ -29,16 +29,16 @@
 # command with no skill, surfaces as a missing counterpart instead of as a file
 # nobody thought to look at.
 #
-# Usage:   bash code-judo/tests/test-frontmatter-lint.sh
+# Usage:   bash remodel/tests/test-frontmatter-lint.sh
 # Exit:    0 if every surface agrees; 1 otherwise.
 # Deps:    bash 3.2+, ruby with psych.
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-# CODE_JUDO_LINT_ROOT points the lint at another plugin tree; only
+# REMODEL_LINT_ROOT points the lint at another plugin tree; only
 # tests/test-frontmatter-lint-fixtures.sh sets it, to run the lint on fixtures.
-PLUGIN_ROOT="${CODE_JUDO_LINT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+PLUGIN_ROOT="${REMODEL_LINT_ROOT:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SKILLS_DIR="$PLUGIN_ROOT/skills"
 COMMANDS_DIR="$PLUGIN_ROOT/commands"
 
@@ -297,7 +297,7 @@ check_codex_policy() {
   esac
 }
 
-printf '%scode-judo invocation and frontmatter lint%s\n' "$DIM" "$RST"
+printf '%sremodel invocation and frontmatter lint%s\n' "$DIM" "$RST"
 
 # The union of both globs. An orphan on either side becomes a missing
 # counterpart rather than a file nobody looked at.

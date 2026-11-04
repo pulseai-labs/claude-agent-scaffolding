@@ -13,7 +13,7 @@ humans and for agents.
 This skill is *informed* by the project's domain model and built on a shared design
 vocabulary:
 
-- Load `code-judo:codebase-design` for the architecture vocabulary —
+- Load `remodel:codebase-design` for the architecture vocabulary —
   **module**, **interface**, **depth**, **seam**, **adapter**, **leverage**, **locality** —
   and its principles: the deletion test, "the interface is the test surface", "one adapter is
   a hypothetical seam, two is a real one". Use those terms exactly in every suggestion. Do
@@ -31,7 +31,7 @@ vocabulary:
   either.** Do not assume either sits at the repo root, and do not assume the vocabulary is in
   a glossary file at all: *Where the model lives* also covers the case where a lifecycle
   assigns terms an owner that is not a glossary — a journey map, the ADR whose decision defines
-  the term, a document regenerated from a spec. `code-judo:domain-modeling` owns that
+  the term, a document regenerated from a spec. `remodel:domain-modeling` owns that
   inference and it is one lookup. Read whatever the resolution names, glossary or not; if the
   selected area spans more than one scope, resolve each.
 
@@ -64,7 +64,7 @@ organically and note where *you* experience friction:
 - Where do tightly-coupled modules leak across their seams?
 - Which parts are untested, or hard to test through their current interface?
 
-Apply the **deletion test** to anything you suspect is shallow. `code-judo:codebase-design`
+Apply the **deletion test** to anything you suspect is shallow. `remodel:codebase-design`
 defines it; the direction that matters when you are scanning is: imagine the module gone. If
 the complexity **vanishes**, it was a pass-through — that is your deepening candidate. If the
 complexity **reappears, scattered across every caller** that used to go through it, the module
@@ -191,13 +191,13 @@ order, the probe, and the in-plugin protocol that runs when nothing else is inst
 ### Side effects, inline
 
 These happen as decisions crystallize, not in a batch at the end. Load
-`code-judo:domain-modeling` — by *How you load a sibling skill depends on the host* — to keep
+`remodel:domain-modeling` — by *How you load a sibling skill depends on the host* — to keep
 the domain model current as you
 go. Route every glossary change through it rather than writing `CONTEXT.md` from here: that
 skill knows when the project's vocabulary has another owner, and this one does not.
 
 - **Naming a deepened module after a concept the project's vocabulary does not define?** Add
-  the term through `code-judo:domain-modeling`, on its terms — it writes the glossary only
+  the term through `remodel:domain-modeling`, on its terms — it writes the glossary only
   where nothing else owns the vocabulary, and otherwise names the owner and hands the term
   over.
 - **Sharpening a fuzzy term during the conversation?** Same route, same moment — not batched.
@@ -205,10 +205,10 @@ skill knows when the project's vocabulary has another owner, and this one does n
   me to record this as an ADR so future architecture reviews don't re-suggest it?"* Offer it
   only when the reason is one a future explorer would actually need in order to avoid
   re-suggesting the same thing. Skip ephemeral reasons ("not worth it right now") and
-  self-evident ones. On yes, hand it to `code-judo:domain-modeling`, whose
+  self-evident ones. On yes, hand it to `remodel:domain-modeling`, whose
   `references/adr-format.md` governs what happens next.
 - **Want to explore alternative interfaces for the deepened module?** Load
-  `code-judo:codebase-design` — again by *How you load a sibling skill depends on the host* —
+  `remodel:codebase-design` — again by *How you load a sibling skill depends on the host* —
   and use its design-it-twice parallel sub-agent pattern.
 
 ### In an ossify project

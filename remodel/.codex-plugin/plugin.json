@@ -1,6 +1,6 @@
 {
-  "name": "code-judo",
-  "version": "0.2.4",
+  "name": "remodel",
+  "version": "0.3.0",
   "description": "Strict quality review and architecture deepening: deep-review, deepen-architecture, codebase-design, and domain-modeling skills.",
   "author": {
     "name": "Pras"
@@ -16,9 +16,9 @@
   ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "Code Judo",
+    "displayName": "Remodel",
     "shortDescription": "Strict quality review and architecture deepening.",
-    "longDescription": "Code Judo reviews a diff for maintainability with an unusually strict bar, and scans a codebase for shallow modules worth deepening. It is ambitious about structure: it hunts for restructurings that delete complexity rather than rearrange it. Ships the deep-module design vocabulary and a domain-modeling discipline the other two skills speak.",
+    "longDescription": "Remodel reviews a diff for maintainability with an unusually strict bar, and scans a codebase for shallow modules worth deepening. It is ambitious about structure: it hunts for restructurings that delete complexity rather than rearrange it. Ships the deep-module design vocabulary and a domain-modeling discipline the other two skills speak.",
     "developerName": "Pras",
     "category": "Coding",
     "capabilities": [
@@ -31,7 +31,7 @@
       "Where is this codebase shallow?",
       "Is this abstraction earning its keep?"
     ],
-    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/code-judo",
+    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/remodel",
     "brandColor": "#0F766E"
   }
 }

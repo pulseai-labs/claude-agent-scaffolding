@@ -10,7 +10,7 @@ ready to build:
 
 1. **Constraints** — what any new interface would have to satisfy.
 2. **Dependencies** — what the module depends on, and which category each falls into
-   (`code-judo:codebase-design` → `references/deepening.md`).
+   (`remodel:codebase-design` → `references/deepening.md`).
 3. **The shape of the deepened module** — its interface: entry points, parameters,
    invariants, error modes.
 4. **What sits behind the seam** — what the implementation absorbs, and what stays outside.

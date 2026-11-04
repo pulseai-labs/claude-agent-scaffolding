@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# code-judo — plugin test runner.
+# remodel — plugin test runner.
 #
 # Discovers every suite under tests/ by glob rather than listing them. A hand
 # list and this header's claim drift apart the moment someone adds a file: the
@@ -20,7 +20,7 @@ shopt -u nullglob
 # An empty glob would otherwise exit 0 having run nothing, which reads exactly
 # like a passing suite.
 if [ "${#SUITES[@]}" -eq 0 ]; then
-  printf 'code-judo: no suites found under tests/test-*.sh\n' >&2
+  printf 'remodel: no suites found under tests/test-*.sh\n' >&2
   exit 1
 fi
 
@@ -38,6 +38,6 @@ for suite in "${SUITES[@]}"; do
   fi
 done
 
-printf '\n=== code-judo: %d suite(s) run, %d failed ===\n' "$ran" "$failed"
+printf '\n=== remodel: %d suite(s) run, %d failed ===\n' "$ran" "$failed"
 [ "$failed" -eq 0 ] || exit 1
 exit 0

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# code-judo — fidelity pins
+# remodel — fidelity pins
 #
-# code-judo is a port. Its value is that specific upstream rules survived the
+# remodel is a port. Its value is that specific upstream rules survived the
 # adaptation intact, and the failure mode this guards is a later edit quietly
 # summarising one of them away — the kind of change that reads fine in a diff
 # and is invisible in every other test.
@@ -25,7 +25,7 @@
 # matching LINES rather than occurrences, so it cannot see a duplicate on one
 # line, and `grep -q` in a pipeline can fail on a true match under pipefail.
 #
-# Usage:   bash code-judo/tests/test-fidelity-pins.sh
+# Usage:   bash remodel/tests/test-fidelity-pins.sh
 # Exit:    0 if every pin occurs exactly once; 1 otherwise.
 # Deps:    bash 3.2+, awk.
 
@@ -74,7 +74,7 @@ pin() {
   fi
 }
 
-printf '%scode-judo fidelity pins — ten load-bearing rules from the port record (#382)%s\n\n' "$DIM" "$RST"
+printf '%sremodel fidelity pins — ten load-bearing rules from the port record (#382)%s\n\n' "$DIM" "$RST"
 
 pin "skills/deep-review/references/rubric.md" \
   "from under 1000 lines to over 1000 lines" \

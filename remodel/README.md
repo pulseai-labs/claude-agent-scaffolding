@@ -1,8 +1,8 @@
-# code-judo
+# remodel
 
 Strict quality review and architecture deepening. Four prose skills, no runtime library.
 
-The name is the thesis. A **code-judo move** is a restructuring that uses the existing
+Formerly `code-judo` (renamed in the pulsestack rename). The thesis is unchanged: a **code-judo move** is a restructuring that uses the existing
 architecture more effectively and makes a change dramatically simpler — one that *deletes*
 complexity rather than rearranging it. Both review surfaces here are built to hunt for those,
 not to collect nits.
@@ -20,10 +20,10 @@ not to collect nits.
 
 | Command | Skill |
 |---|---|
-| `/code-judo:deep-review [base-ref]` | `deep-review` |
-| `/code-judo:deepen-architecture [direction]` | `deepen-architecture` |
-| `/code-judo:codebase-design [module or question]` | `codebase-design` |
-| `/code-judo:domain-modeling [term or decision]` | `domain-modeling` |
+| `/remodel:deep-review [base-ref]` | `deep-review` |
+| `/remodel:deepen-architecture [direction]` | `deepen-architecture` |
+| `/remodel:codebase-design [module or question]` | `codebase-design` |
+| `/remodel:domain-modeling [term or decision]` | `domain-modeling` |
 
 ## What `deep-review` is not
 
@@ -80,4 +80,4 @@ count kept in two places is a count that drifts.
 
 ## OMP
 
-Install per the root README. Skills are reachable as `skill://<name>`, with no `code-judo:` prefix. No Claude Code-only parts.
+Install per the root README. Skills are reachable as `skill://<name>`, with no `remodel:` prefix. No Claude Code-only parts.

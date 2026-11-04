@@ -53,10 +53,10 @@
       "category": "Coding"
     },
     {
-      "name": "code-judo",
+      "name": "remodel",
       "source": {
         "source": "local",
-        "path": "./code-judo"
+        "path": "./remodel"
       },
       "policy": {
         "installation": "AVAILABLE",

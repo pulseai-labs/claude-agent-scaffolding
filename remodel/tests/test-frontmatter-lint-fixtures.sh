@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# code-judo — fixtures for the frontmatter lint
+# remodel — fixtures for the frontmatter lint
 #
-# test-frontmatter-lint.sh checks code-judo's own skills, which are all well
+# test-frontmatter-lint.sh checks remodel's own skills, which are all well
 # formed, so none of its failure branches runs in CI. This suite builds small
-# plugin trees, runs the lint on each through CODE_JUDO_LINT_ROOT, and asserts
+# plugin trees, runs the lint on each through REMODEL_LINT_ROOT, and asserts
 # the verdict: each defect class must fail, and its adjacent control must pass
 # (#390, #404).
 #
-# Usage:   bash code-judo/tests/test-frontmatter-lint-fixtures.sh
+# Usage:   bash remodel/tests/test-frontmatter-lint-fixtures.sh
 # Exit:    0 if every fixture gets the expected verdict; 1 otherwise.
 # Deps:    bash 3.2+, ruby with psych (the lint's own dependency).
 
@@ -44,7 +44,7 @@ new_plugin() {
 # expect <label> <pass|fail> <plugin-dir> [needle]
 # Runs the lint on the tree; needle, when given, must appear in its output.
 expect() {
-  _out="$(CODE_JUDO_LINT_ROOT="$3" bash "$LINT" 2>&1)"; _rc=$?
+  _out="$(REMODEL_LINT_ROOT="$3" bash "$LINT" 2>&1)"; _rc=$?
   if [ "$2" = pass ]; then _ok=$([ "$_rc" -eq 0 ] && echo 1 || echo 0)
   else _ok=$([ "$_rc" -ne 0 ] && echo 1 || echo 0); fi
   if [ "$_ok" = 1 ] && { [ -z "${4:-}" ] || printf '%s' "$_out" | grep -Fq -- "$4"; }; then

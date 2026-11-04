@@ -1,6 +1,6 @@
 ---
 name: deep-review
-description: An unusually strict maintainability review of a branch or diff — abstraction quality, giant files, spaghetti growth, boundary leaks — pushed toward ambitious restructurings that delete complexity rather than rearrange it. Human-invoked only. Use for a deep code quality audit, a strict or harsh maintainability review, a code-judo pass over a branch, or "review this diff for structure, not bugs".
+description: An unusually strict maintainability review of a branch or diff — abstraction quality, giant files, spaghetti growth, boundary leaks — pushed toward ambitious restructurings that delete complexity rather than rearrange it. Human-invoked only. Use for a deep code quality audit, a strict or harsh maintainability review, a remodel pass over a branch, or "review this diff for structure, not bugs".
 disable-model-invocation: true
 ---
 

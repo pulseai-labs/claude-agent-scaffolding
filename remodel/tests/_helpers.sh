@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# code-judo test helpers — sourced by every suite in this directory.
+# remodel test helpers — sourced by every suite in this directory.
 #
 # Both suites had their own copy of the counters, the colour setup, and pass/fail.
 # Every plugin in this marketplace that has more than one suite keeps them here
