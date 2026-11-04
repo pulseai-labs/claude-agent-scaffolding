@@ -39,9 +39,11 @@ After that, plan each release once, then run every spine in it through the same 
 close the release last:
 
 ```
-/ossify:plan-release
-  for each spine:  /ossify:plan-spine <spine-id>  →  /ossify:run-spine <spine-id>  →  /ossify:close <spine-id>
-/ossify:close <release-id>
+/ossify:plan-release           # once per release
+/ossify:plan-spine <spine-id>  # then, for each spine:
+/ossify:run-spine <spine-id>
+/ossify:close <spine-id>
+/ossify:close <release-id>     # after the last spine
 ```
 
 A spine's close lands its work by PR through `/ossify:work-pr` where the repo has a remote, and a
