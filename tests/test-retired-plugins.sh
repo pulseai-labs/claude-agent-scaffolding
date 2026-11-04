@@ -71,7 +71,7 @@ is_survivor() {
         merge-bar/tests/fixtures/gh/*) return 0 ;;            # recorded gh output from real PRs: a captured reply is a fixture and is never edited
         ossify/tests/eval/evidence/*) return 0 ;;             # recorded eval evidence: a run's output is history and is never edited
         workspace-init/lib/_helpers.sh) return 0 ;;           # ported-from lineage comments: the helpers mirror the retired plugin's
-        claude-security-audit/tests/_helpers.sh) return 0 ;;  # ported-from lineage comments: the harness mirrors the retired plugin's
+        membrane/tests/_helpers.sh) return 0 ;;  # ported-from lineage comments: the harness mirrors the retired plugin's
       esac ;;
   esac
   return 1

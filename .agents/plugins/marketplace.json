@@ -1,5 +1,5 @@
 {
-  "name": "claude-agent-scaffolding-codex",
+  "name": "pulsestack-codex",
   "interface": {
     "displayName": "Claude Agent Scaffolding for Codex"
   },
@@ -17,10 +17,10 @@
       "category": "Coding"
     },
     {
-      "name": "ai-mentor",
+      "name": "sage",
       "source": {
         "source": "local",
-        "path": "./ai-mentor"
+        "path": "./sage"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -29,10 +29,10 @@
       "category": "Productivity"
     },
     {
-      "name": "claude-security-audit",
+      "name": "membrane",
       "source": {
         "source": "local",
-        "path": "./claude-security-audit"
+        "path": "./membrane"
       },
       "policy": {
         "installation": "AVAILABLE",
@@ -53,10 +53,10 @@
       "category": "Coding"
     },
     {
-      "name": "code-judo",
+      "name": "remodel",
       "source": {
         "source": "local",
-        "path": "./code-judo"
+        "path": "./remodel"
       },
       "policy": {
         "installation": "AVAILABLE",

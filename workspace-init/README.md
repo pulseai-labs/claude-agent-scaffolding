@@ -11,8 +11,8 @@ Scenario A (`/pair-workspace`) lets you adopt an **existing** canonical repo —
 ## Install
 
 ```
-/plugin install workspace-init@claude-agent-scaffolding
-/plugin install ossify@claude-agent-scaffolding
+/plugin install workspace-init@pulsestack
+/plugin install ossify@pulsestack
 ```
 
 `ossify` is the lifecycle continuation this plugin hands off to, and a separate

@@ -32,7 +32,7 @@ On Codex, invoke the skills by name.
 ## Install
 
 ```
-/plugin install merge-bar@claude-agent-scaffolding
+/plugin install merge-bar@pulsestack
 ```
 
 ## The `mb` helper

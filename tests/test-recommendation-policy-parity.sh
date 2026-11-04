@@ -16,9 +16,9 @@ SOT="$ROOT/docs/conventions/recommendation-policy.md"
 # Each plugin's shipped copy (these paths ship with /plugin install; repo-root
 # docs/ does not). Keep in sync with the plugin SKILL.md references.
 COPIES=(
-  "$ROOT/ai-mentor/skills/grill-me/recommendation-policy.md"
-  "$ROOT/ai-mentor/skills/council/recommendation-policy.md"
-  "$ROOT/code-judo/skills/deepen-architecture/references/recommendation-policy.md"
+  "$ROOT/sage/skills/grill-me/recommendation-policy.md"
+  "$ROOT/sage/skills/council/recommendation-policy.md"
+  "$ROOT/remodel/skills/deepen-architecture/references/recommendation-policy.md"
 )
 
 PASS=0

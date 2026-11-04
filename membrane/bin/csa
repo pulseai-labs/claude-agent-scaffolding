@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+# bin/csa — dispatcher entry point for membrane
+#
+# Why this exists: Claude Code's Bash tool on macOS runs under zsh by default
+# ($SHELL=zsh). Skill bodies that `source lib/*.sh` then inherit zsh, where
+# ${BASH_SOURCE[0]} is unset and ${BASH_REMATCH[…]} returns empty silently.
+# This dispatcher's shebang (#!/usr/bin/env bash) forces bash via the kernel
+# on direct execution, regardless of caller shell. Libs sourced through here
+# get the bash runtime they were written for.
+#
+# Contract:
+#   csa <function-suffix> [args...]
+#     → resolves to csa_<function-suffix>, dispatches with remaining args.
+#       Examples:
+#         csa state_bootstrap_gitignore       → csa_state_bootstrap_gitignore
+#         csa rule_engine_scan_all "$tgts"    → csa_rule_engine_scan_all "$tgts"
+#         csa apply_resolve_id "SA-..."       → csa_apply_resolve_id "SA-..."
+#   csa --list
+#     → prints all csa_-prefixed functions, one per line, sorted.
+#
+# Exit codes:
+#   0    function ran successfully (or matched function's exit code)
+#   2    usage error (no args, unknown function)
+#   *    propagated verbatim from the dispatched function
+# stdout/stderr are passed through unchanged — no wrapping.
+
+set -euo pipefail
+
+readonly _DISPATCHER_PREFIX="csa"
+
+_BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLUGIN_ROOT="$(cd "$_BIN_DIR/.." && pwd)"
+export PLUGIN_ROOT
+_LIB_DIR="$PLUGIN_ROOT/lib"
+CSA_PLUGIN_ROOT="${CSA_PLUGIN_ROOT:-$PLUGIN_ROOT}"
+CSA_LIB_DIR="${CSA_LIB_DIR:-$_LIB_DIR}"
+CSA_RULES_DIR="${CSA_RULES_DIR:-$CSA_LIB_DIR/rules}"
+CSA_FIXTURES_DIR="${CSA_FIXTURES_DIR:-$PLUGIN_ROOT/fixtures}"
+export CSA_PLUGIN_ROOT CSA_LIB_DIR CSA_RULES_DIR CSA_FIXTURES_DIR
+
+# Source the conventional helpers first, then everything else in glob order.
+# membrane names its helpers file `helpers.sh` (no underscore prefix).
+if [ -f "$_LIB_DIR/helpers.sh" ]; then
+  # shellcheck source=/dev/null
+  source "$_LIB_DIR/helpers.sh"
+fi
+for _f in "$_LIB_DIR"/*.sh; do
+  [ -e "$_f" ] || continue
+  [ "$(basename "$_f")" = "helpers.sh" ] && continue
+  # shellcheck source=/dev/null
+  source "$_f"
+done
+
+if [ "${1:-}" = "--list" ]; then
+  declare -F \
+    | awk -v pfx="${_DISPATCHER_PREFIX}_" '$3 ~ "^"pfx"[^_]" { sub(pfx, "", $3); print $3 }' \
+    | sort
+  exit 0
+fi
+
+if [ $# -lt 1 ]; then
+  cat >&2 <<USAGE
+Usage: $(basename "$0") <function-suffix> [args...]
+       $(basename "$0") --list
+
+Function suffix resolves to ${_DISPATCHER_PREFIX}_<suffix>.
+Examples:
+  $(basename "$0") state_bootstrap_gitignore
+  $(basename "$0") rule_engine_scan_all "\$targets"
+USAGE
+  exit 2
+fi
+
+_fn="${_DISPATCHER_PREFIX}_$1"
+shift
+if ! declare -f "$_fn" >/dev/null 2>&1; then
+  echo "Unknown function: $_fn" >&2
+  echo "Run '$(basename "$0") --list' to see available functions." >&2
+  exit 2
+fi
+"$_fn" "$@"

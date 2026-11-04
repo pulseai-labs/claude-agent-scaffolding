@@ -14,11 +14,11 @@ function stub(h: string, name: string, version: number, minLoader = 1, body = ""
      export default function (pi: any) { pi.ran = "${name}@${version}"; }`);
   return p;
 }
-function record(h: string, which: ".omp" | ".claude", plugins: Record<string, string>) {
+function record(h: string, which: ".omp" | ".claude", plugins: Record<string, string>, m = M) {
   const f = join(h, which, "plugins", "installed_plugins.json");
   mkdirSync(join(f, ".."), { recursive: true });
   writeFileSync(f, JSON.stringify({ version: 2, plugins: Object.fromEntries(
-    Object.entries(plugins).map(([n, p]) => [`${n}@${M}`, [{ scope: "user", installPath: p }]])) }));
+    Object.entries(plugins).map(([n, p]) => [`${n}@${m}`, [{ scope: "user", installPath: p }]])) }));
 }
 
 describe("loader", () => {
@@ -32,10 +32,10 @@ describe("loader", () => {
   });
   test("finds modules through the Claude record too", async () => {
     const h = home();
-    record(h, ".claude", { "ai-mentor": stub(h, "ai-mentor", 1) });
+    record(h, ".claude", { "sage": stub(h, "sage", 1) });
     const pi: any = {};
     await load(pi, h);
-    expect(pi.ran).toBe("ai-mentor@1");
+    expect(pi.ran).toBe("sage@1");
   });
   test("a plugin of our marketplace without omp/bin-path.ts yields no candidate", () => {
     const h = home();
@@ -49,6 +49,13 @@ describe("loader", () => {
     const p = stub(h, "brand-new-plugin", 1);
     record(h, ".omp", { "brand-new-plugin": p });
     expect(moduleCandidates(h)).toEqual([join(p, "omp", "bin-path.ts")]);
+  });
+  test("moduleCandidates finds modules under both names", () => {
+    const h = home();
+    const a = stub(h, "ossify", 1), b = stub(h, "merge-bar", 1);
+    record(h, ".omp", { ossify: a }, "pulsestack");
+    record(h, ".claude", { "merge-bar": b }, "claude-agent-scaffolding");
+    expect(moduleCandidates(h).sort()).toEqual([join(a, "omp", "bin-path.ts"), join(b, "omp", "bin-path.ts")].sort());
   });
   test("a plugin of another marketplace that ships omp/bin-path.ts yields no candidate", () => {
     const h = home();

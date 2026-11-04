@@ -1,5 +1,5 @@
 {
-  "name": "claude-agent-scaffolding",
+  "name": "pulsestack",
   "owner": {
     "name": "Pras"
   },
@@ -11,10 +11,10 @@
       "source": "./workspace-init"
     },
     {
-      "name": "ai-mentor",
+      "name": "sage",
       "description": "Decision-making mentor. Four skills auto-invoke on natural-language triggers: grill-me (one-question-at-a-time plan interrogation with CORE posture + 4 cognitive-discipline escape valves), council (5-persona multi-angle idea validation, Karpathy LLM Council pattern with codebase-aware Historian), eli10 (repeatable simplification), fool (sticky beginner's-mind mode). Skill-first; no hooks, no state.",
       "category": "productivity",
-      "source": "./ai-mentor"
+      "source": "./sage"
     },
     {
       "name": "ossify",
@@ -23,10 +23,10 @@
       "source": "./ossify"
     },
     {
-      "name": "code-judo",
-      "description": "Strict quality review and architecture deepening. 4 prose skills, 4 slash commands, no runtime library. deep-review is a human-invoked maintainability audit of a diff or branch — the code-judo ambition standard (restructurings that delete complexity rather than rearrange it), the 1000-line rule with its waiver path, spaghetti-growth suspicion, wrapper/cast/boundary rules, a 7-tier prioritized output order, and a categorical approval bar with 6 presumptive blockers. It produces one report and one disposition pass and never re-reviews its own fixes; its verdict is advisory, never a merge gate. deepen-architecture scans a codebase for shallow modules using the deletion test, writes a single HTML report to the OS temp dir with before/after diagrams and Strong/Worth-exploring/Speculative badges, opens it in the browser, and grills through the candidate you pick. codebase-design ships the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality), the four dependency categories, seam discipline, and design-it-twice. domain-modeling keeps the CONTEXT.md glossary where nothing else owns the project's vocabulary, and composes ADRs without filing them — the ADR directory is a numbered sequence and it leaves that to whichever plugin owns it. No hard cross-plugin dependencies: the grilling step resolves softly to ossify:challenge, then ai-mentor:grill-me, then an in-plugin protocol. Adapted from Cursor's thermo-nuclear code-quality review and Matt Pocock's improve-codebase-architecture.",
+      "name": "remodel",
+      "description": "Strict quality review and architecture deepening. 4 prose skills, 4 slash commands, no runtime library. deep-review is a human-invoked maintainability audit of a diff or branch — the code-judo ambition standard (restructurings that delete complexity rather than rearrange it), the 1000-line rule with its waiver path, spaghetti-growth suspicion, wrapper/cast/boundary rules, a 7-tier prioritized output order, and a categorical approval bar with 6 presumptive blockers. It produces one report and one disposition pass and never re-reviews its own fixes; its verdict is advisory, never a merge gate. deepen-architecture scans a codebase for shallow modules using the deletion test, writes a single HTML report to the OS temp dir with before/after diagrams and Strong/Worth-exploring/Speculative badges, opens it in the browser, and grills through the candidate you pick. codebase-design ships the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality), the four dependency categories, seam discipline, and design-it-twice. domain-modeling keeps the CONTEXT.md glossary where nothing else owns the project's vocabulary, and composes ADRs without filing them — the ADR directory is a numbered sequence and it leaves that to whichever plugin owns it. No hard cross-plugin dependencies: the grilling step resolves softly to ossify:challenge, then sage:grill-me, then an in-plugin protocol. Adapted from Cursor's thermo-nuclear code-quality review and Matt Pocock's improve-codebase-architecture.",
       "category": "workflow",
-      "source": "./code-judo"
+      "source": "./remodel"
     },
     {
       "name": "merge-bar",

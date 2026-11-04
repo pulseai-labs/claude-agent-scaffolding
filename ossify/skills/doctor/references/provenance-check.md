@@ -27,7 +27,8 @@ working directory. If that root contains
 an unreadable or invalid checkout manifest makes expected unavailable, and the
 installed record is never a fallback. Otherwise, on Claude Code only, read
 `~/.claude/plugins/installed_plugins.json` (under the configured Claude home)
-and select records under `ossify@claude-agent-scaffolding`. A user-scope
+and select records under `ossify@pulsestack` (on a host that has not moved yet, the
+pre-rename key `ossify@claude-agent-scaffolding`; a record under the new key wins). A user-scope
 record is applicable; a project/local record is applicable only when its
 `projectPath` resolves to the current worktree root. Exactly one applicable
 record must remain. It must supply `version` and a readable `installPath`, and

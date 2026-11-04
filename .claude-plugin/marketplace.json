@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "claude-agent-scaffolding",
+  "name": "pulsestack",
   "description": "Personal plugin marketplace for agent-assisted development: dual-repo workspace bootstrap, a skeleton-first delivery lifecycle, adversarial design critique, strict code-quality and architecture review, configuration security auditing, and decision-making mentor surfaces. Described by capability rather than by plugin name, so it does not go stale as plugins land.",
   "owner": {
     "name": "Pras"
@@ -13,16 +13,16 @@
       "source": "./workspace-init"
     },
     {
-      "name": "ai-mentor",
+      "name": "sage",
       "description": "Decision-making mentor. Four skills auto-invoke on natural-language triggers: grill-me (one-question-at-a-time plan interrogation with CORE posture + 4 cognitive-discipline escape valves), council (5-persona multi-angle idea validation, Karpathy LLM Council pattern with codebase-aware Historian), eli10 (repeatable simplification), fool (sticky beginner's-mind mode). Skill-first; no hooks, no state.",
       "category": "productivity",
-      "source": "./ai-mentor"
+      "source": "./sage"
     },
     {
-      "name": "claude-security-audit",
+      "name": "membrane",
       "description": "Static-analysis security audit for Claude Code project configurations and enabled plugins. 28 rules across 7 aspects: secrets (Anthropic/OpenAI/GitHub/AWS keys, JWTs, env-var leaks, base64 blobs), permissions (broad-allow, missing-deny, settings.local divergence, PERM-005 schema-typo validation, dangerous combos), hooks (curl|bash, rm -rf, unbounded eval, network exfiltration), MCP (untrusted endpoints, missing auth, env-var leaks), CLAUDE.md (plaintext secrets, internal markers), prompt-injection in agents/commands (common patterns; AST is v0.2), marketplace (untrusted sources, malformed manifest). Two-flag auto-fix (T2-H) gated on `RULE_AUTO_FIXABLE` + `RULE_MECHANICALLY_FIXABLE` with 5-layer defense-in-depth (rule re-validation, target re-resolution, symlink refusal, path-traversal refusal, atomic state log). Durable `finding_uid` (T2-I) survives whitespace/line-drift edits; baseline diff tags NEW vs PERSISTED. Self-tamper detection (T1-F) on state.json + suppressions.json. Critical-cannot-suppress + 60s race-window refusal. Zero ambient surface by default — SessionStart reminder ships as opt-in file (T1-C). Inspired by AgentShield in Everything Claude Code (Mustafa, 2026; MIT) — independent MIT implementation tailored to composable plugin marketplaces.",
       "category": "security",
-      "source": "./claude-security-audit"
+      "source": "./membrane"
     },
     {
       "name": "ossify",
@@ -31,10 +31,10 @@
       "source": "./ossify"
     },
     {
-      "name": "code-judo",
-      "description": "Strict quality review and architecture deepening. 4 prose skills, 4 slash commands, no runtime library. deep-review is a human-invoked maintainability audit of a diff or branch — the code-judo ambition standard (restructurings that delete complexity rather than rearrange it), the 1000-line rule with its waiver path, spaghetti-growth suspicion, wrapper/cast/boundary rules, a 7-tier prioritized output order, and a categorical approval bar with 6 presumptive blockers. It produces one report and one disposition pass and never re-reviews its own fixes; its verdict is advisory, never a merge gate. deepen-architecture scans a codebase for shallow modules using the deletion test, writes a single HTML report to the OS temp dir with before/after diagrams and Strong/Worth-exploring/Speculative badges, opens it in the browser, and grills through the candidate you pick. codebase-design ships the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality), the four dependency categories, seam discipline, and design-it-twice. domain-modeling keeps the CONTEXT.md glossary where nothing else owns the project's vocabulary, and composes ADRs without filing them — the ADR directory is a numbered sequence and it leaves that to whichever plugin owns it. No hard cross-plugin dependencies: the grilling step resolves softly to ossify:challenge, then ai-mentor:grill-me, then an in-plugin protocol. Adapted from Cursor's thermo-nuclear code-quality review and Matt Pocock's improve-codebase-architecture.",
+      "name": "remodel",
+      "description": "Strict quality review and architecture deepening. 4 prose skills, 4 slash commands, no runtime library. deep-review is a human-invoked maintainability audit of a diff or branch — the code-judo ambition standard (restructurings that delete complexity rather than rearrange it), the 1000-line rule with its waiver path, spaghetti-growth suspicion, wrapper/cast/boundary rules, a 7-tier prioritized output order, and a categorical approval bar with 6 presumptive blockers. It produces one report and one disposition pass and never re-reviews its own fixes; its verdict is advisory, never a merge gate. deepen-architecture scans a codebase for shallow modules using the deletion test, writes a single HTML report to the OS temp dir with before/after diagrams and Strong/Worth-exploring/Speculative badges, opens it in the browser, and grills through the candidate you pick. codebase-design ships the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality), the four dependency categories, seam discipline, and design-it-twice. domain-modeling keeps the CONTEXT.md glossary where nothing else owns the project's vocabulary, and composes ADRs without filing them — the ADR directory is a numbered sequence and it leaves that to whichever plugin owns it. No hard cross-plugin dependencies: the grilling step resolves softly to ossify:challenge, then sage:grill-me, then an in-plugin protocol. Adapted from Cursor's thermo-nuclear code-quality review and Matt Pocock's improve-codebase-architecture.",
       "category": "workflow",
-      "source": "./code-judo"
+      "source": "./remodel"
     },
     {
       "name": "crew",

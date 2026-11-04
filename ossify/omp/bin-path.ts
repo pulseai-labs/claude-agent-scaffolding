@@ -13,9 +13,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 
-export const VERSION = 1;
+export const VERSION = 2;
 export const MIN_LOADER_VERSION = 1;
-export const MARKETPLACE = "claude-agent-scaffolding";
+export const MARKETPLACE = "pulsestack";
+// The marketplace's name before the pulsestack rename. Its entries are still read, for one
+// release, so a host that has not re-added the marketplace keeps its bin paths; an entry under
+// MARKETPLACE replaces one under this name. Removing it is a filed follow-up issue.
+export const LEGACY_MARKETPLACE = "claude-agent-scaffolding";
 
 type Entry = { scope?: string; installPath?: string };
 type Plugins = Record<string, Entry[]>;
@@ -34,14 +38,17 @@ function load(path: string): Plugins | undefined {
 }
 
 function ours(plugins: Plugins | undefined): Map<string, Entry> {
-  const m = new Map<string, Entry>();
+  const fresh = new Map<string, Entry>(), legacy = new Map<string, Entry>();
   for (const [id, entries] of Object.entries(plugins ?? {})) {
     const at = id.lastIndexOf("@");
-    if (at < 0 || id.slice(at + 1) !== MARKETPLACE || !Array.isArray(entries)) continue;
+    const mkt = at < 0 ? "" : id.slice(at + 1);
+    const to = mkt === MARKETPLACE ? fresh : mkt === LEGACY_MARKETPLACE ? legacy : undefined;
+    if (to === undefined || !Array.isArray(entries)) continue;
     const e = entries.find((x) => x?.scope === "user") ?? entries[0];
-    if (typeof e?.installPath === "string" && e.installPath) m.set(id.slice(0, at), e);
+    if (typeof e?.installPath === "string" && e.installPath) to.set(id.slice(0, at), e);
   }
-  return m;
+  for (const [name, e] of legacy) if (!fresh.has(name)) fresh.set(name, e);
+  return fresh;
 }
 
 // Plugin name -> installPath for this marketplace's entries in one record (the user-scope entry, else

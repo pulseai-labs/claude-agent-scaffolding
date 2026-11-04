@@ -9,7 +9,7 @@
 set -u
 export LC_ALL=C
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-OMP_FIVE="ossify merge-bar workspace-init code-judo ai-mentor"
+OMP_FIVE="ossify merge-bar workspace-init remodel sage"
 # The two mods (spec C): catalog entries equal their Claude entries; their text is not gated here.
 OMP_MODS="seat-mods molt"
 # Claude plugins also listed on OMP for an OMP top (spec D): catalog entries equal their Claude entries; text not gated.

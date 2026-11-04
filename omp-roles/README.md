@@ -15,19 +15,19 @@ Coordinator roles need ossify 1.18.0 for `spine-driver`, `close`, `crew-spine` a
 OMP does not put a plugin's `bin/` on `PATH`, so a coordinator role also needs the `plugin-bin-path.ts` loader from the root README's OMP section, installed once per machine; without it `oss` is not found. `omp-seat` does not pass `--no-extensions`, so the loader in your user extension folder still loads.
 
 ```bash
-omp plugin marketplace add pulseai-labs/claude-agent-scaffolding
-omp plugin install omp-roles@claude-agent-scaffolding
-omp plugin install seat-mods@claude-agent-scaffolding
-omp plugin install molt@claude-agent-scaffolding
-omp plugin install ossify@claude-agent-scaffolding
-omp plugin install merge-bar@claude-agent-scaffolding
-omp plugin install crew@claude-agent-scaffolding   # the orchestrator role only
+omp plugin marketplace add pulseai-labs/pulsestack
+omp plugin install omp-roles@pulsestack
+omp plugin install seat-mods@pulsestack
+omp plugin install molt@pulsestack
+omp plugin install ossify@pulsestack
+omp plugin install merge-bar@pulsestack
+omp plugin install crew@pulsestack   # the orchestrator role only
 ```
 
 Put the launcher on `PATH`. `omp plugin list` shows the installed version; the path is in the install record:
 
 ```bash
-ln -sf "$(jq -r '.plugins["omp-roles@claude-agent-scaffolding"] | (map(select(.scope == "user")) + .)[0].installPath' ~/.omp/plugins/installed_plugins.json)/bin/omp-seat" ~/.local/bin/omp-seat
+ln -sf "$(jq -r '.plugins["omp-roles@pulsestack"] | (map(select(.scope == "user")) + .)[0].installPath' ~/.omp/plugins/installed_plugins.json)/bin/omp-seat" ~/.local/bin/omp-seat
 ```
 
 Run it again after an upgrade: the link points at one version's folder. `omp-seat` needs `bun`; a `--via` wrapper that runs omp under `timeout` needs `--foreground`.

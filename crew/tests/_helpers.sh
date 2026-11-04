@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # crew test helpers — sourced by every suite in this directory.
 #
-# Three plugins in this marketplace — code-judo, merge-bar and this one — keep
+# Three plugins in this marketplace — remodel, merge-bar and this one — keep
 # the colour setup, pass/fail and the report line in a `_helpers.sh` rather than one copy per
 # suite; the other plugins' `_helpers.sh` carry a different set of primitives
 # (`assert_*` and temp helpers). This follows the first shape rather than inventing

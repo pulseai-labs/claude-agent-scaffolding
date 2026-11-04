@@ -1,5 +1,9 @@
 # workspace-init changelog
 
+## 0.10.5
+
+The marketplace is renamed `pulsestack`; the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the old `claude-agent-scaffolding`; an entry under the new name wins. The install key is `workspace-init@pulsestack`, and `ai-mentor` is `sage` in the README stub. No other change.
+
 ## 0.10.4 (2026-11-02)
 
 Routing prose follows ossify 1.35.0.

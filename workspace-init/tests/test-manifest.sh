@@ -263,11 +263,11 @@ test_B4_resolve_ampersand_and_backslash_in_root_are_literal() {
 
 test_C1_plugin_data_resolves_to_path() {
   local ai; ai="$(_setup_pair c1)" || return 1
-  local out; out="$(wi_manifest_resolve "$ai" '${PLUGIN_DATA:ai-mentor}')"
+  local out; out="$(wi_manifest_resolve "$ai" '${PLUGIN_DATA:sage}')"
   # Must be an absolute path
   [[ "$out" == /* ]] || { echo "    not absolute: $out"; return 1; }
   # Must contain the plugin name somewhere
-  assert_contains "ai-mentor" "$out" || return 1
+  assert_contains "sage" "$out" || return 1
 }
 
 test_C2_plugin_data_for_nonexistent_plugin_still_resolves_to_path() {
