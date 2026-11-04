@@ -16,8 +16,9 @@
 The plugins we run every day to ship real software with coding agents (Claude Code, Codex and
 OMP), from one marketplace.
 
-Instead of jumping straight to code, **ossify** builds a thin skeleton that runs end to end, then
-grows it spine by spine. Each work item is built test-first, checked by an agent that did not build
+Instead of jumping straight to code, **ossify** starts from a skeleton: a thin slice that runs end
+to end on a new project, or the code that already shipped on an existing one. Then it grows that
+skeleton spine by spine. Each work item is built test-first, checked by an agent that did not build
 it, and reviewed before it merges. Most of the other plugins plug into that loop; the rest work
 beside it.
 
@@ -25,7 +26,7 @@ beside it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/ossify-skeleton-dark.svg">
-  <img src="docs/assets/readme/ossify-skeleton-light.svg" width="880" alt="ossify: /ossify:start for a new project or /ossify:adopt for existing code leads to Release 0, a thin skeleton that runs end to end; bone and flesh spines grow it to an MVP; v1 ships. Every spine runs plan-spine, run-spine, close and work-pr.">
+  <img src="docs/assets/readme/ossify-skeleton-light.svg" width="880" alt="ossify: /ossify:start cuts Release 0 as a thin slice that runs end to end; /ossify:adopt closes what already shipped as Release 0. Bone and flesh spines grow it to an MVP; v1 ships. Every spine runs plan-spine, run-spine and close, then work-pr where the repo has a remote.">
 </picture>
 
 ## How ossify works
@@ -49,7 +50,7 @@ beside it.
 <li>Groom the feature map.</li>
 <li>Set the exit criteria.</li>
 <li>Order the spines as a graph.</li>
-<li>A fail-closed critic can veto the plan.</li>
+<li>A fail-closed critic reviews the plan: a veto-grade finding makes its spine a bone spine, or comes to you.</li>
 </ul>
 </td>
 </tr>
@@ -59,7 +60,7 @@ beside it.
 <b>Plan and run a spine</b>
 <ul>
 <li>One to five work items, planned in rounds, with a cumulative demo that must keep running.</li>
-<li>A bone spine is grilled one question at a time before it is built.</li>
+<li>A bone spine is offered a grilling, one question at a time, before it is built.</li>
 <li>One worktree per work item, built test-first.</li>
 <li>A verifier that did not build the item judges it at close.</li>
 </ul>
@@ -95,11 +96,11 @@ call it and works without it.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/assets/readme/dual-repo-dark.svg">
-  <img src="docs/assets/readme/dual-repo-light.svg" width="880" alt="One private AI workspace holds specs, plans, handoffs, the memory bank, the review ledger and the pairing manifest, and manages one or more canonical repos that hold product code, tests and ADRs.">
+  <img src="docs/assets/readme/dual-repo-light.svg" width="880" alt="One AI workspace holds specs, plans, handoffs, the memory bank, the review ledger and the pairing manifest, and manages one or more canonical repos that hold product code, tests and ADRs.">
 </picture>
 
 Agent process stays out of your product history. Specs, plans, handoffs and the review record live
-in one private AI workspace; code, tests and ADRs land in the canonical repos it manages, one or
+in one AI workspace; code, tests and ADRs land in the canonical repos it manages, one or
 more. `/workspace-init:init-workspace` sets the pair up and writes the pairing manifest.
 workspace-init's job ends there: its continuation for new workspaces is `ossify`.
 workspace-init is optional for ossify:
@@ -107,7 +108,7 @@ workspace-init is optional for ossify:
 
 ## Install
 
-Linux and macOS; Windows is not supported yet.
+Built for Linux and macOS. On Windows, support differs by plugin; each plugin's README says what runs there.
 
 <details open>
 <summary><b>Claude Code</b></summary>
@@ -187,7 +188,7 @@ through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows.
     omp plugin install omp-roles@pulsestack   # and seat-mods, molt
     omp-seat worker --via omp -p "..."
 
-Last verified with omp 18.11.2 on 2026-10-17.
+`omp-roles` is pinned and tested on omp 18.11.2 (`omp-roles/README.md`).
 
 </details>
 
@@ -225,12 +226,15 @@ namespaces (`/remodel:…`, `/sage:…`, `/membrane:…`) moved. The old GitHub 
 
 To move a machine, for each harness you use:
 
-1. **Claude Code.** Note your enabled plugins (`enabledPlugins` in `~/.claude/settings.json`). Run
-   `/plugin marketplace remove claude-agent-scaffolding`, then `/plugin marketplace add pulseai-labs/pulsestack`,
-   and install the same plugins as `<plugin>@pulsestack`, with the three new names in place of the old.
-   A plugin's data directory, `~/.claude/plugins/data/<plugin>-<marketplace>/`, carries the
-   marketplace name: copy each old one into its `-pulsestack` twin (for a renamed plugin, under the new
-   plugin name) before you delete it.
+1. **Claude Code.** First note each enabled plugin and its scope: `enabledPlugins` in
+   `~/.claude/settings.json` (user), and in each project's `.claude/settings.json` (project) and
+   `.claude/settings.local.json` (local). Then copy the data, before anything is removed, because
+   uninstalling a plugin deletes its data directory. That directory,
+   `~/.claude/plugins/data/<plugin>-<marketplace>/`, carries the marketplace name: copy each old one into
+   its `-pulsestack` twin (for a renamed plugin, under the new plugin name). Then run `/plugin marketplace remove claude-agent-scaffolding`,
+   then `/plugin marketplace add pulseai-labs/pulsestack`, and install the same plugins as
+   `<plugin>@pulsestack` in the scope you noted (`claude plugin install <plugin>@pulsestack --scope project`
+   or `--scope local`; user is the default), with the three new names in place of the old.
 2. **Codex.** Run `codex plugin marketplace remove claude-agent-scaffolding-codex`, then
    `codex plugin marketplace add pulseai-labs/pulsestack`, and enable the same plugins. Hook-trust
    entries in `~/.codex/config.toml` are keyed by `plugin@marketplace`, so re-trust them under
