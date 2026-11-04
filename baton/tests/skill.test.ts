@@ -130,3 +130,22 @@ describe("done-file briefs", () => {
     expect(lastStep("prose only")).toBe("");
   });
 });
+
+// #1075 C2: a ruling file holds one ruling. Appending handed a relaunched seat the old ruling first,
+// and an unpark --to runs no outcome hook, so a left file reached the next close or spine-open seat.
+describe("a ruling file holds one ruling (#1075)", () => {
+  const readme = () => readFileSync(join(import.meta.dir, "..", "README.md"), "utf8").replace(/\s+/g, " ");
+  test("the runbook says replace, never append, and to move the file aside before an unpark --to", () => {
+    const r = readme();
+    expect(r).toContain("replacing any file already there: the file holds one ruling");
+    expect(r).toContain("move any `operator.md` aside as `operator-<n>.md`: `--to` runs no outcome hook");
+    expect(r).toContain("replace any file there");
+    expect(r).not.toMatch(/append (it )?(to|if one)/);
+    expect("append it to, when").toMatch(/append (it )?(to|if one)/); // control: the probe matches the 0.16.0 wording
+  });
+  test("the skill's close row says the same", () => {
+    const row = skill().split("\n").find((l) => l.startsWith("| Close or spine-open stop |")) ?? "";
+    expect(row).toContain("replacing any");
+    expect(row).toContain("move it aside before an unpark `--to` another stage");
+  });
+});

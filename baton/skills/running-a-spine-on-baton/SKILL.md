@@ -141,7 +141,7 @@ operator.
 | "passed review … merge it" | check the pass against the rulings; send a finding the order sends to a fix back to `spine_work` | the merge, unless the project's governance grants this session merge authority |
 | PR conflict | merge the base into the spine branch, move `review.md` to `review-prev.md`, unpark `--to spine_review` | a closed PR |
 | `spine_finish` stop on a `user:` line | prepare the walk and evidence | pass or fail: write it to `out/spine-pr/operator.md`, unpark |
-| Close or spine-open stop | rule it; write `out/<wi>/operator.md` (`out/lane/` for spine-open), unpark | a stop that names a spec or ADR change |
+| Close or spine-open stop | rule it; write `out/<wi>/operator.md` (`out/lane/` for spine-open), replacing any, unpark; move it aside before an unpark `--to` another stage | a stop that names a spec or ADR change |
 | Close harvest | present the candidates | accept |
 
 A notice with no run (`auth`, `down`) is the host's: report it, touch nothing. End each notice

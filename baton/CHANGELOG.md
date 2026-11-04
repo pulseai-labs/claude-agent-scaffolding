@@ -2,6 +2,16 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.16.1 - 2026-11-04
+
+A ruling file holds one ruling (#1075 C2). Prose only; no recipe or engine change.
+
+- **Changed: the runbook and skill.** Write the whole current ruling to `out/<unit>/operator.md`,
+  replacing any file there; 0.16.0's advice to append handed a relaunched seat an old ruling ahead of
+  the new one. Before an unpark `--to` another stage, move the file aside: `--to` runs no outcome
+  hook, and the next close or spine-open seat would apply it. A stop in any other stage takes its
+  ruling in the handoff's `## Clarifications`.
+
 ## 0.16.0 - 2026-11-04
 
 An orchestrator ruling reaches the close, spine-open and spine-finish stops (#1057).
