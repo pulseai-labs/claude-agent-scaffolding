@@ -190,6 +190,34 @@ describe("validate", () => {
     expectError(bad, 'units.stages[0]: names no stage: "ghost"');
   });
 
+  test("expect_head: an argv, with outcomes.moved naming a stage; moved is required with it and refused without it (#1046)", () => {
+    const withHead = () => {
+      const r = relay();
+      const name = Object.keys(r.stages).find((k) => r.stages[k].kind === "merge")!;
+      return { r, st: r.stages[name], p: `stages.${name}` };
+    };
+    const ok = withHead();
+    ok.st.expect_head = ["printf", "%s", "{unit.id}"];
+    ok.st.outcomes.moved = Object.keys(ok.r.stages)[0];
+    expect(validate(ok.r).ok).toBe(true);
+    const noMoved = withHead();
+    noMoved.st.expect_head = ["true"];
+    expectError(noMoved.r, `${noMoved.p}.outcomes.moved: is required when expect_head is set`);
+    const badArgv = withHead();
+    badArgv.st.expect_head = [];
+    badArgv.st.outcomes.moved = Object.keys(badArgv.r.stages)[0];
+    expectError(badArgv.r, `${badArgv.p}.expect_head: must be a non-empty argv list`);
+    const noHead = withHead();
+    noHead.st.outcomes.moved = Object.keys(noHead.r.stages)[0];
+    expectError(noHead.r, `${noHead.p}.outcomes.moved: needs expect_head`);
+    const badTarget = withHead();
+    badTarget.st.expect_head = ["true"];
+    badTarget.st.outcomes.moved = "nowhere";
+    expect(errorsOf(badTarget.r).some((e) => e.includes("outcomes.moved") && e.includes("nowhere"))).toBe(true);
+    // control: the unmodified merge stage validates with neither key
+    expect(validate(relay()).ok).toBe(true);
+  });
+
   test("version other than 1", () => {
     const r = relay();
     r.version = 2;

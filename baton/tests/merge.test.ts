@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { main } from "../src/cli.ts";
@@ -506,4 +506,92 @@ test("a merge-stage park a driver escalates: the notice carries the action, then
   expect(runState().units.o1.parked?.escalated).toBe(true);
   expect(noticeLines().length).toBe(1);
   expect(noticeLines()[0].endsWith(`baton r1/o1 parked in merge: outcome — rerun the checks — red: test, lint — ${URL1}`)).toBe(true);
+});
+
+// ---- expect_head (#1046): merge only the head that was reviewed -------------------------------
+const SHA_A = "a".repeat(40);
+const SHA_B = "b".repeat(40);
+const reviewed = (sha: string) => ["printf", "%s\n", sha];
+const withHead = (expect_head: string[] | undefined, over: Record<string, unknown> = {}) =>
+  mergeStage({ expect_head, outcomes: { merged: "done", red: "fixing", conflict: "fixing", moved: "fixing" }, ...over });
+
+test("expect_head: a PR at the reviewed head merges, pinned to that head", async () => {
+  forge.views.set(URL1, { ...green, head: SHA_A });
+  await arm(withHead(reviewed(SHA_A)));
+  await doTick();
+  expect(forge.merges).toEqual([{ url: URL1, head: SHA_A }]);
+});
+
+test("expect_head: a PR head that differs follows outcomes.moved, merges nothing, even when green", async () => {
+  forge.views.set(URL1, { ...green, head: SHA_B });
+  await arm(withHead(reviewed(SHA_A)));
+  await doTick();
+  expect(stageOf("o1")).toBe("fixing");
+  expect(forge.merges).toEqual([]);
+  expect(kinds()).toContain("head moved");
+});
+
+test("expect_head: moved is judged before red checks and before a conflict", async () => {
+  forge.views.set(URL1, { ...green, head: SHA_B, checks: "red", mergeable: "CONFLICTING" });
+  await arm(withHead(reviewed(SHA_A), { outcomes: { merged: "done", red: "done", conflict: "done", moved: "fixing" } }));
+  await doTick();
+  expect(stageOf("o1")).toBe("fixing");
+});
+
+test("expect_head: a moved head waits on nothing - pending checks do not hold the route", async () => {
+  forge.views.set(URL1, { ...green, head: SHA_B, checks: "pending" });
+  await arm(withHead(reviewed(SHA_A)));
+  await doTick();
+  expect(stageOf("o1")).toBe("fixing");
+});
+
+test("expect_head: a matching head still waits on pending checks and still routes red", async () => {
+  forge.views.set(URL1, { ...green, head: SHA_A, checks: "pending" });
+  await arm(withHead(reviewed(SHA_A)));
+  await doTick();
+  expect(forge.merges).toEqual([]);
+  expect(stageOf("o1")).toBe("merge");
+  forge.views.set(URL1, { ...green, head: SHA_A, checks: "red" });
+  await doTick();
+  expect(stageOf("o1")).toBe("fixing");
+  expect(forge.merges).toEqual([]);
+});
+
+test("expect_head: an empty or malformed output parks expect head at once and merges nothing", async () => {
+  for (const bad of ["", "abc123", "A".repeat(40), `${SHA_A}0`, "not a sha"]) {
+    forge = new FakeForge();
+    forge.views.set(URL1, { ...green, head: SHA_A });
+    rmSync(join(root, "state"), { recursive: true, force: true });
+    await arm(withHead(["printf", "%s", bad]));
+    await doTick();
+    expect([bad, parkedOf("o1")]).toEqual([bad, "expect head"]);
+    expect(forge.merges).toEqual([]);
+  }
+});
+
+test("expect_head: an argv that exits non-zero is retried, and parks expect head at the third failure", async () => {
+  forge.views.set(URL1, { ...green, head: SHA_A });
+  await arm(withHead(["false"]));
+  await doTick();
+  await doTick();
+  expect(parkedOf("o1")).toBeUndefined();
+  await doTick();
+  expect(parkedOf("o1")).toBe("expect head");
+  expect(forge.merges).toEqual([]);
+});
+
+test("expect_head: a MERGED PR is not compared (the landed check decides)", async () => {
+  forge.views.set(URL1, { ...green, state: "MERGED", head: landPr("b-merged") });
+  await arm(withHead(reviewed(SHA_B)));
+  await doTick();
+  expect(stageOf("o1")).toBe("done");
+});
+
+// The adjacent control: a stage without expect_head is exactly the stage it was.
+test("control: without expect_head the merge pins the head it viewed, whatever any review said", async () => {
+  forge.views.set(URL1, { ...green, head: SHA_B });
+  await arm(mergeStage());
+  await doTick();
+  expect(forge.merges).toEqual([{ url: URL1, head: SHA_B }]);
+  expect(kinds()).not.toContain("head moved");
 });

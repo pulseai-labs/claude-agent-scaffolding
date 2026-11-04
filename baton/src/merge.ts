@@ -2,7 +2,7 @@
 // hands in what it owns (events, parking, stage moves, hooks); this file decides.
 
 import { existsSync } from "node:fs";
-import { ForgeReadError, landed, prUrl, type Forge, type PrView } from "./forge.ts";
+import { expectedHead, ForgeReadError, landed, prUrl, type Forge, type PrView } from "./forge.ts";
 import { render, type MergeStage, type Scope } from "./recipe.ts";
 import type { RunState, UnitState } from "./state.ts";
 
@@ -54,7 +54,8 @@ export async function mergeUnit(env: MergeEnv, u: UnitState, stage: MergeStage):
   } catch (e) {
     throw new ForgeReadError("pr view failed", `${url}: ${message(e)}`);
   }
-  if (view.state !== "MERGED") delete u.forge_failures; // a read that worked
+  // A read that worked. With expect_head the count survives until that read has worked too.
+  if (view.state !== "MERGED" && !stage.expect_head) delete u.forge_failures;
   const scope = env.scope(u, { pr: { url, head: view.head } });
   const base = render(stage.base, scope);
   const repo = render(stage.repo, scope);
@@ -83,6 +84,17 @@ export async function mergeUnit(env: MergeEnv, u: UnitState, stage: MergeStage):
     env.ev("wrong base", { unit: u.id, pr: url, base: view.base, expected: base });
     return env.park(u, "wrong base");
   }
+  // The reviewed head: a head that moved since goes back to review, before the checks are read.
+  // This only adds a stop; the checks and the merge below still decide, on the reviewed head.
+  let expected: string | undefined;
+  if (stage.expect_head) {
+    expected = await expectedHead(stage.expect_head.map((a) => render(a, base0)), env.run.dir);
+    delete u.forge_failures;
+    if (view.head !== expected) {
+      env.ev("head moved", { unit: u.id, pr: url, head: view.head, expected });
+      return env.move(u, stage.outcomes.moved!);
+    }
+  }
   if (view.mergeable === "CONFLICTING") return env.move(u, stage.outcomes.conflict, { url, why: "conflict" });
   if (view.checks === "red") {
     return env.move(u, stage.outcomes.red, { url, why: "red", ...(view.failing?.length ? { failing: view.failing } : {}) });
@@ -96,7 +108,7 @@ export async function mergeUnit(env: MergeEnv, u: UnitState, stage: MergeStage):
   }
 
   try {
-    await env.forge.merge(url, view.head);
+    await env.forge.merge(url, expected ?? view.head);
     delete u.merge_failures;
     env.ev("merge requested", { unit: u.id, pr: url, head: view.head });
     env.save();

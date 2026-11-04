@@ -117,7 +117,7 @@ describe("done-file briefs", () => {
   const recipe = JSON.parse(readFileSync(join(BRIEFS_DIR, "..", "recipe.json"), "utf8"));
   const labels = (stage: string): string[] =>
     [...String(recipe.stages[stage].message).matchAll(/([A-Z][a-z]+(?: [a-z]+)* done file|Corrected file): /g)].map((m) => m[1]);
-  for (const [name, stage] of [["correct.md", "correct"], ["spine-work.md", "spine_work"], ["lane.md", "lane"]]) {
+  for (const [name, stage] of [["correct.md", "correct"], ["spine-work.md", "spine_work"], ["item-fix.md", "item_fix"], ["lane.md", "lane"]]) {
     test(`${name} ends by writing the done file its stage's message names`, () => {
       const ls = labels(stage);
       expect(ls.length).toBeGreaterThan(0);
@@ -138,15 +138,27 @@ describe("a ruling file holds one ruling (#1075)", () => {
   test("the runbook says replace, never append, and to move the file aside before an unpark --to", () => {
     const r = readme();
     expect(r).toContain("replacing any file already there: the file holds one ruling");
-    expect(r).toContain("a stage that names no Ruling file (`implement`, `regap`, `verify`, `correct`, `spine_review`), move any `operator.md` aside as the next free `operator-<n>.md`: `--to` runs no outcome hook");
+    expect(r).toContain("a stage that names no Ruling file (`implement`, `regap`, `verify`, `correct`, `spine_review`, `item_review`), move any `operator.md` aside as the next free `operator-<n>.md`: `--to` runs no outcome hook");
     expect(r).toContain("An implement, regap, verify or correct stop takes its ruling in the handoff's `## Clarifications`");
     expect(r).toContain("replace any file there");
     expect(r).not.toMatch(/append (it )?(to|if one)/);
     expect("append it to, when").toMatch(/append (it )?(to|if one)/); // control: the probe matches the 0.16.0 wording
   });
+  test("the item review stop is in the notices and the README runbook (#1046)", () => {
+    const row = skill().split("\n").find((l) => l.startsWith("| Item review stop")) ?? "";
+    expect(row).toContain("--to item_fix");
+    expect(row).toContain("--to land");
+    expect(skill()).toContain("on each reviewer row (`reviewer`, `item reviewer`)");
+    const r = readme();
+    for (const pin of ["The item review stop.", "at most three reviews", "`out/<wi>/review-2.md` exists (review 3 has run)",
+      "`baton unpark <run> <wi> --to item_fix`", "`baton unpark <run> <wi> --to land`", "`item_wait` parks** on `closed` and `conflict`",
+      "`item reviewer` (with `review`)", "`expect_head` (optional)", "`outcomes.moved`, which is then required"]) {
+      expect([pin, r.includes(pin)]).toEqual([pin, true]);
+    }
+  });
   test("every skill row that writes operator.md says replace, and the close row says move it aside", () => {
     const rows = skill().split("\n").filter((l) => l.startsWith("|") && l.includes("operator.md"));
-    expect(rows.length).toBe(3);
+    expect(rows.length).toBe(4);
     for (const row of rows) expect(row).toContain("replacing any");
     const close = rows.find((l) => l.startsWith("| Close or spine-open stop |")) ?? "";
     expect(close).toContain("move it aside before an unpark `--to` a stage that names no Ruling file");

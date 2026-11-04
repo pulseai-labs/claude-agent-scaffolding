@@ -93,7 +93,8 @@ function oss(...args: string[]): void {
 
 const PR_NO: Record<string, number> = { [W1]: 1, [W2]: 2, [SPINE_UNIT]: 9 };
 const prUrl = (unit: string) => `https://github.com/o/canon/pull/${PR_NO[unit]}`;
-const openPr = (base: string): PrView => ({ state: "OPEN", head: "pending", base, mergeable: "MERGEABLE", checks: "green" });
+const HEAD0 = "d".repeat(40);
+const openPr = (base: string): PrView => ({ state: "OPEN", head: HEAD0, base, mergeable: "MERGEABLE", checks: "green" });
 
 /** e2e.test.ts's LandingForge on the spine branch: a merge lands a real merge commit on origin. */
 class SpineForge extends FakeForge {
@@ -164,7 +165,9 @@ class SeatHost extends FakeHost {
   }
 }
 
-const SESSION_STAGES = ["lane", "implement", "regap", "verify", "close", "correct", "spine_open", "spine_review", "spine_work", "spine_finish"];
+/** A closed item's way to the merge when its review passes at once: record the PR, review, wait, land. */
+const TO_LAND = ["close>item_ready", "item_ready>item_review", "item_review>item_wait", "item_wait>land"];
+const SESSION_STAGES = ["lane", "implement", "regap", "verify", "close", "correct", "item_review", "item_fix", "spine_open", "spine_review", "spine_work", "spine_finish"];
 const oneTick = (): Behaviour => ({ ticks: 1, end: "completed" });
 
 const out = (unit: string, name: string) => join(runDir, "out", unit, name);
@@ -208,6 +211,9 @@ function seats(): Record<string, Effect> {
     },
     spine_open: () => put(join(runDir, "spine", `${SPINE_UNIT}.json`),
       JSON.stringify({ id: SPINE_UNIT, group: 0, order: 0, pr_url: prUrl(SPINE_UNIT) })),
+    // an item reviewer reviews the head its PR has now
+    item_review: (u) => put(out(u, "review.md"), `verdict: pass\nhead: ${theForge.views.get(prUrl(u))!.head}\nno findings\n`),
+    item_fix: (u) => put(out(u, "round-done"), "x"),
     spine_review: (u) => put(out(u, "review.md"), "verdict: pass\nhead: abc123\nno findings\n"),
     spine_work: (u) => put(out(u, "round-done"), "x"),
     spine_finish: () => {
@@ -245,9 +251,9 @@ function newHost(lane: Effect, extra: Record<string, Effect> = {}): SeatHost {
 
 /** The run's role table: one agent per D2 role, as `running-a-spine-on-baton` writes it. */
 const SEATS = Object.fromEntries(
-  ["spine session", "implementer", "verifier", "close session", "reviewer", "work-PR session", "driver"].map((role) => [role, {
+  ["spine session", "implementer", "verifier", "close session", "reviewer", "item reviewer", "work-PR session", "driver"].map((role) => [role, {
     agent: `${role.replaceAll(" ", "-").toLowerCase()}-agent`, argv: ["seat-bin", role], brief_delivery: "inject",
-    expected_model: `${role}-model`, effort: "high", env: {}, ...(role === "reviewer" ? { review: "/review" } : {}),
+    expected_model: `${role}-model`, effort: "high", env: {}, ...(role === "reviewer" || role === "item reviewer" ? { review: "/review" } : {}),
   }]),
 );
 
@@ -276,7 +282,9 @@ const moved = (u: string, from: string, to: string) => at((e) => e.kind === "tra
 const launchedEv = (u: string, stage: string, seq = 1) => at((e) => e.kind === "launched" && e.nonce === `r1/${u}/${stage}/${seq}`);
 
 type Rig = { host: SeatHost; forge: SpineForge; notes: string[] };
+let theForge: SpineForge;
 function rig(host: SeatHost, forge = new SpineForge()): Rig {
+  theForge = forge;
   return { host, forge, notes: [] };
 }
 
@@ -336,7 +344,7 @@ test("a two-item round runs to the second spine close", async () => {
     expect(seen[wi]).toEqual({ repo: r.forge.landedTip.get(prUrl(wi))!, head: BRANCH, status: "complete", dispatches: 1 });
   }
   expect(repoTip()).toBe(originTip());
-  for (const wi of [W1, W2]) expect(moves(wi)).toEqual(["implement>verify", "verify>close", "close>land", "land>done"]);
+  for (const wi of [W1, W2]) expect(moves(wi)).toEqual(["implement>verify", "verify>close", ...TO_LAND, "land>done"]);
   // verify launched in the item worktree on the verifier's agent, told its name and the verdict file
   const v = host.of(W1, "verify")[0];
   expect([v.request.instance, v.request.model]).toEqual(["verifier-agent", "verifier-model"]);
@@ -448,9 +456,10 @@ test("a gap waits while a sibling is in correction", async () => {
   await drive(r, 30, () => host.of(W1, "regap").length > 0, () => {
     if (!w2AtRegap && host.of(W1, "regap").length) w2AtRegap = unit(W2).stage;
   });
-  expect(w2AtRegap).toBe("land");
-  expect(moves(W2)).toEqual(["implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", "close>land"]);
-  expect(launchedEv(W1, "regap")).toBeGreaterThan(moved(W2, "close", "land"));
+  // the item PR's review does not hold the gap: only the stages that mutate the worktree do
+  expect(w2AtRegap).toBe("item_ready");
+  expect(moves(W2).slice(0, 6)).toEqual(["implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", "close>item_ready"]);
+  expect(launchedEv(W1, "regap")).toBeGreaterThan(moved(W2, "close", "item_ready"));
 });
 
 test("an item at the dispatch cap parks before a fourth execution", async () => {
@@ -528,20 +537,167 @@ test("a merged item with the canonical root off the spine branch parks", async (
   expect(item(W1).status).toBe("active");
 });
 
-test("item CI red parks", async () => {
+const HEAD1 = "e".repeat(40);
+const HEAD2 = "f".repeat(40);
+const reviewOf = (verdict: string, head: string) => `verdict: ${verdict}\nhead: ${head}\n${verdict === "block" ? "- [blocking] AC2 is not covered\n" : "no findings\n"}`;
+const setHead = (r: Rig, wi: string, head: string) => r.forge.views.set(prUrl(wi), { ...r.forge.views.get(prUrl(wi))!, head });
+const oneItem = (extra: Record<string, Effect> = {}) => newHost((_u, n) => {
+  if (n === 1) { queue(W1, 1, 1); put(out("lane", "lane.done"), "x"); }
+}, extra);
+
+test("item CI red goes to item_fix, and red that fixing never clears parks at review 3", async () => {
   await arm();
-  const host = newHost((_u, n) => {
-    if (n === 1) { queue(W1, 1, 1); put(out("lane", "lane.done"), "x"); }
-  });
+  const host = oneItem();
   const forge = new SpineForge();
   forge.views.set(prUrl(W1), { ...openPr(BRANCH), checks: "red" });
   const r = rig(host, forge);
-  await drive(r, 30, () => unit(W1)?.parked !== undefined);
+  await drive(r, 60, () => unit(W1)?.parked !== undefined);
 
-  expect(unit(W1).stage).toBe("land");
+  expect(unit(W1).stage).toBe("item_wait");
   expect(unit(W1).parked?.reason).toBe("outcome");
   expect(forge.merges).toEqual([]);
+  expect(host.of(W1, "item_review")).toHaveLength(3);
+  expect(host.of(W1, "item_fix")).toHaveLength(2);
   expect(item(W1).status).toBe("active");
+});
+
+test("close records the PR in the queue record; the review is told the URL, then fix, re-review and land the reviewed head", async () => {
+  await arm();
+  const asked: string[] = [];
+  const host = oneItem({
+    item_review: (u, n) => {
+      put(out(u, "review.md"), n === 1 ? reviewOf("block", HEAD0) : reviewOf("pass", HEAD1));
+      if (n === 1) put(out(u, "operator.md"), "ruling: AC2 is a known limit"); // the orchestrator rules on the block
+    },
+    item_fix: (u) => {
+      asked.push(`${existsSync(out(u, "operator.md"))}:${readFileSync(out(u, "review.md"), "utf8").split("\n")[0]}`);
+      setHead(r, u, HEAD1); // the fixer pushed once
+      put(out(u, "round-done"), "x");
+    },
+  });
+  const r = rig(host);
+  await drive(r, 60, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined);
+
+  expect(moves(W1)).toEqual([
+    "implement>verify", "verify>close", "close>item_ready", "item_ready>item_review", "item_review>item_wait",
+    "item_wait>item_fix", "item_fix>item_review", "item_review>item_wait", "item_wait>land", "land>done",
+  ]);
+  // the merge is pinned to the head the second review saw, never the head the first one blocked
+  expect(r.forge.merges).toEqual([{ url: prUrl(W1), head: HEAD1 }]);
+  // the queue record carries the PR url and everything it carried
+  const rec = JSON.parse(readFileSync(join(runDir, "queue", `${W1}.json`), "utf8"));
+  expect(rec).toMatchObject({ work_item_id: W1, round: 1, order: 1, branch: `work/${W1}`, pr_url: prUrl(W1) });
+  expect(readdirSync(join(runDir, "queue")).sort()).toEqual([`${W1}.json`]); // no temp file left beside it
+  // item_review: the PR URL is the command's own argument, the previous review the next word
+  const reviews = host.of(W1, "item_review");
+  expect(reviews).toHaveLength(2);
+  expect(reviews[0].request.message.startsWith(`/review ${prUrl(W1)} previous: ${out(W1, "review-prev.md")} Then read`)).toBe(true);
+  expect(reviews[0].request.cwd).toBe(join(root, "wt", W1));
+  expect(reviews[0].claim?.env).toMatchObject({ BATON_ROLE: "item reviewer", SEAT_MODS_ROLE: "reviewer" });
+  // item_fix: the work-PR session, in the item worktree, told the review, the Ruling file and the round done file
+  const fixes = host.of(W1, "item_fix");
+  expect(fixes).toHaveLength(1);
+  expect(fixes[0].request.cwd).toBe(join(root, "wt", W1));
+  expect(fixes[0].claim?.env).toMatchObject({ BATON_ROLE: "work-PR session" });
+  for (const f of [`Item PR: ${prUrl(W1)}.`, `Review: ${out(W1, "review.md")}.`, `Ruling file: ${out(W1, "operator.md")}.`, `Round done file: ${out(W1, "round-done")}.`]) {
+    expect([f, fixes[0].request.message.includes(f)]).toEqual([f, true]);
+  }
+  expect(asked).toEqual(["true:verdict: block"]); // the ruling and the blocking review were there when the fixer ran
+  // the files: review 1 kept as review-1.md and review-prev.md, the ruling archived, the done file cleared
+  expect(readFileSync(out(W1, "review-1.md"), "utf8")).toBe(reviewOf("block", HEAD0));
+  expect(readFileSync(out(W1, "review-prev.md"), "utf8")).toBe(reviewOf("block", HEAD0));
+  expect(readFileSync(out(W1, "review.md"), "utf8")).toBe(reviewOf("pass", HEAD1));
+  expect(existsSync(out(W1, "review-2.md"))).toBe(false);
+  expect(existsSync(out(W1, "operator.md"))).toBe(false);
+  expect(readFileSync(out(W1, "operator-1.md"), "utf8")).toContain("known limit");
+  expect(existsSync(out(W1, "round-done"))).toBe(false);
+});
+
+test("a head that moves after a passing review goes back to item_review and merges only the re-reviewed head", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u, n) => put(out(u, "review.md"), reviewOf("pass", n === 1 ? HEAD0 : HEAD1)) });
+  const r = rig(host);
+  let pushed = false;
+  await drive(r, 60, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined, () => {
+    // somebody pushes while no seat of this unit is running: the unit has just entered land
+    if (!pushed && unit(W1)?.stage === "land") { pushed = true; setHead(r, W1, HEAD1); }
+  });
+
+  expect(pushed).toBe(true);
+  expect(moves(W1)).toEqual([
+    "implement>verify", "verify>close", "close>item_ready", "item_ready>item_review", "item_review>item_wait", "item_wait>land",
+    "land>item_review", "item_review>item_wait", "item_wait>land", "land>done",
+  ]);
+  expect(r.forge.merges).toEqual([{ url: prUrl(W1), head: HEAD1 }]); // never HEAD0
+  expect(events().filter((e) => e.kind === "head moved")).toHaveLength(1);
+  expect(host.of(W1, "item_review")).toHaveLength(2);
+  expect(readFileSync(out(W1, "review-1.md"), "utf8")).toBe(reviewOf("pass", HEAD0));
+  expect(unit(W1).parked).toBeUndefined();
+});
+
+test("review 3 blocking is a stop; --to land accepts the findings on the reviewed head, --to item_fix takes a ruling", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => put(out(u, "review.md"), reviewOf("block", theForge.views.get(prUrl(u))!.head)) });
+  const r = rig(host);
+  await drive(r, 60, () => unit(W1)?.parked !== undefined);
+
+  // reviews 1 and 2 each sent the item to item_fix; review 3 parks in item_wait, with the fixer not launched a third time
+  expect(unit(W1).stage).toBe("item_wait");
+  expect(unit(W1).parked?.reason).toBe("outcome");
+  expect(host.of(W1, "item_review")).toHaveLength(3);
+  expect(host.of(W1, "item_fix")).toHaveLength(2);
+  expect(moves(W1).filter((m) => m === "item_wait>item_fix")).toHaveLength(2);
+  expect(existsSync(out(W1, "review-1.md")) && existsSync(out(W1, "review-2.md"))).toBe(true);
+  expect(existsSync(out(W1, "review-3.md"))).toBe(false);
+  expect(r.forge.merges).toEqual([]);
+
+  // the ruling route: a fourth fix round, then a fourth review that blocks again parks again at once
+  put(out(W1, "operator.md"), "fix AC2 only");
+  expect(await main(["unpark", "r1", W1, "--to", "item_fix"])).toBe(0);
+  await drive(r, 40, () => unit(W1)?.parked !== undefined && host.of(W1, "item_review").length === 4);
+  expect(host.of(W1, "item_fix")).toHaveLength(3);
+  expect(unit(W1).stage).toBe("item_wait");
+  expect(readFileSync(out(W1, "operator-1.md"), "utf8")).toBe("fix AC2 only");
+
+  // the accept route: land merges the head of the last review, and a head that moved since goes to review instead
+  setHead(r, W1, HEAD2);
+  expect(await main(["unpark", "r1", W1, "--to", "land"])).toBe(0);
+  await drive(r, 3, () => unit(W1)?.stage === "item_review" || r.forge.merges.length > 0);
+  expect(r.forge.merges).toEqual([]);
+  expect(moves(W1).at(-1)).toBe("land>item_review");
+});
+
+test("review 3 blocking: --to land merges the reviewed head when it has not moved", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => put(out(u, "review.md"), reviewOf("block", theForge.views.get(prUrl(u))!.head)) });
+  const r = rig(host);
+  await drive(r, 60, () => unit(W1)?.parked !== undefined);
+  expect(await main(["unpark", "r1", W1, "--to", "land"])).toBe(0);
+  await drive(r, 10, () => unit(W1)?.stage === "done");
+  expect(r.forge.merges).toEqual([{ url: prUrl(W1), head: HEAD0 }]);
+});
+
+test("the pr_url write is no rewrite: a gap after it still waits on regap's own rewrite", async () => {
+  await arm();
+  const host = oneItem({
+    item_review: (u) => put(out(u, "stop"), "x"), // park the item once its PR is recorded
+    implement: (u, n) => (n === 2 ? put(out(u, "gaps.json"), "{}") : put(workFile(u, "report.md"), "r")),
+  });
+  const r = rig(host);
+  await drive(r, 40, () => unit(W1)?.parked !== undefined && unit(W1).stage === "item_review");
+  expect(JSON.parse(readFileSync(join(runDir, "queue", `${W1}.json`), "utf8")).pr_url).toBe(prUrl(W1));
+  expect(unit(W1).vars.pr_url).toBe(prUrl(W1));
+  // the operator sends the item back to implement; its seat gaps, and the record is rewritten by regap only
+  rmSync(out(W1, "stop"));
+  rmSync(workFile(W1, "report.md")); // the new pass writes its own
+  expect(await main(["unpark", "r1", W1, "--to", "implement"])).toBe(0);
+  await drive(r, 30, () => moved(W1, "regap", "implement") > -1);
+  // (an unpark --to records no transition, so the moves after the first four are the new pass's)
+  expect(moves(W1).slice(4, 7)).toEqual(["implement>gap_wait", "gap_wait>regap", "regap>implement"]);
+  // regap ran its seat before the unit left it: the digest the pr_url write changed did not route it at entry
+  expect(launchedEv(W1, "regap")).toBeGreaterThan(-1);
+  expect(launchedEv(W1, "regap")).toBeLessThan(moved(W1, "regap", "implement"));
+  expect(host.of(W1, "regap")).toHaveLength(1);
 });
 
 test("a review without a verdict relaunches, then parks", async () => {
@@ -639,7 +795,7 @@ test("a red close at any layer routes through the correction packet", async () =
   await drive(r, 40, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined);
 
   expect(existsSync(workFile(W1, "verify.md"))).toBe(false);
-  expect(moves(W1)).toEqual(["implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", "close>land", "land>done"]);
+  expect(moves(W1)).toEqual(["implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", ...TO_LAND, "land>done"]);
   expect(host.of(W1, "close")).toHaveLength(2); // routed on the first close, no no-result relaunch; the second lands
   expect(host.of(W1, "correct")[0].request.message).toContain(`Correction packet: ${out(W1, "correction.txt")}.`);
   expect(packetAtCorrect).toBe(true);
@@ -664,7 +820,7 @@ test("a halting verdict runs verify, close, correct, then verify and close again
   await drive(r, 50, () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined);
 
   expect(moves(W1)).toEqual([
-    "implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", "close>land", "land>done",
+    "implement>verify", "verify>close", "close>correct", "correct>verify", "verify>close", ...TO_LAND, "land>done",
   ]);
   expect(host.of(W1, "verify")).toHaveLength(2);
   expect(host.of(W1, "close")).toHaveLength(2);

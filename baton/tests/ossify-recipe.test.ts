@@ -14,6 +14,7 @@ const BIN = join(import.meta.dir, "..", "bin", "baton");
 const SESSION_STAGES = [
   "lane", "implement", "regap", "verify", "close", "correct",
   "spine_open", "spine_review", "spine_work", "spine_finish",
+  "item_review", "item_fix",
 ];
 
 function sessions(r: Recipe): [string, SessionStage][] {
@@ -42,6 +43,7 @@ const STAGE_ROLES: Record<string, string> = {
   close: "close session", spine_open: "close session", spine_finish: "close session",
   spine_review: "reviewer",
   spine_work: "work-PR session",
+  item_review: "item reviewer", item_fix: "work-PR session",
 };
 const stageRoles = (r: Recipe) => ({
   ...Object.fromEntries(sessions(r).map(([n, s]) => [n, s.role])),
@@ -130,6 +132,7 @@ describe("ossify-spine recipe", () => {
     lane: "coordinator", regap: "coordinator", spine_open: "coordinator", spine_finish: "coordinator",
     implement: "implementer", close: "implementer", correct: "implementer",
     spine_work: "implementer", spine_review: "reviewer", verify: "verifier",
+    item_review: "reviewer", item_fix: "implementer",
   };
 
   test("roles match the table", () => {
@@ -144,7 +147,7 @@ describe("ossify-spine recipe", () => {
     const r = loadRecipe();
     const root = sessions(r).filter(([, s]) => s.launch_dir === "root").map(([n]) => n).sort();
     expect(root).toEqual(["close", "lane", "regap", "spine_finish", "spine_open", "spine_work"]);
-    for (const n of ["implement", "correct", "verify", "spine_review"]) {
+    for (const n of ["implement", "correct", "verify", "spine_review", "item_review", "item_fix"]) {
       expect([n, (r.stages[n] as SessionStage).launch_dir]).toEqual([n, "worktree"]);
     }
   });
@@ -163,6 +166,7 @@ describe("ossify-spine recipe", () => {
     expect(allow).toEqual({
       lane: OUT, regap: OUT, verify: OUT, close: OUT, spine_open: OUT, spine_review: OUT, spine_finish: OUT,
       implement: item, correct: item, spine_work: `${OUT}:{param.spine_dir}`,
+      item_review: OUT, item_fix: OUT,
     });
   });
 
@@ -251,7 +255,7 @@ describe("ossify-spine recipe", () => {
       // the packet is the only route to correct: no verify.md grep, so a stale one cannot re-route
       // (each outcome also carries the Ruling file archive, pinned in its own test, #1057)
       expect([name, s.outcomes.map(({ run: _run, ...o }: any) => o)]).toEqual([name, [
-        { when: [{ exit0: PR_RECORDED }], to: "land" },
+        { when: [{ exit0: PR_RECORDED }], to: "item_ready" },
         { when: [{ file: PACKET }], to: "correct" },
       ]]);
       for (const field of ["{unit.vars.handoff_path}", "{unit.vars.worktree_path}", "{unit.vars.branch}", "{unit.vars.base_sha}", `Correction packet: ${PACKET}.`]) {
@@ -325,9 +329,9 @@ describe("ossify-spine recipe", () => {
     rmSync(dir, { recursive: true });
   });
 
-  test("the four ruling stages name the Ruling file at their own {unit.id} path (#1057)", () => {
+  test("the five ruling stages name the Ruling file at their own {unit.id} path (#1057)", () => {
     const r = loadRecipe();
-    for (const n of ["close", "spine_open", "spine_finish", "spine_work"]) {
+    for (const n of ["close", "spine_open", "spine_finish", "spine_work", "item_fix"]) {
       const m = (r.stages[n] as SessionStage).message;
       expect(m).toContain(`Ruling file: ${OUT}/operator.md. `);
       expect(m).not.toContain("Operator file");
@@ -338,9 +342,9 @@ describe("ossify-spine recipe", () => {
   });
 
   const ARCHIVE_OPERATOR = ["sh", OUT, "operator", ".md"];
-  test("every outcome of close, spine_open and spine_finish archives the Ruling file (#1057)", () => {
+  test("every outcome of close, spine_open, spine_finish and item_fix archives the Ruling file (#1057)", () => {
     const r = loadRecipe();
-    for (const n of ["close", "spine_open", "spine_finish"]) {
+    for (const n of ["close", "spine_open", "spine_finish", "item_fix"]) {
       const outs = (r.stages[n] as SessionStage).outcomes;
       expect(outs.length).toBeGreaterThan(0);
       for (const o of outs) {
@@ -348,7 +352,7 @@ describe("ossify-spine recipe", () => {
         expect(hooks.filter((a) => a.slice(0, 2).join(" ") === "sh -c" && JSON.stringify(a.slice(3)) === JSON.stringify(ARCHIVE_OPERATOR))).toHaveLength(1);
       }
     }
-    expect((r.stages.close as SessionStage).outcomes.map((o) => o.to)).toEqual(["land", "correct"]);
+    expect((r.stages.close as SessionStage).outcomes.map((o) => o.to)).toEqual(["item_ready", "correct"]);
   });
 
   test("the archive hook of a non-spine_work stage, executed: once per stage end, appended rulings kept, no file needed (#1057)", () => {
@@ -379,6 +383,208 @@ describe("ossify-spine recipe", () => {
     expect(brief("spine-work.md")).toContain("write it into the PR body");
   });
 
+  // ---- the item PR review loop (#1046) ----------------------------------------------------------
+  const ITEM_PR = ["env", "-C", "{param.ai_root}", "{param.oss}", "get", '.work_items[] | select(.id == "{unit.id}") | .pr_url'];
+  const REVIEW = `${OUT}/review.md`;
+  const REVIEW2 = `${OUT}/review-2.md`;
+  const sigName = (sig: any): string =>
+    "pr" in sig ? sig.pr.test : "file" in sig ? `file ${sig.file.slice(OUT.length + 1)}` : sig.exit0.slice(1, 3).join(" ");
+
+  test("item_wait's route table, in order: the review-3 stop first, then closed, conflict, red, block, pass", () => {
+    const w = loadRecipe().stages.item_wait as WaitStage;
+    expect(w.outcomes.map((o) => [o.to, ...o.when.map(sigName)])).toEqual([
+      ["park", "file review-2.md", "-qx verdict: block"],
+      ["park", "file review-2.md", "checks_red"],
+      ["park", "closed"],
+      ["park", "conflict"],
+      ["item_fix", "checks_red"],
+      ["item_fix", "-qx verdict: block", "checks_green"],
+      ["land", "-qx verdict: pass", "checks_green"],
+    ]);
+    // every pr signal reads the PR from ossify's state, as land does: the item unit has no pr_url var to read
+    for (const o of w.outcomes) for (const sig of o.when) if ("pr" in sig) expect(sig.pr.url).toEqual(ITEM_PR);
+    expect(((loadRecipe().stages.land as MergeStage).pr)).toEqual(ITEM_PR);
+    expect(w.outcomes[0].when[0]).toEqual({ file: REVIEW2 });
+    // control: a copy whose review-3 edges are removed no longer has the stop first
+    const copy = structuredClone(w);
+    copy.outcomes = copy.outcomes.filter((o) => !JSON.stringify(o).includes("review-2.md"));
+    expect(JSON.stringify(copy.outcomes[0])).not.toContain("review-2.md");
+  });
+
+  test("close's land outcome records the PR in the queue record; item_ready waits for it before item_review launches", () => {
+    const r = loadRecipe();
+    const close = (r.stages.close as SessionStage).outcomes[0];
+    expect(close.to).toBe("item_ready");
+    expect(close.run).toHaveLength(2);
+    expect(close.run![1].slice(0, 2)).toEqual(["sh", "-c"]);
+    expect(close.run![1].slice(3)).toEqual(["sh", "{param.state_file}", "{unit.id}", "{run.dir}/queue/{unit.id}.json"]);
+    expect(raw().sources[0].vars.pr_url).toBe("pr_url");
+    // a session launched in the tick that moved it renders with the vars read at the tick's start: an
+    // item_review entered straight from close would render {unit.vars.pr_url} before the record was re-read
+    const ready = r.stages.item_ready as WaitStage;
+    expect(ready.kind).toBe("wait");
+    expect(ready.outcomes).toHaveLength(1);
+    expect(ready.outcomes[0].to).toBe("item_review");
+    expect(ready.outcomes[0].when).toEqual([{ exit0: ["jq", "-e", "(.pr_url | type) == \"string\"", "{run.dir}/queue/{unit.id}.json"] }]);
+    // only the stage that hands the PR to review reads the var
+    const readers = Object.entries(r.stages).filter(([, st]) => JSON.stringify(st).includes("unit.vars.pr_url")).map(([n]) => n);
+    expect(readers.sort()).toEqual(["item_fix", "item_review", "spine_review", "spine_wait", "spine_work", "spine_ack", "spine_finish"].sort());
+  });
+
+  test("the pr_url hook, executed: it adds pr_url, keeps every other key, leaves no temp file a source would read", () => {
+    const hook = (loadRecipe().stages.close as SessionStage).outcomes[0].run![1];
+    const dir = mkdtempSync(join(tmpdir(), "baton-prurl-"));
+    const stateFile = join(dir, "project-state.json");
+    const queueFile = join(dir, "w1.json");
+    const exec = () => {
+      const argv = hook.map((a) => a.replace("{param.state_file}", stateFile).replace("{unit.id}", "w1").replace("{run.dir}/queue/w1.json", queueFile));
+      const p = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" });
+      return p.exitCode;
+    };
+    const rec = { work_item_id: "w1", round: 1, order: 2, worktree_path: "/wt/w1", branch: "work/w1" };
+    writeFileSync(queueFile, JSON.stringify(rec));
+    // no PR recorded yet: the hook fails and the record is untouched (jq -e)
+    writeFileSync(stateFile, JSON.stringify({ work_items: [{ id: "w1" }, { id: "w2", pr_url: "https://github.com/o/r/pull/2" }] }));
+    expect(exec()).not.toBe(0);
+    expect(JSON.parse(readFileSync(queueFile, "utf8"))).toEqual(rec);
+    // the item's own PR is recorded: only that one is written
+    writeFileSync(stateFile, JSON.stringify({ work_items: [{ id: "w1", pr_url: "https://github.com/o/r/pull/1" }, { id: "w2", pr_url: "https://github.com/o/r/pull/2" }] }));
+    expect(exec()).toBe(0);
+    expect(JSON.parse(readFileSync(queueFile, "utf8"))).toEqual({ ...rec, pr_url: "https://github.com/o/r/pull/1" });
+    // a second run rewrites the same value, and no temp file is left (a *.json one would be read as a record)
+    expect(exec()).toBe(0);
+    expect(readdirSync(dir).sort()).toEqual(["project-state.json", "w1.json"]);
+    rmSync(dir, { recursive: true });
+  });
+
+  test("the write fires record_changed nowhere it matters: regap is the only stage that reads it", () => {
+    const readers = Object.entries(raw().stages).filter(([, st]) => JSON.stringify(st).includes("record_changed")).map(([n]) => n);
+    expect(readers).toEqual(["regap"]);
+    // control: the probe finds the stage that does read it
+    expect(JSON.stringify(raw().stages.regap)).toContain("record_changed");
+  });
+
+  test("item_review: the item reviewer, in the item worktree, the PR URL as the command's own argument, a stale verdict archived before every launch", () => {
+    const st = loadRecipe().stages.item_review as SessionStage;
+    expect([st.role, st.cwd, st.launch_dir, st.project]).toEqual(["item reviewer", "{unit.vars.worktree_path}", "worktree", "{param.project}"]);
+    expect(st.message.split(/[ \t]+/).slice(0, 2)).toEqual(["{agent.review}", "{unit.vars.pr_url}"]);
+    expect(st.message).toContain(` previous: ${OUT}/review-prev.md Then read`);
+    expect(st.message).toContain(`{param.briefs}/common.md and {param.briefs}/item-review.md`);
+    expect(st.message).toContain(`write ${REVIEW} whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA`);
+    expect(st.before![0]).toEqual(["mkdir", "-p", OUT]);
+    expect(st.before).toHaveLength(2); // the archive: no other hook runs, so a `moved` route (which runs none) cannot reuse a verdict
+    expect(st.slots).toEqual(["session"]);
+    expect(st.outcomes).toHaveLength(1);
+    expect(st.outcomes[0].to).toBe("item_wait");
+    expect(st.outcomes[0].run ?? []).toEqual([]);
+  });
+
+  test("the item_review archive, executed: review-prev.md is a copy of the last review, review-<n>.md the next free number, no file needed", () => {
+    const argv = (loadRecipe().stages.item_review as SessionStage).before![1];
+    const dir = mkdtempSync(join(tmpdir(), "baton-review-"));
+    const exec = () => {
+      const a = argv.map((x) => x.replaceAll(OUT, dir));
+      const p = Bun.spawnSync(a, { stdout: "pipe", stderr: "pipe" });
+      expect([p.exitCode, p.stderr.toString()]).toEqual([0, ""]);
+    };
+    const put = (f: string, t: string) => writeFileSync(join(dir, f), t);
+    const get = (f: string) => readFileSync(join(dir, f), "utf8");
+    const ls = () => readdirSync(dir).sort();
+    exec(); // review 1: nothing to archive, and review-prev.md is not made up
+    expect(ls()).toEqual([]);
+    put("review.md", "one");
+    exec(); // review 2 starts: review 1 is review-1.md and the previous review
+    expect(ls()).toEqual(["review-1.md", "review-prev.md"]);
+    expect([get("review-1.md"), get("review-prev.md")]).toEqual(["one", "one"]);
+    exec(); // a relaunch of review 2 before it wrote anything: nothing moves, nothing is lost
+    expect(ls()).toEqual(["review-1.md", "review-prev.md"]);
+    put("review.md", "two");
+    exec(); // review 3 starts: review-2.md exists, which is what item_wait's first edges read
+    expect(ls()).toEqual(["review-1.md", "review-2.md", "review-prev.md"]);
+    expect([get("review-1.md"), get("review-2.md"), get("review-prev.md")]).toEqual(["one", "two", "two"]);
+    put("review.md", "three");
+    exec(); // never overwritten, whatever the count
+    expect(ls()).toEqual(["review-1.md", "review-2.md", "review-3.md", "review-prev.md"]);
+    expect([get("review-1.md"), get("review-2.md"), get("review-3.md")]).toEqual(["one", "two", "three"]);
+    rmSync(dir, { recursive: true });
+  });
+
+  test("item_review's outcome needs the verdict line and a 40-hex head on line 2, each tried on an input that separates it", () => {
+    const o = (loadRecipe().stages.item_review as SessionStage).outcomes[0];
+    const dir = mkdtempSync(join(tmpdir(), "baton-verdict-"));
+    const file = join(dir, "review.md");
+    const holds = (text: string | null): boolean => {
+      if (text === null) rmSync(file, { force: true });
+      else writeFileSync(file, text);
+      return o.when.every((sig) => {
+        if ("file" in sig) return existsSync(file);
+        if (!("exit0" in sig)) return false;
+        const p = Bun.spawnSync(sig.exit0.map((a) => a.replaceAll(REVIEW, file)), { stdout: "pipe", stderr: "pipe" });
+        return p.exitCode === 0;
+      });
+    };
+    const sha = "0123456789abcdef".repeat(3).slice(0, 40);
+    expect(holds(`verdict: pass\nhead: ${sha}\nfine\n`)).toBe(true);
+    expect(holds(`verdict: block\nhead: ${sha}\n- finding\n`)).toBe(true);
+    // adjacent controls: each of these must still fail
+    expect(holds(null)).toBe(false);
+    expect(holds(`verdict: maybe\nhead: ${sha}\n`)).toBe(false);
+    expect(holds(`verdict: pass\nhead: ${sha.slice(0, 39)}\n`)).toBe(false); // 39
+    expect(holds(`verdict: pass\nhead: ${sha}0\n`)).toBe(false); // 41
+    expect(holds(`verdict: pass\nhead: ${sha.toUpperCase().replace(/[0-9]/g, "A")}\n`)).toBe(false); // not lower-case hex
+    expect(holds(`verdict: pass\nhead: ${sha.replace("0", "g")}\n`)).toBe(false);
+    expect(holds(`verdict: pass\nreviewed it\nhead: ${sha}\n`)).toBe(false); // not on line 2: land reads line 2
+    expect(holds(`verdict: pass\nhead: abc123\n- head: ${sha}\n`)).toBe(false); // a quoted line is no head
+    expect(holds(`head: ${sha}\nverdict: pass\n`)).toBe(false); // head on line 1 is not the contract's line 2
+    rmSync(dir, { recursive: true });
+  });
+
+  test("land's expect_head reads the same line, executed: the head, nothing for a review that has none", () => {
+    const argv = (loadRecipe().stages.land as MergeStage).expect_head!;
+    const dir = mkdtempSync(join(tmpdir(), "baton-head-"));
+    const file = join(dir, "review.md");
+    const out = (text: string) => {
+      writeFileSync(file, text);
+      const p = Bun.spawnSync(argv.map((a) => a.replaceAll(REVIEW, file)), { stdout: "pipe", stderr: "pipe" });
+      return [p.exitCode, p.stdout.toString()];
+    };
+    const sha = "ab".repeat(20);
+    expect(out(`verdict: pass\nhead: ${sha}\n- head: ${"cd".repeat(20)}\n`)).toEqual([0, `${sha}\n`]);
+    expect(out("verdict: pass\nno head here\n")).toEqual([0, ""]); // the engine parks an empty output
+    rmSync(dir, { recursive: true });
+  });
+
+  test("the lane's park list holds every stage an item can sit in between implement and land", () => {
+    const stages = (raw().stages.lane.outcomes[1].when as any[]).find((sig) => "units" in sig).units.stages;
+    expect([...stages].sort()).toEqual(
+      ["implement", "gap_wait", "regap", "verify", "close", "correct", "item_ready", "item_review", "item_wait", "item_fix", "land"].sort());
+    // every stage a work item can enter is in that list or is the terminal `done`
+    const r = loadRecipe();
+    const reach = new Set<string>(["implement"]);
+    for (let grew = true; grew;) {
+      grew = false;
+      for (const n of [...reach]) {
+        const st = r.stages[n];
+        const next = st.kind === "merge" ? Object.values(st.outcomes) : st.outcomes.map((o) => o.to);
+        for (const t of next) if (!reach.has(t) && t !== "done" && t !== "park") { reach.add(t); grew = true; }
+      }
+    }
+    expect([...reach].sort()).toEqual([...stages].sort());
+  });
+
+  test("item_fix: the work-PR session in the item worktree, one round, then back to item_review with the done file cleared", () => {
+    const st = loadRecipe().stages.item_fix as SessionStage;
+    expect([st.role, st.cwd, st.launch_dir]).toEqual(["work-PR session", "{unit.vars.worktree_path}", "worktree"]);
+    expect(st.max_launches).toBeUndefined(); // the cap is the review files, not this: enterStage resets launches on every entry
+    expect(st.outcomes).toHaveLength(1);
+    expect(st.outcomes[0].when).toEqual([{ file: `${OUT}/round-done` }]);
+    expect(st.outcomes[0].to).toBe("item_review");
+    expect(st.outcomes[0].run![0].slice(3)).toEqual(["sh", OUT, "operator", ".md"]);
+    expect(st.outcomes[0].run![1]).toEqual(["rm", "-f", `${OUT}/round-done`]);
+    // the review is not removed here: item_review's before hook is the one place that archives it
+    expect(JSON.stringify(st.outcomes[0].run)).not.toContain("review");
+  });
+
   test("land merges by plan (a)'s order", () => {
     const land = loadRecipe().stages.land as MergeStage;
     expect(land.kind).toBe("merge");
@@ -386,7 +592,9 @@ describe("ossify-spine recipe", () => {
     expect(land.checks).toBe("green");
     expect(land.base).toBe("{param.spine_branch}");
     expect(land.repo).toBe("{param.repo}");
-    expect(land.outcomes).toEqual({ merged: "done", red: "park", conflict: "park" });
+    expect(land.outcomes).toEqual({ merged: "done", red: "park", conflict: "park", moved: "item_review" });
+    // the head the item reviewer saw: line 2 of the review file, the contract's `head:` line (#1046)
+    expect(land.expect_head).toEqual(["sed", "-n", "2s/^head: //p", `${OUT}/review.md`]);
     expect(land.run_after).toEqual([
       ["sh", "-c", 'test "$(git -C "$1" symbolic-ref --short HEAD)" = "$2"', "sh", "{param.repo}", "{param.spine_branch}"],
       ["git", "-C", "{param.repo}", "merge", "--ff-only", "origin/{param.spine_branch}"],
@@ -397,8 +605,8 @@ describe("ossify-spine recipe", () => {
 
   test("build slot only where a build starts", () => {
     for (const [name, s] of sessions(raw() as Recipe)) {
-      // verify's mutation check runs the item's tests
-      const want = ["implement", "correct", "verify"].includes(name) ? ["session", "build"] : ["session"];
+      // verify's mutation check runs the item's tests; item_fix runs working-a-pr's, which builds
+      const want = ["implement", "correct", "verify", "item_fix"].includes(name) ? ["session", "build"] : ["session"];
       expect([name, s.slots]).toEqual([name, want]);
     }
   });
@@ -571,6 +779,31 @@ describe("ossify-spine briefs", () => {
     expect(r).toContain("verdict: pass");
     expect(r).toContain("verdict: block");
     expect(r).toContain("head: ");
+  });
+
+  test("item-review carries the review contract and judges a body with no bar by the template's four conditions (#1046)", () => {
+    const r = brief("item-review.md");
+    for (const pin of ["verdict: pass", "verdict: block", "head: <sha>", "40-hex", "A missing file means round 1", "## Merge bar",
+      "four conditions", "opening-a-pr/references/pr-body.md", "Never merge, edit or push"]) {
+      expect([pin, r.includes(pin)]).toEqual([pin, true]);
+    }
+    // the two-line contract is spine-review's, word for word
+    for (const line of ["exactly `verdict: pass` or `verdict: block`", "block if any finding blocks the merge bar", "Write it once, after the review, and end."]) {
+      expect([line, brief("spine-review.md").includes(line) && r.includes(line)]).toEqual([line, true]);
+    }
+    expect(r.length).toBeLessThan(1000);
+  });
+
+  test("item-fix is one working-a-pr round on the existing branch: blocking findings only, one push, never a merge, the done file last (#1046)", () => {
+    const f = brief("item-fix.md");
+    for (const pin of ["If the Ruling file exists", "one round only", "blocking findings", "Commit and push once", "existing item branch",
+      "Never merge", "force-push", "`## Merge bar`", "working-a-pr adds the fields", "round-3 stop"]) {
+      expect([pin, f.includes(pin)]).toEqual([pin, true]);
+    }
+    expect(f).not.toContain("operator file");
+    expect(f.length).toBeLessThan(1000);
+    // control: the probe tells a brief that says nothing about the merge from this one
+    expect("1. Fix it.".includes("Never merge")).toBe(false);
   });
 
   // OMP splits a slash command's arguments on spaces and tabs only. A newline after the URL

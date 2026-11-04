@@ -47,7 +47,10 @@ export type MergeStage = {
   repo: string;
   ordered: boolean;
   checks?: "green" | "none-required";
-  outcomes: { merged: string; red: string; conflict: string };
+  /** Prints the head to merge: a 40-hex sha. A PR head that differs from it goes to `outcomes.moved`. */
+  expect_head?: string[];
+  /** `moved` is required when `expect_head` is set, and refused without it. */
+  outcomes: { merged: string; red: string; conflict: string; moved?: string };
   run_after?: string[][];
 };
 /** The recipe's one driver session: launched when a unit parks. The session-only fields below are refused. */
@@ -395,6 +398,12 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       }
       if (!isObj(st.outcomes)) err(`${p}.outcomes`, "must be {merged, red, conflict}");
       else for (const k of ["merged", "red", "conflict"]) target(`${p}.outcomes.${k}`, st.outcomes[k]);
+      if (st.expect_head !== undefined && !isArgv(st.expect_head)) err(`${p}.expect_head`, "must be a non-empty argv list");
+      if (isObj(st.outcomes)) {
+        if (st.expect_head !== undefined && st.outcomes.moved === undefined) err(`${p}.outcomes.moved`, "is required when expect_head is set");
+        else if (st.expect_head === undefined && st.outcomes.moved !== undefined) err(`${p}.outcomes.moved`, "needs expect_head");
+        else if (st.outcomes.moved !== undefined) target(`${p}.outcomes.moved`, st.outcomes.moved);
+      }
       hooks(`${p}.run_after`, st.run_after);
     } else {
       err(`${p}.kind`, 'must be "session", "wait" or "merge"');
