@@ -53,8 +53,8 @@ jobs:
       - name: workspace-init suite
         run: bash workspace-init/run-tests.sh
 
-      - name: ai-mentor suite
-        run: bash ai-mentor/tests/test-frontmatter-lint.sh
+      - name: sage suite
+        run: bash sage/tests/test-frontmatter-lint.sh
 
       - name: ossify suite
         run: bash ossify/tests/run-all.sh

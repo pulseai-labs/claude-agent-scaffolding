@@ -69,7 +69,7 @@ Stop when **any** holds: user signals stop ("we're good", "ship it"); three cons
 
 On exit, post a summary with four sections: **Locked decisions** (choice + brief rationale per decision), **Self-answered (delegated)** (question + adopted answer + citation per disposition-triage item — the audit record; omit the section when empty), **Open / deferred** (issue + why deferred), and **Worth re-checking later** (assumption + when/how to validate).
 
-## Composition with other ai-mentor surfaces
+## Composition with other sage surfaces
 
 - **`council`** — different shape (5 voices on one idea vs 1 question per turn across branches). Don't run in the same session.
 - **`eli10`** — if invoked mid-grill, yield, simplify the current question's framing, then come back.

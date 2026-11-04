@@ -4,7 +4,7 @@ Depth for `challenge/SKILL.md`. Interview the user about a plan or design until
 you both reach a shared understanding. You are surfacing *unmade decisions* in
 new material, not testing known material.
 
-Absorbed from ai-mentor's `grill-me` (CORE posture, orient block, disposition
+Absorbed from sage's `grill-me` (CORE posture, orient block, disposition
 triage, escape valves, exit summary) merged with mattpocock's `grilling`
 (design tree, frontier, fact dispatch). The merge rule: **the tree decides what
 to ask; triage decides what the user is asked.**

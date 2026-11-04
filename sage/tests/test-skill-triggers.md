@@ -1,15 +1,15 @@
 # test-skill-triggers — natural-language auto-invocation fixtures
 
-**Phase 1 RED-state checklist (ai-mentor v2.0).** Fixtures that capture which
+**Phase 1 RED-state checklist (sage v2.0).** Fixtures that capture which
 natural-language phrases should auto-invoke which skill. Validate by running
-each phrase in a fresh Claude Code session with ai-mentor v2.0 installed and
+each phrase in a fresh Claude Code session with sage v2.0 installed and
 inspecting whether the expected Skill tool call appears.
 
 ## How to use
 
 For each fixture row:
 
-1. Open a fresh Claude Code session in any directory with the ai-mentor plugin
+1. Open a fresh Claude Code session in any directory with the sage plugin
    installed and enabled (so the 4 skills are discoverable).
 2. Send the **trigger phrase** verbatim as your first message.
 3. Inspect the response (or the transcript / tool-call log) for whether the
@@ -18,7 +18,7 @@ For each fixture row:
 
 A fixture passes if the expected skill is invoked. Cross-skill fixtures pass
 if either of the listed acceptable skills is invoked. Negative fixtures pass
-if NO ai-mentor skill is invoked (Claude responds normally without dispatching
+if NO sage skill is invoked (Claude responds normally without dispatching
 grill-me / eli10 / fool / council).
 
 **Current state (Phase 1):** all rows below are **RED** — eli10, fool, and

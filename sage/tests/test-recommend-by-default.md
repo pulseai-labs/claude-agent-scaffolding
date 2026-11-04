@@ -1,14 +1,14 @@
 # test-recommend-by-default — recommend-by-default fixture checklist
 
-**Behavioral checklist (ai-mentor v2.2, #93).** Every surfaced decision should carry
+**Behavioral checklist (sage v2.2, #93).** Every surfaced decision should carry
 **one firm, vision-grounded recommendation** + a one-line rationale by default, so
 the user can **accept / rebut / defer** with guidance rather than adjudicate cold.
-Grounding reuses ai-mentor's orientation-derivation chain (issue/PR → memory-bank →
+Grounding reuses sage's orientation-derivation chain (issue/PR → memory-bank →
 handoffs); when no source-of-truth is reachable the recommendation is general
 best-practice and **labelled as such** — never a fabricated citation. `--neutral`
 (or "no recommendations") suppresses recommendations per invocation.
 
-Covers `grill-me` and `council` here (ai-mentor owns the convention). The shared
+Covers `grill-me` and `council` here (sage owns the convention). The shared
 policy ships as `recommendation-policy.md` next to each skill's `SKILL.md` (a
 byte-identical copy of the marketplace SoT
 `docs/conventions/recommendation-policy.md`, guarded by the repo-root parity
@@ -19,7 +19,7 @@ it in its own plugin.
 
 For each fixture:
 
-1. Start a fresh Claude Code session with ai-mentor v2.2 installed.
+1. Start a fresh Claude Code session with sage v2.2 installed.
 2. Trigger the named skill as described in the fixture.
 3. Inspect the response. It passes if the recommendation appears in the expected
    shape (language need not match word-for-word; the firm single recommendation +
@@ -118,7 +118,7 @@ For each fixture:
 Total fixtures: **7.** Target GREEN: **7 / 7**. Currently validated: **5 / 7** (R6–R7 RED — pending live-session validation) (the recommend-by-default
 instruction is embedded in `skills/grill-me/SKILL.md` Rule #3 and
 `skills/council/SKILL.md` Mechanic as of #93). These are **manual** behavioral checks
-— not automated — consistent with ai-mentor's skill-first, agent-driven design (the
+— not automated — consistent with sage's skill-first, agent-driven design (the
 recommendation is produced by the agent, never by a script). The shipped policy
 copies under `skills/grill-me/` and `skills/council/` are parity-guarded by the
 repo-root `tests/test-recommendation-policy-parity.sh`.

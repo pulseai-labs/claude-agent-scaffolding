@@ -1,6 +1,6 @@
-# ai-mentor
+# sage
 
-> Decision-making mentor for project work. The user owns the decisions; ai-mentor provides the prompts, simplifications, interrogations, and perspectives that make decisions sharper. AI never decides for the user; AI helps the user decide.
+> Decision-making mentor for project work. The user owns the decisions; sage provides the prompts, simplifications, interrogations, and perspectives that make decisions sharper. AI never decides for the user; AI helps the user decide.
 
 **v2.0.0** is a scope-cut release. v1.x shipped a 4-pillar cognitive-partner framework with mechanical edit-blocking hooks, a quiz protocol, prompt rewriting, and ~620 tokens of per-session protocol injection. In ~12 months of v1.x use, only one surface (`grill-me`) actually earned its keep. v2.0 deletes everything that didn't, sharpens `grill-me` with cognitive-discipline content, promotes the two simpler surfaces that still see use, and adds one new surface (`council`) for multi-angle idea validation.
 
@@ -31,14 +31,14 @@ All four auto-invoke on natural-language triggers — no slash command required.
 
 ```
 /plugin marketplace add github:pulseai-labs/pulsestack
-/plugin install ai-mentor@pulsestack
+/plugin install sage@pulsestack
 ```
 
 For local development:
 
 ```
 /plugin marketplace add /path/to/pulsestack
-/plugin install ai-mentor@pulsestack
+/plugin install sage@pulsestack
 ```
 
 ## Migrating from v1.x
@@ -53,7 +53,7 @@ v2.0 is a breaking change. If you were on v1.x:
 ## Tests
 
 ```
-bash ai-mentor/tests/test-frontmatter-lint.sh
+bash sage/tests/test-frontmatter-lint.sh
 ```
 
 Bash automation verifies the v2.0 frontmatter contract (2 fields only, ≤1024 chars, no `version`, no `when_to_use`, kebab-case names). No `jq`/`yq` dependencies; bash 3.2+ and `awk` only.
@@ -62,7 +62,7 @@ LLM-behavior fixtures (skill auto-invocation, grill-me escape valves, council 5-
 
 ## Composition with other plugins
 
-ai-mentor stays orthogonal — no manifest dependencies, no shared state. Other plugins (remodel) probe for ai-mentor's surfaces via natural-language invocation in their own workflows; ai-mentor itself doesn't probe back. Don't run `grill-me` and `council` in the same session (different interaction shapes — pick one).
+sage stays orthogonal — no manifest dependencies, no shared state. Other plugins (remodel) probe for sage's surfaces via natural-language invocation in their own workflows; sage itself doesn't probe back. Don't run `grill-me` and `council` in the same session (different interaction shapes — pick one).
 
 ## Platforms
 
@@ -74,4 +74,4 @@ MIT — see [`LICENSE`](./LICENSE).
 
 ## OMP
 
-Install per the root README. Skills are reachable as `skill://<name>`, with no `ai-mentor:` prefix. No Claude Code-only parts.
+Install per the root README. Skills are reachable as `skill://<name>`, with no `sage:` prefix. No Claude Code-only parts.

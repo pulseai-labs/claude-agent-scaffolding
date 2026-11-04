@@ -1,10 +1,21 @@
 # Changelog
 
-All notable changes to the ai-mentor plugin are documented here.
+All notable changes to the sage plugin (named ai-mentor through 2.5.0) are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
 ## [Unreleased]
+
+## [2.6.0]
+
+### Changed
+
+- Renamed from `ai-mentor` to `sage`, in the marketplace's rename to `pulsestack`. The commands are
+  now `/sage:grill-me`, `/sage:council`, `/sage:eli10` and `/sage:fool`, and the install key is
+  `sage@pulsestack`. Behaviour is unchanged. To move: uninstall `ai-mentor@claude-agent-scaffolding`,
+  then install `sage@pulsestack` (the root README's *Renamed from claude-agent-scaffolding* section
+  has every step).
 
 ## [2.5.0] — 2026-10-11
 

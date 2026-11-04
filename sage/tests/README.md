@@ -1,4 +1,4 @@
-# ai-mentor tests
+# sage tests
 
 Test suite for the plugin. v2.0 is **skill-first** (no bash code, no hooks,
 no state machinery), so the test surface differs sharply from the v1.3 hook
@@ -44,7 +44,7 @@ to `claude --print` automation later (post-2.0) if value justifies the cost.
 ### Automated (bash)
 
 ```bash
-bash ai-mentor/tests/test-frontmatter-lint.sh
+bash sage/tests/test-frontmatter-lint.sh
 ```
 
 Exit 0 if every `skills/*/SKILL.md` passes every check. Exit 1 with a list
@@ -57,7 +57,7 @@ The four `.md` files are structured fixture lists. Pick one and:
 
 1. Read the **How to use** section at the top.
 2. Open a fresh Claude Code session in a context that matches the fixture's
-   setup (most fixtures: any directory with ai-mentor v2.0 installed; the
+   setup (most fixtures: any directory with sage v2.0 installed; the
    Historian fixtures specify a priors-rich repo and a fresh greenfield).
 3. For each fixture row, send the trigger phrase / stuck-state message
    verbatim, inspect the response against the expected behavior, and update
@@ -69,14 +69,14 @@ Two ways to walk a checklist:
 - **Solo smoke** — you run the fixtures yourself in a fresh session, ~5
   minutes per checklist.
 - **Claude-session-based** — paste the checklist into a Claude Code session
-  with ai-mentor installed and ask Claude to run each fixture and report
+  with sage installed and ask Claude to run each fixture and report
   back. Faster but Claude marking its own homework — sanity-check the
   results.
 
 ## Dependencies
 
 - `test-frontmatter-lint.sh`: `bash` 3.2+, `awk`. Nothing else.
-- `*.md` checklists: a Claude Code session with ai-mentor v2.0+ installed (v2.1+ for `test-orientation-preamble.md`, which exercises the #88 orientation preamble).
+- `*.md` checklists: a Claude Code session with sage v2.0+ installed (v2.1+ for `test-orientation-preamble.md`, which exercises the #88 orientation preamble).
 
 ## When to run
 

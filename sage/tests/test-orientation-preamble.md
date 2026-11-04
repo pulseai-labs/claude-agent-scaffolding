@@ -1,19 +1,19 @@
 # test-orientation-preamble — "📍 You are here" fixture checklist
 
-**Behavioral checklist (ai-mentor v2.1, #88).** When a dialogue/cognitive session
+**Behavioral checklist (sage v2.1, #88).** When a dialogue/cognitive session
 opens, the skill should lead with a compact, **agent-produced** "📍 You are here"
 orientation block — **Topic** / **Where-it-sits + strategic weight** / **Why** —
 so a resumed or context-switched user is globally anchored, not just locally
 coherent. Derived from available context; if context is thin the agent **asks**
 rather than fabricating. Re-surfaceable on demand ("where am I?").
 
-Covers `grill-me` and `council` here (ai-mentor owns the convention).
+Covers `grill-me` and `council` here (sage owns the convention).
 
 ## How to use
 
 For each fixture:
 
-1. Start a fresh Claude Code session with ai-mentor v2.1 installed.
+1. Start a fresh Claude Code session with sage v2.1 installed.
 2. Trigger the named skill as described in the fixture.
 3. Inspect the FIRST response. It passes if the orientation block appears in the
    expected shape (language need not match word-for-word; the three labelled
@@ -78,5 +78,5 @@ For each fixture:
 Total fixtures: **4.** Target GREEN on this tree: **4 / 4** (the orientation
 instruction is embedded in `skills/grill-me/SKILL.md` and `skills/council/SKILL.md`
 as of #88). These are **manual** behavioral checks — not automated — consistent
-with ai-mentor's skill-first, agent-driven design (the orientation is produced by
+with sage's skill-first, agent-driven design (the orientation is produced by
 the agent, never by a script).

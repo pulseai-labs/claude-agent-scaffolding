@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# ai-mentor — frontmatter lint (v2.0 contract)
+# sage — frontmatter lint (v2.0 contract)
 #
 # Asserts each skills/*/SKILL.md complies with the v2.0 Anthropic-canonical
 # frontmatter convention (SPEC-ai-mentor-v2.md §4):
@@ -12,11 +12,11 @@
 #   - `description` value ≤1024 chars
 #   - `name` is kebab-case (lowercase letters, digits, hyphens; no leading hyphen)
 #
-# Usage:   bash ai-mentor/tests/test-frontmatter-lint.sh
+# Usage:   bash sage/tests/test-frontmatter-lint.sh
 # Exit:    0 if every skill passes every check; 1 if any check fails.
 # Deps:    bash 3.2+ (no GNU-isms), awk. No jq, no yq required.
 #
-# RED-state note (Phase 1, ai-mentor v2.0):
+# RED-state note (Phase 1, sage v2.0):
 #   This test currently FAILS for skills/grill-me/SKILL.md because the v1.3
 #   body still ships `when_to_use:` and `version:` lines. Phase 2 makes it pass.
 
@@ -177,7 +177,7 @@ check_skill() {
 }
 
 # ── main ────────────────────────────────────────────────────────────────────
-printf '%sai-mentor frontmatter lint — v2.0 contract%s\n' "$DIM" "$RST"
+printf '%ssage frontmatter lint — v2.0 contract%s\n' "$DIM" "$RST"
 printf '%sskills dir: %s%s\n' "$DIM" "$SKILLS_DIR" "$RST"
 
 if [ ! -d "$SKILLS_DIR" ]; then

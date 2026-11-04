@@ -1,6 +1,6 @@
 # test-grill-escape-valves — stuck-state fixture checklist
 
-**Phase 1 RED-state checklist (ai-mentor v2.0).** During a grill-me session,
+**Phase 1 RED-state checklist (sage v2.0).** During a grill-me session,
 when the user produces a stuck-state answer (tangled / paralyzed / tactical /
 no-timescale), the grill-me skill should detect the cue and fire the
 corresponding **escape valve reframe** (SPEC §5.1, body item #4).
@@ -9,7 +9,7 @@ corresponding **escape valve reframe** (SPEC §5.1, body item #4).
 
 For each fixture:
 
-1. Start a fresh Claude Code session with ai-mentor v2.0 installed.
+1. Start a fresh Claude Code session with sage v2.0 installed.
 2. Open a grill-me session — e.g., paste a short fictional design and say
    `grill me on this design`. Let grill-me ask its first question.
 3. Reply with the **stuck-state message** verbatim (or close — the cue should

@@ -25,7 +25,7 @@ delegating — that produces two interviews.
 Take the first of these that works:
 
 1. **`ossify:challenge`** — the normal case, in interview mode.
-2. **`ai-mentor:grill-me`**.
+2. **`sage:grill-me`**.
 3. **The protocol below** — in-plugin, no dependency, always available.
 
 **How to probe: just call it**, the way your host invokes a skill — the Skill tool in Claude
@@ -45,7 +45,7 @@ neither plugin is installed; the third option is a complete griller, not a degra
 not tell the user to install anything.
 
 **Cadence differs between resolvers, and that is fine.** `ossify:challenge` and
-`ai-mentor:grill-me` ask one question at a time. The protocol below asks a whole round at a
+`sage:grill-me` ask one question at a time. The protocol below asks a whole round at a
 time. What must not differ is the agenda: whichever resolver fires, all five items above get
 settled before you stop. The "not ready to build" ending on an untracked defer (below) is the
 in-plugin protocol's own rule; the other two end by their own.
@@ -83,7 +83,7 @@ only how it renders on this surface is:
 - **Opt-outs.** `--neutral` (or *"no recommendations"*) drops the leans and asks cold. `--walk`
   keeps the leans but asks every question, disabling triage.
 
-When `ossify:challenge` or `ai-mentor:grill-me` runs instead, that skill brings its own
+When `ossify:challenge` or `sage:grill-me` runs instead, that skill brings its own
 adoption of the same policy — which is the point of there being one policy.
 
 ## The in-plugin protocol

@@ -1,6 +1,6 @@
 # test-council-personas — Council multi-persona output fixtures
 
-**Phase 1 RED-state checklist (ai-mentor v2.0).** When `council` is invoked
+**Phase 1 RED-state checklist (sage v2.0).** When `council` is invoked
 on an idea, the response must contain 5 distinguishable persona sections,
 each in-character, ending with a Chairman-synthesis prompt. The Historian
 persona has special codebase-grounding behavior that degrades gracefully on
@@ -10,7 +10,7 @@ greenfield repos.
 
 For each fixture:
 
-1. Start a fresh Claude Code session with ai-mentor v2.0 installed.
+1. Start a fresh Claude Code session with sage v2.0 installed.
 2. Run the **trigger** column verbatim.
 3. Inspect the response against the **assertion** column.
 4. Check the box or annotate FAIL.
@@ -67,7 +67,7 @@ fixtures test both modes — priors-rich and greenfield.
 | Fixture field | Value |
 |---|---|
 | Setup | Run from within this repo (`/path/to/pulsestack`) which has rich git history |
-| Trigger | `council me on this idea: should I add a hook back to ai-mentor for ambient enforcement` |
+| Trigger | `council me on this idea: should I add a hook back to sage for ambient enforcement` |
 | Expected | The Historian section must quote at least one specific commit hash, file path, or branch name from this repo (e.g., references the v1.3 PreToolUse hook removal in commit `1d3c9e0`, or the SPEC's "Hook re-introduction" deferred-scope note) |
 | Status | RED |
 

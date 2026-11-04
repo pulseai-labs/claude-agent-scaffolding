@@ -17,10 +17,10 @@
       "category": "Coding"
     },
     {
-      "name": "ai-mentor",
+      "name": "sage",
       "source": {
         "source": "local",
-        "path": "./ai-mentor"
+        "path": "./sage"
       },
       "policy": {
         "installation": "AVAILABLE",

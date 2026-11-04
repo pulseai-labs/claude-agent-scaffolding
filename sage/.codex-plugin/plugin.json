@@ -1,27 +1,35 @@
 {
-  "name": "ai-mentor",
-  "version": "2.5.0",
+  "name": "sage",
+  "version": "2.6.0",
   "description": "Decision-making mentor for project work: grill-me, council, eli10, and fool skills.",
   "author": {
     "name": "Pras"
   },
   "repository": "https://github.com/pulseai-labs/pulsestack",
   "license": "MIT",
-  "keywords": ["mentoring", "planning", "critique", "skills"],
+  "keywords": [
+    "mentoring",
+    "planning",
+    "critique",
+    "skills"
+  ],
   "skills": "./skills/",
   "interface": {
-    "displayName": "AI Mentor",
+    "displayName": "Sage",
     "shortDescription": "Grill, council, simplify, and beginner-mind project decisions.",
-    "longDescription": "AI Mentor provides conversational decision-support skills for programmers: one-question-at-a-time plan interrogation, multi-persona idea validation, simpler explanations, and beginner's-mind mode.",
+    "longDescription": "Sage provides conversational decision-support skills for programmers: one-question-at-a-time plan interrogation, multi-persona idea validation, simpler explanations, and beginner's-mind mode.",
     "developerName": "Pras",
     "category": "Productivity",
-    "capabilities": ["Interactive", "Read"],
+    "capabilities": [
+      "Interactive",
+      "Read"
+    ],
     "defaultPrompt": [
       "Grill me on this implementation plan.",
       "Council me on this architecture decision.",
       "Explain this tradeoff in simpler terms."
     ],
-    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/ai-mentor",
+    "websiteURL": "https://github.com/pulseai-labs/pulsestack/tree/main/sage",
     "brandColor": "#2563EB"
   }
 }

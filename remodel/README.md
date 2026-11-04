@@ -55,7 +55,7 @@ and opening it tells that CDN a report was rendered. Nothing from your repositor
 ## Dependencies
 
 None that are hard. The grilling step resolves softly: `ossify:challenge` when ossify is
-installed, else `ai-mentor:grill-me` when present, else a complete grill protocol the plugin
+installed, else `sage:grill-me` when present, else a complete grill protocol the plugin
 carries itself. Nothing about correctness changes when neither is installed.
 
 This plugin never runs `oss` verbs and never writes to another plugin's state.

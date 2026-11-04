@@ -588,8 +588,8 @@ in each skill's `references/`, so every harness the plugin ships on has them.
 
 `challenge` is the grill and the adversarial critic, absorbed in-tree at 1.1.0:
 the bone grill gate, the spec-core close audit, the release class veto, and the
-spine plan/close audits all run on ossify alone — no ai-mentor install
-required. ai-mentor remains useful standalone; ossify does not depend on it.
+spine plan/close audits all run on ossify alone — no sage install
+required. sage remains useful standalone; ossify does not depend on it.
 `challenge` is the marketplace's one adversarial audit surface. A close-depth
 audit recruits an external fresh-frame adversary when one is configured via
 `OSSIFY_ADVERSARY` (`skills/challenge/references/adversaries.md`); unconfigured
