@@ -313,12 +313,9 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   local row
   row="$(grep -F '| [`workspace-init`](./workspace-init/)' "$ROOT_README")"
   [[ -n "$row" ]] || { echo "    workspace-init row not found in root README"; return 1; }
-  # The row carries the shipped version: read it from the manifest, not a literal
-  # that every bump would have to edit.
-  local wi_ver
-  wi_ver="$(jq -r .version "$WI_PLUGIN_ROOT/.claude-plugin/plugin.json" 2>/dev/null)"
-  [[ -n "$wi_ver" && "$wi_ver" != null ]] || { echo "    no version in the workspace-init manifest"; return 1; }
-  assert_contains "v$wi_ver" "$row" || return 1
+  # The front-page redesign (2026-11) dropped the version column: the front page
+  # carries no version labels (tests/test-root-readme.sh owns that), so the row
+  # is pinned for presence and retired routes only.
   assert_not_contains 'scaffold-onboard' "$row" || return 1
   assert_not_contains 'scaffold-dev' "$row" || return 1
   assert_not_contains 'scaffolding chain' "$row" || return 1
@@ -327,7 +324,9 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   # S8 closing edit (item 3): the row's continuation clause states adoption's
   # qualifier — the claim it replaced ("for existing source or history" alone)
   # is what the row must not carry back.
-  assert_contains 'with or without the legacy scaffold stack' "$row" || return 1
+  # The front-page redesign moved the clause from the catalog row to the
+  # /ossify:adopt card, so it is pinned on the whole root README.
+  assert_contains 'with or without the legacy scaffold stack' "$(cat "$ROOT_README")" || return 1
   assert_not_contains 'plain repos: #536' "$row" || return 1
 
   # S8 round 1 (F3): the lifecycle overview above the table must not leave
@@ -335,7 +334,8 @@ test_no_retired_guidance_or_ornamental_versions_on_consumer_surfaces() {
   # workspaces — it names ossify as the continuation and no longer names the
   # retired chain.
   local overview
-  overview="$(awk '/^Most of the marketplace is designed to/,/^## Install/' "$ROOT_README")"
+  # The front-page redesign replaced the overview paragraph with the workspace section.
+  overview="$(awk '/^## One AI workspace, clean product repos/,/^## Install/' "$ROOT_README")"
   [[ -n "$overview" ]] || { echo "    root lifecycle overview not found"; return 1; }
   assert_not_contains '(chain head)' "$overview" || return 1
   assert_contains 'its continuation for new workspaces is `ossify`' "$overview" || return 1
@@ -660,36 +660,14 @@ test_release_record_matches_the_shipped_files() {
   assert_not_contains 'SPEC §8.5' "$hdr" || return 1
 }
 
-test_layout_tree_versions_match_manifests() {
-  # D7: the root README's Layout tree carries a hand-maintained `(vX.Y.Z)` per
-  # plugin, and workspace-init's had drifted to v0.8.0 two releases behind. The
-  # catalog row above is read from the manifest; this tree was not. Pin every
-  # label to its own manifest so the next bump cannot leave a stale one.
-  local layout n=0 d v m
-  # Fence-aware: `sed -n '/^## Layout$/,/^```$/p'` closes on the OPENING fence
-  # and returns three lines. Enter on the heading, then skip one fence, then
-  # collect until the fence that closes the block.
-  layout="$(awk '
-    /^## Layout$/ { inblock=1; next }
-    inblock && /^```/ { if (fence++) exit; next }
-    inblock { print }
-  ' "$ROOT_README")"
-  [[ -n "$layout" ]] || { echo "    Layout block not found in the root README"; return 1; }
-  while IFS= read -r line; do
-    case "$line" in
-      *'plugin (v'*|*'lifecycle (v'*|*'roles'*'orchestrator (v'*) ;;
-      *) continue ;;
-    esac
-    d="$(printf '%s' "$line" | sed -E 's/^[^ ]+ ([a-z-]+)\/.*/\1/')"
-    [[ -d "$REPO_ROOT/$d" ]] || { echo "    Layout names a missing dir: $d"; return 1; }
-    v="$(printf '%s' "$line" | grep -oE '\(v[0-9.]+' | sed 's/(v//')"
-    m="$(jq -r .version "$REPO_ROOT/$d/.claude-plugin/plugin.json" 2>/dev/null)"
-    [[ -n "$m" && "$m" != null ]] || m="$(jq -r .version "$REPO_ROOT/$d/package.json" 2>/dev/null)"
-    [[ "$v" == "$m" ]] || { echo "    $d: Layout says v$v, manifest says $m"; return 1; }
-    n=$((n + 1))
-  done <<<"$layout"
-  # Adjacent control: the scan must have found the rows, not passed vacuously.
-  [[ "$n" -ge 10 ]] || { echo "    only $n version labels found in the Layout tree"; return 1; }
+test_root_readme_has_no_version_labels() {
+  # D7 pinned the root README's Layout tree labels to each manifest after
+  # workspace-init's drifted two releases behind. The front-page redesign
+  # (2026-11) removed the Layout tree, so the drift surface is gone: pin that no
+  # `(vX.Y.Z)` label comes back.
+  if grep -nE '\(v[0-9]+\.[0-9]+\.[0-9]+\)' "$ROOT_README"; then
+    echo "    root README carries a version label"; return 1
+  fi
 }
 
 test_existing_dual_scans_both_instruction_files() {
@@ -729,7 +707,7 @@ wi_test_run test_marker_string_matches_across_surfaces
 wi_test_run test_ossify_versions_are_conditioned_in_the_stub_and_scenario_c
 wi_test_run test_claude_code_fallback_is_version_gated
 wi_test_run test_release_record_matches_the_shipped_files
-wi_test_run test_layout_tree_versions_match_manifests
+wi_test_run test_root_readme_has_no_version_labels
 wi_test_run test_existing_dual_scans_both_instruction_files
 
 wi_test_summary

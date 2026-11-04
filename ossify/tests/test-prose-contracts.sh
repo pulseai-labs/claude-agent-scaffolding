@@ -1454,7 +1454,8 @@ _r=1; grep -Fq '1.12.0 replaces this predicate' "$_OSSR/README.md" && _r=0
 _pin "$_r" "ossify/README.md's 1.11.0 section still teaches the branch-or-worktree predicate as current"
 # (#579.3) both READMEs name the dropped refusal so it cannot be read as the shipped complete clause.
 _r=0
-for _f in "$_OSSR/README.md" "$_OSSR/../README.md"; do
+# The root README no longer carries release notes (front-page redesign, 2026-11): ossify/README.md only.
+for _f in "$_OSSR/README.md"; do
   grep -Fq 'landed-provenance refusal' "$_f" || { _r=1; echo "  (#579.3 site: $_f)"; }
   grep -Fq 'the landed-item refusal' "$_f" && { _r=1; echo "  (#579.3 old name still in: $_f)"; }
 done
@@ -2066,7 +2067,8 @@ for _f in "$SKILLS/close/references/spine-close.md" "$SKILLS/plan-spine/referenc
   _pin "$_r" "$(basename "$_f") still says spine close closes an intake request, or names withdrawn or a permission check (#631)"
 done
 # ...and the advertised '#N' form is quoted: an unquoted # starts a shell comment.
-for _f in "$HERE/../README.md" "$HERE/../../README.md"; do
+# The root README no longer carries release notes (front-page redesign, 2026-11): ossify/README.md only.
+for _f in "$HERE/../README.md"; do
   _r=1; grep -Fq "'#N'" "$_f" && ! grep -Fq '`N` or `#N`' "$_f" && _r=0
   _pin "$_r" "$_f advertises an unquoted #N - the shell drops it as a comment and feature_add records no issue (#631)"
 done
