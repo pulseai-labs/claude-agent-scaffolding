@@ -2,6 +2,16 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.17.1 - 2026-11-04
+
+- **Fixed: the example recipe's moved-head loop (#1079 C2).** A review that passed with a `head:` line that
+  never matched the PR looped `item_wait`, `land`, `item_review` with no cap and no park. `land`'s moved
+  outcome now goes to a new wait stage, `item_moved`: it parks once `review-2.md` exists (three reviews have
+  run, the same count `item_wait` caps on), else it goes back to `item_review`. The lane's park list gains
+  the stage. `--to land` after a cap park with a moved head now parks in `item_moved`; `--to item_review`
+  runs one more review. The README's review-cap wording now holds on both paths.
+- **Upgrade.** Copy the new recipe. A run armed on the old recipe is unchanged.
+
 ## 0.17.0 - 2026-11-04
 
 Each item PR gets a review loop in the example recipe, and the `merge` stage can pin the head it merges (#1046).

@@ -387,6 +387,7 @@ describe("ossify-spine recipe", () => {
   const ITEM_PR = ["env", "-C", "{param.ai_root}", "{param.oss}", "get", '.work_items[] | select(.id == "{unit.id}") | .pr_url'];
   const REVIEW = `${OUT}/review.md`;
   const REVIEW2 = `${OUT}/review-2.md`;
+  const w2first = () => (loadRecipe().stages.item_wait as WaitStage).outcomes[0].when[0];
   const sigName = (sig: any): string =>
     "pr" in sig ? sig.pr.test : "file" in sig ? `file ${sig.file.slice(OUT.length + 1)}` : sig.exit0.slice(1, 3).join(" ");
 
@@ -409,6 +410,17 @@ describe("ossify-spine recipe", () => {
     const copy = structuredClone(w);
     copy.outcomes = copy.outcomes.filter((o) => !JSON.stringify(o).includes("review-2.md"));
     expect(JSON.stringify(copy.outcomes[0])).not.toContain("review-2.md");
+  });
+
+  test("item_moved: the review-3 stop first, then an unconditional edge back to item_review (#1079 C2)", () => {
+    const st = loadRecipe().stages.item_moved as WaitStage;
+    expect(st.kind).toBe("wait");
+    expect(st.outcomes).toEqual([
+      { when: [{ file: REVIEW2 }], to: "park" },
+      { when: [], to: "item_review" },
+    ]);
+    // the cap is the same signal item_wait's cap clauses read
+    expect(st.outcomes[0].when[0]).toEqual(w2first());
   });
 
   test("close's land outcome records the PR in the queue record; item_ready waits for it before item_review launches", () => {
@@ -557,7 +569,7 @@ describe("ossify-spine recipe", () => {
   test("the lane's park list holds every stage an item can sit in between implement and land", () => {
     const stages = (raw().stages.lane.outcomes[1].when as any[]).find((sig) => "units" in sig).units.stages;
     expect([...stages].sort()).toEqual(
-      ["implement", "gap_wait", "regap", "verify", "close", "correct", "item_ready", "item_review", "item_wait", "item_fix", "land"].sort());
+      ["implement", "gap_wait", "regap", "verify", "close", "correct", "item_ready", "item_review", "item_wait", "item_moved", "item_fix", "land"].sort());
     // every stage a work item can enter is in that list or is the terminal `done`
     const r = loadRecipe();
     const reach = new Set<string>(["implement"]);
@@ -592,7 +604,7 @@ describe("ossify-spine recipe", () => {
     expect(land.checks).toBe("green");
     expect(land.base).toBe("{param.spine_branch}");
     expect(land.repo).toBe("{param.repo}");
-    expect(land.outcomes).toEqual({ merged: "done", red: "park", conflict: "park", moved: "item_review" });
+    expect(land.outcomes).toEqual({ merged: "done", red: "park", conflict: "park", moved: "item_moved" });
     // the head the item reviewer saw: line 2 of the review file, the contract's `head:` line (#1046)
     expect(land.expect_head).toEqual(["sed", "-n", "2s/^head: //p", `${OUT}/review.md`]);
     expect(land.run_after).toEqual([

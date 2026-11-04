@@ -419,7 +419,7 @@ stage without `expect_head` is unchanged.
 `examples/ossify-spine/` is a recipe that runs one planned ossify spine in Orca terminals: the detached
 run-spine lane queues each round's work items, an implementer per item, gap re-entry, a `verify`
 seat that writes the item's verdict file, close on that verdict (`--verdict`) and correction (back
-to `verify`), a review loop on each item PR (`item_review`, `item_wait`, `item_fix`: up to three
+to `verify`), a review loop on each item PR (`item_review`, `item_wait`, `item_moved`, `item_fix`: up to three
 reviews, then a stop), ordered merges onto the spine branch that merge only the reviewed head, the
 spine PR's review rounds, and the spine close. Every session stage and `driver` names a crew role, so
 the arm needs `--seats` with a row for each of `spine session`, `implementer`, `verifier`,
@@ -468,15 +468,16 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   correct stop takes its ruling in the handoff's `## Clarifications`; a lane round barrier is ruled
   by planning the round.
 - **The item review stop.** Each item PR gets at most three reviews (`item_review`, then `item_wait`
-  reads the verdict and the checks). A block or red checks after review 1 or 2 sends the item to
+  reads the verdict and the checks; a head that moved after a pass goes to `item_moved`, which sends it
+  to review until `review-2.md` exists, then parks). A block or red checks after review 1 or 2 sends the item to
   `item_fix`, one `working-a-pr` round that fixes the blocking findings and pushes once, then back to
   review. A block, or red checks, once `out/<wi>/review-2.md` exists (review 3 has run) parks the
   unit in `item_wait` with reason `outcome`, and baton notifies the orchestrator. Rule it one of two
   ways. To fix more: write the ruling to `out/<wi>/operator.md` (replacing any file there), then
   `baton unpark <run> <wi> --to item_fix`; `item_fix` applies it first and its end archives it as
   `operator-<n>.md`. To accept the findings as known limits: `baton unpark <run> <wi> --to land`,
-  which merges the head of the last review and nothing newer (a head pushed since goes back to
-  `item_review`). A later block parks again at once, because the review files keep counting. Each
+  which merges the head of the last review and nothing newer (a head pushed since goes to
+  `item_moved`, which parks at once; `--to item_review` skips it and runs one more review). A later block parks again at once, because the review files keep counting. Each
   review is kept as `out/<wi>/review-<n>.md`; `review.md` is the latest and `review-prev.md` the
   one before.
 - **`item_wait` parks** on `closed` and `conflict` as well (reason `outcome`): reopen or resolve the
