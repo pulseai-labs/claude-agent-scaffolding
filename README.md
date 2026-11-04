@@ -1,12 +1,12 @@
-<p align="center">
+<p>
   <img src="docs/assets/readme/mark.svg" width="88" alt="pulsestack mark (placeholder)">
 </p>
 
 # pulsestack
 
-<p align="center"><b>Workflow plugins for coding agents — from the first spec to a merged, tagged release.</b></p>
+<p><b>Workflow plugins for coding agents — from the first spec to a merged, tagged release.</b></p>
 
-<p align="center">
+<p>
   <img src="https://img.shields.io/badge/Claude%20Code-plugins-8b7cf6" alt="Claude Code">
   <img src="https://img.shields.io/badge/Codex-plugins-8b7cf6" alt="Codex">
   <img src="https://img.shields.io/badge/OMP-plugins-8b7cf6" alt="OMP">
