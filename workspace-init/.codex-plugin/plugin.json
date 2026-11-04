@@ -1,6 +1,6 @@
 {
   "name": "workspace-init",
-  "version": "0.10.4",
+  "version": "0.10.5",
   "description": "Bootstrap a dual-repo workspace with pairing manifest and AI-trace commit filtering.",
   "author": {
     "name": "Praveen Kumar Singh",
@@ -9,7 +9,12 @@
   "homepage": "https://github.com/pulseai-labs/pulsestack/tree/main/workspace-init",
   "repository": "https://github.com/pulseai-labs/pulsestack",
   "license": "MIT",
-  "keywords": ["workspace", "bootstrap", "dual-repo", "git"],
+  "keywords": [
+    "workspace",
+    "bootstrap",
+    "dual-repo",
+    "git"
+  ],
   "skills": "./skills/",
   "interface": {
     "displayName": "Workspace Init",
@@ -17,7 +22,11 @@
     "longDescription": "Workspace Init creates or pairs an AI workspace and canonical repository, writes the pairing manifest, seeds project scaffolding, and installs AI-trace commit-message filtering.",
     "developerName": "Pras",
     "category": "Coding",
-    "capabilities": ["Interactive", "Read", "Write"],
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
     "defaultPrompt": [
       "Initialize a dual-repo workspace here.",
       "Pair this AI workspace with a canonical repo.",

@@ -2,6 +2,10 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.10.2
+
+The marketplace is renamed `pulsestack`; the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the old `claude-agent-scaffolding`; an entry under the new name wins. The install key is `merge-bar@pulsestack`. No other change.
+
 ## 0.10.1
 
 **Prose and tests only (#1061, follow-up to #1060).**

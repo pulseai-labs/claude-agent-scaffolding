@@ -2,6 +2,10 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.11.2
+
+The marketplace is renamed `pulsestack`; the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the old `claude-agent-scaffolding`; an entry under the new name wins. The install key is `crew@pulsestack`. No other change.
+
 ## 0.11.1
 
 **Text only (#755).** `lifecycle.md`, `briefs.md` and `ossify-pr-briefs.md` say where a `gh --repo` name comes from: the target repository's own `origin` (`gh repo view`), read from that repository's checkout and never built from a folder name. The dispatcher fills `PR_REPO` the same way. No code.

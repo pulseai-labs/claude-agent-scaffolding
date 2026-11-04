@@ -1,4 +1,4 @@
-# ossify (v1.36.6)
+# ossify (v1.36.7)
 
 Skeleton-first lifecycle plugin: Release 0 → MVP → v1, driven by bone and flesh
 spines against a cumulative demo ledger. Fourteen skills: ten entry skills (`start`, `adopt`,
@@ -240,6 +240,8 @@ prints a note, writes it into `verify.md`, and closes; a different spec halts `h
 two ways out, both the operator's: restore the dispatched spec and re-run close, or return the item to `planned` and re-dispatch it. The
 recorded value changes only through a new dispatch. The two crash-repair rows that re-call `work_item_exec` record the spec as it is at repair
 and say so. Verb: `oss spec_oid <path>`. No state schema bump.
+
+Since 1.36.7, the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the pre-rename name; an entry under the new name wins. The marketplace was renamed (pulsestack rename). No other change.
 
 Since 1.36.6 (#1063), spine close's fields check reads the Merge bar and the Door line under their own headings: the bar's six template lines (the lead line, four conditions and `Everything else is non-blocking.`) must be whole lines under `## Merge bar`, an extra numbered line there halts, and the `Door:` line must sit under `## Merge danger` and read `one-way` or `two-way` followed by the line's end or any character that is not an ASCII letter or digit, `_` or `-` (so `Door: one-way after the tag — …` passes; `Door: one-way or two-way`, `Door: two-way or one-way`, `Door: two-wayfoo` and `Door: two-way-ish` halt); a template bar line repeated under `## Merge bar` halts too. A fields file with CRLF line endings halts with a message naming CRLF instead of reporting a visible heading missing. Same halt point as before: before that repo's push, only where `pr_fields_dir` is set.
 
