@@ -249,7 +249,8 @@ describe("ossify-spine recipe", () => {
     for (const name of ["close"]) {
       const s = r.stages[name];
       // the packet is the only route to correct: no verify.md grep, so a stale one cannot re-route
-      expect([name, s.outcomes]).toEqual([name, [
+      // (each outcome also carries the Ruling file archive, pinned in its own test, #1057)
+      expect([name, s.outcomes.map(({ run: _run, ...o }: any) => o)]).toEqual([name, [
         { when: [{ exit0: PR_RECORDED }], to: "land" },
         { when: [{ file: PACKET }], to: "correct" },
       ]]);
@@ -321,6 +322,53 @@ describe("ossify-spine recipe", () => {
     exec();
     expect(ls()).toEqual(["operator-1.md", "operator-2.md", "review-prev.md"]);
     expect(readFileSync(join(dir, "review-prev.md"), "utf8")).toBe("verdict: block\nhead: b2\n");
+    rmSync(dir, { recursive: true });
+  });
+
+  test("the four ruling stages name the Ruling file at their own {unit.id} path (#1057)", () => {
+    const r = loadRecipe();
+    for (const n of ["close", "spine_open", "spine_finish", "spine_work"]) {
+      const m = (r.stages[n] as SessionStage).message;
+      expect(m).toContain(`Ruling file: ${OUT}/operator.md. `);
+      expect(m).not.toContain("Operator file");
+    }
+    // the unit ids behind {unit.id}: spine_open runs on the lane, spine_finish on the spine PR
+    expect(raw().seed[0]).toEqual({ id: "lane", stage: "lane" });
+    expect(raw().stages.spine_open.message).toContain(`Ruling file: ${OUT}/operator.md.`);
+  });
+
+  const ARCHIVE_OPERATOR = ["sh", OUT, "operator", ".md"];
+  test("every outcome of close, spine_open and spine_finish archives the Ruling file (#1057)", () => {
+    const r = loadRecipe();
+    for (const n of ["close", "spine_open", "spine_finish"]) {
+      const outs = (r.stages[n] as SessionStage).outcomes;
+      expect(outs.length).toBeGreaterThan(0);
+      for (const o of outs) {
+        const hooks = o.run ?? [];
+        expect(hooks.filter((a) => a.slice(0, 2).join(" ") === "sh -c" && JSON.stringify(a.slice(3)) === JSON.stringify(ARCHIVE_OPERATOR))).toHaveLength(1);
+      }
+    }
+    expect((r.stages.close as SessionStage).outcomes.map((o) => o.to)).toEqual(["land", "correct"]);
+  });
+
+  test("the archive hook of a non-spine_work stage, executed: once per stage end, appended rulings kept, no file needed (#1057)", () => {
+    const hook = (loadRecipe().stages.spine_finish as SessionStage).outcomes[0].run![0];
+    const dir = mkdtempSync(join(tmpdir(), "baton-ruling-"));
+    const exec = () => {
+      const argv = hook.map((a) => a.replaceAll(OUT, dir));
+      const p = Bun.spawnSync(argv, { stdout: "pipe", stderr: "pipe" });
+      expect([p.exitCode, p.stderr.toString()]).toEqual([0, ""]);
+    };
+    exec(); // no ruling: succeeds, creates nothing
+    expect(readdirSync(dir)).toEqual([]);
+    writeFileSync(join(dir, "operator.md"), "pass d3");
+    exec();
+    expect(readdirSync(dir).sort()).toEqual(["operator-1.md"]);
+    writeFileSync(join(dir, "operator.md"), "second");
+    exec();
+    expect(readdirSync(dir).sort()).toEqual(["operator-1.md", "operator-2.md"]);
+    expect(readFileSync(join(dir, "operator-1.md"), "utf8")).toBe("pass d3"); // never overwritten
+    expect(readFileSync(join(dir, "operator-2.md"), "utf8")).toBe("second");
     rmSync(dir, { recursive: true });
   });
 
@@ -548,6 +596,13 @@ describe("ossify-spine briefs", () => {
 
   test("spine_finish pushes the AI workspace commit the close made", () => {
     expect(brief("spine-finish.md")).toContain("git push");
+  });
+
+  test("common tells a seat to read a named Ruling file first; spine-work uses the same label (#1057)", () => {
+    expect(brief("common.md")).toContain("**Ruling file.** If your message names a Ruling file and it exists when you start");
+    expect(brief("common.md")).toContain("Do not edit or remove it; the stage's end archives it.");
+    expect(brief("spine-work.md")).toContain("If the Ruling file exists");
+    expect(brief("spine-work.md")).not.toContain("operator file");
   });
 
   test("the example carries no triage: no stage, no brief, no note in common.md (removed in 0.14.0)", () => {

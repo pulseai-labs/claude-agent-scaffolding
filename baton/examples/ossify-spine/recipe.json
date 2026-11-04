@@ -182,7 +182,7 @@
       "project": "{param.ai_project}",
       "cwd": "{param.ai_root}",
       "launch_dir": "root", "title": "close {unit.id}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Worktree: {unit.vars.worktree_path}. Branch: {unit.vars.branch}. Base SHA: {unit.vars.base_sha}. Verdict file: {run.dir}/out/{unit.id}/verdict.json. Correction packet: {run.dir}/out/{unit.id}/correction.txt. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/close.md, and follow them. Work item: {unit.id}. Handoff: {unit.vars.handoff_path}. Worktree: {unit.vars.worktree_path}. Branch: {unit.vars.branch}. Base SHA: {unit.vars.base_sha}. Verdict file: {run.dir}/out/{unit.id}/verdict.json. Correction packet: {run.dir}/out/{unit.id}/correction.txt. Ruling file: {run.dir}/out/{unit.id}/operator.md. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
@@ -198,11 +198,13 @@
       "outcomes": [
         {
           "when": [{ "exit0": ["jq", "-e", "--arg", "w", "{unit.id}", "any(.work_items[]; .id == $w and (.pr_url | type) == \"string\")", "{param.state_file}"] }],
-          "to": "land"
+          "to": "land",
+          "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"]]
         },
         {
           "when": [{ "file": "{run.dir}/out/{unit.id}/correction.txt" }],
-          "to": "correct"
+          "to": "correct",
+          "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"]]
         }
       ]
     },
@@ -260,7 +262,7 @@
       "cwd": "{param.ai_root}",
       "launch_dir": "root",
       "title": "spine open {param.spine}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/spine-open.md, and follow them. Spine: {param.spine}. Spine PR record: {run.dir}/spine/spine-pr.json. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/spine-open.md, and follow them. Spine: {param.spine}. Spine PR record: {run.dir}/spine/spine-pr.json. Ruling file: {run.dir}/out/{unit.id}/operator.md. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "coordinator",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
@@ -274,7 +276,7 @@
       "stop_file": "{run.dir}/out/{unit.id}/stop",
       "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
       "outcomes": [
-        { "when": [{ "file": "{run.dir}/spine/spine-pr.json" }], "to": "done" }
+        { "when": [{ "file": "{run.dir}/spine/spine-pr.json" }], "to": "done", "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"]] }
       ]
     },
     "spine_review": {
@@ -339,7 +341,7 @@
       "cwd": "{param.repo}",
       "launch_dir": "root",
       "title": "spine work {param.spine}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/spine-work.md, and follow them. Spine PR: {unit.vars.pr_url}. Review: {run.dir}/out/{unit.id}/review.md. Operator file: {run.dir}/out/{unit.id}/operator.md. Round done file: {run.dir}/out/{unit.id}/round-done. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/spine-work.md, and follow them. Spine PR: {unit.vars.pr_url}. Review: {run.dir}/out/{unit.id}/review.md. Ruling file: {run.dir}/out/{unit.id}/operator.md. Round done file: {run.dir}/out/{unit.id}/round-done. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "implementer",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}:{param.spine_dir}",
@@ -374,7 +376,7 @@
       "cwd": "{param.ai_root}",
       "launch_dir": "root",
       "title": "spine finish {param.spine}",
-      "message": "Read {param.briefs}/common.md, then {param.briefs}/spine-finish.md, and follow them. Spine: {param.spine}. Spine PR: {unit.vars.pr_url}. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/spine-finish.md, and follow them. Spine: {param.spine}. Spine PR: {unit.vars.pr_url}. Ruling file: {run.dir}/out/{unit.id}/operator.md. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
       "env": {
         "SEAT_MODS_ROLE": "coordinator",
         "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
@@ -390,7 +392,8 @@
       "outcomes": [
         {
           "when": [{ "exit0": ["jq", "-e", "--arg", "s", "{param.spine}", ".spines[] | select(.id == $s) | .status == \"closed\"", "{param.state_file}"] }],
-          "to": "done"
+          "to": "done",
+          "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"]]
         }
       ]
     }
