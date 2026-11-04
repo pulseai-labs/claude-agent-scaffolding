@@ -137,11 +137,11 @@ operator.
 | Implement stall, `before failed` | `baton unpark <run> <wi> --to implement` | raising the dispatch cap (no verb does it: the recipe's `max_launches` or a hook, the operator's); an item that keeps failing |
 | Verify stop | clear what the verifier named, unpark | a stop that names a spec or ADR change |
 | `land` red check | send the item back with the fix; rerun a flaky check once | none |
-| Spine PR round stop | rule it under the project's Round stop order, write the ruling to `operator.md` (the work-PR seat puts it in the PR body) | split the PR or change the design; a finding the order sends to the operator |
+| Spine PR round stop | rule it under the project's Round stop order, write the ruling to `operator.md`, replacing any (the work-PR seat puts it in the PR body) | split the PR or change the design; a finding the order sends to the operator |
 | "passed review … merge it" | check the pass against the rulings; send a finding the order sends to a fix back to `spine_work` | the merge, unless the project's governance grants this session merge authority |
 | PR conflict | merge the base into the spine branch, move `review.md` to `review-prev.md`, unpark `--to spine_review` | a closed PR |
-| `spine_finish` stop on a `user:` line | prepare the walk and evidence | pass or fail: write it to `out/spine-pr/operator.md`, unpark |
-| Close or spine-open stop | rule it; write `out/<wi>/operator.md` (`out/lane/` for spine-open), replacing any, unpark; move it aside before an unpark `--to` another stage | a stop that names a spec or ADR change |
+| `spine_finish` stop on a `user:` line | prepare the walk and evidence | pass or fail: write it to `out/spine-pr/operator.md`, replacing any, unpark |
+| Close or spine-open stop | rule it; write `out/<wi>/operator.md` (`out/lane/` for spine-open), replacing any, unpark; move it aside before an unpark `--to` a stage that names no Ruling file | a stop that names a spec or ADR change |
 | Close harvest | present the candidates | accept |
 
 A notice with no run (`auth`, `down`) is the host's: report it, touch nothing. End each notice
