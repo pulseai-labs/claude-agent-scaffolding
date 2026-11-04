@@ -108,7 +108,7 @@ workspace-init is optional for ossify:
 
 ## Install
 
-Built for Linux and macOS; CI runs on Linux. On Windows, only sage states support: its skills and commands work there (`sage/README.md`).
+Built for Linux and macOS; CI runs on Linux.
 
 <details open>
 <summary><b>Claude Code</b></summary>
