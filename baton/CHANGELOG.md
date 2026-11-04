@@ -2,6 +2,30 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.17.0 - 2026-11-04
+
+Each item PR gets a review loop in the example recipe, and the `merge` stage can pin the head it merges (#1046).
+
+- **Added: engine, `merge` stage.** An optional `expect_head` argv (rendered like `pr`) prints the head to
+  merge: 40 lowercase hex, else the unit parks `expect head` (an argv that exits non-zero is retried and
+  parks at the third failure). A PR head that differs goes to `outcomes.moved`, which is required with
+  `expect_head` and refused without it; the compare runs after the base check and before the checks, and
+  `gh pr merge --match-head-commit` takes the expected head. It only adds a stop (skill-first question 3):
+  green checks are still required, and a stage without `expect_head` is unchanged.
+- **Added: the example recipe.** `close` now goes to `item_ready` (it also writes `pr_url` into the item's
+  queue record, mapped to `unit.vars.pr_url`), then `item_review` (new role `item reviewer`, which needs a
+  `review` key in its seat row), `item_wait` and `item_fix` (role `work-PR session`, in the item
+  worktree). Review 3 blocking, or red checks after review 2, parks in `item_wait`; the cap is counted
+  from `review-<n>.md` files because `enterStage` resets launch counts. `land` merges the head named on
+  line 2 of `review.md` and sends a moved head back to `item_review`. The lane's park list gains the new
+  stages. `item_ready` is a one-tick wait: a session launched in the tick that moved it renders with the
+  unit vars read at the tick's start, so `item_review` cannot be entered straight from `close`.
+- **Added: briefs** `item-review.md` and `item-fix.md`.
+- **Changed: the runbook and skill.** The item review stop, the `item_wait` parks, `item_review` in the
+  `--to` list, the `item reviewer` seat row, the merge-stage reference, one Notices row.
+- **Upgrade.** Copy the new recipe and briefs, and add an `item reviewer` row (with `review`) to the seat
+  table. A run armed on the old recipe is unchanged.
+
 ## 0.16.1 - 2026-11-04
 
 A ruling file holds one ruling (#1075 C2). Prose only; no recipe or engine change.

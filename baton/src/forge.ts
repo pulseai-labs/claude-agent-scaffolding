@@ -25,7 +25,15 @@ export class PrUrlError extends Error {
 }
 
 /** What a failed forge read was reading; also the park reason at the third failure in a row. */
-export type ForgeRead = "pr view failed" | "pr url" | "landed failed";
+export type ForgeRead = "pr view failed" | "pr url" | "landed failed" | "expect head";
+
+/** An `expect_head` argv whose output is not a 40-hex sha: the unit parks `expect head`. */
+export class HeadError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HeadError";
+  }
+}
 
 /**
  * A forge read that failed and may work next tick (a `gh` 502, a rate limit, a network blip).
@@ -67,6 +75,21 @@ export async function prUrl(argv: string[], cwd?: string): Promise<string> {
   const url = r.out.trim();
   if (!PR_URL_RE.test(url)) throw new PrUrlError(`not a pull request URL: ${JSON.stringify(url.slice(0, 200))}`);
   return url;
+}
+
+const SHA_RE = /^[0-9a-f]{40}$/;
+
+/**
+ * Run the stage's `expect_head` argv (no shell) and return its output as a head sha. A non-zero
+ * exit is a failed read (retried). Anything but 40 lowercase hex, an empty output included, is a
+ * `HeadError`. The shape check only adds a stop: it never approves a merge.
+ */
+export async function expectedHead(argv: string[], cwd?: string): Promise<string> {
+  const r = await run(argv, cwd, 60_000);
+  if (r.rc !== 0) throw new ForgeReadError("expect head", `expect_head argv ${JSON.stringify(argv)} did not exit 0`);
+  const sha = r.out.trim();
+  if (!SHA_RE.test(sha)) throw new HeadError(`not a 40-hex head sha: ${JSON.stringify(sha.slice(0, 200))}`);
+  return sha;
 }
 
 type Entry = { __typename?: string; status?: string; conclusion?: string; state?: string; name?: string; context?: string };

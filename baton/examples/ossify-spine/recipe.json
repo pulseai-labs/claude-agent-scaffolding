@@ -9,7 +9,7 @@
       "id_key": "work_item_id",
       "group_key": "round",
       "order_key": "order",
-      "vars": { "worktree_path": "worktree_path", "branch": "branch", "handoff_path": "handoff_path", "base_sha": "base_sha" },
+      "vars": { "worktree_path": "worktree_path", "branch": "branch", "handoff_path": "handoff_path", "base_sha": "base_sha", "pr_url": "pr_url" },
       "stage": "implement"
     },
     {
@@ -71,7 +71,7 @@
         {
           "when": [
             { "file": "{run.dir}/out/{unit.id}/lane.done" },
-            { "units": { "group": "{run.group}", "stages": ["implement", "gap_wait", "regap", "verify", "close", "correct", "land"], "count": "none" } }
+            { "units": { "group": "{run.group}", "stages": ["implement", "gap_wait", "regap", "verify", "close", "correct", "item_ready", "item_review", "item_wait", "item_fix", "land"], "count": "none" } }
           ],
           "to": "park",
           "run": [["rm", "-f", "{run.dir}/out/{unit.id}/lane.done"]]
@@ -198,8 +198,8 @@
       "outcomes": [
         {
           "when": [{ "exit0": ["jq", "-e", "--arg", "w", "{unit.id}", "any(.work_items[]; .id == $w and (.pr_url | type) == \"string\")", "{param.state_file}"] }],
-          "to": "land",
-          "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"]]
+          "to": "item_ready",
+          "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"], ["sh", "-c", "u=$(jq -er --arg w \"$2\" '.work_items[] | select(.id == $w) | .pr_url' \"$1\") && jq --arg u \"$u\" '.pr_url = $u' \"$3\" > \"$3.tmp\" && mv -- \"$3.tmp\" \"$3\"", "sh", "{param.state_file}", "{unit.id}", "{run.dir}/queue/{unit.id}.json"]]
         },
         {
           "when": [{ "file": "{run.dir}/out/{unit.id}/correction.txt" }],
@@ -245,14 +245,104 @@
       "pr": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"],
       "base": "{param.spine_branch}",
       "repo": "{param.repo}",
+      "expect_head": ["sed", "-n", "2s/^head: //p", "{run.dir}/out/{unit.id}/review.md"],
       "ordered": true,
       "checks": "green",
-      "outcomes": { "merged": "done", "red": "park", "conflict": "park" },
+      "outcomes": { "merged": "done", "red": "park", "conflict": "park", "moved": "item_review" },
       "run_after": [
         ["sh", "-c", "test \"$(git -C \"$1\" symbolic-ref --short HEAD)\" = \"$2\"", "sh", "{param.repo}", "{param.spine_branch}"],
         ["git", "-C", "{param.repo}", "merge", "--ff-only", "origin/{param.spine_branch}"],
         ["git", "-C", "{param.repo}", "merge-base", "--is-ancestor", "{pr.head}", "{param.spine_branch}"],
         ["env", "-C", "{param.ai_root}", "{param.oss}", "work_item_status", "{unit.id}", "complete"]
+      ]
+    },
+    "item_ready": {
+      "kind": "wait",
+      "outcomes": [
+        { "when": [{ "exit0": ["jq", "-e", "(.pr_url | type) == \"string\"", "{run.dir}/queue/{unit.id}.json"] }], "to": "item_review" }
+      ]
+    },
+    "item_review": {
+      "kind": "session",
+      "role": "item reviewer",
+      "project": "{param.project}",
+      "cwd": "{unit.vars.worktree_path}",
+      "launch_dir": "worktree",
+      "title": "item review {unit.id}",
+      "message": "{agent.review} {unit.vars.pr_url} previous: {run.dir}/out/{unit.id}/review-prev.md Then read {param.briefs}/common.md and {param.briefs}/item-review.md, and write {run.dir}/out/{unit.id}/review.md whose first line is exactly verdict: pass or verdict: block, whose second line is head: followed by the reviewed head SHA (40 hex), then the findings. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "env": {
+        "SEAT_MODS_ROLE": "reviewer",
+        "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
+        "MOLT_HANDOFF": "parent",
+        "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
+        "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
+        "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
+      },
+      "slots": ["session"],
+      "before": [["mkdir", "-p", "{run.dir}/out/{unit.id}"], ["sh", "-c", "[ -e \"$1/review.md\" ] || exit 0; cp -f -- \"$1/review.md\" \"$1/review-prev.md\"; n=1; while [ -e \"$1/review-$n.md\" ]; do n=$((n+1)); done; mv -- \"$1/review.md\" \"$1/review-$n.md\"", "sh", "{run.dir}/out/{unit.id}"]],
+      "stop_file": "{run.dir}/out/{unit.id}/stop",
+      "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
+      "outcomes": [
+        {
+          "when": [
+            { "file": "{run.dir}/out/{unit.id}/review.md" },
+            { "exit0": ["grep", "-qxE", "verdict: (pass|block)", "{run.dir}/out/{unit.id}/review.md"] },
+            { "exit0": ["sh", "-c", "sed -n 2p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "head: [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]"] }
+          ],
+          "to": "item_wait"
+        }
+      ]
+    },
+    "item_wait": {
+      "kind": "wait",
+      "outcomes": [
+        { "when": [{ "file": "{run.dir}/out/{unit.id}/review-2.md" }, { "exit0": ["grep", "-qx", "verdict: block", "{run.dir}/out/{unit.id}/review.md"] }], "to": "park" },
+        { "when": [{ "file": "{run.dir}/out/{unit.id}/review-2.md" }, { "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_red" } }], "to": "park" },
+        { "when": [{ "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "closed" } }], "to": "park" },
+        { "when": [{ "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "conflict" } }], "to": "park" },
+        { "when": [{ "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_red" } }], "to": "item_fix" },
+        {
+          "when": [
+            { "exit0": ["grep", "-qx", "verdict: block", "{run.dir}/out/{unit.id}/review.md"] },
+            { "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_green" } }
+          ],
+          "to": "item_fix"
+        },
+        {
+          "when": [
+            { "exit0": ["grep", "-qx", "verdict: pass", "{run.dir}/out/{unit.id}/review.md"] },
+            { "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_green" } }
+          ],
+          "to": "land"
+        }
+      ]
+    },
+    "item_fix": {
+      "kind": "session",
+      "role": "work-PR session",
+      "project": "{param.project}",
+      "cwd": "{unit.vars.worktree_path}",
+      "launch_dir": "worktree",
+      "title": "item fix {unit.id}",
+      "message": "Read {param.briefs}/common.md, then {param.briefs}/item-fix.md, and follow them. Item PR: {unit.vars.pr_url}. Review: {run.dir}/out/{unit.id}/review.md. Ruling file: {run.dir}/out/{unit.id}/operator.md. Round done file: {run.dir}/out/{unit.id}/round-done. OUT: {run.dir}/out/{unit.id}. Stop file: {run.dir}/out/{unit.id}/stop. Ledger: {param.spine_dir}/autopilot-ledger.md.",
+      "env": {
+        "SEAT_MODS_ROLE": "implementer",
+        "SEAT_MODS_ALLOW": "{run.dir}/out/{unit.id}",
+        "MOLT_HANDOFF": "parent",
+        "MOLT_STATUS_PATH": "{run.dir}/out/{unit.id}/molt.log",
+        "SPINE_LEDGER": "{param.spine_dir}/autopilot-ledger.md",
+        "SPINE_STOP_FILE": "{run.dir}/out/{unit.id}/stop"
+      },
+      "slots": ["session", "build"],
+      "before": [["mkdir", "-p", "{run.dir}/out/{unit.id}"]],
+      "stop_file": "{run.dir}/out/{unit.id}/stop",
+      "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
+      "outcomes": [
+        {
+          "when": [{ "file": "{run.dir}/out/{unit.id}/round-done" }],
+          "to": "item_review",
+          "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"], ["rm", "-f", "{run.dir}/out/{unit.id}/round-done"]]
+        }
       ]
     },
     "spine_open": {

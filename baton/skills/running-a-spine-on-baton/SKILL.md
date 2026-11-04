@@ -84,7 +84,7 @@ Each picked agent's entry becomes that role's row of the seat file (schema in th
   follow `--` as a path.
 - `env` is `{}` unless the entry's note names a key the agent itself needs. The stage sets the
   seat's marking.
-- `review`, on the reviewer's row, is the entry's `review:` command. In it,
+- `review`, on each reviewer row (`reviewer`, `item reviewer`), is the entry's `review:` command. In it,
   drop a trailing `<PR_URL>` or `<PR>`: the stage appends the PR. No `review:` field, or a
   placeholder left after that, is one question.
 - An entry whose `host:` is another machine is one question: baton launches on this one.
@@ -141,6 +141,7 @@ operator.
 | "passed review … merge it" | check the pass against the rulings; send a finding the order sends to a fix back to `spine_work` | the merge, unless the project's governance grants this session merge authority |
 | PR conflict | merge the base into the spine branch, move `review.md` to `review-prev.md`, unpark `--to spine_review` | a closed PR |
 | `spine_finish` stop on a `user:` line | prepare the walk and evidence | pass or fail: write it to `out/spine-pr/operator.md`, replacing any, unpark |
+| Item review stop (`item_wait` park, review 3) | `--to item_fix` after writing `out/<wi>/operator.md`, replacing any; or accept the findings with `--to land` | a finding the order sends to the operator |
 | Close or spine-open stop | rule it; write `out/<wi>/operator.md` (`out/lane/` for spine-open), replacing any, unpark; move it aside before an unpark `--to` a stage that names no Ruling file | a stop that names a spec or ADR change |
 | Close harvest | present the candidates | accept |
 

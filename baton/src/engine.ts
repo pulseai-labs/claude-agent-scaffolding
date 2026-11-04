@@ -15,7 +15,7 @@ import { dirname, join, basename } from "node:path";
 import { CLONED_PARK } from "./clone.ts";
 import { ClaimBusy, claimKey, liveClaim, removeClaim, writeClaim } from "./claims.ts";
 import { ledgerLine, readDriverResult, renderDriverState } from "./driver.ts";
-import { FORGE_FAILURES_TO_PARK, ForgeReadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
+import { FORGE_FAILURES_TO_PARK, ForgeReadError, HeadError, PrUrlError, type Forge, type PrView } from "./forge.ts";
 import {
   HostAuthError, HostDownError, LaunchError, type Host, type LaunchRequest, type ThreadStatus,
 } from "./host.ts";
@@ -518,6 +518,11 @@ class RunTick {
       if (e instanceof PrUrlError) {
         this.ev("pr url", { unit: u.id, reason: e.message });
         await this.park(u, "pr url");
+        return;
+      }
+      if (e instanceof HeadError) {
+        this.ev("expect head", { unit: u.id, reason: e.message });
+        await this.park(u, "expect head");
         return;
       }
       if (e instanceof Exit0Error) {

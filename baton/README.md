@@ -399,16 +399,34 @@ park names: a notice leaves the host, so the rendered arguments stay in the even
 }
 ```
 
+## The merge stage
+
+A `merge` stage reads one PR (`pr`, an argv that prints its URL), waits for it, and merges it with
+`gh pr merge --merge --match-head-commit <the head it merges>`. `base` and `repo` name the branch it
+must target and the checkout it fast-forwards; `ordered` merges a group's units in order; `checks`
+is `green` (the default) or `none-required`; `run_after` hooks run once it has landed. `outcomes`
+route `merged`, `red` and `conflict`.
+
+`expect_head` (optional) is an argv, rendered like `pr`, that prints the head the recipe means to
+merge: exactly 40 lowercase hex characters and a newline. A PR whose head differs goes to
+`outcomes.moved`, which is then required, checked after the base and before the checks, and the merge
+is pinned to that head. An empty or malformed output parks the unit `expect head`, and an argv that
+fails three ticks running does too. It only adds a stop: green checks are still required, and a
+stage without `expect_head` is unchanged.
+
 ## Example: an ossify spine
 
 `examples/ossify-spine/` is a recipe that runs one planned ossify spine in Orca terminals: the detached
 run-spine lane queues each round's work items, an implementer per item, gap re-entry, a `verify`
 seat that writes the item's verdict file, close on that verdict (`--verdict`) and correction (back
-to `verify`), ordered merges onto the spine branch, the spine PR's review rounds, and the spine
-close. Every session stage and `driver` names a crew role, so the arm needs `--seats`
-with a row for each of `spine session`, `implementer`, `verifier`, `close session`, `reviewer`
-(with `review`), `work-PR session` and `driver` (see Seats). The briefs it names are
-prose; `common.md` is read first by every seat.
+to `verify`), a review loop on each item PR (`item_review`, `item_wait`, `item_fix`: up to three
+reviews, then a stop), ordered merges onto the spine branch that merge only the reviewed head, the
+spine PR's review rounds, and the spine close. Every session stage and `driver` names a crew role, so
+the arm needs `--seats` with a row for each of `spine session`, `implementer`, `verifier`,
+`close session`, `reviewer` (with `review`), `item reviewer` (with `review`), `work-PR session` and
+`driver` (see Seats). The item reviewer is its own role so the item PRs can go to a different
+agent than the spine PR's `reviewer`. The briefs it names are prose; `common.md` is read first by
+every seat.
 
 Copy the example outside the plugin cache first, and pass that copy's `briefs` path: a plugin
 update moves the cache, and a run armed on the old path would lose its briefs.
@@ -444,11 +462,26 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   for spine-finish), replacing any file already there: the file holds one ruling, and a seat records
   a ruling when it applies it. Then `baton unpark <run> <unit>`; the stage's end archives it as
   `operator-<n>.md`. Before `baton unpark <run> <unit> --to` a stage that names no Ruling file
-  (`implement`, `regap`, `verify`, `correct`, `spine_review`), move any `operator.md` aside as the
-  next free `operator-<n>.md`: `--to` runs no outcome hook, and the next seat that reads the file
-  (close, spine-open, `spine_work` or spine-finish) would apply it. An implement, regap, verify or
+  (`implement`, `regap`, `verify`, `correct`, `spine_review`, `item_review`), move any `operator.md`
+  aside as the next free `operator-<n>.md`: `--to` runs no outcome hook, and the next seat that reads
+  the file (close, spine-open, `item_fix`, `spine_work` or spine-finish) would apply it. An implement, regap, verify or
   correct stop takes its ruling in the handoff's `## Clarifications`; a lane round barrier is ruled
   by planning the round.
+- **The item review stop.** Each item PR gets at most three reviews (`item_review`, then `item_wait`
+  reads the verdict and the checks). A block or red checks after review 1 or 2 sends the item to
+  `item_fix`, one `working-a-pr` round that fixes the blocking findings and pushes once, then back to
+  review. A block, or red checks, once `out/<wi>/review-2.md` exists (review 3 has run) parks the
+  unit in `item_wait` with reason `outcome`, and baton notifies the orchestrator. Rule it one of two
+  ways. To fix more: write the ruling to `out/<wi>/operator.md` (replacing any file there), then
+  `baton unpark <run> <wi> --to item_fix`; `item_fix` applies it first and its end archives it as
+  `operator-<n>.md`. To accept the findings as known limits: `baton unpark <run> <wi> --to land`,
+  which merges the head of the last review and nothing newer (a head pushed since goes back to
+  `item_review`). A later block parks again at once, because the review files keep counting. Each
+  review is kept as `out/<wi>/review-<n>.md`; `review.md` is the latest and `review-prev.md` the
+  one before.
+- **`item_wait` parks** on `closed` and `conflict` as well (reason `outcome`): reopen or resolve the
+  conflict on the item branch (merge the base in; never rebase or force-push), push, then
+  `baton unpark <run> <wi> --to item_review` so the new head is reviewed.
 - **A reversal before the spine merges**: write it to `out/spine-pr/operator.md` (the same file and
   archive; replace any file there), then
   `baton unpark <run> spine-pr --to spine_work`; that round does it first, and the round's end archives the file as `out/spine-pr/operator-<n>.md`
@@ -465,6 +498,9 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - **A `land` park** names its reason. `run failed`: the canonical root is not on the spine branch
   (or the fast-forward failed); check the spine branch out there, then `baton unpark <run> <wi>`.
   `outcome`: the item PR's checks are red or it conflicts; fix it on the item branch, then unpark.
+  `expect head`: the `head:` line (line 2) of `out/<wi>/review.md` is missing or is not 40 hex, or
+  its read failed three times; nothing was merged; rerun the review with
+  `baton unpark <run> <wi> --to item_review`.
   `pr closed`: reopen the PR and unpark, or finish the item by hand. `not landed`: the PR merged
   but its head is not on the spine branch (a squash or rebase); the recipe cannot record that
   landing, so finish the item by hand.
