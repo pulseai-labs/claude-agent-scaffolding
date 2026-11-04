@@ -3,8 +3,10 @@
 # 2026-11). Each fact prints its own finding:
 #   h1               the README's first line is exactly "# ossify", with no version label;
 #   history          no "Since x.y" line on the README: release notes go to CHANGELOG.md;
-#   command-row      every skills/<name>/ has a README table row that names /ossify:<name>;
+#   command-row      every skills/<name>/ has a README table row whose Command cell (the second)
+#                    starts with /ossify:<name>; a mention in another row does not count;
 #   link             every relative link, src or srcset target on the README exists;
+#   anchor           every in-page link (#x) names a heading on the README, by GitHub's slug;
 #   codex-worker     the README says "Codex has no worker path" (wayfinder's ticket-types.md
 #                    cites ossify/README.md for that sentence);
 #   changelog-order  CHANGELOG.md's "## x.y.z" headings are strictly newest first;
@@ -39,7 +41,10 @@ check_plugin() (
 
   for d in skills/*/; do
     n="$(basename "$d")"
-    grep -E '^\|' "$r" | grep -Fq "/ossify:$n" || echo "command-row: no table row names /ossify:$n"
+    awk -F'|' -v want="/ossify:$n" '
+      /^\|/ { c = $3; sub(/^[[:space:]]*`/, "", c)
+               if (index(c, want) == 1) { rest = substr(c, length(want) + 1); if (rest ~ /^[ `]/) found = 1 } }
+      END { exit !found }' "$r" || echo "command-row: no table row has /ossify:$n as its command"
   done
 
   prose_lines "$r" \
@@ -49,6 +54,13 @@ check_plugin() (
     | sort -u \
     | while IFS= read -r t; do
         [ -e "$t" ] || echo "link: $t does not exist"
+      done
+
+  slugs="$(prose_lines "$r" | sed 's/^[0-9]*://' | grep -E '^#{1,6} ' \
+    | sed -E 's/^#+ //' | tr 'A-Z' 'a-z' | sed -E 's/[^a-z0-9 _-]//g; s/ /-/g')"
+  prose_lines "$r" | grep -oE '\]\(#[^)]*\)' | sed -E 's/^\]\(#//; s/\)$//' | sort -u \
+    | while IFS= read -r a; do
+        printf '%s\n' "$slugs" | grep -Fxq "$a" || echo "anchor: #$a names no heading"
       done
 
   grep -Fq 'Codex has no worker path' "$r" || echo "codex-worker: the README no longer says 'Codex has no worker path'"
@@ -109,7 +121,10 @@ else fail "control clean: an unchanged copy has findings: $out"; fi
 control h1-version    "h1: first line"                   "sed '1s/.*/# ossify (v1.0.0)/' README.md > t && mv t README.md"
 control history       "history: line"                    "printf 'Since 1.2.0, a note.\n' >> README.md"
 control history-fence "history: line"                    "printf '\x60\x60\x60\nx\n\x60\x60\x60\nSince 2.0.1 (#1), a note.\n' >> README.md"
-control command-row   "command-row: no table row names /ossify:frobnicate" "mkdir skills/frobnicate"
+control command-row   "command-row: no table row has /ossify:frobnicate as its command" "mkdir skills/frobnicate"
+control row-mentioned "command-row: no table row has /ossify:adopt as its command" "grep -v '^| Bring in a codebase' README.md > t && mv t README.md"
+control row-prefix    "command-row: no table row has /ossify:handoff as its command" "grep -v '^| Hand the work' README.md > t && mv t README.md"
+control anchor        "anchor: #no-such-heading names no heading" "printf 'See [x](#no-such-heading).\n' >> README.md"
 control link          "link: ./no-such-file.md"          "printf 'See [x](./no-such-file.md#part).\n' >> README.md"
 control link-src      "link: ../docs/assets/readme/missing.svg" "printf '<img src=\"../docs/assets/readme/missing.svg\">\n' >> README.md"
 control codex-worker  "codex-worker:"                    "sed 's/Codex has no worker path/Codex has a worker path/' README.md > t && mv t README.md"
