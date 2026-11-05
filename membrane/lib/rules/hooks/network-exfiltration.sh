@@ -47,8 +47,8 @@ detect() {
   if [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; then
     # Emit a finding at line 1 (file-level rule)
     # File-level rule: the excerpt is the whole file, and the uid holds the rule and the file, so there is one
-    # finding per file and nothing for C11 to collide with. It keeps csa_finding_uid (an edit past character 200
-    # keeps the uid); the raw form would hash the whole script and move it on every edit.
+    # finding per file. It keeps csa_finding_uid (an edit past character 200 keeps the uid, and so keeps a
+    # suppression: C11's harm, as in 0.4.2; #1098); the raw form would hash the whole script and move it on every edit.
     local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$content")"
     jq -nc \
       --arg rule_id "$RULE_ID" \
