@@ -36,9 +36,28 @@ plugin_options() {
   ' "$1" 2>/dev/null | sort
 }
 
+# A Markdown file's lines outside fenced code. A fence closes only on the opener's character,
+# repeated at least as many times, with nothing after it but whitespace (CommonMark), so a
+# four-backtick block can quote a three-backtick line.
+prose() {
+  awk '
+    !open && match($0, /^ ? ? ?(````*|~~~~*)/) {
+      f = substr($0, RSTART, RLENGTH); sub(/^ +/, "", f); ch = substr(f, 1, 1); n = length(f); open = 1; next
+    }
+    open {
+      line = $0; sub(/^ ? ? ?/, "", line); sub(/[[:space:]]+$/, "", line)
+      if (length(line) >= n && line ~ ("^" (ch == "`" ? "`" : "~") "+$")) open = 0
+      next
+    }
+    { print }' "$1"
+}
+
 # Every defect in the tree at $1, one line each, prefixed by its fact. Always returns 0.
+# Link targets resolve against $LINKROOT (default: the tree itself); the controls point it at the
+# real repository, so a copy needs only the files the gate reads, not every file a link names.
 check_tree() (
   cd "$1" || { echo "setup: cannot enter $1"; exit 0; }
+  LINKROOT="${LINKROOT:-$PWD}"
   for f in $DOCS $FORMS $CONFIG; do [ -s "$f" ] || echo "missing: $f"; done
 
   cat="$(jq -r '.plugins[].name' .claude-plugin/marketplace.json .omp-plugin/marketplace.json 2>/dev/null | sort -u)"
@@ -52,11 +71,11 @@ check_tree() (
 
   for f in $DOCS; do
     [ -s "$f" ] || continue
-    awk '/^[[:space:]]*(```|~~~)/ { fence = !fence; next } !fence' "$f" \
-      | grep -oE '\]\([^)]*\)' | sed -E 's/^\]\(//; s/\)$//; s/#.*//' \
+    prose "$f" \
+      | grep -oE '\]\([^)]*\)' | sed -E 's/^\]\(//; s/\)$//; s/[[:space:]]+"[^"]*"$//; s/#.*//' \
       | grep -vE '^(https?:|mailto:|$)' | sort -u \
       | while IFS= read -r t; do
-          [ -e ".github/$t" ] || echo "link: $f -> $t does not exist"
+          [ -e "$LINKROOT/.github/$t" ] || echo "link: $f -> $t does not exist"
         done
   done
 )
@@ -69,18 +88,16 @@ else fail "the real tree has findings:"; printf '        %s\n' "$findings"; fi
 
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 
-# A copy of what the gate reads and what the community files link to.
+# A copy of what the gate reads. Links in it resolve against the real repository (LINKROOT).
 make_copy() {
   local d="$1/repo"
-  mkdir -p "$d/.github" "$d/.claude-plugin" "$d/.omp-plugin" "$d/docs/conventions" "$d/merge-bar"
+  mkdir -p "$d/.github" "$d/.claude-plugin" "$d/.omp-plugin"
   cp -R "$ROOT/.github/." "$d/.github/"
   cp "$ROOT/.claude-plugin/marketplace.json" "$d/.claude-plugin/"
   cp "$ROOT/.omp-plugin/marketplace.json" "$d/.omp-plugin/"
-  cp "$ROOT/CLAUDE.md" "$ROOT/README.md" "$d/"
-  cp "$ROOT/docs/conventions/skill-first.md" "$d/docs/conventions/"
-  mkdir -p "$d/merge-bar/skills/opening-a-pr/references" && cp "$ROOT/merge-bar/skills/opening-a-pr/references/pr-body.md" "$d/merge-bar/skills/opening-a-pr/references/"
   printf '%s\n' "$d"
 }
+export LINKROOT="$ROOT"
 
 # control <name> <expected finding prefix> <shell that plants the defect, run inside the copy>
 control() {
@@ -121,6 +138,10 @@ quiet   reordered    "plugin-options:" "sed 's/^          - baton\$/__B__/; s/^ 
 quiet   reindented   "plugin-options:" "sed 's/^          - /        - /' .github/ISSUE_TEMPLATE/feature_request.yml > t && mv t .github/ISSUE_TEMPLATE/feature_request.yml && grep -q '^        - baton\$' .github/ISSUE_TEMPLATE/feature_request.yml"
 quiet   quoted       "plugin-options:" "sed 's/^          - sage\$/          - \"sage\"/' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml && grep -q '\"sage\"' .github/ISSUE_TEMPLATE/bug_report.yml"
 quiet   fenced-link  "in-fence.md" "printf '\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\n' >> .github/SECURITY.md"
+quiet   long-fence   "in-fence.md" "printf '\x60\x60\x60\x60\n\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\x60\n' >> .github/SECURITY.md"
+quiet   titled-link  "README.md" "printf 'See [x](../README.md \"Guide\").\n' >> .github/CONTRIBUTING.md"
+quiet   other-target "LICENSE" "printf 'See [x](../LICENSE).\n' >> .github/CONTRIBUTING.md"
+control after-fence  "link: .github/SECURITY.md -> ../after.md" "printf '\x60\x60\x60\x60\nx\n\x60\x60\x60\x60\n[y](../after.md)\n' >> .github/SECURITY.md"
 
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
