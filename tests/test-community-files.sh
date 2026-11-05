@@ -10,7 +10,7 @@
 # What it leaves to review: whether each sentence is true.
 #
 # Usage: bash tests/test-community-files.sh
-# Deps:  bash 3.2+, awk, grep, sed, sort, jq.
+# Deps:  bash 3.2+, awk, grep, sed, sort, jq, ruby (Psych).
 set -u
 export LC_ALL=C
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -20,24 +20,26 @@ pass() { PASS=$((PASS + 1)); printf '  ok  %s\n' "$1"; }
 fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
 
 FORMS=".github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_request.yml"
+CONFIG=".github/ISSUE_TEMPLATE/config.yml"
 DOCS=".github/CONTRIBUTING.md .github/SECURITY.md .github/CODE_OF_CONDUCT.md"
 OTHER="several plugins, or the marketplace itself"
 
-# The options of the dropdown whose id is "plugin", one per line, sorted.
+# The options of the dropdown whose id is "plugin", one per line, sorted. The form is parsed as
+# YAML (Ruby's Psych, which CI's runner ships), so any valid indentation or quoting reads the same;
+# a file that is not YAML, or has no such dropdown, prints nothing and the comparison names it.
 plugin_options() {
-  awk '
-    /^  - type:/        { inplugin = 0; inopts = 0 }
-    /^    id: plugin$/  { inplugin = 1 }
-    inplugin && /^      options:$/ { inopts = 1; next }
-    inopts && /^          - / { sub(/^          - /, ""); print; next }
-    inopts && !/^          - / { inopts = 0 }
-  ' "$1" | sort
+  ruby -ryaml -e '
+    y = (YAML.load_file(ARGV[0]) rescue nil)
+    b = y.is_a?(Hash) ? Array(y["body"]).find { |x| x.is_a?(Hash) && x["id"] == "plugin" } : nil
+    o = b.is_a?(Hash) && b["attributes"].is_a?(Hash) ? b["attributes"]["options"] : nil
+    puts o if o.is_a?(Array)
+  ' "$1" 2>/dev/null | sort
 }
 
 # Every defect in the tree at $1, one line each, prefixed by its fact. Always returns 0.
 check_tree() (
   cd "$1" || { echo "setup: cannot enter $1"; exit 0; }
-  for f in $DOCS $FORMS; do [ -s "$f" ] || echo "missing: $f"; done
+  for f in $DOCS $FORMS $CONFIG; do [ -s "$f" ] || echo "missing: $f"; done
 
   cat="$(jq -r '.plugins[].name' .claude-plugin/marketplace.json .omp-plugin/marketplace.json 2>/dev/null | sort -u)"
   [ -n "$cat" ] || echo "plugin-options: no plugin read from the catalogs"
@@ -106,6 +108,8 @@ if [ -z "$out" ]; then pass "control clean: an unchanged copy has no findings"
 else fail "control clean: an unchanged copy has findings: $out"; fi
 
 control missing      "missing: .github/SECURITY.md"   "rm .github/SECURITY.md"
+control missing-cfg  "missing: .github/ISSUE_TEMPLATE/config.yml" "rm .github/ISSUE_TEMPLATE/config.yml"
+control not-yaml     "plugin-options: .github/ISSUE_TEMPLATE/bug_report.yml lists []" "printf 'body: [\n' > .github/ISSUE_TEMPLATE/bug_report.yml"
 control new-plugin   "plugin-options: .github/ISSUE_TEMPLATE/bug_report.yml" "jq '.plugins += [{\"name\": \"zz-new\"}]' .claude-plugin/marketplace.json > t && mv t .claude-plugin/marketplace.json"
 control omp-only     "plugin-options: .github/ISSUE_TEMPLATE/feature_request.yml" "jq '.plugins += [{\"name\": \"zz-omp\"}]' .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json"
 control dropped      "plugin-options: .github/ISSUE_TEMPLATE/bug_report.yml" "grep -v '^          - sage\$' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml"
@@ -113,7 +117,9 @@ control no-other     "plugin-options: .github/ISSUE_TEMPLATE/feature_request.yml
 control fence-link   "link: .github/SECURITY.md -> ../outside.md" "printf 'See [x](../outside.md).\n\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\n' >> .github/SECURITY.md"
 control link         "link: .github/CONTRIBUTING.md -> ../no-such.md" "printf 'See [x](../no-such.md#y).\n' >> .github/CONTRIBUTING.md"
 
-quiet   reordered    "plugin-options:" "awk '/^          - baton\$/{held=\$0; next} {print} /^          - crew\$/ && held {print held; held=\"\"}' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml && ! grep -q '^          - baton\$' <(sed -n '/id: plugin/,/validations/p' .github/ISSUE_TEMPLATE/bug_report.yml | sed -n 4p)"
+quiet   reordered    "plugin-options:" "sed 's/^          - baton\$/__B__/; s/^          - crew\$/          - baton/; s/^__B__\$/          - crew/' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml && awk '/^          - crew\$/{c=NR} /^          - baton\$/{b=NR} END{exit !(c && b && c < b)}' .github/ISSUE_TEMPLATE/bug_report.yml"
+quiet   reindented   "plugin-options:" "sed 's/^          - /        - /' .github/ISSUE_TEMPLATE/feature_request.yml > t && mv t .github/ISSUE_TEMPLATE/feature_request.yml && grep -q '^        - baton\$' .github/ISSUE_TEMPLATE/feature_request.yml"
+quiet   quoted       "plugin-options:" "sed 's/^          - sage\$/          - \"sage\"/' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml && grep -q '\"sage\"' .github/ISSUE_TEMPLATE/bug_report.yml"
 quiet   fenced-link  "in-fence.md" "printf '\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\n' >> .github/SECURITY.md"
 
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"

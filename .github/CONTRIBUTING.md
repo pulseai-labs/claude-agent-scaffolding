@@ -1,9 +1,11 @@
 # Contributing to pulsestack
 
 pulsestack is a plugin marketplace for coding agents. Each top-level plugin directory (`ossify/`,
-`merge-bar/`, `crew/` and the rest) is one plugin, published from this one repository. The
-root [README's plugin table](../README.md#all-plugins) says which harnesses each one ships on:
-Claude Code, Codex, OMP, or a subset. There is no application: the plugins are the product.
+`merge-bar/`, `crew/` and the rest) is one plugin, published from this one repository. Not every
+plugin ships on every harness. The three catalogs (`.claude-plugin/marketplace.json`,
+`.agents/plugins/marketplace.json`, `.omp-plugin/marketplace.json`) list what Claude Code, Codex
+and OMP each carry, and the root [README's Install section](../README.md#install) shows how to
+install on each. There is no application: the plugins are the product.
 
 Bug reports, feature requests and pull requests are welcome. The issue forms ask for what a maintainer
 needs first: for a bug, the plugin, its version and the harness it ran on.

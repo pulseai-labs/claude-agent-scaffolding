@@ -146,7 +146,8 @@ jobs:
         run: bash tests/test-retired-plugins.sh
 
       - name: merge-bar template parity (repo-root)
-        # ossify's fallback PR-body template must match merge-bar's (ossify 1.13.0).
+        # ossify's fallback PR-body template (ossify 1.13.0) and the repository's own PR template
+        # must match merge-bar's.
         run: bash tests/test-merge-bar-template-parity.sh
 
       - name: Mutation harness contract

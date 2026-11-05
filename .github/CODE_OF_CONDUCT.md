@@ -7,5 +7,5 @@ project.
 ## Reporting
 
 To report behaviour that breaks it, send a private report through the repository's **Security** tab
-(**Report a vulnerability**) and start the title with "Conduct". Only the maintainers see it. The
-maintainers keep the reporter's identity private.
+(**Report a vulnerability**) and start the title with "Conduct". GitHub shows it only to the
+repository's administrators and security managers.

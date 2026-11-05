@@ -9,8 +9,8 @@
 # bar than the one merge-bar's working-a-pr judges against - merge-bar's bar has
 # already grown from three conditions to four since 0.1.0.
 #
-# Only the fenced ```markdown template block is compared: the prose around it is
-# per-copy by design (ossify's header says whose copy it is). Repo-root, because
+# In the two pr-body.md files only the fenced ```markdown template block is compared: the prose
+# around it is per-copy by design (ossify's header says whose copy it is). Repo-root, because
 # a plugin suite cannot see its sibling tree.
 #
 # Usage: bash tests/test-merge-bar-template-parity.sh
