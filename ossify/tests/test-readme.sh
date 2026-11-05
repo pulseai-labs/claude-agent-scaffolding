@@ -68,7 +68,7 @@ check_plugin() (
   if [ ! -f "$c" ]; then
     echo "changelog-order: $c is missing"
   else
-    grep -E '^## ' "$c" | awk '
+    prose_lines "$c" | sed 's/^[0-9]*://' | grep -E '^## ' | awk '
       function key(v,  a) { split(v, a, "."); return sprintf("%06d%06d%06d", a[1], a[2], a[3]) }
       {
         v = $2
@@ -76,7 +76,7 @@ check_plugin() (
         if (prev != "" && key(v) >= key(prev)) print "changelog-order: " v " is not older than " prev
         prev = v
       }'
-    top="$(grep -E '^## ' "$c" | sed -n 1p | sed 's/^## //')"
+    top="$(prose_lines "$c" | sed 's/^[0-9]*://' | grep -E '^## ' | sed -n 1p | sed 's/^## //')"
     want="$(jq -r .version .claude-plugin/plugin.json 2>/dev/null)"
     [ -n "$want" ] && [ "$top" = "$want" ] \
       || echo "changelog-top: newest heading is '$top', plugin.json says '$want'"
@@ -151,6 +151,7 @@ control link-href     "link: ./nope.md"                  "printf '<a href=\"./no
 control codex-comment "codex-worker:"                    "sed 's/Codex has no worker path/Codex has a worker path/' README.md > t && printf '<!-- Codex has no worker path -->\n' >> t && mv t README.md"
 control order-dup     "changelog-order: 1.36.6 is not older than 1.36.6" "awk '/^## 1.36.5\$/{print \"## 1.36.6\"; print \"\"; print \"x\"; print \"\"} {print}' CHANGELOG.md > t && mv t CHANGELOG.md"
 control no-changelog  "changelog-order: CHANGELOG.md is missing" "rm CHANGELOG.md"
+quiet   fence-heading "changelog-order:"                 "printf '\x60\x60\x60\n## Known limits\n\x60\x60\x60\n' >> CHANGELOG.md"
 quiet   fence-exempt  "history:"                         "printf '\x60\x60\x60\nSince 1.2.0, quoted in a fence.\n\x60\x60\x60\n' >> README.md"
 
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"

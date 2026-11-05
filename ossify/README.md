@@ -144,8 +144,9 @@ three. What differs is who builds a work item and who verifies it.
 
 **An external executor.** `/ossify:run-spine <spine-id> --external-executor` hands the round's work
 items to a procedure the caller supplies, as one `external_execution_request` per item still to
-build, and takes back one `external_execution_result` each. An item that is complete, abandoned or
-in flight gets no request. It names no tool, product or model. With `--detach`
+build. For each it takes back one `external_execution_result`, or one `external_execution_gaps`
+when the item's pre-flight stopped it before any work. An item that is complete, abandoned or in
+flight gets no request. It names no tool, product or model. With `--detach`
 after it, the lane writes the round's requests and ends; the caller counts each execution and
 closes the items. The contract is
 [`skills/work-item/references/external-executor.md`](./skills/work-item/references/external-executor.md).
