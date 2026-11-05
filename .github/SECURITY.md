@@ -19,9 +19,10 @@ report a problem in a plugin, update it to the version on `main`.
 These plugins run on your machine with your user's privileges. Most of what they do happens inside
 a coding agent, under the permissions you give it, but not all of it:
 
-- hooks and mods run on events, outside the agent's tool prompts: crew's and membrane's hooks are
-  shell commands on the harness's events, molt and seat-mods are TypeScript modules the harness
-  loads, and workspace-init installs a git `commit-msg` hook that runs on every commit;
+- hooks and mods run on events, outside the agent's tool prompts: crew's hooks are shell commands
+  on the harness's events, molt and seat-mods are TypeScript modules the harness loads, and
+  workspace-init installs a git `commit-msg` hook that runs on every commit. membrane ships an
+  opt-in SessionStart script that runs only if you register it;
 - some plugins ship command-line tools (`oss`, `mb`, `crew-run`, `baton`, `omp-seat` and others)
   that the harness puts on `PATH` or that you link there, and that you or a script can run directly;
 - baton installs a systemd user timer that runs `baton tick` without an agent asking for it, and a

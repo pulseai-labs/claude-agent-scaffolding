@@ -73,7 +73,7 @@ check_tree() (
   for f in $DOCS; do
     [ -s "$f" ] || continue
     prose "$f" \
-      | grep -oE '\]\([^)]*\)' | sed -E 's/^\]\(//; s/\)$//; s/[[:space:]]+"[^"]*"$//; s/#.*//' \
+      | grep -oE '\]\([^)]*\)' | sed -E 's/^\]\(//; s/\)$//; s/[[:space:]].*$//; s/#.*//' \
       | grep -vE '^(https?:|mailto:|$)' | sort -u \
       | while IFS= read -r t; do
           [ -e "$LINKROOT/.github/$t" ] || echo "link: $f -> $t does not exist"
@@ -140,6 +140,8 @@ quiet   reindented   "plugin-options:" "sed 's/^          - /        - /' .githu
 quiet   quoted       "plugin-options:" "sed 's/^          - sage\$/          - \"sage\"/' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml && grep -q '\"sage\"' .github/ISSUE_TEMPLATE/bug_report.yml"
 quiet   fenced-link  "in-fence.md" "printf '\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\n' >> .github/SECURITY.md"
 quiet   long-fence   "in-fence.md" "printf '\x60\x60\x60\x60\n\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\x60\n' >> .github/SECURITY.md"
+quiet   title-single "README.md" "printf \"See [x](../README.md 'Guide').\\n\" >> .github/CONTRIBUTING.md"
+quiet   title-paren  "README.md" "printf 'See [x](../README.md (Guide)).\\n' >> .github/CONTRIBUTING.md"
 quiet   titled-link  "README.md" "printf 'See [x](../README.md \"Guide\").\n' >> .github/CONTRIBUTING.md"
 quiet   other-target "LICENSE" "printf 'See [x](../LICENSE).\n' >> .github/CONTRIBUTING.md"
 control after-fence  "link: .github/SECURITY.md -> ../after.md" "printf '\x60\x60\x60\x60\nx\n\x60\x60\x60\x60\n[y](../after.md)\n' >> .github/SECURITY.md"
