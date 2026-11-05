@@ -227,6 +227,58 @@ describe("baton notify-orchestrator", () => {
     expect(fallbackLines(r)).toEqual([]);
   });
 
+  // #1053 C2: the three branches of sendToOrchestrator that no fixture reached.
+  const SEND_REFUSED = { ok: true, result: { send: { handle: "term_x", accepted: false, bytesWritten: 0 } } };
+
+  test("a send Orca answers ok but did not accept runs the fallback; the accepted send beside it does not", async () => {
+    const r = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_REFUSED } });
+    await register(r);
+    await baton(r, ["notify-orchestrator", KEY, MSG]);
+    expect(orcaCalls(r).filter((c) => c[1] === "send")).toHaveLength(1); // never resent
+    expect(fallbackLines(r)).toEqual([`${KEY}|${MSG}`]);
+    const ok = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_OK } }); // control
+    await register(ok);
+    await baton(ok, ["notify-orchestrator", KEY, MSG]);
+    expect(fallbackLines(ok)).toEqual([]);
+  });
+
+  test("a status envelope with ok:false (an error reply) decides nothing: the send goes ahead", async () => {
+    const other = { ok: false, error: { code: "runtime_unavailable", message: "no runtime" } };
+    const r = await rig({ replies: { "status --json": other, "terminal send": SEND_OK } });
+    await register(r);
+    await baton(r, ["notify-orchestrator", KEY, MSG]);
+    expect(orcaCalls(r).map((c) => c[0])).toEqual(["status", "terminal"]);
+    expect(fallbackLines(r)).toEqual([]);
+    // control: the same runtime id in an ok:true envelope is a restarted Orca, and nothing is sent
+    const lost = await rig({ replies: { "status --json": STATUS("00000000-0000-0000-0000-000000000000"), "terminal send": SEND_OK } });
+    await register(lost);
+    await baton(lost, ["notify-orchestrator", KEY, MSG]);
+    expect(orcaCalls(lost)).toEqual([["status", "--json"]]);
+  });
+
+  test("a budget used up by the status call sends nothing and runs the fallback; with the budget left, the send goes", async () => {
+    const run = async (r: Rig, skewMs: number) => {
+      // the clock jumps by skewMs once the fake orca has been called: the status call 'took' that long
+      const script = `import { existsSync } from "node:fs"; import { notifyOrchestrator } from ${JSON.stringify(join(import.meta.dir, "..", "src", "hosts", "orchestrator.ts"))};
+        const real = Date.now; const log = ${JSON.stringify(join(r.orca, "argv.jsonl"))};
+        Date.now = () => real() + (existsSync(log) ? ${skewMs} : 0);
+        process.exit(notifyOrchestrator(${JSON.stringify(KEY)}, ${JSON.stringify(MSG)}));`;
+      const env = { ...process.env, HOME: r.home, BATON_STATE_DIR: r.state, BATON_CONFIG: r.cfg, FAKE_ORCA_DIR: r.orca };
+      const p = Bun.spawn(["bun", "-e", script], { env, stdout: "pipe", stderr: "pipe" });
+      expect(await p.exited).toBe(0);
+    };
+    const spent = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_OK } });
+    await register(spent);
+    await run(spent, 27_500); // 28 s budget, 500 ms left: under the 1 s the send needs
+    expect(orcaCalls(spent)).toEqual([["status", "--json"]]);
+    expect(fallbackLines(spent)).toEqual([`${KEY}|${MSG}`]);
+    const left = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_OK } });
+    await register(left);
+    await run(left, 0); // control: no skew, the budget is whole
+    expect(orcaCalls(left).map((c) => c[0])).toEqual(["status", "terminal"]);
+    expect(fallbackLines(left)).toEqual([]);
+  });
+
   test("an Orca that answers with garbage runs the fallback", async () => {
     const r = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_OK } });
     await register(r);

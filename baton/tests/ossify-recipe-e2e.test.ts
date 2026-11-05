@@ -726,6 +726,64 @@ test("review 3 blocking: --to land merges the reviewed head when it has not move
   expect(r.forge.merges).toEqual([{ url: prUrl(W1), head: HEAD0 }]);
 });
 
+/** A person merges the item PR by hand: its head lands on the spine branch and the PR reads MERGED. */
+function handMerge(wi: string): void {
+  git(other, "fetch", "origin");
+  git(other, "checkout", "-B", BRANCH, `origin/${BRANCH}`);
+  git(other, "checkout", "-b", `hand-${wi}`);
+  const head = commit(other, `hand-${wi}`);
+  git(other, "checkout", BRANCH);
+  git(other, "merge", "--no-ff", "-m", `hand merge ${wi}`, `hand-${wi}`);
+  git(other, "push", "origin", BRANCH);
+  theForge.views.set(prUrl(wi), { ...theForge.views.get(prUrl(wi))!, state: "MERGED", head });
+}
+
+test("a hand-merged item PR whose review blocks goes to land and ends the unit: no fixer is sent to a merged branch (#1079 C4)", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => { put(out(u, "review.md"), reviewOf("block", HEAD0)); handMerge(u); } });
+  const r = rig(host);
+  await drive(r, 40, () => unit(W1)?.stage === "done");
+  expect(host.of(W1, "item_fix")).toHaveLength(0);
+  expect(moves(W1).slice(-3)).toEqual(["item_review>item_wait", "item_wait>land", "land>done"]);
+  expect(r.forge.merges).toEqual([]); // baton merged nothing: the merge was the person's
+  expect(item(W1).status).not.toBe("active");
+});
+
+test("review 3 passed, the PR closed, checks undecided: the item parks instead of waiting behind the checks (#1079 C3b)", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => put(out(u, "review.md"), reviewOf("pass", HEAD0)) });
+  const forge = new SpineForge();
+  forge.views.set(prUrl(W1), { ...openPr(BRANCH), state: "CLOSED", checks: "pending", mergeable: "UNKNOWN" });
+  const r = rig(host, forge);
+  put(out(W1, "review-2.md"), reviewOf("block", HEAD0)); // two reviews already ran: the cap clauses are live
+  await drive(r, 40, () => unit(W1)?.parked !== undefined);
+  expect([unit(W1).stage, unit(W1).parked?.reason]).toEqual(["item_wait", "outcome"]);
+  expect(forge.merges).toEqual([]);
+});
+
+test("review 3 passed, the PR in conflict, checks undecided: the item parks instead of waiting behind the checks (#1079 C3b)", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => put(out(u, "review.md"), reviewOf("pass", HEAD0)) });
+  const forge = new SpineForge();
+  forge.views.set(prUrl(W1), { ...openPr(BRANCH), mergeable: "CONFLICTING", checks: "pending" });
+  const r = rig(host, forge);
+  put(out(W1, "review-2.md"), reviewOf("block", HEAD0));
+  await drive(r, 40, () => unit(W1)?.parked !== undefined);
+  expect([unit(W1).stage, unit(W1).parked?.reason]).toEqual(["item_wait", "outcome"]);
+  expect(forge.merges).toEqual([]);
+});
+
+test("control: review 3 passed, checks undecided, the PR open and mergeable: the item keeps waiting (#1079 C3b)", async () => {
+  await arm();
+  const host = oneItem({ item_review: (u) => put(out(u, "review.md"), reviewOf("pass", HEAD0)) });
+  const forge = new SpineForge();
+  forge.views.set(prUrl(W1), { ...openPr(BRANCH), checks: "pending" });
+  const r = rig(host, forge);
+  put(out(W1, "review-2.md"), reviewOf("block", HEAD0));
+  await settle(r, 25);
+  expect([unit(W1).stage, unit(W1).parked]).toEqual(["item_wait", undefined]);
+});
+
 test("the pr_url write is no rewrite: a gap after it still waits on regap's own rewrite", async () => {
   await arm();
   const host = oneItem({

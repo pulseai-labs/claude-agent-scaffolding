@@ -37,6 +37,7 @@ Stop and report if any check fails. Do not arm around a failure.
   that gives the demo walk to the `spine_finish` seat's role is not a failed check: say in the proposal
   that the run parks after the merge (`spine-pr`, reason `stop`) until the operator walks the lines
   or an order is added first.
+- **Checks on the PRs.** The example recipe needs at least one required check on item and spine PRs: a PR with no checks reads as `none`, and its unit waits in `item_wait`, `spine_wait` or `land` with no park. Read the canonical's workflows or a recent PR's `gh pr checks`; a repo with none is one question, asked before the arm.
 - **The recipe copy.** `~/baton-recipes/ossify-spine/` exists; if not, propose the README's copy
   step. Compare it with the installed baton's `examples/ossify-spine/` (ignore `*.bak*`). A
   difference is reported, not a failed check. Propose a refresh only when no run of any project
@@ -141,9 +142,10 @@ operator.
 | Spine PR round stop | rule it under the project's Round stop order, write the ruling to `operator.md`, replacing any (the work-PR seat puts it in the PR body) | split the PR or change the design; a finding the order sends to the operator |
 | "passed review … merge it" | check the pass against the rulings; send a finding the order sends to a fix back to `spine_work` | the merge, unless the project's governance grants this session merge authority |
 | PR conflict | merge the base into the spine branch, move `review.md` to `review-prev.md`, unpark `--to spine_review` | a closed PR |
-| `spine_finish` stop on a `user:` line | prepare the walk and evidence | pass or fail: write it to `out/spine-pr/operator.md`, replacing any, unpark |
+| `spine_finish` stop | a `user:` line: prepare the walk and evidence; any other stop: rule it as a close stop | a `user:` line's pass or fail: write it to `out/spine-pr/operator.md`, replacing any, unpark; move it aside as the next free `operator-<n>.md` before an unpark `--to` any other stage |
 | Item review stop (`item_wait` park, review 3) | `--to item_fix` after writing `out/<wi>/operator.md`, replacing any; or accept the findings with `--to land` | a finding the order sends to the operator |
-| Close or spine-open stop | rule it; write `out/<wi>/operator.md` (`out/lane/` for spine-open), replacing any, unpark; move it aside before an unpark `--to` a stage that names no Ruling file | a stop that names a spec or ADR change |
+| Item moved stop (`item_moved` park, nothing merged) | `--to item_review` runs one more review | merging the PR by hand, then `--to land` ends the unit; `--to land` alone parks again |
+| Close or spine-open stop | rule it; write `out/<wi>/operator.md` (`out/lane/` for spine-open), replacing any, unpark; move it aside as the next free `operator-<n>.md` before an unpark `--to` any stage other than the one the ruling is for | a stop that names a spec or ADR change |
 | Close harvest | present the candidates | accept |
 
 A notice with no run (`auth`, `down`) is the host's: report it, touch nothing. End each notice

@@ -2,6 +2,45 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.17.3 - 2026-11-05
+
+A sweep of the review findings left on the item review loop and the ruling files (#1079, #1075, #1053).
+The example recipe changes; the engine changes only an error text.
+
+- **Fixed: the example recipe's routing.**
+  - `item_wait` takes a merged PR to `land` first. Before, a hand-merged item PR with a block verdict sent
+    a fixer to a merged branch (#1079 C4).
+  - At review 3 the red-checks stop now sits after `closed` and `conflict`, so checks that are still
+    pending no longer hold a closed or conflicting PR in `item_wait` (#1079 C3b).
+  - Every verdict signal (`item_review`, `item_wait`, `spine_review`, `spine_wait`) reads line 1 of
+    `review.md` only. A later `verdict: block` line under a passing review no longer routes it, and a review
+    whose line 1 is not a verdict no longer passes the gate (#1079 C5).
+  - `item_ready` waits for a `pr_url` shaped like `https://<host>/.../pull/<n>`, not any string, before the
+    URL reaches the reviewer's message. A recorded `pr_url` of any other shape parks the unit in
+    `item_ready` instead of waiting with no route (#1079 C6).
+  - A `review.md` that fails the line-1 and line-2 check is kept as `review-bad-<n>.md`. It no longer counts
+    toward the three-review cap and is no longer copied to `review-prev.md` (#1079 C1).
+  - `regap` is given the item's handoff path, and its brief reads the handoff's `## Clarifications` first, so
+    a ruling for an earlier stop reaches it (#1075 PR1076r2 C9).
+- **Fixed: engine.** The error for a `merge` stage whose `outcomes` is not an object names `moved` (#1079 C9).
+- **Changed: wording.** `driver.md` names every stage with no brief of its own (`item_ready` and `item_moved`
+  were missing; a test now derives the list from the recipe). `item-fix.md` tells the seat to write a ruling
+  into the PR body, as `spine-work.md` does. `common.md` has the ledger entry quote the ruling instead of
+  naming a file that is archived later. The skill gains an `item_moved` row, a `spine_finish` row that is no
+  longer `user:`-only, the move-aside clause on every row that writes `operator.md`, and a preflight
+  question: the example recipe needs at least one required check on item and spine PRs, or a unit waits in
+  `item_wait`, `spine_wait` or `land` with no park. The README says the same, gives an `item_moved` park its
+  own runbook bullet, states that `expect_head` does not itself require green checks, names the character
+  mapping of `notices/<key>.md`, drops the retired bridge clause, and no longer reads its list of stages
+  that name no Ruling file as complete (`--to` any stage but the one the ruling is for needs the move-aside).
+- **Tests.** Mutation-pinned controls replace two that could not fail; every archive hook is pinned to one
+  script and every close, `spine_open` and `spine_finish` outcome to its full `run` list; the notifier's
+  `accepted:false`, error-envelope and used-up-budget branches have fixtures; wrapped lines no longer break a
+  prose pin.
+- **Upgrade.** Copy the new recipe and briefs (`cp -r <plugin root>/examples/ossify-spine ~/baton-recipes/`).
+  A run armed on an older recipe keeps its snapshot; every armed run reads its briefs from the shared copy,
+  so refresh it only when no run is armed or parked.
+
 ## 0.17.2 - 2026-11-04
 
 The marketplace is renamed `pulsestack`. The arm skill reads plugin roots from the

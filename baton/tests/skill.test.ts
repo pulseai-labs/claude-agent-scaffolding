@@ -8,6 +8,8 @@ import { join } from "node:path";
 const SKILL = join(import.meta.dir, "..", "skills", "running-a-spine-on-baton", "SKILL.md");
 const BRIEFS_DIR = join(import.meta.dir, "..", "examples", "ossify-spine", "briefs");
 const skill = (): string => readFileSync(SKILL, "utf8");
+/** The skill with every run of whitespace one space: a pin on a phrase must not depend on where the source wraps. */
+const flatSkill = (): string => skill().replace(/\s+/g, " ");
 const brief = (name: string): string => readFileSync(join(BRIEFS_DIR, name), "utf8");
 
 /** The frontmatter's `description` value, or "" when there is none. */
@@ -92,18 +94,20 @@ describe("running-a-spine-on-baton", () => {
   });
 
   test("after arming, a watch request runs no command and the close is baton's", () => {
-    const s = skill();
+    const s = flatSkill();
     expect(s).toContain('"Keep an eye on it" is not a status request');
     expect(s).toContain("Do not start `/ossify:close` beside it.");
   });
 
   test("notices go to the orchestrator: no OpenBot, no spend-nothing line, a Notices section (#1045)", () => {
-    const s = skill();
+    const s = flatSkill();
     expect(s).not.toMatch(/openbot|phone/i);
     expect(s).not.toContain("spend no tokens on the run");
     expect(s).toContain('"notify": ["baton", "notify-orchestrator", "{key}", "{message}"]');
     expect(s).toContain("## Notices");
-    expect(s).toContain("`baton orchestrator <run>` as its\n  first step, and `baton orchestrator <run> --clear` before it stands down");
+    expect(s).toContain("`baton orchestrator <run>` as its first step, and `baton orchestrator <run> --clear` before it stands down");
+    // control: the flattened skill still matches a phrase the source wraps
+    expect(flatSkill()).toContain("a lean successor (the top hands off by spawning one)");
     expect(s).toContain("[crew message baton] baton notice <key>");
     // design 5, row 2: no verb raises the dispatch cap
     expect(s).toContain("raising the dispatch cap (no verb does it");
@@ -135,14 +139,23 @@ describe("done-file briefs", () => {
 // and an unpark --to runs no outcome hook, so a left file reached the next close or spine-open seat.
 describe("a ruling file holds one ruling (#1075)", () => {
   const readme = () => readFileSync(join(import.meta.dir, "..", "README.md"), "utf8").replace(/\s+/g, " ");
+  const APPENDS = /append(ing)? (it |the ruling )?(to|if one)/i;
   test("the runbook says replace, never append, and to move the file aside before an unpark --to", () => {
     const r = readme();
     expect(r).toContain("replacing any file already there: the file holds one ruling");
-    expect(r).toContain("a stage that names no Ruling file (`implement`, `regap`, `verify`, `correct`, `spine_review`, `item_review`), move any `operator.md` aside as the next free `operator-<n>.md`: `--to` runs no outcome hook");
+    // the list is examples, not the whole set: any stage but the one the ruling is for (#1075 PR1076r2 C8)
+    expect(r).toContain("any stage other than the one the ruling is for (for example `implement`, `regap`, `verify`, `correct`, `spine_review` or `item_review`, which name no Ruling file), move any `operator.md` aside as the next free `operator-<n>.md`: `--to` runs no outcome hook");
+    expect(r).not.toContain("a stage that names no Ruling file (`implement`");
     expect(r).toContain("An implement, regap, verify or correct stop takes its ruling in the handoff's `## Clarifications`");
     expect(r).toContain("replace any file there");
-    expect(r).not.toMatch(/append (it )?(to|if one)/);
-    expect("append it to, when").toMatch(/append (it )?(to|if one)/); // control: the probe matches the 0.16.0 wording
+    expect(r).not.toMatch(APPENDS);
+    // a control per alternative: the probe matches the 0.16.0 wording and each variant it must also catch
+    for (const alt of ["append to", "append it to, when", "append the ruling to", "appending to", "Append if one", "append it if one", "Appending the ruling to"]) {
+      expect([alt, APPENDS.test(alt)]).toEqual([alt, true]);
+    }
+    for (const fine of ["replacing any file already there", "the file holds one ruling, never two", "append rulings"]) {
+      expect([fine, APPENDS.test(fine)]).toEqual([fine, false]); // and it does not match prose that says the opposite
+    }
   });
   test("the item review stop is in the notices and the README runbook (#1046)", () => {
     const row = skill().split("\n").find((l) => l.startsWith("| Item review stop")) ?? "";
@@ -156,11 +169,118 @@ describe("a ruling file holds one ruling (#1075)", () => {
       expect([pin, r.includes(pin)]).toEqual([pin, true]);
     }
   });
+  test("the item_moved park has a notices row: nothing merged, one more review, or by hand; land parks again (#1079 C11)", () => {
+    const row = skill().split("\n").find((l) => l.startsWith("| Item moved stop")) ?? "";
+    expect(row).toContain("`item_moved` park");
+    expect(row).toContain("nothing merged");
+    expect(row).toContain("`--to item_review`");
+    expect(row).toContain("one more review");
+    expect(row).toContain("by hand");
+    expect(row).toContain("`--to land` alone parks again");
+    // control: the probe finds no row in a skill without it
+    expect("| Close harvest | a | b |".split("\n").find((l) => l.startsWith("| Item moved stop"))).toBeUndefined();
+  });
   test("every skill row that writes operator.md says replace, and the close row says move it aside", () => {
     const rows = skill().split("\n").filter((l) => l.startsWith("|") && l.includes("operator.md"));
     expect(rows.length).toBe(4);
     for (const row of rows) expect(row).toContain("replacing any");
     const close = rows.find((l) => l.startsWith("| Close or spine-open stop |")) ?? "";
-    expect(close).toContain("move it aside before an unpark `--to` a stage that names no Ruling file");
+    expect(close).toContain("move it aside as the next free `operator-<n>.md` before an unpark `--to` any stage other than the one the ruling is for");
+  });
+});
+
+// 0.17.3 wording: the README and the skill, pinned on the lines an operator or an orchestrator acts on.
+describe("README and skill wording (baton 0.17.3)", () => {
+  const readmeRaw = () => readFileSync(join(import.meta.dir, "..", "README.md"), "utf8");
+  const readme = () => readmeRaw().replace(/\s+/g, " ");
+  /** A runbook bullet: the text from `- **<title>` to the next bullet, whitespace flattened; "" when absent. */
+  const bullet = (title: string): string => readmeRaw().split("\n- **").find((b) => b.startsWith(title))?.replace(/\s+/g, " ") ?? "";
+
+  test("expect_head does not itself require green checks: the stage's checks policy decides (#1079 CodeRabbit)", () => {
+    const r = readme();
+    expect(r).toContain("`expect_head` does not itself require green checks (the stage's `checks` policy still decides)");
+    expect(r).not.toContain("green checks are still required");
+  });
+
+  test("an item_moved park has a runbook bullet of its own (#1079 C10)", () => {
+    const b = bullet("An `item_moved` park");
+    expect(b).toContain("nothing was merged");
+    expect(b).toContain("`baton unpark <run> <wi> --to item_review`");
+    expect(b).toContain("`--to land` parks again at once");
+    expect(b).toContain("merge the PR yourself");
+    // the item review stop's own bullet points at it instead of carrying the detail
+    expect(bullet("The item review stop.")).toContain("`item_moved` park, below");
+    // control: the probe finds no bullet in a README without it
+    expect("- **x**".split("\n- **").find((t) => t.startsWith("An `item_moved` park"))).toBeUndefined();
+  });
+
+  test("the runbook's lines keep the file's wrap width (#1079 C12)", () => {
+    const text = readmeRaw();
+    const region = text.slice(text.indexOf("Operator runbook:"), text.indexOf("## Known limits")).split("\n");
+    expect(region.filter((l) => l.length > 105)).toEqual([]);
+    expect(region.length).toBeGreaterThan(60); // control: the region is the runbook, not an empty slice
+    expect(["x".repeat(106)].filter((l) => l.length > 105)).toHaveLength(1); // control: the filter reports a long line
+  });
+
+  test("the example recipe needs a check on item and spine PRs, and the skill's preflight asks (#1079 Q1)", () => {
+    const r = readme();
+    expect(r).toContain("needs at least one required check on its item and spine PRs");
+    expect(r).toContain("a PR with no checks reads as `none`");
+    expect(r).toContain("waits in `item_wait`, `spine_wait` or `land` with no park");
+    const bul = flatSkill().split(" - **").find((b) => b.startsWith("Checks on the PRs.")) ?? "";
+    expect(bul).toContain("at least one required check on item and spine PRs");
+    expect(bul).toContain("with no park");
+    expect(bul).toContain("is one question");
+    expect(skill().indexOf("**Checks on the PRs.**")).toBeGreaterThan(skill().indexOf("## 1. Preflight"));
+    expect(skill().indexOf("**Checks on the PRs.**")).toBeLessThan(skill().indexOf("## 2. Propose, then stop"));
+  });
+
+  test("the notice file name's character mapping is stated (#1053 C1)", () => {
+    expect(readme()).toContain("notices/<key>.md` (mode 600; each character of the key outside `A-Za-z0-9._-` becomes `_`)");
+  });
+
+  test("the retired bridge clause is gone from the answer section (#1053 PR1054 C1)", () => {
+    const r = readme();
+    expect(r).not.toContain("bridge");
+    expect(r).not.toContain("operator's tap");
+    expect(r).toContain("Two commands let a caller answer it from outside the Orca terminal");
+  });
+
+  test("the readers of a Ruling file named in the README are the recipe's, and a lane barrier is ruled by planning (#1075 PR1076r2 C11)", () => {
+    const r = readme();
+    const m = /the next seat that reads the file \(([^)]*)\) would apply it/.exec(r);
+    expect(m).not.toBeNull();
+    const named = m![1].split(/,| or /).map((t) => t.replace(/[`\s]/g, "").replace(/-/g, "_")).filter(Boolean).sort();
+    const recipe = JSON.parse(readFileSync(join(BRIEFS_DIR, "..", "recipe.json"), "utf8"));
+    const readers = Object.entries(recipe.stages as Record<string, { message?: string }>)
+      .filter(([, st]) => (st.message ?? "").includes("Ruling file:")).map(([n]) => n).sort();
+    expect(named).toEqual(readers);
+    expect(r).toContain("a lane round barrier is ruled by planning the round");
+    // control: a reader missing from the README's list is reported by the same comparison
+    expect(named.filter((n) => n !== "item_fix")).not.toEqual(readers);
+  });
+
+  test("a stop's ruling points at the Ruling-file bullet for the stages that read operator.md (#1075 C7)", () => {
+    const b = bullet("A stop parks the unit.");
+    expect(b).toContain("a close, spine-open or spine-finish stop takes `operator.md`, as the ruling bullet below says");
+  });
+
+  test("the spine_finish row is no longer a user:-line row only, and carries the move-aside clause (#1075 C7, C10)", () => {
+    const row = skill().split("\n").find((l) => l.startsWith("| `spine_finish` stop |")) ?? "";
+    expect(row).not.toContain("on a `user:` line |");
+    expect(row).toContain("any other stop");
+    expect(row).toContain("a `user:` line");
+    expect(row).toContain("replacing any");
+    expect(row).toContain("move it aside as the next free `operator-<n>.md` before an unpark `--to` any other stage");
+    expect(skill()).not.toContain("| `spine_finish` stop on a `user:` line |");
+  });
+});
+
+describe("briefs wording (baton 0.17.3)", () => {
+  const flatBrief = (n: string): string => brief(n).replace(/\s+/g, " ");
+  test("common's ledger entry quotes the ruling, it does not name a file that is archived later (#1075 C3, PR1076r1 C6)", () => {
+    const c = flatBrief("common.md");
+    expect(c).toContain("else as a ledger entry whose `A:` quotes the ruling in one line");
+    expect(c).not.toContain("whose `A:` names the file");
   });
 });

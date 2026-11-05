@@ -396,7 +396,7 @@ export function validate(raw: unknown): { ok: true; recipe: Recipe } | { ok: fal
       if (st.checks !== undefined && st.checks !== "green" && st.checks !== "none-required") {
         err(`${p}.checks`, 'must be "green" or "none-required"');
       }
-      if (!isObj(st.outcomes)) err(`${p}.outcomes`, "must be {merged, red, conflict}");
+      if (!isObj(st.outcomes)) err(`${p}.outcomes`, "must be {merged, red, conflict}, plus moved when expect_head is set");
       else for (const k of ["merged", "red", "conflict"]) target(`${p}.outcomes.${k}`, st.outcomes[k]);
       if (st.expect_head !== undefined && !isArgv(st.expect_head)) err(`${p}.expect_head`, "must be a non-empty argv list");
       if (isObj(st.outcomes)) {
