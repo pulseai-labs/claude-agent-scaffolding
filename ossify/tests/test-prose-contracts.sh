@@ -1985,17 +1985,78 @@ pin "$SKILLS/start/SKILL.md" 'declares under its `tooling_repo` key is not the p
 pin "$SKILLS/start/SKILL.md" '`.ossify/topology.json` every key is just a repo name, so every declared repo there is checked.' \
   "start §3 limits the tooling-repo exemption to the pairing manifest (#553)"
 # #809: the gate reads product source at HEAD, not history. History alone
-# proceeds as class H and is recorded in the hand-off; source at HEAD refuses.
+# proceeds as class H and is recorded in `06-progress.md`'s spec-core-close entry; source at HEAD refuses.
 pin "$SKILLS/start/SKILL.md" 'product'"'"'s own source at `HEAD`.' \
   "start §3's content gate asks for product source at HEAD (#809)"
-pin "$SKILLS/start/SKILL.md" '**No product source at `HEAD`, history or not:** proceed as greenfield.' \
+pin "$SKILLS/start/SKILL.md" '**No product source at `HEAD`, history or not,** and the operator confirmed it, or no file is at `HEAD`: proceed as greenfield.' \
   "start §3's content gate proceeds on history alone (#809)"
 pin "$SKILLS/start/SKILL.md" '**Product source at `HEAD`:** author nothing and refuse' \
   "start §3's content gate still refuses product source at HEAD (#809)"
 pin "$SKILLS/start/SKILL.md" 'only propose; whether `HEAD` holds' \
   "start §3's probe proposes and the operator confirms what HEAD holds (#809)"
-pin "$SKILLS/start/SKILL.md" 'The hand-off records class H history (§3): per repo, commit count and what is at `HEAD`.' \
-  "start §13's hand-off records class H's history (#809)"
+pin "$SKILLS/start/SKILL.md" '`06-progress.md`'"'"'s spec-core-close entry records class H history (§3): per repo, commit count and what is at `HEAD`' \
+  "start §13 records class H's history in 06-progress.md's spec-core-close entry (#809, #1040)"
+pin "$SKILLS/start/SKILL.md" 'note each such repo'"'"'s commit count and what is at `HEAD` for `06-progress.md`'"'"'s spec-core-close entry (§13).' \
+  "start §3 routes class H history to 06-progress.md, not to an unnamed hand-off (#1040)"
+# ossify 1.37.0 (#1040, operator ruling): with no operator to answer, the content gate refuses a repo with files
+# beyond the scaffold (the pre-1.34.0 behaviour), prints what it found and what to do next; it is not the audit's non-interactive rule.
+pin "$SKILLS/start/SKILL.md" '- **No operator to answer** (a non-interactive run), checked after the product-source bullet' \
+  "start §3's content gate has no rule for a run with no operator (#1040)"
+pin "$SKILLS/start/SKILL.md" 'whose refusal and adopt route print instead when you judge the files product: a repo with any file at `HEAD` (a workspace-init pairing leaves the canonical with none) refuses (#1040);' \
+  "start §3's no-operator rule does not refuse files at HEAD, or does not defer to the product-source refusal (#1040)"
+pin "$SKILLS/start/SKILL.md" 'A bare scaffold (no file at `HEAD`) or a repo with no commit proceeds.' \
+  "start §3's no-operator rule does not let a bare scaffold or a no-commit repo proceed (#1040)"
+pin "$SKILLS/start/SKILL.md" 'beyond the scaffold and no operator confirmed they are not product - refusing' \
+  "start §3's no-operator refusal does not print what it found and why (#1040)"
+pin "$SKILLS/start/SKILL.md" 'or `/ossify:adopt` if it is the product (adopt owns product source; run headless it refuses a repo it does not judge product, and says to re-run with an operator).' \
+  "start §3's no-operator refusal does not say what the operator does next (#1040)"
+pin "$SKILLS/start/SKILL.md" '| Class H history (per repo: commit count, what is at `HEAD`) | `06-progress.md`, the spec-core-close entry |' \
+  "start §13's output table does not name where class H history lands (#1040)"
+pin "$SKILLS/start/references/memory-bank-brief.md" 'One dated entry: spec-core close, with class H history' \
+  "memory-bank-brief's 06-progress row does not carry class H history (#1040)"
+# ossify 1.37.0 (#1007, #1000): reviewer-home's crew-row rule, window, result-line placement and gh failure; impl-check's third route.
+pin "$SKILLS/start/references/reviewer-home.md" 'whose `When` covers every PR; when the rows split by condition, name each row with its condition' \
+  "reviewer-home §4 picks the reviewer row by first position, not by the row crew would pick (#1007)"
+pin "$SKILLS/start/references/reviewer-home.md" 'in each declared repo (a `tooling_repo` skipped), 30 per repo' \
+  "reviewer-home §5 leaves the multi-repo 30-PR window unstated (#1007)"
+pin "$SKILLS/start/references/reviewer-home.md" 'when `gh` exited non-zero or is absent; when other sources still yield proposals, the counts line with its window replaced by `none (gh failed)`' \
+  "reviewer-home §5 lets a failed gh read as no review history (#1007)"
+pin "$SKILLS/start/references/reviewer-home.md" 'Record the result line after the other lines of the `## Review` section' \
+  "reviewer-home §6 places the result line inconsistently with the proposals below it (#1007)"
+pin "$SKILLS/close/references/impl-check.md" '### The pass — a fresh verifier, inline, or the caller'"'"'s under `--verdict`' \
+  "impl-check's pass heading names two routes, not three (#1000)"
+# ossify 1.37.0 round 1 (PR #1097): pins for sentences the first push left unpinned (C3), the multi-repo and gh-failed
+# forms (C4), the README row (C5), adopt's headless class step (C6).
+pin "$SKILLS/close/references/impl-check.md" "or by the caller's verifier under \`--verdict\` (\`work-item-close.md\` §2 owns which" \
+  "impl-check's pass omits the caller's verifier under --verdict (#1000 C4)"
+pin "$SKILLS/close/references/impl-check.md" 'carries no tag and needs no criterion fix: a corrected item' \
+  "impl-check's recovery menu has no stale-verdict entry saying a corrected item needs a fresh verdict (#1000 C6)"
+pin "$SKILLS/start/references/reviewer-home.md" 'as this run authors it at §13, three or four lines.' \
+  "reviewer-home §4's line count does not match its optional CI line (#1007)"
+pin "$SKILLS/start/references/reviewer-home.md" 'on the last 30 merged PRs by merge date,' \
+  "reviewer-home §5's window does not say by merge date (#1007)"
+pin "$SKILLS/start/references/reviewer-home.md" 'Each proposal is one line, `- <class>: <rule>. Why: <why>. PRs: #<n>, #<n>`' \
+  "reviewer-home §5 gives proposals no one-line format (#1007)"
+pin "$SKILLS/adopt/SKILL.md" 'exceed 500 lines (the cap `test-skill-bash-blocks.sh` enforces).' \
+  "adopt's line cap is not the enforced 500 (#1042)"
+pin "$SKILLS/start/references/reviewer-home.md" '(`<repo>#<n>` when more than one repo is declared)' \
+  "reviewer-home §5's proposal line cannot name the repo of a multi-repo adoption (#1007)"
+pin "$SKILLS/start/references/reviewer-home.md" 'With more than one declared repo, the window names each repo:' \
+  "reviewer-home §5's result line cannot name each repo's window (#1007)"
+pin "$SKILLS/start/references/reviewer-home.md" 'the counts line with its window replaced by `none (gh failed)`' \
+  "reviewer-home §5's gh-failed counts line does not say which window it has (#1007)"
+pin "$SKILLS/../README.md" 'with no operator to confirm, it refuses a repo with any file at `HEAD`.' \
+  "ossify/README's /start row omits the no-operator refusal (#1040)"
+pin "$SKILLS/adopt/references/plain-repo.md" 'saying `re-run with an operator`: `/start` would refuse it for the same reason' \
+  "plain-repo's class step can route a headless docs-only repo to /start, which refuses it (#1040)"
+pin "$SKILLS/adopt/SKILL.md" 'with no operator to answer, `plain-repo.md` §1 says when it refuses instead.' \
+  "adopt's scope line sends every no-product repo to /start, headless too (#1040)"
+pin "$SKILLS/adopt/references/plain-repo.md" 'With no operator to answer, refuse a repo with any file at `HEAD` that you do not judge product' \
+  "plain-repo's class step does not refuse a headless repo with any file at HEAD that is not product (#1040)"
+pin "$SKILLS/start/references/reviewer-home.md" '`window <repo> <first PR>–<last PR>, <repo> <first PR>–<last PR>`' \
+  "reviewer-home §5's multi-repo window format is not stated per repo (#1007)"
+pin "$SKILLS/start/SKILL.md" 'where `06-progress.md` is an occupied destination the operator kept, that history goes in the §13 hand-off message to the operator, as a refusal'"'"'s does.' \
+  "start §13 leaves class H history nowhere when the operator keeps 06-progress.md (#1040)"
 if grep -Fq 'source or its own history' "$SKILLS/start/SKILL.md"; then
   T_FAIL=$((T_FAIL+1)); echo "FAIL: start §3's gate still refuses on history alone (#809)"
 else
@@ -2277,6 +2338,9 @@ pin "$_PRW_LOOP" 'recommended when every fix extends one' \
 # the staleness sentence lists changing the design among the ways out of the second exit.
 pin "$_PRW_LOOP" 'offered at every such stop until the change has' \
   "loop.md's second exit offers the design change at every stop with no end, against its own 'do not restructure twice' (#1071 C4)"
+# ossify 1.37.0 (#1091, CodeRabbit): the offer's end is pinned too (the line wrap puts it on the next line).
+pin "$_PRW_LOOP" 'been redesigned once, recommended when every fix' \
+  "loop.md's second exit lost the end of the design-change offer ('redesigned once') (#1091)"
 # ossify 1.36.8 (#1091 r1 C1): the fields-check prose names the or-forms the Door check halts on,
 # and the two "could not run" halts, so it agrees with the block below it.
 pin "$_SC" 'a line naming both doors joined by `or`, `,`, `/` or `|`, and `two-wayfoo`,' \
@@ -2559,7 +2623,7 @@ pin "$_PR" 'at C4, after C3, do not call `release_add`' \
   "plain-repo §4: zero shipped steps after C2 mints no Release 0, and halts at C4 after C3 (#536)"
 pin "$_PR" 'names what to clear to retry: the file `oss state_path` prints and its `.base.json` sibling, `ADOPTION.md` moved' \
   "plain-repo §4: the C2 halt's hand-off names the state file, its .base.json and ADOPTION.md (#536)"
-pin "$_PR" 'aside (C5 creates it only when absent), and C3'"'"'s uncommitted ADR files in the product repo (commit or remove' \
+pin "$_PR" 'outside the AI workspace (C5 creates it only when absent; A3 refuses it untracked inside), and C3'"'"'s uncommitted ADR files in the product repo (commit or remove' \
   "plain-repo §4: the retry hand-off names C3's uncommitted ADR files (#536)"
 pin "$_AD2" 'a class P halt at C4, after C2 left zero `shipped` steps, is a halt,' \
   "adopt's completion floor accepts the C4 halt after a zero-shipped C2 as a halt (#536)"

@@ -1614,6 +1614,20 @@ _fields_halt doorsep4 "$_door_msg" 's/^Door: two-way.*/Door: two-way , one-way -
 # the or-form takes runs of whitespace; two spaces around `or` still halt
 _fields_halt doorsp2 "$_door_msg" 's/^Door: two-way.*/Door: one-way  or  two-way/'
 _fields_halt doorsptab "$_door_msg" "s/^Door: two-way.*/Door: one-way$(printf '\t')or$(printf '\t')two-way/"
+# ossify 1.37.0: the punctuation separators take tabs too (spine-close.md used literal spaces)
+_fields_halt doorsepTab "$_door_msg" "s/^Door: two-way.*/Door: one-way$(printf '\t')\/$(printf '\t')two-way/"
+# ossify 1.37.0 round 1 (PR #1097 C9): the separator set is space and tab only, so the verdict does not depend on the awk or the
+# locale: a vertical tab or form feed is not a separator, and neither form halts as an or-form.
+_fields_ok doorsepVT "s/^Door: two-way.*/Door: one-way$(printf '\v')\/$(printf '\v')two-way/"
+_fields_ok doorsepFF "s/^Door: two-way.*/Door: one-way$(printf '\f')\/$(printf '\f')two-way/"
+_fields_ok dooror_VT "s/^Door: two-way.*/Door: one-way$(printf '\v')or$(printf '\v')two-way/"
+# adjacent control: one door, a tab-spaced separator, then other text still passes
+_fields_ok doorsepTabc "s/^Door: two-way.*/Door: one-way$(printf '\t')\/$(printf '\t')released with the tag./"
+# round 2 (PR #1097, CodeRabbit on spine-close.md): the or-form's second value takes the same word boundary as the first, so a
+# filled one-way line whose text begins `two-way-sync` is not read as the unfilled form; the real or-form halts stay.
+_fields_ok doorsecond 's/^Door: two-way.*/Door: one-way\/two-way-sync is disabled after migration./'
+_fields_ok doorsecond2 's/^Door: two-way.*/Door: one-way or two-wayfoo is disabled after migration./'
+_fields_halt doorsecond3 "$_door_msg" 's/^Door: two-way.*/Door: one-way\/two-way is disabled after migration./'
 # #1073 C4a (r2 C11a-c): the word ends only at a character outside the class
 _fields_halt doorcase "$_door_msg" 's/^Door: two-way.*/Door: two-wayFoo/'
 _fields_halt doordigit "$_door_msg" 's/^Door: two-way.*/Door: two-way2/'

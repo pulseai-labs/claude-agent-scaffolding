@@ -320,11 +320,11 @@ Layer 4 catches a defect while the item is still open that code review would onl
 see once the spine's diff is one thing; code review still owns craft and
 spine-level intent. Neither re-runs the other.
 
-### The pass — a fresh verifier, or inline
+### The pass — a fresh verifier, inline, or the caller's under `--verdict`
 
 Layers 3 and 4 and §4c run as one pass, by `ossify:verifier-agent` in a context
 that did not build the item, or by the closing session where no agent can be
-dispatched (`work-item-close.md` §2 owns which, and applies the verdicts). Read
+dispatched, or by the caller's verifier under `--verdict` (`work-item-close.md` §2 owns which, and applies the verdicts). Read
 the diff (staged, or `$base_sha..HEAD` on a `--pr` resume), `spec.md`,
 `handoff.md`, report §7 and the patterns file, apply the three lenses, and emit
 findings in the schema. Never take a mutation answer from the implementer's
@@ -417,6 +417,10 @@ consequences and stop:
    no AC is involved, and the honest options are amend the pattern, or fix the
    code. **A pattern amendment is never a quiet by-product of one work item's
    gate** — it changes the rule for everything after it.
+
+A stale-verdict halt under `--verdict` (the identity no longer matches the worktree,
+`work-item-close.md` §2) carries no tag and needs no criterion fix: a corrected item
+needs a fresh verdict, so re-run the caller's verifier and close again, or close without `--verdict`. The three options above do not apply.
 
 The user picks. This is not a disposition row and the auto-apply policy does not
 reach it (`work-item-close.md` §5).

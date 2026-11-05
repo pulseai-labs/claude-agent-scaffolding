@@ -1,0 +1,1 @@
+{"scores":{"source_decides":5,"operator_confirms":5,"route_and_record":5},"pass":true,"notes":"The skill judged Cargo.toml, src/ and tests/ to be product source, so it refused, authored nothing, named what it found with the 9 commits, and routed to /ossify:adopt. It correctly left the no-operator message unprinted and did not proceed as greenfield."}

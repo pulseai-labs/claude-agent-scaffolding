@@ -1,7 +1,7 @@
 ---
 scenario_id: 01-history-only-proceeds
 expected_outcome: proceed-record-history
-expected_reason: Class H (#809). The canonical has 14 commits, and the operator confirms HEAD holds only a README, a LICENSE and a docs/ folder of notes, no product source. The gate does not refuse and does not route to adopt. It proceeds as greenfield and carries the history (repo, 14 commits, what is at HEAD) to the §13 hand-off.
+expected_reason: Class H (#809). The canonical has 14 commits, and the operator confirms HEAD holds only a README, a LICENSE and a docs/ folder of notes, no product source. The gate does not refuse and does not route to adopt. It proceeds as greenfield and carries the history (repo, 14 commits, what is at HEAD) to `06-progress.md`'s spec-core-close entry.
 ---
 The operator typed `/start` in `/home/dev/projects/ledgerline-ai`. The topology
 declares one repo, `canonical`, at `/home/dev/projects/ledgerline`. Its

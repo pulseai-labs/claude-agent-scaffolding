@@ -35,7 +35,7 @@ Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on C
 **Do NOT auto-invoke when:**
 
 - The project is greenfield — that is `/start`.
-- No declared repo carries product source at `HEAD` — that is `/start` (§3).
+- No declared repo carries product source at `HEAD` — that is `/start` (§3); with no operator to answer, `plain-repo.md` §1 says when it refuses instead.
 - Ossify state already exists at the routed path — route to `doctor`.
 - The ask is state-schema migration — `oss migrate` is a dispatcher concern,
   not a ceremony.
@@ -321,7 +321,7 @@ Close with `oss doctor` (the state gate: `state`, `schema`, `replay`,
   is additive; the operator retires the old stack at their choosing.
 - **Mid-slice adoption.** §3 A5 refuses it by design.
 - **Repairing what it finds.** C2 gaps and stale ADRs are findings.
-- **Letting this body exceed 250 lines.** Thin-by-design is a stated
+- **Letting this body exceed 500 lines (the cap `test-skill-bash-blocks.sh` enforces).** Thin-by-design is a stated
   constraint, not an aspiration. Depth belongs in pointers, never restated.
 
 ---

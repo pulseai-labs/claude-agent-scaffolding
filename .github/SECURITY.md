@@ -10,7 +10,7 @@ that show the problem.
 
 ## Supported versions
 
-Each plugin is released on its own, with tags such as `ossify-v1.36.7`, from one line of history:
+Each plugin is released on its own, with tags such as `<plugin>-v<x.y.z>`, from one line of history:
 `main`. There are no maintenance branches, so a fix ships in the plugin's next release. Before you
 report a problem in a plugin, update it to the version on `main`.
 
