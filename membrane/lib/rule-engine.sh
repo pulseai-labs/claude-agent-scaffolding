@@ -305,7 +305,10 @@ _csa_enum_stderr_to_findings() {
 # rule; flagged: those of them with at least one finding; not-inspected: entries
 # of another type; unreadable: entries (or files) that could not be read, plus
 # command entries whose match failed in a rule (SCANNER-002 naming the entry's
-# json_path), which are not checked. A clean count cannot come from the
+# json_path), which are not checked. flagged is a subset of checked (#1072 C5,
+# orchestrator ruling): an entry one rule flags and another rule fails on counts
+# as unreadable, so it is not flagged either, though its finding still prints.
+# A clean count cannot come from the
 # findings, so it travels as this line and the skill hands it to the report header.
 _csa_hook_coverage_line() {
   local cache="$1" findings="$2" all t target c
@@ -320,7 +323,7 @@ _csa_hook_coverage_line() {
       def key: .file + "\u001f" + .context.json_path;
       def named: objects | select((.context | objects | .json_path? // null) != null);
       ([$f[] | named | select(.rule_id == "SCANNER-002") | key] | map({key: ., value: true}) | from_entries) as $failed
-      | ([$f[] | named | select(.rule_id != "SCANNER-002") | key] | map({key: ., value: true}) | from_entries) as $flagged
+      | ([$f[] | named | key] | map({key: ., value: true}) | from_entries) as $flagged
       | [$e[] | select(.type == "command" and has("text"))] as $cmd
       | [$cmd[] | select($failed[.file + "\u001f" + .json_path] | not)] as $ok
       | "csa: hook-coverage checked=\($ok | length)"

@@ -57,7 +57,7 @@ detect() {
 # only add a stop.
 detect_text() {
   local entry="$1" target_file="$2" text
-  text="$(csa_hook_entry_command "$entry")" || return 1
+  text="$(csa_hook_entry_command "$entry")" || return $?
   [[ "$text" =~ $RULE_PATTERN ]] || return 1
   csa_hook_entry_emit "$RULE_ID" "$RULE_SEVERITY" "$entry" "$target_file"
 }
