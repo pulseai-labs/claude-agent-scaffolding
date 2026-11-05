@@ -2,6 +2,10 @@
 
 Distilled from SPEC §9.3. Each rule declares severity statically; chat-summary posture follows.
 
+## Scanner findings
+
+The scanner reports its own failures as findings, not as a clean read. SCANNER-001: a rule failed to load (High). SCANNER-002: a rule's check failed on a target, for example a settings file that is not JSON (High). SCANNER-003: the scan could not read a target (Medium; one per target, for a scan whose rules would have read it, and it does not count toward the "rule(s) failed" banner).
+
 ## Tiers (5 static)
 
 - **Critical** — actively dangerous; immediate action.

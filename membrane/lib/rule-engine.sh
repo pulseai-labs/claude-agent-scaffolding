@@ -14,6 +14,8 @@ fi
 # Empty output with exit 1 means no match (grep-compatible detector contract).
 # Any other non-zero result emits SCANNER-002 (High), including exit 1 with
 # output because a detector must not mix findings with a no-match status.
+# SCANNER-003 (Medium) is the engine's own: a target no rule could read, emitted once
+# per target by csa_rule_engine_scan_all (_csa_unreadable_targets_findings).
 csa_rule_run_one() {
   local rule_file="$1"; local target_file="$2"
   local rule_id; rule_id="$(basename "$rule_file" .sh)"
@@ -83,14 +85,24 @@ _csa_hook_entries_file() {
   if [[ -n "${_CSA_HOOK_CACHE_DIR:-}" ]]; then
     cf="$_CSA_HOOK_CACHE_DIR/$(csa_sha256 "$target")"
     if [[ ! -f "$cf" ]]; then
-      csa_hook_entries "$target" "$mode" > "$cf.tmp" 2>/dev/null
-      printf '%s\n' "$target" > "$cf.target"
-      mv "$cf.tmp" "$cf"
+      # A failed or partial walk is rc 1 and is never cached: the cache is run-wide, so a
+      # partial one would silence the file for every rule (#1089). Skill-first question 3.
+      if ! csa_hook_entries "$target" "$mode" > "$cf.tmp" 2>/dev/null; then
+        rm -f "$cf.tmp"
+        return 1
+      fi
+      mv "$cf.tmp" "$cf" || { rm -f "$cf.tmp"; return 1; }
+      # The .target file feeds only the coverage line: a failed write costs that line a count,
+      # never the walk that succeeded.
+      { printf '%s\n' "$target" > "$cf.target"; } 2>/dev/null || rm -f "$cf.target" 2>/dev/null
     fi
     printf '%s\n' "$cf"
   else
     cf="$(mktemp "${TMPDIR:-/tmp}/csa-hook-entries.XXXXXX")" || return 1
-    csa_hook_entries "$target" "$mode" > "$cf" 2>/dev/null
+    if ! csa_hook_entries "$target" "$mode" > "$cf" 2>/dev/null; then
+      rm -f "$cf"
+      return 1
+    fi
     printf '%s\ntmp\n' "$cf"
   fi
 }
@@ -102,7 +114,12 @@ _csa_hook_entries_file() {
 # no match; any other non-zero is SCANNER-002.
 _csa_rule_run_text() {
   local rule_file="$1" target="$2" mode="$3" info cf tmp="" entry out ec
-  info="$(_csa_hook_entries_file "$target" "$mode")" || return 0
+  # A failed mktemp or walk is a SCANNER-002 for the target, not a skip (#1089). Skill-first question 3.
+  if ! info="$(_csa_hook_entries_file "$target" "$mode")"; then
+    jq -nc --arg rid "SCANNER-002" --arg f "$target" --arg r "$rule_file" \
+      '{rule_id: $rid, file: $f, line: 0, offset: 0, preview: "hook entries could not be read", severity: "high", context: {failed_rule: $r, exit_code: 1}}'
+    return 0
+  fi
   cf="$(printf '%s\n' "$info" | sed -n 1p)"
   [[ "$(printf '%s\n' "$info" | sed -n 2p)" == "tmp" ]] && tmp="$cf"
   if [[ "${RULE_TEXT_SCOPE:-entry}" == "file" ]]; then
@@ -134,6 +151,32 @@ _csa_rule_text_once() {
   elif [[ -n "$out" ]]; then
     printf '%s\n' "$out"
   fi
+}
+
+# _csa_unreadable_targets_findings <targets_file> <rules_dir>
+# One SCANNER-003 (Medium) per enumerated target this process cannot read (#1089), when
+# a rule in <rules_dir> (all rules, or the focused aspect's) would have read it. It is
+# emitted here, once per target, and not in csa_rule_run_many: that runs once per rule, so
+# it would repeat the finding for every rule that skipped the file, and 22 rules skip it
+# silently on `[[ -r ]] || return 0`. Skill-first question 3: it can only add a stop; it
+# never removes or approves a finding. SCANNER-003 is not a rule failure, so it stays out
+# of the SCANNER-002 count that drives the "rule(s) failed" banner.
+_csa_unreadable_targets_findings() {
+  local target_line target rule_file aspect
+  while IFS= read -r target_line; do
+    [[ -z "$target_line" ]] && continue
+    target="${target_line##*$'\t'}"
+    [[ -r "$target" ]] && continue
+    while read -r rule_file; do
+      [[ -z "$rule_file" ]] && continue
+      aspect="$(_csa_rule_aspect_from_file "$rule_file")"
+      if [[ -z "$aspect" ]] || _csa_target_matches_aspect "$target" "$aspect"; then
+        jq -nc --arg rid "SCANNER-003" --arg f "$target" \
+          '{rule_id: $rid, file: $f, line: 0, offset: 0, preview: "target could not be read; rules skipped it", severity: "medium"}'
+        break
+      fi
+    done < <(find "$2" -name '*.sh' -type f 2>/dev/null)
+  done < "$1"
 }
 
 # csa_rule_run_many <rule_file> <targets_file>
@@ -370,11 +413,18 @@ csa_rule_engine_scan_all() {
   # High finding, not a note) and `csa:` warnings (an enabledPlugins shape the
   # reader could not use).
   _csa_enum_stderr_to_findings "$enum_error" >> "$findings_out"
+  _csa_unreadable_targets_findings "$targets_file" "$rules_glob" >> "$findings_out"
   while read -r rule_file; do
     [[ -z "$rule_file" ]] && continue
     local aspect; aspect="$(_csa_rule_aspect_from_file "$rule_file")"
     # Build a filtered targets file for this rule's aspect.
-    local rule_targets_file; rule_targets_file="$(mktemp)"
+    local rule_targets_file
+    if ! rule_targets_file="$(mktemp)"; then
+      # No target list for this rule: a SCANNER-002 for the rule, not a silent skip (#1089).
+      jq -nc --arg rid "SCANNER-002" --arg f "$rule_file" --arg r "$rule_file" \
+        '{rule_id: $rid, file: $f, line: 0, offset: 0, preview: "targets could not be listed for this rule", severity: "high", context: {failed_rule: $r, exit_code: 1}}' >> "$findings_out"
+      continue
+    fi
     if [[ -n "$aspect" ]]; then
       while IFS= read -r target_line; do
         [[ -z "$target_line" ]] && continue

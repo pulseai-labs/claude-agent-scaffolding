@@ -31,7 +31,7 @@ detect() {
 
   # Parse with jq: iterate mcpServers entries that have a "url" field but
   # no "Authorization" in headers and no env-like placeholder in headers or args.
-  local servers; servers="$(jq -r '
+  local servers jrc=0; servers="$(jq -r '
     .mcpServers // {} | to_entries[] |
     select(.value.url != null) |
     # Has auth if: headers.Authorization exists, or any header value looks like env-var ref, or args[] contains env-var ref
@@ -42,7 +42,10 @@ detect() {
       ([$entry.value.args // [] | .[] | test("\\$\\{?[A-Z_]+\\}?|\\$[A-Z_]+")] | any)
     ) as $has_auth |
     if $has_auth then empty else .key end
-  ' "$target_file" 2>/dev/null)"
+  ' "$target_file" 2>/dev/null)" || jrc=$?
+  # A jq failure is a SCANNER-002 (#1089), unless names were already printed before it: those are
+  # findings and are emitted. Skill-first question 3: only adds a stop.
+  [[ "$jrc" -eq 0 ]] || [[ -n "$servers" ]] || return 2
 
   [[ -n "$servers" ]] || return 0
 

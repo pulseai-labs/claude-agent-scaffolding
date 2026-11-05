@@ -32,9 +32,13 @@ detect() {
     *) return 0 ;;
   esac
 
-  jq empty "$target_file" 2>/dev/null || return 0
+  # Not JSON is rc 2 (SCANNER-002), not a clean read (#1089). Skill-first question 3: only adds a stop.
+  jq empty "$target_file" 2>/dev/null || return 2
 
-  jq -r 'keys[]' "$target_file" 2>/dev/null \
+  # A top level that has no keys (a number, a string, a boolean) is rc 2 too, not a clean read (#1089).
+  local keys; keys="$(jq -r 'keys[]' "$target_file" 2>/dev/null)" || return 2
+  [[ -n "$keys" ]] || return 0
+  printf '%s\n' "$keys" \
     | while read -r key; do
         # Check if key is in known-keys allowlist
         if ! grep -qxF "$key" "$_KNOWN_KEYS_FILE" 2>/dev/null; then

@@ -27,11 +27,12 @@ detect() {
   local bn; bn="$(basename "$target_file")"
   [[ "$bn" == "settings.local.json" ]] || return 0
 
-  jq empty "$target_file" 2>/dev/null || return 0
+  # Not JSON (this file or its sibling) is rc 2 (SCANNER-002), not a clean read (#1089). Skill-first question 3: only adds a stop.
+  jq empty "$target_file" 2>/dev/null || return 2
 
   local sibling; sibling="$(dirname "$target_file")/settings.json"
   [[ -r "$sibling" ]] || return 0
-  jq empty "$sibling" 2>/dev/null || return 0
+  jq empty "$sibling" 2>/dev/null || return 2
 
   # Find entries in local allow that are NOT in base settings allow.
   jq -r '.permissions.allow[]? // empty' "$target_file" 2>/dev/null \

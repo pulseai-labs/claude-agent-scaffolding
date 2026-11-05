@@ -37,7 +37,13 @@ detect() {
     return 0
   fi
   # Fire only when BOTH a network command AND a sensitive path reference are present
-  local content; content="$(cat "$target_file" 2>/dev/null)"
+  # A read error is rc 2 (SCANNER-002), not an empty file or a clean prefix. Content read before the
+  # error is matched, and a match is emitted, never traded for the stop; no match in what was read
+  # says nothing about the rest, so that is rc 2 (#1089). Skill-first question 3: only adds a stop.
+  local content crc=0; content="$(cat "$target_file" 2>/dev/null)" || crc=$?
+  if [[ "$crc" -ne 0 ]] && ! { [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; }; then
+    return 2
+  fi
   if [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; then
     # Emit a finding at line 1 (file-level rule)
     local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$content")"

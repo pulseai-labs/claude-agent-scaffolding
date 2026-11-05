@@ -63,7 +63,12 @@ detect() {
 
   # Check: each entry must have name and url
   local bad_entries
-  bad_entries="$(jq '[.marketplaces[] | select((has("name") | not) or (has("url") | not))] | length' "$target_file" 2>/dev/null)"
+  # jq fails when an entry is not an object (`has` on a string): a finding, not a clean read (#1089).
+  # Skill-first question 3: only adds a stop.
+  if ! bad_entries="$(jq '[.marketplaces[] | select((has("name") | not) or (has("url") | not))] | length' "$target_file" 2>/dev/null)"; then
+    _emit_finding "marketplace.json: .marketplaces entries could not be read (an entry is not an object)"
+    return 0
+  fi
   if [[ -n "$bad_entries" && "$bad_entries" -gt 0 ]]; then
     _emit_finding "marketplace.json: $bad_entries entry/entries missing required 'name' or 'url' field"
     return 0

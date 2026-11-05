@@ -25,7 +25,13 @@ detect() {
   local target_file="$1"
   [[ -r "$target_file" ]] || return 0
   # Case-insensitive match on variable names; require at least 12 alphanumeric chars as value.
-  grep -inE '(API_KEY|SECRET|TOKEN|PASSWORD)[[:space:]]*=[[:space:]]*[A-Za-z0-9]{12,}' "$target_file" 2>/dev/null \
+  # grep rc 1 is no match; rc 2 or more is a read error: rc 2 (SCANNER-002) unless a match is already in hand,
+  # which is emitted, since the engine drops a detector's stdout on rc 2 (#1089). Skill-first question 3.
+  local hits grc=0
+  hits="$(grep -inE '(API_KEY|SECRET|TOKEN|PASSWORD)[[:space:]]*=[[:space:]]*[A-Za-z0-9]{12,}' "$target_file" 2>/dev/null)" || grc=$?
+  [[ "$grc" -le 1 ]] || [[ -n "$hits" ]] || return 2
+  [[ -n "$hits" ]] || return 0
+  printf '%s\n' "$hits" \
     | while IFS=: read -r line_no match; do
         local preview; preview="$(csa_redact "$match")"
         local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$match")"

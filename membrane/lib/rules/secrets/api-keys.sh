@@ -26,7 +26,13 @@ source "$_RULE_DIR/helpers.sh" 2>/dev/null || true
 detect() {
   local target_file="$1"
   [[ -r "$target_file" ]] || return 0
-  grep -nE 'sk-ant-api03-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}|gh[psorau]_[A-Za-z0-9]{36,}|AKIA[0-9A-Z]{16}' "$target_file" 2>/dev/null \
+  # grep rc 1 is no match; rc 2 or more is a read error: rc 2 (SCANNER-002) unless a match is already in hand,
+  # which is emitted, since the engine drops a detector's stdout on rc 2 (#1089). Skill-first question 3.
+  local hits grc=0
+  hits="$(grep -nE 'sk-ant-api03-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}|gh[psorau]_[A-Za-z0-9]{36,}|AKIA[0-9A-Z]{16}' "$target_file" 2>/dev/null)" || grc=$?
+  [[ "$grc" -le 1 ]] || [[ -n "$hits" ]] || return 2
+  [[ -n "$hits" ]] || return 0
+  printf '%s\n' "$hits" \
     | while IFS=: read -r line_no match; do
         local preview; preview="$(csa_redact "$match")"
         local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$match")"

@@ -30,14 +30,15 @@ detect() {
   fi
 
   # Extract all string values from args[] and env{} blocks across all mcpServers
-  local values; values="$(jq -r '
+  local values jrc=0; values="$(jq -r '
     .mcpServers // {} | to_entries[] |
     .value |
     ((.args // [])[], (.env // {} | to_entries[] | .value))
-  ' "$target_file" 2>/dev/null)"
+  ' "$target_file" 2>/dev/null)" || jrc=$?
+  # A jq failure is a SCANNER-002 (#1089), unless findings were already made from the values printed
+  # before it: those are emitted (the engine drops stdout on rc 2). Skill-first question 3: only adds a stop.
 
-  [[ -n "$values" ]] || return 0
-
+  local found=""
   local secret_re='sk-[A-Za-z0-9_-]{20,}|gh[psorau]_[A-Za-z0-9]{36,}|eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|AKIA[0-9A-Z]{16}|[A-Za-z0-9+/=]{40,}'
   while IFS= read -r val; do
     [[ -n "$val" ]] || continue
@@ -45,7 +46,7 @@ detect() {
     if [[ "$val" =~ $secret_re ]]; then
       local preview; preview="$(csa_redact "$val")"
       local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$val")"
-      jq -nc \
+      found+="$(jq -nc \
         --arg rule_id "$RULE_ID" \
         --arg file "$target_file" \
         --argjson line 1 \
@@ -53,7 +54,13 @@ detect() {
         --arg preview "$preview" \
         --arg severity "$RULE_SEVERITY" \
         --arg fuid "$fuid" \
-        '{rule_id: $rule_id, file: $file, line: $line, offset: $offset, preview: $preview, severity: $severity, finding_uid: $fuid}'
+        '{rule_id: $rule_id, file: $file, line: $line, offset: $offset, preview: $preview, severity: $severity, finding_uid: $fuid}')"$'\n'
     fi
   done <<< "$values"
+  if [[ -n "$found" ]]; then
+    printf '%s' "$found"
+    return 0
+  fi
+  [[ "$jrc" -eq 0 ]] || return 2
+  return 0
 }
