@@ -33,8 +33,11 @@ csa_normalize_path() {
     printf '@plugin:%s:%s' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}"
     return
   fi
-  if [[ -n "${CSA_PROJECT_ROOT:-}" && "$p" == "$CSA_PROJECT_ROOT"/* ]]; then
-    printf '%s' "${p#$CSA_PROJECT_ROOT/}"
+  # Trailing slashes off the root, as the engine does (#1072 C8); "/" stays "/".
+  local root="${CSA_PROJECT_ROOT:-}"
+  while [[ "$root" == ?*/ ]]; do root="${root%/}"; done
+  if [[ -n "$root" && "$p" == "$root"/* ]]; then
+    printf '%s' "${p#"$root"/}"
   else
     printf '%s' "$p"
   fi

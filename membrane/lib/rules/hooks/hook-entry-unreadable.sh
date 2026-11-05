@@ -31,8 +31,10 @@ detect() { return 1; }
 # audit never reads clean while a hook went unread. Skill-first question 3: a
 # mechanical check that can only add a stop.
 detect_text() {
-  local entry="$1" target_file="$2" jp why preview fuid sep
-  [[ "$(printf '%s' "$entry" | jq -r 'has("inconclusive")' 2>/dev/null)" == "true" ]] || return 1
+  local entry="$1" target_file="$2" jp why preview fuid sep has
+  # A jq error is rc 2 (SCANNER-002), not "no match" (#1072 C10).
+  has="$(printf '%s' "$entry" | jq -r 'has("inconclusive")' 2>/dev/null)" || return 2
+  [[ "$has" == "true" ]] || return 1
   jp="$(printf '%s' "$entry" | jq -r '.json_path // ""')"
   why="$(printf '%s' "$entry" | jq -r '.inconclusive // ""')"
   preview="$(csa_redact "hook entry not read: $why")"
