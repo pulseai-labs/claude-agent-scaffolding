@@ -4,6 +4,6 @@ argument-hint: "<PR number or URL> [--round N --previous <report>] [--standards 
 allowed-tools: Bash(git:*), Bash(gh:*), Bash(rg:*), Read, Glob, Grep, Write, Agent
 ---
 
-Read `${CLAUDE_PLUGIN_ROOT}/skills/reviewing-a-pr/SKILL.md` (in OMP: `skill://reviewing-a-pr`) end to end and follow it. `Write` is for the report file only. This command takes no `run` (its tools cannot run a suite); `run:` is for a launcher that invokes the skill with a scratch directory.
+Read `${CLAUDE_PLUGIN_ROOT}/skills/reviewing-a-pr/SKILL.md` (in OMP: `skill://reviewing-a-pr`) end to end and follow it. `Write` is for the report file only. This command takes no `run` (its tools cannot run a suite): a `--run` in the arguments is ignored, never run, and the report's `Run:` header says so. `run:` is for a launcher that invokes the skill with a scratch directory.
 
 The PR to review, and any flags: $ARGUMENTS
