@@ -35,7 +35,7 @@ Call the `oss` dispatcher by name. The plugin loader puts `bin/` on `$PATH` on C
 **Do NOT auto-invoke when:**
 
 - The project is greenfield — that is `/start`.
-- No declared repo carries product source at `HEAD` — that is `/start` (§3).
+- No declared repo carries product source at `HEAD` — that is `/start` (§3); with no operator to answer, `plain-repo.md` §1 says when it refuses instead.
 - Ossify state already exists at the routed path — route to `doctor`.
 - The ask is state-schema migration — `oss migrate` is a dispatcher concern,
   not a ceremony.

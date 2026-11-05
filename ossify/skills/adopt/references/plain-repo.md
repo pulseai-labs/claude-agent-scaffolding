@@ -22,7 +22,7 @@ or a bare scaffold). Ask in order; the first yes decides.
 
 1. **Does any declared repo carry product source at `HEAD`?** No: refuse, authoring nothing further, and route to **`/ossify:start`**
    (class G, no history; class H, history only). The topology A1 may have just authored stays, uncommitted, and
-   `/start` resolves it. A declared repo with no commit is not this answer: see the unborn-`HEAD` rule below.
+   `/start` resolves it. With no operator to answer, refuse a repo with any file at `HEAD` that you do not judge product, saying `re-run with an operator`: `/start` would refuse it for the same reason (start §3). A declared repo with no commit is not this answer: see the unborn-`HEAD` rule below.
 2. **Yes, and the project has a scaffold-dev stack** (a roadmap state or an active-context cursor): **class L**.
    Look where A5 looks: the manifest-routed roadmap state (`well_known_paths.roadmap_state`) and memory bank's
    `05-active-context.md`; a native topology routes neither, so look at the conventional

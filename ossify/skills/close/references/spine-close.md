@@ -473,7 +473,7 @@ $repo:$merge_sha"
                        $0 in head { sec = $0; next }
                        sec == "## Merge bar" && ($0 in want) { if (seen[$0]++ && d == "") d = $0 }
                        sec == "## Merge bar" && !($0 in want) && $0 ~ /^[0-9]+[a-z]*[.)] / && x == "" { x = $0 }
-                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way([[:space:]]+or[[:space:]]+|[[:space:]]*[,\/|][[:space:]]*)(one|two)-way/ { door = 1 }
+                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way([ \t]+or[ \t]+|[ \t]*[,\/|][ \t]*)(one|two)-way/ { door = 1 }
                        END {
                          for (i = 1; i <= r; i++) if (!(req[i] in seen)) { print "line:" req[i]; exit }
                          if (x != "") { print "extra:" x; exit }

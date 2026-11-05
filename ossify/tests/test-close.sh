@@ -1616,6 +1616,11 @@ _fields_halt doorsp2 "$_door_msg" 's/^Door: two-way.*/Door: one-way  or  two-way
 _fields_halt doorsptab "$_door_msg" "s/^Door: two-way.*/Door: one-way$(printf '\t')or$(printf '\t')two-way/"
 # ossify 1.37.0: the punctuation separators take tabs too (spine-close.md used literal spaces)
 _fields_halt doorsepTab "$_door_msg" "s/^Door: two-way.*/Door: one-way$(printf '\t')\/$(printf '\t')two-way/"
+# ossify 1.37.0 round 1 (PR #1097 C9): the separator set is space and tab only, so the verdict does not depend on the awk or the
+# locale: a vertical tab or form feed is not a separator, and neither form halts as an or-form.
+_fields_ok doorsepVT "s/^Door: two-way.*/Door: one-way$(printf '\v')\/$(printf '\v')two-way/"
+_fields_ok doorsepFF "s/^Door: two-way.*/Door: one-way$(printf '\f')\/$(printf '\f')two-way/"
+_fields_ok dooror_VT "s/^Door: two-way.*/Door: one-way$(printf '\v')or$(printf '\v')two-way/"
 # adjacent control: one door, a tab-spaced separator, then other text still passes
 _fields_ok doorsepTabc "s/^Door: two-way.*/Door: one-way$(printf '\t')\/$(printf '\t')released with the tag./"
 # #1073 C4a (r2 C11a-c): the word ends only at a character outside the class

@@ -83,7 +83,7 @@ Sources:
 - review sections of the canonical's `CLAUDE.md`. These become pointers in the stub's
   `## Read these where they live`, never entries.
 
-A finding becomes a proposal only when it recurs in two or more PRs. Each proposal is one line, `- <class>: <rule>. Why: <why>. PRs: #<n>, #<n>`. The operator accepts, edits or rejects each one.
+A finding becomes a proposal only when it recurs in two or more PRs. Each proposal is one line, `- <class>: <rule>. Why: <why>. PRs: #<n>, #<n>` (`<repo>#<n>` when more than one repo is declared). The operator accepts, edits or rejects each one.
 Only accepted entries are written. They go under `## Entries` in `CODING_STANDARDS.md`. In a stub
 this run wrote, the first accepted entry removes the stub's `No project entries yet.` sentence, which
 the entry makes false. A `CODING_STANDARDS.md` that still carries the verbatim
@@ -102,7 +102,7 @@ Adopt never overwrites: on an adopted project `08-governance.md` is occupied, so
 `ADOPTION.md` gets one line: `Reviewer home: <n> proposed, <m> accepted, window <first PR>–<last PR>`,
 with an existing standards file, `<m>` is 0 and the line reads
 `Reviewer home: <n> proposed, 0 accepted (standards file kept; proposals listed below), window <first PR>–<last PR>`;
-or `Reviewer home: no review history` when `gh` succeeded and every source was empty, or `Reviewer home: review history not read (gh failed)` when `gh` exited non-zero or is absent; when other sources still yield proposals, the counts line with `(gh failed)` appended. With no history the stub stays plain.
+or `Reviewer home: no review history` when `gh` succeeded and every source was empty, or `Reviewer home: review history not read (gh failed)` when `gh` exited non-zero or is absent; when other sources still yield proposals, the counts line with its window replaced by `none (gh failed)`. With more than one declared repo, the window names each repo: `window <repo> <first PR>–<last PR>, <repo> <first PR>–<last PR>`. With no history the stub stays plain.
 
 ## 6. On an existing project
 
