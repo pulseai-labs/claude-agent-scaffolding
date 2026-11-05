@@ -34,7 +34,9 @@ detect() {
   fi
 
   # Use jq to extract each marketplace entry's url; flag any that is not https://
-  jq -r '.marketplaces[]? | .url // empty' "$target_file" 2>/dev/null \
+  # `objects` skips an entry that is not an object: `.url` on a string aborts the walk and hides the
+  # URLs after it (#1089; MARKETPLACE-002 reports the entry itself). Skill-first question 3.
+  jq -r '.marketplaces[]? | objects | .url // empty' "$target_file" 2>/dev/null \
     | while IFS= read -r url; do
         # Flag if URL does not start with https://
         if [[ "$url" != https://* ]]; then

