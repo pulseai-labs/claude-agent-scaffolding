@@ -1,0 +1,35 @@
+name: Feature request
+description: Something a plugin should do that it does not do today.
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Plugin
+      options:
+          - baton
+          - crew
+          - membrane
+          - merge-bar
+          - molt
+          - omp-roles
+          - ossify
+          - remodel
+          - sage
+          - seat-mods
+          - workspace-init
+          - several plugins, or the marketplace itself
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to do, and where the plugin got in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you propose
+      description: Optional. A remedy is read as a hypothesis, so the problem matters more.

@@ -1,0 +1,32 @@
+# Security policy
+
+## Reporting a vulnerability
+
+Report it privately through GitHub: open the repository's **Security** tab and choose **Report a
+vulnerability**. Do not open a public issue or pull request for it.
+
+Include the plugin, its version, the harness it ran on (Claude Code, Codex or OMP), and the steps
+that show the problem.
+
+## Supported versions
+
+Each plugin is released on its own, with tags such as `ossify-v1.36.7`, from one line of history:
+`main`. There are no maintenance branches, so a fix ships in the plugin's next release. Before you
+report a problem in a plugin, update it to the version on `main`.
+
+## Scope
+
+These plugins run on your machine with your user's privileges. Most of what they do happens inside
+a coding agent, under the permissions you give it, but not all of it:
+
+- hooks and mods run on events, outside the agent's tool prompts: crew's hooks are shell commands
+  on the harness's events, molt and seat-mods are TypeScript modules the harness loads, and
+  workspace-init installs a git `commit-msg` hook that runs on every commit. membrane ships an
+  opt-in SessionStart script that runs only if you register it;
+- some plugins ship command-line tools (`oss`, `mb`, `crew-run`, `baton`, `omp-seat` and others)
+  that the harness puts on `PATH` or that you link there, and that you or a script can run directly;
+- baton installs a systemd user timer that runs `baton tick` without an agent asking for it, and a
+  tick can launch model sessions.
+
+A report about any of these that runs a command, reads or writes a file, or sends data you did not
+ask for is in scope. A problem in Claude Code, Codex or OMP themselves belongs to that project.

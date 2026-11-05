@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# ossify's copy of merge-bar's PR-body template (ossify 1.13.0).
+# ossify's copy of merge-bar's PR-body template (ossify 1.13.0), and the repository's own PR
+# template (.github/pull_request_template.md), which is the template block itself.
 #
 # /ossify:patch opens a PR from ossify/skills/work-pr/references/pr-body.md where the
 # merge-bar plugin is not installed, and spine close composes a spine PR's six
@@ -8,8 +9,8 @@
 # bar than the one merge-bar's working-a-pr judges against - merge-bar's bar has
 # already grown from three conditions to four since 0.1.0.
 #
-# Only the fenced ```markdown template block is compared: the prose around it is
-# per-copy by design (ossify's header says whose copy it is). Repo-root, because
+# In the two pr-body.md files only the fenced ```markdown template block is compared: the prose
+# around it is per-copy by design (ossify's header says whose copy it is). Repo-root, because
 # a plugin suite cannot see its sibling tree.
 #
 # Usage: bash tests/test-merge-bar-template-parity.sh
@@ -63,6 +64,15 @@ if [[ "$(wc -l < "$T/bar-theirs")" -eq 6 ]] && cmp -s "$T/bar-theirs" "$T/bar-sc
   pass "spine-close.md's hard-coded bar lines equal the template's"
 else
   fail "spine-close.md's hard-coded bar lines (BAR_EOF heredoc) differ from the template's bar lines - copy them from merge-bar's pr-body.md"
+fi
+
+# The repository's own PR template (repo polish, 2026-11) is the template block itself: a
+# contributor's PR starts from the body merge-bar reviews against. The whole file is compared.
+GH="$ROOT/.github/pull_request_template.md"
+if [[ -s "$GH" ]] && cmp -s "$T/theirs" "$GH"; then
+  pass ".github/pull_request_template.md is byte-identical to merge-bar's template block"
+else
+  fail ".github/pull_request_template.md differs from merge-bar's template block - copy the block from merge-bar/skills/opening-a-pr/references/pr-body.md"
 fi
 
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
