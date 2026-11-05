@@ -4,10 +4,10 @@ Named `claude-security-audit` through 0.3.1.
 
 ## 0.4.1 (2026-11-05)
 
-The P3 sweep from #1068's review (#1072). No new rule; failures that used to read as "nothing found" now say so.
+The P3 sweep from #1068's review (#1072). No new rule; in the five rules that read hook entries (HOOK-001 to HOOK-005) and in the HOOK-006 chat count, failures that used to read as "nothing found" now say so. HOOK-006's own rule and the permissions and marketplace rules still read a jq failure as no finding.
 
 ### Fixed
-- **A jq error while reading a hook entry is no longer a non-match.** `csa_hook_entry_command` returned rc 1 for both "not a command" and a jq failure; HOOK-001 to HOOK-004 and HOOK-005 therefore counted an unreadable entry as checked. A jq failure is now rc 2, passed through by those rules, so the engine reports a SCANNER-002 naming the entry and the coverage line counts it `unreadable`. A real non-match stays rc 1.
+- **A jq error while one of the five rules reads a hook entry is no longer a non-match.** `csa_hook_entry_command` returned rc 1 for both "not a command" and a jq failure; HOOK-001 to HOOK-004 and HOOK-005 therefore counted an unreadable entry as checked. A jq failure is now rc 2, passed through by those rules, so the engine reports a SCANNER-002. When the engine can still name the entry (its own `json_path` read succeeds), the SCANNER-002 names it and the coverage line counts it `unreadable`; when that read fails too, the SCANNER-002 carries no `json_path` and the entry stays counted as `checked`. A real non-match stays rc 1.
 - **A failed HOOK-006 count no longer reads as zero.** The chat summary printed nothing when its `jq` count failed (`|| echo 0`); it now prints `HOOK-006 count unavailable`.
 - **A trailing slash on `CSA_PROJECT_ROOT` no longer moves finding ids.** `csa_normalize_path` compared the raw value, so `<p>/` changed every uid under the project and suppressions resurfaced. It now strips every trailing slash before it compares (`/` stays `/`).
 - **A finding with no line prints the bare file.** SCANNER-002, PROVENANCE-002 and the other line-0 findings printed `file:0` (chat) and `file:0:0` (report); they now print `file`.
