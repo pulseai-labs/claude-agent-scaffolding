@@ -234,7 +234,7 @@ pin "$WIC" 'dispatch no `ossify:verifier-agent` and run no' \
 # walk that reports the zero. `ossify` is the known-present token: if the walk
 # cannot find IT, the walk is dead and the `orca` zero means nothing.
 PRODUCT_ROOTS="$OSSIFY/commands $OSSIFY/skills $OSSIFY/agents"
-PRODUCT_FILES="$OSSIFY/.claude-plugin/plugin.json $OSSIFY/.codex-plugin/plugin.json $OSSIFY/README.md"
+PRODUCT_FILES="$OSSIFY/.claude-plugin/plugin.json $OSSIFY/.codex-plugin/plugin.json $OSSIFY/README.md $OSSIFY/CHANGELOG.md"
 
 for d in $PRODUCT_ROOTS; do
   if [ -d "$d" ]; then T_PASS=$((T_PASS+1))

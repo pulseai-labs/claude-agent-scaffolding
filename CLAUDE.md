@@ -211,6 +211,6 @@ an agent per fixture, then a judge against `rubrics/<surface>.md`, writing
 it. Treat a green aggregate as valid only when the results files were regenerated after the
 change under test.
 
-`docs/conventions/` and `docs/assets/readme/` (the root README's pictures) are the only `docs/`
+`docs/conventions/` and `docs/assets/readme/` (the pictures of the root README and ossify's README) are the only `docs/`
 content tracked here, because they are shipped convention and README images rather than process
 exhaust. Delivery differs per convention file; each one's header states its own.
