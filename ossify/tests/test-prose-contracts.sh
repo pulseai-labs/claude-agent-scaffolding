@@ -2269,7 +2269,7 @@ pin "$_PRW_WP" "Never auto-merge." \
   "work-pr/SKILL.md's merge rail lost 'Never auto-merge' - a merge queue's auto-merge stays forbidden (#869 disposition 2)"
 
 # merge-bar 0.10.1 / ossify 1.36.5 (#1061 C8, C9) - the fallback loop's second exit offers the
-# design change at every stop and recommends it on one mechanism over open input, as merge-bar's stop does.
+# design change at every stop and recommends it on one mechanism over open input (1.36.8 caps it at one redesign; merge-bar's stop has no cap).
 pin "$_PRW_LOOP" 'recommended when every fix extends one' \
   "loop.md's second exit does not recommend the design change when every fix extends one mechanism (#1061 C9)"
 # ossify 1.36.8 (#1071 C4, orchestrator ruling: keep the cap): the offer is "at every such stop
@@ -2277,6 +2277,12 @@ pin "$_PRW_LOOP" 'recommended when every fix extends one' \
 # the staleness sentence lists changing the design among the ways out of the second exit.
 pin "$_PRW_LOOP" 'offered at every such stop until the change has' \
   "loop.md's second exit offers the design change at every stop with no end, against its own 'do not restructure twice' (#1071 C4)"
+# ossify 1.36.8 (#1091 r1 C1): the fields-check prose names the or-forms the Door check halts on,
+# and the two "could not run" halts, so it agrees with the block below it.
+pin "$_SC" 'a line naming both doors joined by `or`, `,`, `/` or `|`, and `two-wayfoo`,' \
+  "spine-close.md's fields-check prose still defines a filled Door line by the pre-1.36.8 check (#1091 r1 C1)"
+pin "$_SC" 'heading-order check whose awk cannot run halts too, saying so.' \
+  "spine-close.md's fields-check prose omits the could-not-run halts (#1091 r1 C2)"
 pin "$_PRW_LOOP" 'input; do not restructure twice, and say so.' \
   "loop.md's second exit drops its cap on a second restructure (#1071 C4)"
 pin "$_PRW_LOOP" 'cutting, narrowing, changing the design, or' \

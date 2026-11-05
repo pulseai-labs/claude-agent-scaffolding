@@ -234,8 +234,9 @@ Merge bar section lacking any of the template's six lines (the lead line, the fo
 conditions, `Everything else is non-blocking.`) or carrying an extra numbered line,
 a template bar line repeated, or no filled `Door: one-way` or `Door: two-way` line under
 Merge danger (the word, then the line's end or any character that is not an ASCII letter or
-digit, `_` or `-`; `one-way or two-way` and `two-wayfoo` are unfilled); the bar and
-the Door line are read under their own headings only. The check runs
+digit, `_` or `-`; a line naming both doors joined by `or`, `,`, `/` or `|`, and `two-wayfoo`,
+are unfilled); the bar and the Door line are read under their own headings only. A CRLF or
+heading-order check whose awk cannot run halts too, saying so. The check runs
 per repo: a repo landed earlier in the same pass keeps its PR, and the re-run resumes it. Known limit: a
 stopping rule written in the raising-line slot, after `Everything else is
 non-blocking.`, passes; `working-a-pr` still judges by all four conditions. Without merge-bar,
