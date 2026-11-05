@@ -60,15 +60,15 @@ read it. The file holds no line of its own at creation, and this file states no 
 
 ## 4. The review section
 
-`## Review` is part of `08-governance.md` as this run authors it at §13, four lines. When
+`## Review` is part of `08-governance.md` as this run authors it at §13, three or four lines. When
 `08-governance.md` was an occupied destination the operator chose to keep, do not add the section
 and never append to the kept file; name it in the hand-off so the operator can add it by hand.
-The four lines:
+The lines:
 
 - the standards file path, as a resolved path relative to the AI workspace root, never a `<placeholder>`;
 - the review ledger path, resolved the same way, and `tech-debt.md` for the `[KL]`/`[TD]` lines;
 - the reviewer: merge-bar `reviewing-a-pr`, at the seat the project's crew file or standing orders
-  name, or the operator's choice per PR when neither does. Name no model;
+  name (the `reviewer` row of `.crew/roles.md` whose `When` covers every PR; when the rows split by condition, name each row with its condition, as crew's `orchestrate` `config.md`, "The project file", reads them), or the operator's choice per PR when neither does. Name no model;
 - CodeRabbit or any CI review, when the project has one, as an extra that gates nothing. Omit this
   line when the project has none.
 
@@ -77,14 +77,13 @@ The four lines:
 After §1–§4 are written, adopt reads the project's review history and proposes the first entries.
 Sources:
 
-- review comments and review bodies on the last 30 merged PRs (`gh`), or all of them if fewer;
+- review comments and review bodies on the last 30 merged PRs by merge date, in each declared repo (a `tooling_repo` skipped), 30 per repo (`gh`), or all of a repo's if fewer;
 - any review ledger already in the AI workspace;
 - `[KL]` and `[TD]` lines in `tech-debt.md`;
 - review sections of the canonical's `CLAUDE.md`. These become pointers in the stub's
   `## Read these where they live`, never entries.
 
-A finding becomes a proposal only when it recurs in two or more PRs. Each proposal states the class,
-the rule, the **Why** and the source PRs. The operator accepts, edits or rejects each one.
+A finding becomes a proposal only when it recurs in two or more PRs. Each proposal is one line, `- <class>: <rule>. Why: <why>. PRs: #<n>, #<n>`. The operator accepts, edits or rejects each one.
 Only accepted entries are written. They go under `## Entries` in `CODING_STANDARDS.md`. In a stub
 this run wrote, the first accepted entry removes the stub's `No project entries yet.` sentence, which
 the entry makes false. A `CODING_STANDARDS.md` that still carries the verbatim
@@ -103,7 +102,7 @@ Adopt never overwrites: on an adopted project `08-governance.md` is occupied, so
 `ADOPTION.md` gets one line: `Reviewer home: <n> proposed, <m> accepted, window <first PR>–<last PR>`,
 with an existing standards file, `<m>` is 0 and the line reads
 `Reviewer home: <n> proposed, 0 accepted (standards file kept; proposals listed below), window <first PR>–<last PR>`;
-or `Reviewer home: no review history` when there is none. With no history the stub stays plain.
+or `Reviewer home: no review history` when `gh` succeeded and every source was empty, or `Reviewer home: review history not read (gh failed)` when `gh` exited non-zero or is absent; when other sources still yield proposals, the counts line with `(gh failed)` appended. With no history the stub stays plain.
 
 ## 6. On an existing project
 
@@ -111,7 +110,7 @@ For a project ossify already started or adopted. Follow §1–§5 as written, wi
 
 - Run no adopt station. Append the `## Review` section with no provenance trailer: adopt's
   `source: adoption` and `r0 baseline` do not apply to a project it did not adopt.
-- `ADOPTION.md` may not exist. Record the result line as the last line of the `## Review` section
-  of `08-governance.md`; with an existing standards file, list the proposals directly below it.
+- `ADOPTION.md` may not exist. Record the result line after the other lines of the `## Review` section
+  of `08-governance.md`; with an existing standards file, the proposals follow it, one per line.
 - When `08-governance.md` has no `## Review` section, add it, as part of seeding the project.
   Never edit any other part of the file.

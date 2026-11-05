@@ -1,7 +1,7 @@
 ---
 scenario_id: 05-standalone-existing-file
 expected_outcome: propose-to-record
-expected_reason: The standards file is hand-written and carries no stub sentence, so it counts as an existing file and is never edited. The project has no ADOPTION.md, so the result line `1 proposed, 0 accepted (standards file kept; proposals listed below), window …` goes as the last line of the 08-governance.md Review section, with no provenance trailer, and the proposal for the recurring class is listed directly below it. No ADOPTION.md is created.
+expected_reason: The standards file is hand-written and carries no stub sentence, so it counts as an existing file and is never edited. The project has no ADOPTION.md, so the result line `1 proposed, 0 accepted (standards file kept; proposals listed below), window …` goes after the other lines of the 08-governance.md Review section, with no provenance trailer, and the proposal for the recurring class follows it, one per line. No ADOPTION.md is created.
 ---
 The project is `tallyho`, a dual-repo project that `/ossify:start` set up some weeks ago, now in
 Release 2. The AI workspace is `/home/dev/projects/tallyho-ai` and the canonical is

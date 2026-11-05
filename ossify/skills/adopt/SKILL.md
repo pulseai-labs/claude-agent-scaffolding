@@ -321,7 +321,7 @@ Close with `oss doctor` (the state gate: `state`, `schema`, `replay`,
   is additive; the operator retires the old stack at their choosing.
 - **Mid-slice adoption.** §3 A5 refuses it by design.
 - **Repairing what it finds.** C2 gaps and stale ADRs are findings.
-- **Letting this body exceed 250 lines.** Thin-by-design is a stated
+- **Letting this body exceed 500 lines (the cap `test-skill-bash-blocks.sh` enforces).** Thin-by-design is a stated
   constraint, not an aspiration. Depth belongs in pointers, never restated.
 
 ---

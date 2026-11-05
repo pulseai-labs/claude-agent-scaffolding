@@ -22,7 +22,7 @@ slot-fill.
 | `03-code-patterns.md` | branch | Bones category 8 (stack) + the **machine-checkable rules** section (seeded empty) |
 | `04-tech-context.md` | branch | Bones category 8 + the verified/unverified claims from the smoke-test pass |
 | `05-active-context.md` | **Tier 0 · LIVE** | Current position: "spec-core closed; Release 0 not yet planned" |
-| `06-progress.md` | branch · LIVE | One dated entry: spec-core close |
+| `06-progress.md` | branch · LIVE | One dated entry: spec-core close, with class H history when §3 recorded any |
 | `07-constraints.md` | branch | Risk gates + bones categories 5, 9 (trust boundaries; cross-cutting constraints) |
 | `08-governance.md` | branch | Pointers: bones ADR dir, `PUBLIC_BOUNDARY.md`, private inventory, `project-state.json` + the **standing orders** section (seeded empty); also a `## Review` section per `reviewer-home.md` §4 |
 | `09-known-issues.md` | **Tier 0 · LIVE** | **Unverified claims** from the smoke-test pass; any spike `inconclusive` result |

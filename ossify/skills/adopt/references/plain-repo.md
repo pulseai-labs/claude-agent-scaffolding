@@ -98,7 +98,7 @@ before C2), or the completion floor refuses. The release description drops `unde
 **Zero steps left `shipped`** (a stated known limit): at C4, after C3, do not call `release_add`. Write the adoption
 record to that point (class, gates, baseline table, the C1 table, every C2 result and gap), then halt. The hand-off
 names what to clear to retry: the file `oss state_path` prints and its `.base.json` sibling, `ADOPTION.md` moved
-aside (C5 creates it only when absent), and C3's uncommitted ADR files in the product repo (commit or remove
+outside the AI workspace (C5 creates it only when absent; A3 refuses it untracked inside), and C3's uncommitted ADR files in the product repo (commit or remove
 them: A3 refuses them on retry). It says what happened: A6 asked, C2 found the checkout disagrees. The
 completion floor does not apply to this halt: it is a halt with its record written, not a completion.
 

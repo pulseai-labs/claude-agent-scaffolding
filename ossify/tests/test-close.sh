@@ -1614,6 +1614,10 @@ _fields_halt doorsep4 "$_door_msg" 's/^Door: two-way.*/Door: two-way , one-way -
 # the or-form takes runs of whitespace; two spaces around `or` still halt
 _fields_halt doorsp2 "$_door_msg" 's/^Door: two-way.*/Door: one-way  or  two-way/'
 _fields_halt doorsptab "$_door_msg" "s/^Door: two-way.*/Door: one-way$(printf '\t')or$(printf '\t')two-way/"
+# ossify 1.37.0: the punctuation separators take tabs too (spine-close.md used literal spaces)
+_fields_halt doorsepTab "$_door_msg" "s/^Door: two-way.*/Door: one-way$(printf '\t')\/$(printf '\t')two-way/"
+# adjacent control: one door, a tab-spaced separator, then other text still passes
+_fields_ok doorsepTabc "s/^Door: two-way.*/Door: one-way$(printf '\t')\/$(printf '\t')released with the tag./"
 # #1073 C4a (r2 C11a-c): the word ends only at a character outside the class
 _fields_halt doorcase "$_door_msg" 's/^Door: two-way.*/Door: two-wayFoo/'
 _fields_halt doordigit "$_door_msg" 's/^Door: two-way.*/Door: two-way2/'
