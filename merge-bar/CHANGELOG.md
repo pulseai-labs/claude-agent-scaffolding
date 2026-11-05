@@ -2,6 +2,17 @@
 
 All notable changes to the `merge-bar` plugin.
 
+## 0.10.3
+
+**Prose, tests and evals only (#1071, the non-blocking classes of #1070).**
+
+- `reviewing-a-pr`: `run` is the one input that is not a slash-command flag; the write rule reads the same in the description, the opening and the Limits (the report, and with `run` the axis's own subdirectory); the extract is `d=$(mktemp -d "<run>/axis.XXXXXX") && git -C <checkout> archive HEAD | tar -x -C "$d"`, so each axis starts empty and the command works from outside the checkout; the skill limits only the reviewer's own writes, so the launcher must enforce the write boundary as well as any network limit.
+- `/merge-bar:review-pr` says a `--run` in its arguments is ignored, never run, and the report's `Run:` header says so.
+- `working-a-pr`: the round stop says the operator chooses at every stop; there is no "redesign once" cap (ossify's agent-driven loop has one).
+- Corrects 0.10.1: its `test-prose-pins.sh` pinned only "the launcher must enforce", not the trust sentence it claimed. It now also pins the trust sentence, "outside any git repository", the extract command, the write-boundary sentence, the `run` flag exception, the command's `--run` line and the operator-chooses clause.
+- Evals: fixtures W17 (an `Extends:` chain makes the stop recommend changing the design) and R13 (`run`: a `Run:` line, nothing written outside the run directory); W4's stale result is regenerated.
+- README names `test-prose-pins.sh` in the runner list.
+
 ## 0.10.2
 
 The marketplace is renamed `pulsestack`; the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the old `claude-agent-scaffolding`; an entry under the new name wins. The install key is `merge-bar@pulsestack`. No other change.

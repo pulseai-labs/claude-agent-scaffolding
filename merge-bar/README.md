@@ -57,7 +57,7 @@ a newer PR shows it. With no paired workspace there is no log.
 
 ## Tests
 
-`bash merge-bar/run-tests.sh` runs the frontmatter lint, ten fidelity pins and the `mb` tests; CI runs it.
+`bash merge-bar/run-tests.sh` runs the frontmatter lint, the fidelity and prose pins and the `mb` tests; CI runs it.
 The behaviour evals in `tests/eval/` are session-driven and **not** run by CI — follow
 `tests/eval/RUNBOOK.md` before any version bump.
 
