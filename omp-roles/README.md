@@ -34,4 +34,4 @@ Run it again after an upgrade: the link points at one version's folder. `omp-sea
 
 `omp-seat` needs seat-mods 0.4.1 (the first release that maps `seat-reviewer` to the reviewer profile) and molt 0.3.0. It refuses an older version or a missing OMP extension, naming the required minimum.
 
-Pinned and tested on omp 18.11.2; an upgrade is a PR.
+Pinned and tested on omp 18.16.0; an upgrade is a PR.

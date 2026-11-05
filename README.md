@@ -188,7 +188,7 @@ through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows.
     omp plugin install omp-roles@pulsestack   # and seat-mods, molt
     omp-seat worker --via omp -p "..."
 
-`omp-roles` is pinned and tested on omp 18.11.2 (`omp-roles/README.md`).
+`omp-roles` is pinned and tested on omp 18.16.0 (`omp-roles/README.md`).
 
 </details>
 
