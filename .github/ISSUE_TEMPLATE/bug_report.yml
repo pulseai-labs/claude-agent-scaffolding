@@ -18,13 +18,14 @@ body:
           - sage
           - seat-mods
           - workspace-init
+          - several plugins, or the marketplace itself
     validations:
       required: true
   - type: input
     id: version
     attributes:
       label: Plugin version
-      description: The version in the plugin's manifest, or the release tag you installed.
+      description: The version in the plugin's manifest (`package.json` for omp-roles), or the release tag you installed.
       placeholder: e.g. 1.36.7
     validations:
       required: true

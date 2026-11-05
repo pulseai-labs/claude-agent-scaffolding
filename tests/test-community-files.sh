@@ -3,8 +3,8 @@
 # Each fact prints its own finding:
 #   missing         CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md and both issue forms exist;
 #   plugin-options  each issue form's Plugin dropdown lists exactly the plugins in the Claude Code
-#                   and OMP catalogs (.claude-plugin/ and .omp-plugin/marketplace.json), so a new
-#                   or retired plugin cannot leave the forms behind;
+#                   and OMP catalogs (.claude-plugin/ and .omp-plugin/marketplace.json), plus the one
+#                   fixed option "$OTHER", so a new or retired plugin cannot leave the forms behind;
 #   link            every relative link in the three community files resolves from .github/.
 # The PR template's parity with merge-bar's body is tests/test-merge-bar-template-parity.sh's.
 # What it leaves to review: whether each sentence is true.
@@ -21,6 +21,7 @@ fail() { FAIL=$((FAIL + 1)); printf '  not ok  %s\n' "$1"; }
 
 FORMS=".github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/feature_request.yml"
 DOCS=".github/CONTRIBUTING.md .github/SECURITY.md .github/CODE_OF_CONDUCT.md"
+OTHER="several plugins, or the marketplace itself"
 
 # The options of the dropdown whose id is "plugin", one per line, sorted.
 plugin_options() {
@@ -38,8 +39,9 @@ check_tree() (
   cd "$1" || { echo "setup: cannot enter $1"; exit 0; }
   for f in $DOCS $FORMS; do [ -s "$f" ] || echo "missing: $f"; done
 
-  want="$(jq -r '.plugins[].name' .claude-plugin/marketplace.json .omp-plugin/marketplace.json 2>/dev/null | sort -u)"
-  [ -n "$want" ] || echo "plugin-options: no plugin read from the catalogs"
+  cat="$(jq -r '.plugins[].name' .claude-plugin/marketplace.json .omp-plugin/marketplace.json 2>/dev/null | sort -u)"
+  [ -n "$cat" ] || echo "plugin-options: no plugin read from the catalogs"
+  want="$(printf '%s\n%s\n' "$cat" "$OTHER" | sort)"
   for f in $FORMS; do
     [ -s "$f" ] || continue
     got="$(plugin_options "$f")"
@@ -74,6 +76,7 @@ make_copy() {
   cp "$ROOT/.omp-plugin/marketplace.json" "$d/.omp-plugin/"
   cp "$ROOT/CLAUDE.md" "$ROOT/README.md" "$d/"
   cp "$ROOT/docs/conventions/skill-first.md" "$d/docs/conventions/"
+  mkdir -p "$d/merge-bar/skills/opening-a-pr/references" && cp "$ROOT/merge-bar/skills/opening-a-pr/references/pr-body.md" "$d/merge-bar/skills/opening-a-pr/references/"
   printf '%s\n' "$d"
 }
 
@@ -87,6 +90,16 @@ control() {
   else fail "control $name: expected '$want', got: ${out:-nothing}"; fi
 }
 
+# quiet <name> <text that must NOT appear in any finding> <plant>: a must-still-pass control.
+quiet() {
+  local name="$1" absent="$2" plant="$3" d out
+  d="$(make_copy "$WORK/$name")"
+  (cd "$d" && eval "$plant") || { fail "control $name: the plant did not apply"; return; }
+  out="$(check_tree "$d")"
+  if printf '%s\n' "$out" | grep -Fq "$absent"; then fail "control $name: '$absent' must not appear, got: $out"
+  else pass "control $name: no '$absent'"; fi
+}
+
 clean="$(make_copy "$WORK/clean")"
 out="$(check_tree "$clean")"
 if [ -z "$out" ]; then pass "control clean: an unchanged copy has no findings"
@@ -96,7 +109,12 @@ control missing      "missing: .github/SECURITY.md"   "rm .github/SECURITY.md"
 control new-plugin   "plugin-options: .github/ISSUE_TEMPLATE/bug_report.yml" "jq '.plugins += [{\"name\": \"zz-new\"}]' .claude-plugin/marketplace.json > t && mv t .claude-plugin/marketplace.json"
 control omp-only     "plugin-options: .github/ISSUE_TEMPLATE/feature_request.yml" "jq '.plugins += [{\"name\": \"zz-omp\"}]' .omp-plugin/marketplace.json > t && mv t .omp-plugin/marketplace.json"
 control dropped      "plugin-options: .github/ISSUE_TEMPLATE/bug_report.yml" "grep -v '^          - sage\$' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml"
+control no-other     "plugin-options: .github/ISSUE_TEMPLATE/feature_request.yml" "grep -v '^          - several plugins' .github/ISSUE_TEMPLATE/feature_request.yml > t && mv t .github/ISSUE_TEMPLATE/feature_request.yml"
+control fence-link   "link: .github/SECURITY.md -> ../outside.md" "printf 'See [x](../outside.md).\n\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\n' >> .github/SECURITY.md"
 control link         "link: .github/CONTRIBUTING.md -> ../no-such.md" "printf 'See [x](../no-such.md#y).\n' >> .github/CONTRIBUTING.md"
+
+quiet   reordered    "plugin-options:" "awk '/^          - baton\$/{held=\$0; next} {print} /^          - crew\$/ && held {print held; held=\"\"}' .github/ISSUE_TEMPLATE/bug_report.yml > t && mv t .github/ISSUE_TEMPLATE/bug_report.yml && ! grep -q '^          - baton\$' <(sed -n '/id: plugin/,/validations/p' .github/ISSUE_TEMPLATE/bug_report.yml | sed -n 4p)"
+quiet   fenced-link  "in-fence.md" "printf '\x60\x60\x60\n[y](../in-fence.md)\n\x60\x60\x60\n' >> .github/SECURITY.md"
 
 printf '\nPassed: %d  Failed: %d\n' "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

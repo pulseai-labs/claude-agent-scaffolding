@@ -18,6 +18,7 @@ body:
           - sage
           - seat-mods
           - workspace-init
+          - several plugins, or the marketplace itself
     validations:
       required: true
   - type: textarea
