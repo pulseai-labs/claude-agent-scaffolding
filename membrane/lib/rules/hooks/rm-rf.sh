@@ -37,7 +37,15 @@ detect() {
   fi
   # Match rm with -rf or -fr flags followed by an absolute path /
   # Skip benign relative/variable paths like ./build or "$TMPDIR"
-  grep -nE "$RULE_PATTERN" "$target_file" 2>/dev/null \
+  # grep rc 1 is no match; rc 2 or more is a read error: rc 2 here (a SCANNER-002 in the engine, not a
+  # clean read) unless a match is already in hand. The engine drops a detector's stdout on rc 2, so a
+  # match found before the error is emitted and returned 0, never traded for the stop (#1089).
+  # Skill-first question 3: only adds a stop.
+  local hits grc=0
+  hits="$(grep -nE "$RULE_PATTERN" "$target_file" 2>/dev/null)" || grc=$?
+  [[ "$grc" -le 1 ]] || [[ -n "$hits" ]] || return 2
+  [[ -n "$hits" ]] || return 0
+  printf '%s\n' "$hits" \
     | while IFS=: read -r line_no match; do
         local preview; preview="$(csa_redact "$match")"
         local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$match")"

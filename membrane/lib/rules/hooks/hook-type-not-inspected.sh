@@ -30,14 +30,15 @@ source "$_RULE_DIR/hook-entries.sh" 2>/dev/null || true
 detect() { return 1; }
 
 # detect_text <entries-jsonl> <file> — one Info finding per file with per-type
-# counts. Skill-first question 3: a mechanical report that can only add a stop.
+# counts. Skill-first question 3: a mechanical report that can only add a stop. A jq
+# error is rc 2 (SCANNER-002), not rc 1: "nothing to report" is only an empty count.
 # json_path "hooks" names the key the entries sit under, so a report prints
 # file#hooks and not file:0:0.
 detect_text() {
   local entries="$1" target_file="$2" counts preview fuid
   counts="$(printf '%s\n' "$entries" | jq -rs '
     [.[] | select(has("inconclusive") | not) | select(.type != "command") | .type]
-    | group_by(.) | map("\(.[0])=\(length)") | join(", ")' 2>/dev/null)"
+    | group_by(.) | map("\(.[0])=\(length)") | join(", ")' 2>/dev/null)" || return 2
   [[ -n "$counts" ]] || return 1
   preview="$(csa_redact "hook entries not inspected: $counts")"
   # Hash first, as HOOK-005 does: the counts hold attacker-chosen type names, and

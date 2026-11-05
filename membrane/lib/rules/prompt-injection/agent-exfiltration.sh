@@ -32,9 +32,15 @@ detect() {
     return 0
   fi
 
-  grep -niE \
+  # grep rc 1 is no match; rc 2 or more is a read error: rc 2 (SCANNER-002) unless a match is already in hand,
+  # which is emitted, since the engine drops a detector's stdout on rc 2 (#1089). Skill-first question 3.
+  local hits grc=0
+  hits="$(grep -niE \
     'read[[:space:]]+.*~/\.ssh|cat[[:space:]]+.*~/\.ssh|(POST|send|exfil).*attacker|curl[[:space:]]+.*(http|https)://.*~/\.' \
-    "$target_file" 2>/dev/null \
+    "$target_file" 2>/dev/null)" || grc=$?
+  [[ "$grc" -le 1 ]] || [[ -n "$hits" ]] || return 2
+  [[ -n "$hits" ]] || return 0
+  printf '%s\n' "$hits" \
     | while IFS=: read -r line_no match; do
         local preview; preview="$(csa_redact "$match")"
         local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$match")"

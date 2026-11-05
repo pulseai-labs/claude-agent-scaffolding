@@ -34,7 +34,7 @@ detect() {
     .mcpServers // {} | to_entries[] |
     .value |
     ((.args // [])[], (.env // {} | to_entries[] | .value))
-  ' "$target_file" 2>/dev/null)"
+  ' "$target_file" 2>/dev/null)" || return 2   # not JSON (or no .mcpServers shape) is a SCANNER-002, not a clean read (#1089); skill-first question 3
 
   [[ -n "$values" ]] || return 0
 

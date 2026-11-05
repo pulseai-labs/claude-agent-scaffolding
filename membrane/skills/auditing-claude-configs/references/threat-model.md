@@ -34,7 +34,7 @@ This keeps the no-LLM boundary below: the walk is a mechanical check on open inp
 
 The audit reads files that, per the threat model, may be attacker-controlled. The plugin detecting exfiltration must not itself be one:
 - Static analysis only — no LLM evaluation over raw file bytes
-- Findings show `file:line:offset` with redacted previews (`sk-ant-***xyz`); never full secret material
+- Findings show `file:line:offset` with redacted previews (`sk-ant-***xyz`); never full secret material. A finding with no line (line 0) prints the bare `file`, and one that names a JSON entry (a `json_path`) prints `file#path`
 - No subagent / codex dispatch on file content
 
 ## Enumerate-targets resolution algorithm (T2-J pin)

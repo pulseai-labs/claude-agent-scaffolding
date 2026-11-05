@@ -42,7 +42,7 @@ detect() {
       ([$entry.value.args // [] | .[] | test("\\$\\{?[A-Z_]+\\}?|\\$[A-Z_]+")] | any)
     ) as $has_auth |
     if $has_auth then empty else .key end
-  ' "$target_file" 2>/dev/null)"
+  ' "$target_file" 2>/dev/null)" || return 2   # not JSON (or no .mcpServers shape) is a SCANNER-002, not a clean read (#1089); skill-first question 3
 
   [[ -n "$servers" ]] || return 0
 

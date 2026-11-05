@@ -101,6 +101,8 @@ The **first audit run** adds `.claude/audits/` to your `.gitignore` automaticall
 | Low | Hygiene | localhost dev URLs; permissions slightly too broad |
 | Info | Observation | "N plugins in cache not enabled here"; "no audit baseline yet" |
 
+Scanner failures are findings too, not a clean read: SCANNER-001 (a rule failed to load, High), SCANNER-002 (a rule's check failed on a target, for example a `settings.json` or `mcp.json` that is not JSON, High) and SCANNER-003 (the scan could not read a target, Medium; one per target). A malformed `settings.json` gives four SCANNER-002, one per permissions rule that reads it, or five when a `settings.local.json` sits beside it; that alone trips the "⚠ 4 rule(s) failed during scan" banner.
+
 Critical findings **cannot be suppressed**; they must be remediated.
 
 ## Composition

@@ -2,6 +2,23 @@
 
 Named `claude-security-audit` through 0.3.1.
 
+## 0.4.2 (2026-11-05)
+
+The rest of #1089, from #1088's review, and the same failure in the MCP rules and the other grep rules. A reader that could not read used to report no finding; the readers below now report one. The checks can only add a stop: a real non-match, and a readable file with nothing in it, still report nothing, and a match a rule already found is never dropped.
+
+### Fixed
+- **A file the scan cannot read is a finding, once.** A target the audit could not read (`chmod 000`) was skipped silently by the rules that read it. The engine now emits one SCANNER-003 (Medium) per such target, when a rule in the scan's focus would have read it, and it does not count toward the "rule(s) failed" banner. The rules still skip the file themselves; an enabled plugin's unreadable `hooks/hooks.json` is still reported as HOOK-005. Run as root, where every file reads, none is reported.
+- **A malformed `settings.json` no longer reads clean.** Not valid JSON, or a `permissions.deny` that has no length (a boolean), was a non-match in PERM-001 to PERM-004 and the schema check; it is now rc 2, a SCANNER-002 per rule: four, or five when a `settings.local.json` sits beside it (the divergence check on the local file also reports a malformed sibling `settings.json`). That alone trips the "rule(s) failed" banner. The project's own settings files also keep their HOOK-005.
+- **A malformed `mcp.json` no longer reads clean.** MCP-002 (missing auth) and MCP-003 (env-var leak) read a jq failure as no servers; it is now rc 2. A valid file with no `mcpServers` stays silent.
+- **A marketplace entry that is not an object is a finding.** `malformed-marketplace` read a jq failure on the entry check as no malformed entries. The invalid-JSON and missing-array findings were already emitted and are pinned.
+- **A jq error in HOOK-006 is rc 2, not a non-match.** An empty count is still rc 1.
+- **A read error in the file rules is rc 2.** `grep` rc 2 or more was masked by `2>/dev/null | while` in the file mode of HOOK-001 to HOOK-003, the secrets rules, the CLAUDE.md rules, the prompt-injection rules and the MCP endpoint rule, and `cat` in HOOK-004 (network-exfiltration). `grep` rc 1 (no match) is unchanged. When the read fails after a match was found, the rule emits that match and returns 0, because the engine drops a rule's output on rc 2.
+- **A failed `mktemp` or hook-entry walk is a SCANNER-002, not a skip.** The walk was cached run-wide even when it failed, which silenced HOOK-001 to HOOK-005 for the file; a failed walk is no longer cached, and each hook rule that reads the file reports it. A failed walk's partial output is discarded, not scanned. A failure to write the coverage `.target` file costs the coverage line a count, not the walk. A failed `mktemp` for a rule's target list is a SCANNER-002 for that rule.
+- **threat-model.md** says what a finding with no line (the bare file) and one with a `json_path` (`file#path`) print.
+
+### Tests
+- `tests/test-fail-closed-readers.sh`: each stop above beside a control (a real non-match, a valid file, a readable target), the SCANNER-002 counts for a malformed settings file, and a match kept through a read error. The unreadable-target tests skip when run as root. Mutation-checked, one per branch, all killed.
+
 ## 0.4.1 (2026-11-05)
 
 The P3 sweep from #1068's review (#1072). No new rule. Two failures that used to read as "nothing found" now say so: a jq error while one of the five rules that read hook entries (HOOK-001 to HOOK-005) reads an entry, and a failed HOOK-006 chat count. Other failures still read as no finding, among them HOOK-006's own rule and the permissions and marketplace rules on a jq failure, and a script the file-mode rules cannot read.

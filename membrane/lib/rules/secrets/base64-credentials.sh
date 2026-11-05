@@ -24,7 +24,13 @@ source "$_RULE_DIR/helpers.sh" 2>/dev/null || true
 detect() {
   local target_file="$1"
   [[ -r "$target_file" ]] || return 0
-  grep -nE '[A-Za-z0-9+/]{40,}={0,2}' "$target_file" 2>/dev/null \
+  # grep rc 1 is no match; rc 2 or more is a read error: rc 2 (SCANNER-002) unless a match is already in hand,
+  # which is emitted, since the engine drops a detector's stdout on rc 2 (#1089). Skill-first question 3.
+  local hits grc=0
+  hits="$(grep -nE '[A-Za-z0-9+/]{40,}={0,2}' "$target_file" 2>/dev/null)" || grc=$?
+  [[ "$grc" -le 1 ]] || [[ -n "$hits" ]] || return 2
+  [[ -n "$hits" ]] || return 0
+  printf '%s\n' "$hits" \
     | grep -vE '(sha256:|sha1:|md5:)' \
     | while IFS=: read -r line_no match; do
         local preview; preview="$(csa_redact "$match")"

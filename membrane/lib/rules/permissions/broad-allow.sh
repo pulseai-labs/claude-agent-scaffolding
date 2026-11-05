@@ -31,7 +31,8 @@ detect() {
   esac
 
   # Ensure parseable JSON
-  jq empty "$target_file" 2>/dev/null || return 0
+  # Not JSON is rc 2 (SCANNER-002), not a clean read (#1089). Skill-first question 3: only adds a stop.
+  jq empty "$target_file" 2>/dev/null || return 2
 
   jq -r '.permissions.allow[]? // empty' "$target_file" 2>/dev/null \
     | grep -E '^(Bash|Read|Write)\(\*\)$' \
