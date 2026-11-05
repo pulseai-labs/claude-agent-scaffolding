@@ -2,10 +2,14 @@
 # lib/fingerprint.sh — two-layer fingerprint per SPEC §9.1 + T2-I.
 # Requires: lib/helpers.sh (csa_sha256, csa_is_version_name), lib/redact.sh (csa_redact).
 
+# _csa_squeeze_excerpt <match_text> — whitespace runs to one space, ends trimmed. Nothing else.
+_csa_squeeze_excerpt() {
+  printf '%s' "$1" | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//'
+}
+
 # csa_canonicalize_excerpt <match_text>
 csa_canonicalize_excerpt() {
-  local m="$1"
-  m="$(printf '%s' "$m" | tr -s '[:space:]' ' ' | sed 's/^ //; s/ $//')"
+  local m; m="$(_csa_squeeze_excerpt "$1")"
   csa_redact "$m"
 }
 
@@ -49,6 +53,24 @@ csa_finding_uid() {
   local rule_id="$1"; local file_path="$2"; local match="$3"
   local norm_path; norm_path="$(csa_normalize_path "$file_path")"
   local canon; canon="$(csa_canonicalize_excerpt "$match")"
+  local full; full="$(csa_sha256 "${rule_id}|${norm_path}|${canon}")"
+  printf 'FUID-%s' "${full:0:8}"
+}
+
+# csa_finding_uid_raw <rule_id> <file_path> <match_excerpt>
+# The uid for a caller whose excerpt is free text of any length (a grep line, a JSON
+# value). csa_finding_uid hashes the REDACTED excerpt, and csa_redact caps it at 200 characters and
+# masks every secret-like run to its first and last four, so two long excerpts that share their first
+# 200 characters, or their redacted form, share a uid, and a crafted finding can then share a suppressed
+# finding's uid (#1072 C11). This one hashes the whitespace-squeezed excerpt itself, so no character
+# is lost. The excerpt only ever reaches sha256: it is never printed, stored or logged; the uid keeps
+# 8 hex characters. An excerpt under the cap with nothing to mask hashes as csa_finding_uid does, so
+# only the capped or masked ones get a new uid. Same format, same path normalization.
+# Skill-first question 2: our own digest over a closed shape (rule id, path, excerpt).
+csa_finding_uid_raw() {
+  local rule_id="$1"; local file_path="$2"; local match="$3"
+  local norm_path; norm_path="$(csa_normalize_path "$file_path")"
+  local canon; canon="$(_csa_squeeze_excerpt "$match")"
   local full; full="$(csa_sha256 "${rule_id}|${norm_path}|${canon}")"
   printf 'FUID-%s' "${full:0:8}"
 }

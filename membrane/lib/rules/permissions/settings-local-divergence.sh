@@ -41,7 +41,7 @@ detect() {
         local found
         found="$(jq --arg e "$entry" '.permissions.allow[]? // empty | select(. == $e)' "$sibling" 2>/dev/null)"
         if [[ -z "$found" ]]; then
-          local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$entry")"
+          local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$entry")"
           jq -nc \
             --arg rule_id "$RULE_ID" \
             --arg file "$target_file" \

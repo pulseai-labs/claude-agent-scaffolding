@@ -327,8 +327,8 @@ _csa_enum_stderr_to_findings() {
         reason="${rest#* enabled but }"
         file="@plugin:$key"
         fuid=""
-        if declare -F csa_finding_uid >/dev/null 2>&1; then
-          fuid="$(csa_finding_uid "PROVENANCE-002" "$file" "$key")"
+        if declare -F csa_finding_uid_raw >/dev/null 2>&1; then
+          fuid="$(csa_finding_uid_raw "PROVENANCE-002" "$file" "$key")"
         fi
         jq -nc --arg key "$key" --arg reason "$reason" --arg file "$file" --arg fuid "$fuid" '
           {rule_id: "PROVENANCE-002", file: $file, line: 0, offset: 0,

@@ -28,6 +28,7 @@ The scanner reports its own failures as findings, not as a clean read. SCANNER-0
 - **Critical + High**: shown with explicit counts AND alert tone ("⚠ N findings need attention").
 - **Medium + Low**: aggregated as totals; no per-finding detail unless `--verbose`.
 - **Info**: suppressed from chat by default; included in report file; surface in chat only with `--verbose`.
+- **Plugin test files and agent scratch** (a finding under an enabled plugin's `fixtures/` or `tests/`, or under the project's `.dagr/scratch/`): not listed in chat unless `--verbose`; one line after the table gives the count and the Critical, High and Medium split. Totals and severities are unchanged, and the report lists each with a `Group:` tag.
 
 Counts table at the top of chat output (mirrors SPEC §8.4 report header):
 
@@ -46,7 +47,7 @@ Counts table at the top of chat output (mirrors SPEC §8.4 report header):
 `state.json.findings` registry tracks `seen_in_runs`. After every audit:
 - For each `finding_uid` in the registry, increment `seen_in_runs` if seen in current run.
 - Compute `runs_since_last_seen = current_run_index - last_seen_run_index`, minus the runs in that window that were focused on another aspect (#429). Each `audit_history` entry records its `focus`: `all` for a full audit, which counts for every finding, or the one aspect a focused scan covered. A finding's aspect is its rule's directory under `lib/rules/`.
-- A run recorded before 0.1.7 (no `focus`) counts as a full run. A finding whose rule is not shipped (`SCANNER-*`, `TAMPER-*`) has no aspect and ages on every run.
+- A run recorded before 0.1.7 (no `focus`) counts as a full run. A `TAMPER-*` finding has no aspect and ages on every run. A `SCANNER-*` finding carries no `finding_uid`, so it never enters the registry.
 - If `runs_since_last_seen > 10`, evict the entry.
 - Evicted entries silently re-appear as NEW if rediscovered (acceptable for a "what changed recently" feature).
 

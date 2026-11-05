@@ -42,7 +42,7 @@ detect() {
     | while read -r key; do
         # Check if key is in known-keys allowlist
         if ! grep -qxF "$key" "$_KNOWN_KEYS_FILE" 2>/dev/null; then
-          local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$key")"
+          local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$key")"
           jq -nc \
             --arg rule_id "$RULE_ID" \
             --arg file "$target_file" \
