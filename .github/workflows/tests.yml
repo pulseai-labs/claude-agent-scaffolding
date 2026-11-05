@@ -136,6 +136,9 @@ jobs:
       - name: root README gate (repo-root)
         run: bash tests/test-root-readme.sh
 
+      - name: community files gate (repo-root)
+        run: bash tests/test-community-files.sh
+
       - name: retired-plugin gate (repo-root)
         # Each retired plugin (#948 and later): no tracked path, no catalog entry and no tree-wide
         # reference outside CHANGELOG history and the sanctioned survivors listed in the

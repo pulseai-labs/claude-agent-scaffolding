@@ -1,0 +1,58 @@
+name: Bug report
+description: A plugin does something its docs or its tests say it should not.
+labels: [bug]
+body:
+  - type: dropdown
+    id: plugin
+    attributes:
+      label: Plugin
+      options:
+          - baton
+          - crew
+          - membrane
+          - merge-bar
+          - molt
+          - omp-roles
+          - ossify
+          - remodel
+          - sage
+          - seat-mods
+          - workspace-init
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: The version in the plugin's manifest, or the release tag you installed.
+      placeholder: e.g. 1.36.7
+    validations:
+      required: true
+  - type: dropdown
+    id: harness
+    attributes:
+      label: Harness
+      options:
+          - Claude Code
+          - Codex
+          - OMP
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The command or skill you ran, and what it did. Paste output as text.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The smallest sequence that shows the problem.
