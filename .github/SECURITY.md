@@ -3,9 +3,7 @@
 ## Reporting a vulnerability
 
 Report it privately through GitHub: open the repository's **Security** tab and choose **Report a
-vulnerability**. GitHub shows the report only to the repository's administrators and security
-managers. Do not open a public issue or pull request
-for it.
+vulnerability**. Do not open a public issue or pull request for it.
 
 Include the plugin, its version, the harness it ran on (Claude Code, Codex or OMP), and the steps
 that show the problem.
@@ -13,16 +11,17 @@ that show the problem.
 ## Supported versions
 
 Each plugin is released on its own, with tags such as `ossify-v1.36.7`, from one line of history:
-`main`. There are no maintenance branches, so a fix ships in the plugin's next release. Before you report a problem in a plugin, update it to
-the version on `main`.
+`main`. There are no maintenance branches, so a fix ships in the plugin's next release. Before you
+report a problem in a plugin, update it to the version on `main`.
 
 ## Scope
 
 These plugins run on your machine with your user's privileges. Most of what they do happens inside
 a coding agent, under the permissions you give it, but not all of it:
 
-- hooks run on the harness's own events, outside the agent's tool prompts: some are shell commands,
-  and some (molt's and seat-mods') are TypeScript modules the harness loads in-process;
+- hooks and mods run on events, outside the agent's tool prompts: crew's and membrane's hooks are
+  shell commands on the harness's events, molt and seat-mods are TypeScript modules the harness
+  loads, and workspace-init installs a git `commit-msg` hook that runs on every commit;
 - some plugins ship command-line tools (`oss`, `mb`, `crew-run`, `baton`, `omp-seat` and others)
   that the harness puts on `PATH` or that you link there, and that you or a script can run directly;
 - baton installs a systemd user timer that runs `baton tick` without an agent asking for it, and a

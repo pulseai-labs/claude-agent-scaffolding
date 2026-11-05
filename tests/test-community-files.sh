@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Community files gate (repo polish, 2026-11) — the mechanical facts of .github/'s community files.
 # Each fact prints its own finding:
-#   missing         CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md and both issue forms exist;
+#   missing         CONTRIBUTING.md, SECURITY.md, CODE_OF_CONDUCT.md, both issue forms and config.yml exist;
 #   plugin-options  each issue form's Plugin dropdown lists exactly the plugins in the Claude Code
 #                   and OMP catalogs (.claude-plugin/ and .omp-plugin/marketplace.json), plus the one
 #                   fixed option "$OTHER", so a new or retired plugin cannot leave the forms behind;
@@ -59,6 +59,7 @@ check_tree() (
   cd "$1" || { echo "setup: cannot enter $1"; exit 0; }
   LINKROOT="${LINKROOT:-$PWD}"
   for f in $DOCS $FORMS $CONFIG; do [ -s "$f" ] || echo "missing: $f"; done
+  command -v ruby >/dev/null 2>&1 || echo "plugin-options: ruby is not installed; the issue forms cannot be parsed"
 
   cat="$(jq -r '.plugins[].name' .claude-plugin/marketplace.json .omp-plugin/marketplace.json 2>/dev/null | sort -u)"
   [ -n "$cat" ] || echo "plugin-options: no plugin read from the catalogs"
