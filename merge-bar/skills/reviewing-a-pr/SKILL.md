@@ -1,6 +1,6 @@
 ---
 name: reviewing-a-pr
-description: Use when reviewing a PR, re-reviewing one after a fix push, or seated as a PR's reviewer — reports every defect as a class with every site in the repo, each sorted against the merge bar in the PR's own body, both axes (standards, and the Claim or spec) in parallel fresh-context subagents, coverage stated per file; round 2+ reviews only the fix diff plus each prior class's closure. Reports only — never posts, commits, edits or checks out; writes only the report and, with `run`, its own axis subdirectory.
+description: Use when reviewing a PR, re-reviewing one after a fix push, or seated as a PR's reviewer — reports every defect as a class with every site in the repo, each sorted against the merge bar in the PR's own body, both axes (standards, and the Claim or spec) in parallel fresh-context subagents, coverage stated per file; round 2+ reviews only the fix diff plus each prior class's closure. Reports only — never posts, commits, edits or checks out; writes only the report, and with `run` each axis writes only in its own subdirectory.
 ---
 
 # Reviewing a pull request — classes against its merge bar
@@ -11,8 +11,8 @@ one site of a pattern guarantees a later round that finds the rest. **Round 2 re
 fix diff**: a fresh read of the whole PR each round re-samples it and brings findings round 1
 should have had. So round 1 carries the burden — whole diff, every class, every site.
 
-You never post, commit, edit, push or check out; you write only the report and, with `run`, your own axis
-subdirectory. The launcher prepared the checkout; the work-PR session posts the report.
+You never post, commit, edit, push or check out; you write only the report; with `run`, each axis writes
+only in its own subdirectory. The launcher prepared the checkout; the work-PR session posts the report.
 
 **Inputs.** Each except `run` can come as a slash-command flag or be named in a brief:
 
@@ -25,7 +25,7 @@ subdirectory. The launcher prepared the checkout; the work-PR session posts the 
 | `verifier` — the verifier's report for this PR | none |
 | `head` — the SHA the checkout must equal | the PR's `headRefOid` |
 | `body` — a file replacing the PR's body | the PR's current body |
-| `run` — a scratch directory the launcher names | none (read only) |
+| `run` — an existing scratch directory the launcher names | none (read only) |
 
 ## 1. Resolve the inputs
 
@@ -142,5 +142,5 @@ clean over a gap. Write it to the report file the brief names, or return it.
   boundary and any network limit; the skill cannot.
 - A language server or check that builds obeys the host's build rules — reuse the project's
   existing build output, never start a cold build of your own.
-- Never post, commit, edit, push or check out. You write only the report and, with `run`, your
-  own axis subdirectory.
+- Never post, commit, edit, push or check out. You write only the report; with `run`, each axis
+  writes only in its own subdirectory.

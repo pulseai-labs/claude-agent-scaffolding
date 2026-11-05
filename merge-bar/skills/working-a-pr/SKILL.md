@@ -195,7 +195,7 @@ fix diff and each prior class's closure. Your own sweep is a pre-push check, not
   blocking class, followed back through the posted reports' `Extends:` lines, makes a chain of
   two or more: each fix adds a case to one mechanism that reads open input. Name the mechanism and the closed form that
   replaces it — refuse what it does not model, or an allowlist for a denylist; the change is
-  new commits, reviewed as round 1 of the changed part. The operator chooses at every stop (no "redesign once" cap here; ossify's agent-driven loop has one). Under a standing order (see **Standing orders**) that binds this role
+  new commits, reviewed as round 1 of the changed part. The operator chooses at every stop; this loop has no "redesign once" cap. Under a standing order (see **Standing orders**) that binds this role
   and settles the round stop, follow that order instead and record the
   choice in the stop report. Findings in that same round which
   sit on the PR's original commits are dispositioned on their merits alongside the stop report.

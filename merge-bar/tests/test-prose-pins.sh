@@ -32,8 +32,11 @@ pin "skills/working-a-pr/SKILL.md" \
 
 section "reviewing-a-pr run"
 pin "skills/reviewing-a-pr/SKILL.md" \
-  "the launcher must enforce" \
-  "naming run is the launcher's trust statement, and the network limit is the launcher's"
+  "boundary and any network limit; the skill cannot." \
+  "the network limit, with the write boundary, is the launcher's"
+pin "skills/reviewing-a-pr/SKILL.md" \
+  "(not a fork or unknown author)" \
+  "naming run vouches only for code that is not a fork or an unknown author's"
 pin "skills/reviewing-a-pr/SKILL.md" \
   "the PR's code and Evidence command are trusted" \
   "naming run states the PR's code and Evidence command are trusted"
@@ -57,7 +60,7 @@ pin "commands/review-pr.md" \
 
 section "working-a-pr operator chooses"
 pin "skills/working-a-pr/SKILL.md" \
-  "The operator chooses at every stop (no \"redesign once\" cap here" \
+  "The operator chooses at every stop; this loop has no \"redesign once\" cap." \
   "the operator chooses at every stop; merge-bar has no redesign-once cap"
 
 report
