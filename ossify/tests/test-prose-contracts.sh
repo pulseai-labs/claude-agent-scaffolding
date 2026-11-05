@@ -1994,7 +1994,7 @@ pin "$SKILLS/start/SKILL.md" '**Product source at `HEAD`:** author nothing and r
   "start §3's content gate still refuses product source at HEAD (#809)"
 pin "$SKILLS/start/SKILL.md" 'only propose; whether `HEAD` holds' \
   "start §3's probe proposes and the operator confirms what HEAD holds (#809)"
-pin "$SKILLS/start/SKILL.md" '`06-progress.md`'"'"'s spec-core-close entry records class H history (§3): per repo, commit count and what is at `HEAD`.' \
+pin "$SKILLS/start/SKILL.md" '`06-progress.md`'"'"'s spec-core-close entry records class H history (§3): per repo, commit count and what is at `HEAD`' \
   "start §13 records class H's history in 06-progress.md's spec-core-close entry (#809, #1040)"
 pin "$SKILLS/start/SKILL.md" 'note each such repo'"'"'s commit count and what is at `HEAD` for `06-progress.md`'"'"'s spec-core-close entry (§13).' \
   "start §3 routes class H history to 06-progress.md, not to an unnamed hand-off (#1040)"
@@ -2051,6 +2051,12 @@ pin "$SKILLS/adopt/references/plain-repo.md" 'saying `re-run with an operator`: 
   "plain-repo's class step can route a headless docs-only repo to /start, which refuses it (#1040)"
 pin "$SKILLS/adopt/SKILL.md" 'with no operator to answer, `plain-repo.md` §1 says when it refuses instead.' \
   "adopt's scope line sends every no-product repo to /start, headless too (#1040)"
+pin "$SKILLS/adopt/references/plain-repo.md" 'With no operator to answer, refuse a repo with any file at `HEAD` that you do not judge product' \
+  "plain-repo's class step does not refuse a headless repo with any file at HEAD that is not product (#1040)"
+pin "$SKILLS/start/references/reviewer-home.md" '`window <repo> <first PR>–<last PR>, <repo> <first PR>–<last PR>`' \
+  "reviewer-home §5's multi-repo window format is not stated per repo (#1007)"
+pin "$SKILLS/start/SKILL.md" 'where `06-progress.md` is an occupied destination the operator kept, that history goes in the §13 hand-off message to the operator, as a refusal'"'"'s does.' \
+  "start §13 leaves class H history nowhere when the operator keeps 06-progress.md (#1040)"
 if grep -Fq 'source or its own history' "$SKILLS/start/SKILL.md"; then
   T_FAIL=$((T_FAIL+1)); echo "FAIL: start §3's gate still refuses on history alone (#809)"
 else

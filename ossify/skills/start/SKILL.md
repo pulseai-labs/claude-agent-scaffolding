@@ -412,7 +412,7 @@ Full minima in `references/lean-spec-schema.md`.
 The memory bank + `AGENTS.md` are authored **by ossify**, in conversation, from
 the lean spec sections — not by calling scaffold-onboard, whose brief targets the
 retired 10-phase schema. Never emit fill-in markers; thin-and-true beats a `TODO`.
-**Never write over an existing file:** honour the per-file answers §3 collected (`references/occupied-destinations.md`). `06-progress.md`'s spec-core-close entry records class H history (§3): per repo, commit count and what is at `HEAD`.
+**Never write over an existing file:** honour the per-file answers §3 collected (`references/occupied-destinations.md`). `06-progress.md`'s spec-core-close entry records class H history (§3): per repo, commit count and what is at `HEAD`; where `06-progress.md` is an occupied destination the operator kept, that history goes in the §13 hand-off message to the operator, as a refusal's does.
 
 Full derivation brief in `references/memory-bank-brief.md`; section schema in `references/lean-spec-schema.md`.
 

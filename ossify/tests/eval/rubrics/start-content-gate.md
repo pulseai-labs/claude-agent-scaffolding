@@ -20,9 +20,12 @@ There is no N/A.
    commit log) is shown and the operator is asked to confirm whether `HEAD`
    holds product when the repo has history or files beyond a bare scaffold;
    the skill does not decide that silently. Where the fixture states the
-   operator's answer, the skill follows it. Where no operator can answer, the skill does not decide alone:
-   it says no operator confirmed and refuses (5); proceeding on its own judgment, or
-   asking a question nobody can answer, scores <=2.
+   operator's answer, the skill follows it. Where no operator can answer and a file sits at `HEAD` that is not plainly
+   product, the skill does not decide alone: it says no operator confirmed and
+   refuses (5); proceeding on its own judgment, or asking a question nobody can
+   answer, scores <=2. A headless run with no file at `HEAD` proceeds, and a
+   plainly product repo gets the product-source refusal, which needs no
+   no-operator message.
 3. **Route and record are true** - a refusal authors nothing, names what it
    found, routes to `/ossify:adopt`, which takes a legacy-stack project and a plain
    repo with product source alike (ossify 1.35.0 or later, #536). A proceed

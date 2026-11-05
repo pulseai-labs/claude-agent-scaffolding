@@ -1623,6 +1623,11 @@ _fields_ok doorsepFF "s/^Door: two-way.*/Door: one-way$(printf '\f')\/$(printf '
 _fields_ok dooror_VT "s/^Door: two-way.*/Door: one-way$(printf '\v')or$(printf '\v')two-way/"
 # adjacent control: one door, a tab-spaced separator, then other text still passes
 _fields_ok doorsepTabc "s/^Door: two-way.*/Door: one-way$(printf '\t')\/$(printf '\t')released with the tag./"
+# round 2 (PR #1097, CodeRabbit on spine-close.md): the or-form's second value takes the same word boundary as the first, so a
+# filled one-way line whose text begins `two-way-sync` is not read as the unfilled form; the real or-form halts stay.
+_fields_ok doorsecond 's/^Door: two-way.*/Door: one-way\/two-way-sync is disabled after migration./'
+_fields_ok doorsecond2 's/^Door: two-way.*/Door: one-way or two-wayfoo is disabled after migration./'
+_fields_halt doorsecond3 "$_door_msg" 's/^Door: two-way.*/Door: one-way\/two-way is disabled after migration./'
 # #1073 C4a (r2 C11a-c): the word ends only at a character outside the class
 _fields_halt doorcase "$_door_msg" 's/^Door: two-way.*/Door: two-wayFoo/'
 _fields_halt doordigit "$_door_msg" 's/^Door: two-way.*/Door: two-way2/'

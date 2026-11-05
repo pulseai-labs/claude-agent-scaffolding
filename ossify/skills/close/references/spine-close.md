@@ -466,14 +466,14 @@ $repo:$merge_sha"
         # the first problem, or nothing. A filled Door line is `Door: one-way`
         # or `Door: two-way` then the line's end or any character that is not
         # an ASCII letter or digit, `_` or `-`; the unfilled forms `one-way or two-way`
-        # (either order; or joined by `,`, `/` or `|`), `two-wayfoo` and `two-way-ish` fail. A template bar
+        # (either order; or joined by `,`, `/` or `|`; the second value takes the same word boundary), `two-wayfoo` and `two-way-ish` fail. A template bar
         # line occurring twice under Merge bar is reported as `dup:`.
         pr_bad="$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); for (i = 1; i <= n; i++) head["## " w[i]] = 1 }
                        NR == FNR { req[++r] = $0; want[$0] = 1; next }
                        $0 in head { sec = $0; next }
                        sec == "## Merge bar" && ($0 in want) { if (seen[$0]++ && d == "") d = $0 }
                        sec == "## Merge bar" && !($0 in want) && $0 ~ /^[0-9]+[a-z]*[.)] / && x == "" { x = $0 }
-                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way([ \t]+or[ \t]+|[ \t]*[,\/|][ \t]*)(one|two)-way/ { door = 1 }
+                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way([ \t]+or[ \t]+|[ \t]*[,\/|][ \t]*)(one|two)-way([^A-Za-z0-9_-]|$)/ { door = 1 }
                        END {
                          for (i = 1; i <= r; i++) if (!(req[i] in seen)) { print "line:" req[i]; exit }
                          if (x != "") { print "extra:" x; exit }
