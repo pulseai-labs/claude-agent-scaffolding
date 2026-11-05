@@ -429,7 +429,8 @@ the arm needs `--seats` with a row for each of `spine session`, `implementer`, `
 agent than the spine PR's `reviewer`. The briefs it names are prose; `common.md` is read first by
 every seat.
 
-The example needs at least one required check on its item and spine PRs: a PR with no checks reads
+The example needs at least one check that runs on its item PRs (into the spine branch) and its spine
+PR: a workflow limited to `branches: [main]` runs on no item PR. A PR with no checks reads
 as `none`, which is neither green nor red, so its unit waits in `item_wait`, `spine_wait` or `land`
 with no park and no notice.
 
@@ -488,6 +489,9 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   kept as `out/<wi>/review-<n>.md`; `review.md` is the latest and `review-prev.md` the one before.
   A review file whose line 1 is not a verdict or whose line 2 is not a `head:` is kept as
   `review-bad-<n>.md` and counts for nothing.
+- **An `item_ready` park** (the recorded `pr_url` is not a PR URL): fix the work item's `pr_url` in
+  the ossify state and in the run's `queue/<wi>.json`, which close copied it to, then
+  `baton unpark <run> <wi> --to item_ready`.
 - **An `item_moved` park** (the PR's head moved after its last review and `out/<wi>/review-2.md`
   exists): nothing was merged. `baton unpark <run> <wi> --to item_review` runs one more review of the
   new head; `--to land` parks again at once while the head still differs from the reviewed one. To

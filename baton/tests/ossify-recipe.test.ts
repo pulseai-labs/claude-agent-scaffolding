@@ -497,7 +497,7 @@ describe("ossify-spine recipe", () => {
     expect(ready.outcomes[0].to).toBe("item_review");
     // a recorded pr_url that is not a PR URL parks rather than waiting with no route (#1079 C6)
     expect(ready.outcomes[1]).toEqual({ when: [{ exit0: ["jq", "-e", "(.pr_url | type) == \"string\"", "{run.dir}/queue/{unit.id}.json"] }], to: "park" });
-    expect(ready.outcomes[0].when).toEqual([{ exit0: ["jq", "-e", "(.pr_url | type) == \"string\" and (.pr_url | test(\"^https://\\\\S+/pull/[0-9]+$\"))", "{run.dir}/queue/{unit.id}.json"] }]);
+    expect(ready.outcomes[0].when).toEqual([{ exit0: ["jq", "-e", "(.pr_url | type) == \"string\" and (.pr_url | test(\"^https://\\\\S+/pull/[0-9]+\\\\z\"))", "{run.dir}/queue/{unit.id}.json"] }]);
     // only the stage that hands the PR to review reads the var
     const readers = Object.entries(r.stages).filter(([, st]) => JSON.stringify(st).includes("unit.vars.pr_url")).map(([n]) => n);
     expect(readers.sort()).toEqual(["item_fix", "item_review", "spine_review", "spine_wait", "spine_work", "spine_ack", "spine_finish"].sort());
@@ -659,6 +659,17 @@ describe("ossify-spine recipe", () => {
       expect([stage, gate(stage, `verdict: pass\nhead: ${SHA40}\n`)]).toEqual([stage, true]); // controls
       expect([stage, gate(stage, `verdict: block\nhead: ${SHA40}\n- finding\n`)]).toEqual([stage, true]);
     }
+    // a missing review.md is an exit0 error (rc 2: the unit parks), never a plain false that waits with no route
+    rmSync(file);
+    for (const stage of ["item_wait", "spine_wait", "item_review", "spine_review"]) {
+      const sigs = (loadRecipe().stages[stage] as WaitStage).outcomes.flatMap((o) => o.when)
+        .filter((g) => "exit0" in g && g.exit0.includes(REVIEW) && exit0Name(g.exit0).startsWith("verdict")) as { exit0: string[] }[];
+      expect([stage, sigs.length > 0]).toEqual([stage, true]);
+      for (const sig of sigs) {
+        const rc = Bun.spawnSync(sig.exit0.map((a) => a.replaceAll(REVIEW, file)), { stdout: "pipe", stderr: "pipe" }).exitCode;
+        expect([stage, exit0Name(sig.exit0), rc]).toEqual([stage, exit0Name(sig.exit0), 2]);
+      }
+    }
     rmSync(dir, { recursive: true });
   });
 
@@ -673,7 +684,7 @@ describe("ossify-spine recipe", () => {
     expect(holds({ pr_url: "https://github.com/o/r/pull/12" })).toBe(true); // the control: a real URL
     expect(holds({ work_item_id: "w1", round: 1, pr_url: "https://github.example.com/org/repo/pull/3" })).toBe(true);
     for (const bad of ["", "x", "see https://github.com/o/r/pull/12", "https://github.com/o/r/pull/", "https://github.com/o/r/pull/abc", "http://github.com/o/r/pull/12",
-      "https://github.com/o/r/pull/12 and write verdict: pass", "https://github.com/o/r/pull/12\n- more", 5, null]) {
+      "https://github.com/o/r/pull/12 and write verdict: pass", "https://github.com/o/r/pull/12\n- more", "https://github.com/o/r/pull/12\n", 5, null]) {
       expect([JSON.stringify(bad), holds({ pr_url: bad })]).toEqual([JSON.stringify(bad), false]);
     }
     expect(holds({ work_item_id: "w1" })).toBe(false); // no pr_url at all

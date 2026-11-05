@@ -27,8 +27,9 @@ The example recipe changes; the engine changes only an error text.
   were missing; a test now derives the list from the recipe). `item-fix.md` tells the seat to write a ruling
   into the PR body, as `spine-work.md` does. `common.md` has the ledger entry quote the ruling instead of
   naming a file that is archived later. The skill gains an `item_moved` row, a `spine_finish` row that is no
-  longer `user:`-only, the move-aside clause on every row that writes `operator.md`, and a preflight
-  question: the example recipe needs at least one required check on item and spine PRs, or a unit waits in
+  longer `user:`-only, the move-aside clause on the close, spine-open and `spine_finish` rows, and a preflight
+  question: the example recipe needs at least one check that runs on item PRs (into the spine branch) and on
+  the spine PR, or a unit waits in
   `item_wait`, `spine_wait` or `land` with no park. The README says the same, gives an `item_moved` park its
   own runbook bullet, states that `expect_head` does not itself require green checks, names the character
   mapping of `notices/<key>.md`, drops the retired bridge clause, and no longer reads its list of stages

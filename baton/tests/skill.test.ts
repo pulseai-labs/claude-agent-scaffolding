@@ -222,13 +222,23 @@ describe("README and skill wording (baton 0.17.3)", () => {
     expect(["x".repeat(106)].filter((l) => l.length > 105)).toHaveLength(1); // control: the filter reports a long line
   });
 
+  test("an item_ready park has a runbook route and a notice row: fix pr_url in both places, then --to item_ready", () => {
+    const r = readme();
+    expect(r).toContain("**An `item_ready` park** (the recorded `pr_url` is not a PR URL)");
+    expect(r).toContain("in the run's `queue/<wi>.json`, which close copied it to, then `baton unpark <run> <wi> --to item_ready`");
+    expect(flatSkill()).toContain("| PR URL stop (`item_ready` park) |");
+    expect(flatSkill()).toContain("fix the item's `pr_url` in the ossify state and in `queue/<wi>.json`, then `--to item_ready`");
+  });
+
   test("the example recipe needs a check on item and spine PRs, and the skill's preflight asks (#1079 Q1)", () => {
     const r = readme();
-    expect(r).toContain("needs at least one required check on its item and spine PRs");
-    expect(r).toContain("a PR with no checks reads as `none`");
+    expect(r).toContain("needs at least one check that runs on its item PRs (into the spine branch)");
+    expect(r).toContain("`branches: [main]` runs on no item PR");
+    expect(r).toContain("A PR with no checks reads as `none`");
     expect(r).toContain("waits in `item_wait`, `spine_wait` or `land` with no park");
     const bul = flatSkill().split(" - **").find((b) => b.startsWith("Checks on the PRs.")) ?? "";
-    expect(bul).toContain("at least one required check on item and spine PRs");
+    expect(bul).toContain("at least one check that runs on item PRs (into the spine branch)");
+    expect(bul).toContain("not a recent PR's checks");
     expect(bul).toContain("with no park");
     expect(bul).toContain("is one question");
     expect(skill().indexOf("**Checks on the PRs.**")).toBeGreaterThan(skill().indexOf("## 1. Preflight"));

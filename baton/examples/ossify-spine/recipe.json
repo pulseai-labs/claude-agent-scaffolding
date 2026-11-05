@@ -259,7 +259,7 @@
     "item_ready": {
       "kind": "wait",
       "outcomes": [
-        { "when": [{ "exit0": ["jq", "-e", "(.pr_url | type) == \"string\" and (.pr_url | test(\"^https://\\\\S+/pull/[0-9]+$\"))", "{run.dir}/queue/{unit.id}.json"] }], "to": "item_review" },
+        { "when": [{ "exit0": ["jq", "-e", "(.pr_url | type) == \"string\" and (.pr_url | test(\"^https://\\\\S+/pull/[0-9]+\\\\z\"))", "{run.dir}/queue/{unit.id}.json"] }], "to": "item_review" },
         { "when": [{ "exit0": ["jq", "-e", "(.pr_url | type) == \"string\"", "{run.dir}/queue/{unit.id}.json"] }], "to": "park" }
       ]
     },
@@ -287,7 +287,7 @@
         {
           "when": [
             { "file": "{run.dir}/out/{unit.id}/review.md" },
-            { "exit0": ["sh", "-c", "sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: (pass|block)"] },
+            { "exit0": ["sh", "-c", "[ -r \"$1\" ] || exit 2; sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: (pass|block)"] },
             { "exit0": ["sh", "-c", "sed -n 2p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "head: [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]"] }
           ],
           "to": "item_wait"
@@ -298,21 +298,21 @@
       "kind": "wait",
       "outcomes": [
         { "when": [{ "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "merged" } }], "to": "land" },
-        { "when": [{ "file": "{run.dir}/out/{unit.id}/review-2.md" }, { "exit0": ["sh", "-c", "sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: block"] }], "to": "park" },
+        { "when": [{ "file": "{run.dir}/out/{unit.id}/review-2.md" }, { "exit0": ["sh", "-c", "[ -r \"$1\" ] || exit 2; sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: block"] }], "to": "park" },
         { "when": [{ "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "closed" } }], "to": "park" },
         { "when": [{ "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "conflict" } }], "to": "park" },
         { "when": [{ "file": "{run.dir}/out/{unit.id}/review-2.md" }, { "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_red" } }], "to": "park" },
         { "when": [{ "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_red" } }], "to": "item_fix" },
         {
           "when": [
-            { "exit0": ["sh", "-c", "sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: block"] },
+            { "exit0": ["sh", "-c", "[ -r \"$1\" ] || exit 2; sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: block"] },
             { "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_green" } }
           ],
           "to": "item_fix"
         },
         {
           "when": [
-            { "exit0": ["sh", "-c", "sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: pass"] },
+            { "exit0": ["sh", "-c", "[ -r \"$1\" ] || exit 2; sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: pass"] },
             { "pr": { "url": ["env", "-C", "{param.ai_root}", "{param.oss}", "get", ".work_items[] | select(.id == \"{unit.id}\") | .pr_url"], "test": "checks_green" } }
           ],
           "to": "land"
@@ -402,7 +402,7 @@
         {
           "when": [
             { "file": "{run.dir}/out/{unit.id}/review.md" },
-            { "exit0": ["sh", "-c", "sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: (pass|block)"] }
+            { "exit0": ["sh", "-c", "[ -r \"$1\" ] || exit 2; sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: (pass|block)"] }
           ],
           "to": "spine_wait"
         }
@@ -417,14 +417,14 @@
         { "when": [{ "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "checks_red" } }], "to": "spine_work" },
         {
           "when": [
-            { "exit0": ["sh", "-c", "sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: block"] },
+            { "exit0": ["sh", "-c", "[ -r \"$1\" ] || exit 2; sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: block"] },
             { "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "checks_green" } }
           ],
           "to": "spine_work"
         },
         {
           "when": [
-            { "exit0": ["sh", "-c", "sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: pass"] },
+            { "exit0": ["sh", "-c", "[ -r \"$1\" ] || exit 2; sed -n 1p \"$1\" | grep -qxE \"$2\"", "sh", "{run.dir}/out/{unit.id}/review.md", "verdict: pass"] },
             { "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "checks_green" } },
             { "pr": { "url": ["printf", "%s", "{unit.vars.pr_url}"], "test": "mergeable" } }
           ],
