@@ -260,7 +260,7 @@
       "kind": "wait",
       "outcomes": [
         { "when": [{ "exit0": ["jq", "-e", "(.pr_url | type) == \"string\" and (.pr_url | test(\"^https://\\\\S+/pull/[0-9]+\\\\z\"))", "{run.dir}/queue/{unit.id}.json"] }], "to": "item_review" },
-        { "when": [{ "exit0": ["jq", "-e", "(.pr_url | type) == \"string\"", "{run.dir}/queue/{unit.id}.json"] }], "to": "park" }
+        { "when": [{ "exit0": ["jq", "-e", ".pr_url != null", "{run.dir}/queue/{unit.id}.json"] }], "to": "park" }
       ]
     },
     "item_review": {

@@ -496,7 +496,7 @@ describe("ossify-spine recipe", () => {
     expect(ready.outcomes).toHaveLength(2);
     expect(ready.outcomes[0].to).toBe("item_review");
     // a recorded pr_url that is not a PR URL parks rather than waiting with no route (#1079 C6)
-    expect(ready.outcomes[1]).toEqual({ when: [{ exit0: ["jq", "-e", "(.pr_url | type) == \"string\"", "{run.dir}/queue/{unit.id}.json"] }], to: "park" });
+    expect(ready.outcomes[1]).toEqual({ when: [{ exit0: ["jq", "-e", ".pr_url != null", "{run.dir}/queue/{unit.id}.json"] }], to: "park" });
     expect(ready.outcomes[0].when).toEqual([{ exit0: ["jq", "-e", "(.pr_url | type) == \"string\" and (.pr_url | test(\"^https://\\\\S+/pull/[0-9]+\\\\z\"))", "{run.dir}/queue/{unit.id}.json"] }]);
     // only the stage that hands the PR to review reads the var
     const readers = Object.entries(r.stages).filter(([, st]) => JSON.stringify(st).includes("unit.vars.pr_url")).map(([n]) => n);
@@ -696,7 +696,9 @@ describe("ossify-spine recipe", () => {
       return Bun.spawnSync(a.map((x) => x.replaceAll("{run.dir}/queue/{unit.id}.json", file)), { stdout: "pipe", stderr: "pipe" }).exitCode === 0;
     };
     expect(park.to).toBe("park");
-    for (const bad of ["", "x", "see https://github.com/o/r/pull/12"]) expect([bad, parks({ pr_url: bad })]).toEqual([bad, true]);
+    for (const bad of ["", "x", "see https://github.com/o/r/pull/12", 5, true, ["https://github.com/o/r/pull/1"], { a: 1 }]) {
+      expect([JSON.stringify(bad), parks({ pr_url: bad })]).toEqual([JSON.stringify(bad), true]);
+    }
     expect(parks({ work_item_id: "w1" })).toBe(false); // the control: nothing recorded yet keeps waiting
     expect(parks({ pr_url: null })).toBe(false);
     rmSync(dir, { recursive: true });

@@ -16,7 +16,7 @@ The example recipe changes; the engine changes only an error text.
     `review.md` only. A later `verdict: block` line under a passing review no longer routes it, and a review
     whose line 1 is not a verdict no longer passes the gate (#1079 C5).
   - `item_ready` waits for a `pr_url` shaped like `https://<host>/.../pull/<n>`, not any string, before the
-    URL reaches the reviewer's message. A recorded `pr_url` of any other shape parks the unit in
+    URL reaches the reviewer's message. A recorded `pr_url` of any other shape or type parks the unit in
     `item_ready` instead of waiting with no route (#1079 C6).
   - A `review.md` that fails the line-1 and line-2 check is kept as `review-bad-<n>.md`. It no longer counts
     toward the three-review cap and is no longer copied to `review-prev.md` (#1079 C1).
