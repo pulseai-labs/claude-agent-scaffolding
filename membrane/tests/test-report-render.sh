@@ -211,6 +211,21 @@ test_group_scratch_anchor_is_the_project_root() {
   [[ "$out" != *"in plugin fixtures/tests"* ]] || { printf '    a nested scratch is grouped\n' >&2; return 1; }
 }
 
+test_group_total_equals_the_sum_of_the_buckets() {
+  export CSA_PROJECT_ROOT="$_P_ROOT"
+  local f out
+  f="$(csa_report_assign_display_ids "$(jq -nc --arg a "$_P_ROOT/.dagr/scratch/z.md" '
+    {rule_id:"X-1",file:$a,line:1,offset:0,preview:"p",severity:"bogus",finding_uid:"FUID-11111111",state:"NEW"},
+    {rule_id:"X-2",file:$a,line:2,offset:0,preview:"p",finding_uid:"FUID-22222222",state:"NEW"},
+    {rule_id:"X-3",file:$a,line:3,offset:0,preview:"p",severity:"medium",finding_uid:"FUID-33333333",state:"NEW"}')" "2026-11-05")"
+  out="$(csa_report_render_chat "$f")"
+  assert_contains "$out" "3 findings in plugin fixtures/tests and agent scratch copies (0 critical, 0 high, 1 medium, 2 other); listed in the report" "unknown and missing severity are other" || return 1
+  # control: no unknown severity, no other bucket
+  f="$(csa_report_assign_display_ids "$(jq -nc --arg a "$_P_ROOT/.dagr/scratch/z.md" '{rule_id:"X-3",file:$a,line:3,offset:0,preview:"p",severity:"medium",finding_uid:"FUID-33333333",state:"NEW"}')" "2026-11-05")"
+  out="$(csa_report_render_chat "$f")"
+  [[ "$out" != *other* ]] || { printf '    an other bucket with nothing in it: %s\n' "$out" >&2; return 1; }
+}
+
 test_group_relative_scratch_path_is_grouped() {
   export CSA_PROJECT_ROOT="$_P_ROOT"
   local f; f="$(csa_report_assign_display_ids "$(jq -nc '{rule_id:"X-1",file:".dagr/scratch/a/n.md",line:1,offset:0,preview:"p",severity:"high",finding_uid:"FUID-99999999",state:"NEW"}')" "2026-11-05")"
@@ -266,6 +281,7 @@ csa_test_run test_group_does_not_change_the_totals     || _csa_failed=$((_csa_fa
 csa_test_run test_group_controls_own_tests_listed_and_empty_group_silent || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_group_without_the_path_normalizer_lists_everything || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_group_scratch_anchor_is_the_project_root || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_group_total_equals_the_sum_of_the_buckets || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_group_relative_scratch_path_is_grouped || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_group_line_prints_for_info_only_and_singular || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_group_suppressed_is_not_counted_and_verbose_lists_all || _csa_failed=$((_csa_failed + 1))

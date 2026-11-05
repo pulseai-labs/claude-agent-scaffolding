@@ -85,7 +85,7 @@ _csa_finding_group() {
 
 # _csa_group_count_line <findings_jsonl> — one line, or nothing when no non-suppressed finding is in a group.
 _csa_group_count_line() {
-  local findings_jsonl="$1" line file sev st n=0 c=0 h=0 m=0 l=0 i=0 g
+  local findings_jsonl="$1" line file sev st n=0 c=0 h=0 m=0 l=0 i=0 o=0 g
   [[ -n "$findings_jsonl" ]] || return 0
   # Same extraction as the chat list (jq -r .file per line), so a finding is counted here exactly when it is not listed there.
   while IFS= read -r line; do
@@ -100,12 +100,14 @@ _csa_group_count_line() {
     case "$sev" in
       critical) c=$((c + 1)) ;; high) h=$((h + 1)) ;; medium) m=$((m + 1)) ;;
       low) l=$((l + 1)) ;; info) i=$((i + 1)) ;;
+      *) o=$((o + 1)) ;;   # a missing or unknown severity: the total stays the sum of what is printed
     esac
   done <<< "$findings_jsonl"
   [[ "$n" -gt 0 ]] || return 0
   local extra=""
   [[ "$l" -eq 0 ]] || extra="$extra, $l low"
   [[ "$i" -eq 0 ]] || extra="$extra, $i info"
+  [[ "$o" -eq 0 ]] || extra="$extra, $o other"
   printf '%d %s in plugin fixtures/tests and agent scratch copies (%d critical, %d high, %d medium%s); listed in the report\n\n' \
     "$n" "$([[ "$n" -eq 1 ]] && printf finding || printf findings)" "$c" "$h" "$m" "$extra"
 }

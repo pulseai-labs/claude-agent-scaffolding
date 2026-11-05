@@ -19,7 +19,7 @@ v0.1 catches **common, unobfuscated patterns**. A determined adversary who obfus
 2. **First-run gitignore bootstrap** (only if `.claude/audits/state.json` does not yet exist): `csa state_bootstrap_gitignore` to add `.claude/audits/` to `.gitignore` (idempotent; covers nested git repos, missing gitignore, unwritable files — see references/auto-fix-policy.md).
 3. Resolve scan targets: `csa enum_targets_all "$PWD"` (project `.claude/`, `CLAUDE.md`, `.claude-plugin/marketplace.json`, Codex surfaces such as `.codex/`, `AGENTS.md`, `.agents/plugins/marketplace.json`, `.codex-plugin/plugin.json`, readable `~/.codex/config.toml`, plus enabled Claude plugins per the algorithm in references/threat-model.md §enumerate).
 4. Run the deterministic rule engine: `csa rule_engine_scan_all "$PWD" "$focus"` iterates concrete targets × applicable rules. Keep its stderr line `csa: hook-coverage ...` (printed for `all` and `hooks` scans) for step 8.
-5. Each scanner finding already carries its durable `finding_uid`: the rule computes it; do not recompute it.
+5. Rule findings carry their durable `finding_uid`: the rule computes it; do not recompute it. SCANNER findings carry none, so they are reported on every run and not registered.
 6. Tag scanner findings NEW vs PERSISTED via `csa baseline_tag <findings>` against state.json's `findings` registry.
 7. Filter suppressed scanner findings via `csa suppress_filter <findings>` (unless `--show-suppressed`).
 8. Write the scanner report file `.claude/audits/<date>-<NN>.md` and return chat summary via `csa report_render_markdown` + `csa report_render_chat`; pass the hook-coverage line from step 4 as `metadata.scope_summary`.
