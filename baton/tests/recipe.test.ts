@@ -218,6 +218,18 @@ describe("validate", () => {
     expect(validate(relay()).ok).toBe(true);
   });
 
+  test("a merge stage whose outcomes is no object names every key it takes, moved included (#1079 C9)", () => {
+    const r = relay();
+    const name = Object.keys(r.stages).find((k) => r.stages[k].kind === "merge")!;
+    r.stages[name].outcomes = "park";
+    const msg = errorsOf(r).find((e) => e.startsWith(`stages.${name}.outcomes: `)) ?? "";
+    expect(msg).toContain("{merged, red, conflict}");
+    expect(msg).toContain("moved");
+    expect(msg).toContain("expect_head");
+    // control: a merge stage with outcomes as an object validates
+    expect(validate(relay()).ok).toBe(true);
+  });
+
   test("version other than 1", () => {
     const r = relay();
     r.version = 2;

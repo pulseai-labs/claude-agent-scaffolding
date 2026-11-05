@@ -117,8 +117,7 @@ Known limits on Orca (Orca 1.4.238, recorded in the host's fixtures):
 ## Answering a blocked park
 
 A blocked park's worker waits on a picker baton cannot answer through the host. Two commands let
-a caller (the operator, or a bridge acting on the operator's tap) answer it from outside the Orca
-terminal, with keys checked against a fresh screen:
+a caller answer it from outside the Orca terminal, with keys checked against a fresh screen:
 
     baton screen <run> <unit>
     baton answer <run> <unit> --park <at> --screen <n> <label>
@@ -215,7 +214,8 @@ only: baton has no Codex manifest.
 session registers itself for the run (it refuses when either is unset, or the run does not exist);
 `--clear` removes it, and a session stands down that way first. `notify-orchestrator` is the
 config's `notify` argv, not a command to type: for a run-scoped key (the key's first segment is a
-run on this host) it writes the notice to `<state>/runs/<run>/notices/<key>.md` (mode 600), then
+run on this host) it writes the notice to `<state>/runs/<run>/notices/<key>.md` (mode 600; each
+character of the key outside `A-Za-z0-9._-` becomes `_`), then
 sends the registered terminal one line, `[crew message baton] baton notice <key>: read <file> and
 follow running-a-spine-on-baton §Notices.`, with `orca terminal send --enter --wait-submit 5`. A
 queued receipt is a success. A host-wide key (`auth/<day>`, `down/<day>`), no pointer, an Orca
@@ -411,8 +411,9 @@ route `merged`, `red` and `conflict`.
 merge: exactly 40 lowercase hex characters and a newline. A PR whose head differs goes to
 `outcomes.moved`, which is then required, checked after the base and before the checks, and the merge
 is pinned to that head. An empty or malformed output parks the unit `expect head`, and an argv that
-fails three ticks running does too. It only adds a stop: green checks are still required, and a
-stage without `expect_head` is unchanged.
+fails three ticks running does too. It only adds a stop: `expect_head` does not itself require
+green checks (the stage's `checks` policy still decides), and a stage without `expect_head` is
+unchanged.
 
 ## Example: an ossify spine
 
@@ -427,6 +428,11 @@ the arm needs `--seats` with a row for each of `spine session`, `implementer`, `
 `driver` (see Seats). The item reviewer is its own role so the item PRs can go to a different
 agent than the spine PR's `reviewer`. The briefs it names are prose; `common.md` is read first by
 every seat.
+
+The example needs at least one check that runs on its item PRs (into the spine branch) and its spine
+PR: a workflow limited to `branches: [main]` runs on no item PR. A PR with no checks reads
+as `none`, which is neither green nor red, so its unit waits in `item_wait`, `spine_wait` or `land`
+with no park and no notice.
 
 Copy the example outside the plugin cache first, and pass that copy's `briefs` path: a plugin
 update moves the cache, and a run armed on the old path would lose its briefs.
@@ -449,7 +455,8 @@ update moves the cache, and a run armed on the old path would lose its briefs.
 Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 
 - **A stop parks the unit.** Read its `stop` file, write the ruling into the work item handoff's
-  `## Clarifications` (or into the file the stop names), delete the `stop` file, then
+  `## Clarifications` (or into the file the stop names; a close, spine-open or spine-finish stop
+  takes `operator.md`, as the ruling bullet below says), delete the `stop` file, then
   `baton unpark <run> <unit>`. If the stop file is still there, `unpark` renames it to
   `<path>.consumed-<iso>`, so it does not park the unit again.
 - **A round barrier is a stop.** A spine planned one round at a time halts the lane at the next
@@ -461,33 +468,43 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   `out/<unit>/operator.md` (`<unit>` is the work item for a close, `lane` for spine-open, `spine-pr`
   for spine-finish), replacing any file already there: the file holds one ruling, and a seat records
   a ruling when it applies it. Then `baton unpark <run> <unit>`; the stage's end archives it as
-  `operator-<n>.md`. Before `baton unpark <run> <unit> --to` a stage that names no Ruling file
-  (`implement`, `regap`, `verify`, `correct`, `spine_review`, `item_review`), move any `operator.md`
-  aside as the next free `operator-<n>.md`: `--to` runs no outcome hook, and the next seat that reads
-  the file (close, spine-open, `item_fix`, `spine_work` or spine-finish) would apply it. An implement, regap, verify or
-  correct stop takes its ruling in the handoff's `## Clarifications`; a lane round barrier is ruled
-  by planning the round.
+  `operator-<n>.md`. Before `baton unpark <run> <unit> --to` any stage other than the one the ruling
+  is for (for example `implement`, `regap`, `verify`, `correct`, `spine_review` or `item_review`,
+  which name no Ruling file), move any `operator.md` aside as the next free `operator-<n>.md`: `--to`
+  runs no outcome hook, and the next seat that reads the file (close, spine-open, `item_fix`,
+  `spine_work` or spine-finish) would apply it. An implement, regap, verify or correct stop takes its
+  ruling in the handoff's `## Clarifications`; a lane round barrier is ruled by planning the round.
 - **The item review stop.** Each item PR gets at most three reviews (`item_review`, then `item_wait`
-  reads the verdict and the checks; a head that moved after a pass goes to `item_moved`, which sends it
-  to review until `review-2.md` exists, then parks). A block or red checks after review 1 or 2 sends the item to
-  `item_fix`, one `working-a-pr` round that fixes the blocking findings and pushes once, then back to
-  review. A block, or red checks, once `out/<wi>/review-2.md` exists (review 3 has run) parks the
-  unit in `item_wait` with reason `outcome`, and baton notifies the orchestrator. Rule it one of two
-  ways. To fix more: write the ruling to `out/<wi>/operator.md` (replacing any file there), then
-  `baton unpark <run> <wi> --to item_fix`; `item_fix` applies it first and its end archives it as
-  `operator-<n>.md`. To accept the findings as known limits: `baton unpark <run> <wi> --to land`,
-  which merges the head of the last review and nothing newer (a head pushed since goes to
-  `item_moved`, which parks at once; `--to item_review` skips it and runs one more review). A later block parks again at once, because the review files keep counting. Each
-  review is kept as `out/<wi>/review-<n>.md`; `review.md` is the latest and `review-prev.md` the
-  one before.
+  reads the verdict and the checks; a head that moved after a pass goes to `item_moved`, which sends
+  it to review until `review-2.md` exists, then parks). A block or red checks after review 1 or 2
+  sends the item to `item_fix`, one `working-a-pr` round that fixes the blocking findings and pushes
+  once, then back to review. A block, or red checks, once `out/<wi>/review-2.md` exists (review 3 has
+  run) parks the unit in `item_wait` with reason `outcome`, and baton notifies the orchestrator. Rule
+  it one of two ways. To fix more: write the ruling to `out/<wi>/operator.md` (replacing any file
+  there), then `baton unpark <run> <wi> --to item_fix`; `item_fix` applies it first and its end
+  archives it as `operator-<n>.md`. To accept the findings as known limits:
+  `baton unpark <run> <wi> --to land`, which merges the head of the last review and nothing newer (a
+  head pushed since is an `item_moved` park, below; `--to item_review` skips it and runs one more
+  review). A later block parks again at once, because the review files keep counting. Each review is
+  kept as `out/<wi>/review-<n>.md`; `review.md` is the latest and `review-prev.md` the one before.
+  A review file whose line 1 is not a verdict or whose line 2 is not a `head:` is kept as
+  `review-bad-<n>.md` and counts for nothing.
+- **An `item_ready` park** (the recorded `pr_url` is not a PR URL): fix the work item's `pr_url` in
+  the ossify state and in the run's `queue/<wi>.json`, which close copied it to, then
+  `baton unpark <run> <wi> --to item_ready`.
+- **An `item_moved` park** (the PR's head moved after its last review and `out/<wi>/review-2.md`
+  exists): nothing was merged. `baton unpark <run> <wi> --to item_review` runs one more review of the
+  new head; `--to land` parks again at once while the head still differs from the reviewed one. To
+  finish by hand, merge the PR yourself, then `--to land` ends the unit.
 - **`item_wait` parks** on `closed` and `conflict` as well (reason `outcome`): reopen or resolve the
   conflict on the item branch (merge the base in; never rebase or force-push), push, then
   `baton unpark <run> <wi> --to item_review` so the new head is reviewed.
 - **A reversal before the spine merges**: write it to `out/spine-pr/operator.md` (the same file and
   archive; replace any file there), then
-  `baton unpark <run> spine-pr --to spine_work`; that round does it first, and the round's end archives the file as `out/spine-pr/operator-<n>.md`
-  (the work-PR seat also writes the ruling into the PR body, which the reviewer reads). The previous
-  round's review stays as `out/spine-pr/review-prev.md`, which the next review is told as `previous:`.
+  `baton unpark <run> spine-pr --to spine_work`; that round does it first, and the round's end
+  archives the file as `out/spine-pr/operator-<n>.md` (the work-PR seat also writes the ruling into
+  the PR body, which the reviewer reads). The previous round's review stays as
+  `out/spine-pr/review-prev.md`, which the next review is told as `previous:`.
 - **A spine PR conflict parks `spine-pr`** in `spine_wait`. Resolve it on the spine branch in the
   canonical root (merge the base in; never rebase or force-push), push, move
   `out/spine-pr/review.md` to `review-prev.md`, then `baton unpark <run> spine-pr --to spine_review`.
