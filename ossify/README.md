@@ -74,9 +74,11 @@ Each command is also a skill. On Codex and in OMP you reach it by its skill name
 | Fix a defect in shipped behaviour | `/ossify:patch <issues or a described defect>` | Ships the fix, or a small request from another project that it cannot fake, as a versioned patch off the default branch: reproduce first or acceptance criteria first, then a PR and a tag. It refuses, and names the route for, new scope or a request the requester can fake (the intake queue), a request larger than one work item (a spine), and a change nothing observes (close's direct-commit lane). |
 | Stress-test a plan, or audit a spec | `/ossify:challenge [artifact-path]` | With a file, it audits it adversarially. With a plan in the conversation, it grills you one question per turn. At close depth an external adversary joins when one is configured. The ceremonies call the same skill for their grill gates and their critic. |
 
-### In any repository
+### Without ossify set up
 
-These work in any repository, set up for ossify or not.
+These need no ossify setup. `handoff` and `handoff-resume` work in any
+repository; `work-pr` needs a repository that `gh` can reach, and `wayfinder` a GitHub issue
+tracker.
 
 | When you want to | Command | What it does |
 |---|---|---|
@@ -92,13 +94,13 @@ These work in any repository, set up for ossify or not.
   planned in detail beyond the next release.
 - **Spine.** A slice of one release that crosses the whole product and delivers something a user
   can do. A rare **internal enabler** spine has no user journey: it is admitted only when it names
-  the user-facing spine that consumes it, in this release or the next, and it adds `auto:` demo
+  the committed user-facing spine that consumes it, in this release or the next, and it adds `auto:` demo
   lines only. A spine is split into 1–5 **work items**, which run in **rounds** ordered by their
   dependencies. Each item gets its own worktree. An implementer builds it, and at close a verifier
   checks it, in a context that did not build it where the harness can dispatch one.
 - **Bone and flesh.** A **bone** spine creates or changes a bone: the skeleton itself, a boundary, a
   cross-cutting contract, data ownership or a stack decision. It gets the full ceremony: grill gates
-  at planning, a full close-depth audit, a full retro and an ADR for each bone its plan declares. A **flesh** spine lands entirely on
+  offered at planning, a full close-depth audit, a full retro and an ADR for each bone its plan declares. A **flesh** spine lands entirely on
   existing bones and gets the core close rows plus a light critic pass. A spine whose plan touches a
   registered bone's surface is a bone spine, whatever it was declared.
 - **Bones registry.** Each bone is an ADR with a touch surface: the file globs it covers.
@@ -109,12 +111,13 @@ These work in any repository, set up for ossify or not.
   takes on those controls as required work.
 - **Cumulative demo ledger.** Every spine adds at least one demo line. An `auto:` line is a command
   with an expected result, run again at every later spine close. A `user:` line is a journey, a verb
-  and an observable outcome, that a person walks at release close; a line that cannot be walked yet
-  is deferred to a named release. A user-facing spine must
+  and an observable outcome, that a person walks at its own spine's close and again, with every
+  other line, at each release close. A spine's own line that cannot be walked yet is deferred to a
+  named release. A user-facing spine must
   add at least one `user:` line.
 - **Fakes ledger.** A work item that adds or keeps a shell or a fake records it, with a reason, a
   replacement trigger and an expiry release. Fakes reduce breadth, not truth.
-- **Privacy posture.** `/ossify:start` decides what may become public. With no clear signal of
+- **Privacy posture.** `/ossify:start` and `/ossify:adopt` decide what may become public. With no clear signal of
   intent, the posture is fully private.
 - **Close.** One ceremony with three scopes. Its core rows run for every spine, bone or flesh; the
   class changes only the depth of the optional rows.
@@ -139,9 +142,10 @@ three. What differs is who builds a work item and who verifies it.
   0.2.0 or later), and work-item close dispatches its `verifier` agent (0.10.0 or later). Without those agents, `run-spine` with no
   flag refuses as it does on Codex, and close runs the verifier's checks itself.
 
-**An external executor.** `/ossify:run-spine <spine-id> --external-executor` hands each work item in
-a round to a procedure the caller supplies, as one `external_execution_request` per item, and takes
-back one `external_execution_result` each. It names no tool, product or model. With `--detach`
+**An external executor.** `/ossify:run-spine <spine-id> --external-executor` hands the round's work
+items to a procedure the caller supplies, as one `external_execution_request` per item still to
+build, and takes back one `external_execution_result` each. An item that is complete, abandoned or
+in flight gets no request. It names no tool, product or model. With `--detach`
 after it, the lane writes the round's requests and ends; the caller counts each execution and
 closes the items. The contract is
 [`skills/work-item/references/external-executor.md`](./skills/work-item/references/external-executor.md).
