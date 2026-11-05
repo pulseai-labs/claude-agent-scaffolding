@@ -1594,7 +1594,7 @@ _fields_halt doorelsewhere "$_door_msg" '/^Door: /d; s/^None\.$/Door: two-way/'
 # bare Door line is as valid as one with an explanation
 _fields_ok oneway 's/^Door: two-way/Door: one-way/'
 _fields_ok doorbare 's/^Door: two-way.*/Door: two-way/'
-# #1063 C1/C2: any non-word character ends the word; qualified lines from real
+# #1063 C1/C2: any character but an ASCII letter, digit, `_` or `-` ends the word; qualified lines from real
 # merged bodies pass, the unfilled forms still fail (adjacent controls)
 _fields_ok doorq1 's/^Door: two-way.*/Door: one-way after the tag - releases the plugin./'
 _fields_ok doorq2 's/^Door: two-way.*/Door: two-way for the code - a revert undoes it./'
@@ -1605,12 +1605,71 @@ _fields_ok doorparen 's/^Door: two-way.*/Door: two-way)/'
 _fields_ok doortab "s/^Door: two-way.*/Door: two-way$(printf '\t')because/"
 _fields_halt dooror2 "$_door_msg" 's/^Door: two-way.*/Door: two-way or one-way - pick one/'
 _fields_halt doorish "$_door_msg" 's/^Door: two-way.*/Door: two-way-ish/'
-# #1063 C3: a template bar line repeated under Merge bar halts naming the line
+# #1073 r2 C10: a Door line naming both doors joined by a separator other than
+# `or` is the unfilled form too (comma, slash, pipe; optional spaces)
+_fields_halt doorsep1 "$_door_msg" 's/^Door: two-way.*/Door: one-way\/two-way/'
+_fields_halt doorsep2 "$_door_msg" 's/^Door: two-way.*/Door: one-way, two-way/'
+_fields_halt doorsep3 "$_door_msg" 's/^Door: two-way.*/Door: one-way | two-way/'
+_fields_halt doorsep4 "$_door_msg" 's/^Door: two-way.*/Door: two-way , one-way - pick one/'
+# the or-form takes runs of whitespace; two spaces around `or` still halt
+_fields_halt doorsp2 "$_door_msg" 's/^Door: two-way.*/Door: one-way  or  two-way/'
+_fields_halt doorsptab "$_door_msg" "s/^Door: two-way.*/Door: one-way$(printf '\t')or$(printf '\t')two-way/"
+# #1073 C4a (r2 C11a-c): the word ends only at a character outside the class
+_fields_halt doorcase "$_door_msg" 's/^Door: two-way.*/Door: two-wayFoo/'
+_fields_halt doordigit "$_door_msg" 's/^Door: two-way.*/Door: two-way2/'
+_fields_halt doorunder "$_door_msg" 's/^Door: two-way.*/Door: two-way_x/'
+# adjacent controls for the separators: one door followed by a separator and other text
+_fields_ok doorsepc1 's/^Door: two-way.*/Door: two-way, a revert undoes it./'
+_fields_ok doorsepc2 's/^Door: two-way.*/Door: one-way \/ released with the tag./'
+_fields_ok doorsepc3 's/^Door: two-way.*/Door: two-way | a revert undoes it./'
+# #1073 C4b: `)` ends a numbered line too (`[.)]` -> `[.]` mutant); #1073 C5: a
+# numbered Evidence line is not a bar line (the Merge bar section ends at the next heading)
+_fields_halt_f extra2 "numbered line '3) also blocks a typo.'" "awk '{print} /^4\\. /{print \"3) also blocks a typo.\"}'"
+_fields_ok evidence-numbered 's/^Not run - fixture\.$/1. bash run-tests.sh/'
+# #1073 r2 C11e: a bar line quoted under ## Claim is not under ## Merge bar (control)
+_fields_ok barquoted $'s/^The tier spine lands\\.$/&\\\n2. makes the Claim above false;\\\nEverything else is non-blocking./' # backslash-newline: GNU and BSD sed
+# PR1069r1 C3: a template bar line repeated under Merge bar halts naming the line
 _fields_halt_f dupbar "repeats the merge-bar line '2. makes the Claim above false;'" "awk '{print} /^2\\. /{print}'"
 # #1063 C4: the fields file is a seat's Write-tool output, LF by contract; a CRLF
 # file (a Windows editor or tool touched it) halts naming the line endings
 # instead of reporting "lacks the heading" for a heading that is visibly there
 _fields_halt_f crlf "CRLF" "awk '{ printf \"%s\\r\\n\", \$0 }'"
+
+# #1073 r2 C12: the CRLF check fails closed when its awk cannot run. An awk shim
+# exits $2 on the CRLF program only; every other awk call runs the real awk.
+_awk_shim() { # $1=shim dir $2=exit code the shimmed awk returns $3=which program: crlf (default) or order
+  mkdir -p "$1"; _real_awk="$(command -v awk)"
+  cat > "$1/awk" <<'SHIM_EOF'
+#!/bin/sh
+case "__WHICH__:$1" in crlf:*'"\r"'*|order:*'"ok" : "no"'*) exit __RC__;; esac
+exec __AWK__ "$@"
+SHIM_EOF
+  sed -e "s|__RC__|$2|" -e "s|__AWK__|$_real_awk|" -e "s|__WHICH__|${3:-crlf}|" "$1/awk" > "$1/awk.tmp" && mv "$1/awk.tmp" "$1/awk"
+  chmod +x "$1/awk"
+}
+_awk_shim_run() { # $1=label $2=shim exit code $3=which program (see _awk_shim)
+  _pr_fixture "p1-$1"; mkdir -p "$PR_STATE/fields"
+  _valid_fields > "$PR_STATE/fields/canonical"
+  _awk_shim "$TMP/p1-$1-awk" "$2" "${3:-crlf}"
+  t_capture env "GH_STATE=$PR_STATE" "PATH=$TMP/p1-$1-awk:$GHSTUB:$PR_SHIM:$PATH" bash -c \
+    "set -euo pipefail; spine_id='r0.s5'; spine_slug='tier'; repo_base_branches='canonical:main'; pr_fields_dir='$PR_STATE/fields'; . '$MERGE_BLOCK'"
+}
+_awk_shim_run crlfrc2 2
+t_assert_rc 1 "P1-crlfrc2: a CRLF check whose awk errors halts the close"
+t_assert_contains "$T_OUT" "could not run the CRLF check" "P1-crlfrc2: ...with a message that says the check did not run"
+t_assert_eq 0 "$( [ -f "$PR_STATE/create_args" ] && echo 1 || echo 0 )" "P1-crlfrc2: ...and no PR is opened"
+# controls: awk rc 1 (no CR found) continues to the PR; rc 0 (CR found) halts as CRLF
+_awk_shim_run crlfrc1 1
+t_assert_rc 0 "P1-crlfrc1: a clean body (CRLF awk rc 1) continues"
+t_assert_eq 1 "$( [ -f "$PR_STATE/create_args" ] && echo 1 || echo 0 )" "P1-crlfrc1: ...and the PR is opened"
+_awk_shim_run crlfrc0 0
+t_assert_rc 1 "P1-crlfrc0: awk rc 0 (CR found) halts"
+t_assert_contains "$T_OUT" "has CRLF line endings" "P1-crlfrc0: ...with the CRLF message"
+# the heading-order check fails closed with its own message when its awk cannot run (#1073 r2 C12)
+_awk_shim_run orderrc2 2 order
+t_assert_rc 1 "P1-orderrc2: a heading-order check whose awk errors halts the close"
+t_assert_contains "$T_OUT" "could not run the heading-order check" "P1-orderrc2: ...with a message that says the check did not run"
+case "$T_OUT" in *"out of template order"*) T_FAIL=$((T_FAIL+1)); echo "FAIL: P1-orderrc2: the out-of-order message appeared";; *) T_PASS=$((T_PASS+1));; esac
 
 # P1c. A fields directory with no file for this repo halts before the push: a
 # PR opened without its repo's fields would reach review with no merge bar.

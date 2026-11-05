@@ -234,8 +234,9 @@ Merge bar section lacking any of the template's six lines (the lead line, the fo
 conditions, `Everything else is non-blocking.`) or carrying an extra numbered line,
 a template bar line repeated, or no filled `Door: one-way` or `Door: two-way` line under
 Merge danger (the word, then the line's end or any character that is not an ASCII letter or
-digit, `_` or `-`; `one-way or two-way` and `two-wayfoo` are unfilled); the bar and
-the Door line are read under their own headings only. The check runs
+digit, `_` or `-`; a line naming both doors joined by `or`, `,`, `/` or `|`, and `two-wayfoo`,
+are unfilled); the bar and the Door line are read under their own headings only. A CRLF or
+heading-order check whose awk cannot run halts too, saying so. The check runs
 per repo: a repo landed earlier in the same pass keeps its PR, and the re-run resumes it. Known limit: a
 stopping rule written in the raising-line slot, after `Everything else is
 non-blocking.`, passes; `working-a-pr` still judges by all four conditions. Without merge-bar,
@@ -443,29 +444,36 @@ $repo:$merge_sha"
         # the template (a root parity test keeps them equal), because the
         # template file is not reachable from here.
         pr_ff="$pr_fields_dir/$repo"
-        awk 'index($0, "\r") { found = 1 } END { exit !found }' "$pr_ff" \
-          && { echo "close: $pr_ff has CRLF line endings - rewrite it with LF line endings - halt"; exit 1; }
+        pr_rc=0
+        awk 'index($0, "\r") { found = 1 } END { exit !found }' "$pr_ff" || pr_rc=$?
+        case "$pr_rc" in
+          0) echo "close: $pr_ff has CRLF line endings - rewrite it with LF line endings - halt"; exit 1;;
+          1) ;;
+          *) echo "close: could not run the CRLF check (awk exited $pr_rc) on $pr_ff - halt"; exit 1;;
+        esac
         for pr_h in 'Claim' 'Scope' 'Known limits' 'Merge danger' 'Merge bar' 'Evidence' 'Closes'; do
           grep -Fxq -- "## $pr_h" "$pr_ff" \
             || { echo "close: $pr_ff lacks the heading '## $pr_h' - fix the fields file - halt"; exit 1; }
         done
-        [ "$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); i = 1 }
+        pr_ord="$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); i = 1 }
                   i <= n && $0 == ("## " w[i]) { i++ }
-                  END { print (i > n) ? "ok" : "no" }' "$pr_ff")" = ok ] \
+                  END { print (i > n) ? "ok" : "no" }' "$pr_ff")" \
+          || { echo "close: could not run the heading-order check on $pr_ff - halt"; exit 1; }
+        [ "$pr_ord" = ok ] \
           || { echo "close: $pr_ff has the seven headings out of template order - fix the fields file - halt"; exit 1; }
         # One pass reads the bar and the Door line each under its own heading
         # (the template is stdin, the fields file the second input), and prints
         # the first problem, or nothing. A filled Door line is `Door: one-way`
         # or `Door: two-way` then the line's end or any character that is not
         # an ASCII letter or digit, `_` or `-`; the unfilled forms `one-way or two-way`
-        # (either order), `two-wayfoo` and `two-way-ish` fail. A template bar
+        # (either order; or joined by `,`, `/` or `|`), `two-wayfoo` and `two-way-ish` fail. A template bar
         # line occurring twice under Merge bar is reported as `dup:`.
         pr_bad="$(awk 'BEGIN { n = split("Claim|Scope|Known limits|Merge danger|Merge bar|Evidence|Closes", w, "|"); for (i = 1; i <= n; i++) head["## " w[i]] = 1 }
                        NR == FNR { req[++r] = $0; want[$0] = 1; next }
                        $0 in head { sec = $0; next }
                        sec == "## Merge bar" && ($0 in want) { if (seen[$0]++ && d == "") d = $0 }
                        sec == "## Merge bar" && !($0 in want) && $0 ~ /^[0-9]+[a-z]*[.)] / && x == "" { x = $0 }
-                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way +or +(one|two)-way/ { door = 1 }
+                       sec == "## Merge danger" && $0 ~ /^Door: (one-way|two-way)([^A-Za-z0-9_-]|$)/ && $0 !~ /^Door: (one|two)-way([[:space:]]+or[[:space:]]+| *[,\/|] *)(one|two)-way/ { door = 1 }
                        END {
                          for (i = 1; i <= r; i++) if (!(req[i] in seen)) { print "line:" req[i]; exit }
                          if (x != "") { print "extra:" x; exit }

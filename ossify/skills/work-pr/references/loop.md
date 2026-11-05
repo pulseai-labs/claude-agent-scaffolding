@@ -137,8 +137,9 @@ normal terminus. This one is categorical, not a round count:
 - **Rounds stop shrinking *and* the fixes are generating the findings.** When a
   round is mostly fallout from the previous round's own fixes, more rounds will
   not converge; the shape of the change is wrong. Cut it, narrow it, or change its
-  design — offered at every such stop, recommended when every fix extends one
-  mechanism on open input; do not restructure twice, and say so.
+  design — the design change offered at every such stop until the change has
+  been redesigned once, recommended when every fix extends one mechanism on open
+  input; do not restructure twice, and say so.
 - **A claim the change cannot honour ends the loop by being unclaimed.**
   Designing under review pressure at round N produces round N+1; a documented
   refusal is complete, an unhonoured promise is not. Unclaiming is two edits,
@@ -172,7 +173,7 @@ deferred; a finding that it **admits what it cannot handle** is a fix.
 Incoherence this diff introduced is always this diff's to fix.
 
 Neither exit touches the P1 rail. A P1 is fixed, evidence-refuted, or the
-change is cut. It is never merged. And neither exit bypasses staleness: cutting, narrowing, or
+change is cut. It is never merged. And neither exit bypasses staleness: cutting, narrowing, changing the design, or
 unclaiming lands commits like any other fix — prior verdicts go stale, the
 loop re-runs on the new head, and the reviewer signal must be complete on the
 head that carries the final shape before the terminus ask.
