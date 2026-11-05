@@ -4,12 +4,12 @@ Named `claude-security-audit` through 0.3.1.
 
 ## 0.4.1 (2026-11-05)
 
-The P3 sweep from #1068's review (#1072). No new rule; in the five rules that read hook entries (HOOK-001 to HOOK-005) and in the HOOK-006 chat count, failures that used to read as "nothing found" now say so. HOOK-006's own rule and the permissions and marketplace rules still read a jq failure as no finding.
+The P3 sweep from #1068's review (#1072). No new rule. Two failures that used to read as "nothing found" now say so: a jq error while one of the five rules that read hook entries (HOOK-001 to HOOK-005) reads an entry, and a failed HOOK-006 chat count. Other failures still read as no finding, among them HOOK-006's own rule and the permissions and marketplace rules on a jq failure, and a script the file-mode rules cannot read.
 
 ### Fixed
 - **A jq error while one of the five rules reads a hook entry is no longer a non-match.** `csa_hook_entry_command` returned rc 1 for both "not a command" and a jq failure; HOOK-001 to HOOK-004 and HOOK-005 therefore counted an unreadable entry as checked. A jq failure is now rc 2, passed through by those rules, so the engine reports a SCANNER-002. When the engine can still name the entry (its own `json_path` read succeeds), the SCANNER-002 names it and the coverage line counts it `unreadable`; when that read fails too, the SCANNER-002 carries no `json_path` and the entry stays counted as `checked`. A real non-match stays rc 1.
 - **A failed HOOK-006 count no longer reads as zero.** The chat summary printed nothing when its `jq` count failed (`|| echo 0`); it now prints `HOOK-006 count unavailable`.
-- **A trailing slash on `CSA_PROJECT_ROOT` no longer moves finding ids.** `csa_normalize_path` compared the raw value, so `<p>/` changed every uid under the project and suppressions resurfaced. It now strips every trailing slash before it compares (`/` stays `/`).
+- **A trailing slash on `CSA_PROJECT_ROOT` no longer moves finding ids.** `csa_normalize_path` compared the raw value, so `<p>/` changed every uid under the project and suppressions resurfaced. Under `<p>/`, a finding suppressed or saved under `<p>` now reads SUPPRESSED or PERSISTED there, where 0.4.0 read it NEW. It now strips every trailing slash before it compares (`/` stays `/`).
 - **A finding with no line prints the bare file.** SCANNER-002, PROVENANCE-002 and the other line-0 findings printed `file:0` (chat) and `file:0:0` (report); they now print `file`.
 - **Coverage:** `flagged` is documented, and pinned, as a subset of `checked`: an entry that one rule flags and another rule fails on is counted `unreadable`, so it is not `flagged` either; its finding still prints. A redundant `SCANNER-002` filter in the `flagged` definition is gone (no change in output).
 
