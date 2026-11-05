@@ -60,7 +60,7 @@ pin "commands/review-pr.md" \
 
 section "working-a-pr operator chooses"
 pin "skills/working-a-pr/SKILL.md" \
-  "The operator chooses at every stop; this loop has no \"redesign once\" cap." \
+  "The operator chooses at every stop that no standing order settles (next sentence), and no count" \
   "the operator chooses at every stop; merge-bar has no redesign-once cap"
 
 report
