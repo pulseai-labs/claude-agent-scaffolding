@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # lib/report-render.sh — chat summary + markdown report file for membrane.
-# Requires: lib/helpers.sh (csa_realpath)
+# Requires: lib/helpers.sh (csa_realpath); lib/fingerprint.sh (csa_normalize_path), used only to group findings.
 # Bash 3.2+ compatible (macOS portability).
 
 # ---------------------------------------------------------------------------
@@ -44,6 +44,70 @@ _csa_severity_label() {
     info)     printf 'Info'     ;;
     *)        printf '%s' "$1"  ;;
   esac
+}
+
+# ---------------------------------------------------------------------------
+# Finding groups (#1034). Two kinds of finding are folded into one count line in chat; the markdown
+# report still lists them at full severity, tagged with the group. Nothing here changes a count, a
+# severity, a state or a uid.
+#
+# _csa_finding_group <file> — prints the group tag of a finding's file, or nothing. THE one definition:
+#   "plugin fixtures/tests"  an enabled plugin's file with a `fixtures` or `tests` directory segment
+#                            anywhere in its path inside the plugin tree (csa_normalize_path's
+#                            @plugin:<plugin>[@<marketplace>]:<rest>; a file merely NAMED tests is not
+#                            in it). A plugin whose layout does not normalize (a local plugin, an
+#                            installPath outside the cache) is not grouped, so it stays listed.
+#   "agent scratch"          a file under the project's own `.dagr/scratch/` (project root:
+#                            CSA_PROJECT_ROOT, else the working directory).
+# A project's own `tests/` or `fixtures/` is NOT in a group. Anything that does not match is listed in
+# chat as before, and if csa_normalize_path is not loaded no plugin file is grouped (listed, never hidden).
+# Skill-first question 2: our own path shapes, a closed set.
+# ---------------------------------------------------------------------------
+_csa_finding_group() {
+  local f="$1" norm rest root="${CSA_PROJECT_ROOT:-$PWD}"
+  if declare -F csa_normalize_path >/dev/null 2>&1; then
+    norm="$(csa_normalize_path "$f")"
+    if [[ "$norm" == @plugin:* ]]; then
+      rest="${norm#@plugin:}"; rest="${rest#*:}"
+      if [[ "/$rest" == */fixtures/* || "/$rest" == */tests/* ]]; then
+        printf 'plugin fixtures/tests'
+        return 0
+      fi
+      return 0
+    fi
+  fi
+  while [[ "$root" == ?*/ ]]; do root="${root%/}"; done
+  if [[ "$f" == .dagr/scratch/* || "$f" == "$root"/.dagr/scratch/* ]]; then
+    printf 'agent scratch'
+  fi
+  return 0
+}
+
+# _csa_group_count_line <findings_jsonl> — one line, or nothing when no non-suppressed finding is in a group.
+_csa_group_count_line() {
+  local findings_jsonl="$1" line file sev st n=0 c=0 h=0 m=0 l=0 i=0 g
+  [[ -n "$findings_jsonl" ]] || return 0
+  # Same extraction as the chat list (jq -r .file per line), so a finding is counted here exactly when it is not listed there.
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    st="$(printf '%s' "$line" | jq -r '.state // "NEW"')"
+    [[ "$st" != "SUPPRESSED" ]] || continue
+    file="$(printf '%s' "$line" | jq -r '.file // ""')"
+    g="$(_csa_finding_group "$file")"
+    [[ -n "$g" ]] || continue
+    sev="$(printf '%s' "$line" | jq -r '.severity // empty')"
+    n=$((n + 1))
+    case "$sev" in
+      critical) c=$((c + 1)) ;; high) h=$((h + 1)) ;; medium) m=$((m + 1)) ;;
+      low) l=$((l + 1)) ;; info) i=$((i + 1)) ;;
+    esac
+  done <<< "$findings_jsonl"
+  [[ "$n" -gt 0 ]] || return 0
+  local extra=""
+  [[ "$l" -eq 0 ]] || extra="$extra, $l low"
+  [[ "$i" -eq 0 ]] || extra="$extra, $i info"
+  printf '%d %s in plugin fixtures/tests and agent scratch copies (%d critical, %d high, %d medium%s); listed in the report\n\n' \
+    "$n" "$([[ "$n" -eq 1 ]] && printf finding || printf findings)" "$c" "$h" "$m" "$extra"
 }
 
 # ---------------------------------------------------------------------------
@@ -188,6 +252,11 @@ csa_report_render_chat() {
     fi
   fi
 
+  # The group's findings are one count line, not listed one by one; --verbose lists them in full.
+  if [[ "$verbose" != "true" ]]; then
+    _csa_group_count_line "$findings_jsonl"
+  fi
+
   # List critical + high findings explicitly (non-suppressed only, unless verbose).
   local show_severities="critical high"
   if [[ "$verbose" == "true" ]]; then
@@ -206,6 +275,9 @@ csa_report_render_chat() {
         fst="$(printf '%s' "$line" | jq -r '.state // "NEW"')"
         [[ "$fsev" == "$sev" ]] || continue
         if [[ "$verbose" == "true" ]] || [[ "$fst" != "SUPPRESSED" ]]; then
+          if [[ "$verbose" != "true" && -n "$(_csa_finding_group "$(printf '%s' "$line" | jq -r '.file // ""')")" ]]; then
+            continue
+          fi
           sev_findings+=("$line")
         fi
       done <<< "$findings_jsonl"
@@ -306,6 +378,8 @@ csa_report_render_markdown() {
         else
           printf '**File:** %s:%s:%s\n' "$file" "$line_no" "$offset"
         fi
+        local grp; grp="$(_csa_finding_group "$file")"
+        [[ -z "$grp" ]] || printf '**Group:** %s\n' "$grp"
         printf '**Preview:** `%s`\n' "$preview"
         printf '**finding_uid:** `%s`\n\n' "$fuid"
         printf -- '---\n\n'

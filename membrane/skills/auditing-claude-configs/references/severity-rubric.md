@@ -28,6 +28,7 @@ The scanner reports its own failures as findings, not as a clean read. SCANNER-0
 - **Critical + High**: shown with explicit counts AND alert tone ("⚠ N findings need attention").
 - **Medium + Low**: aggregated as totals; no per-finding detail unless `--verbose`.
 - **Info**: suppressed from chat by default; included in report file; surface in chat only with `--verbose`.
+- **Plugin test files and agent scratch** (a finding under an enabled plugin's `fixtures/` or `tests/`, or under the project's `.dagr/scratch/`): not listed in chat unless `--verbose`; one line after the table gives the count and the Critical, High and Medium split. Totals and severities are unchanged, and the report lists each with a `Group:` tag.
 
 Counts table at the top of chat output (mirrors SPEC §8.4 report header):
 

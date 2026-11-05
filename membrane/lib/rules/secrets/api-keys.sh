@@ -35,7 +35,7 @@ detect() {
   printf '%s\n' "$hits" \
     | while IFS=: read -r line_no match; do
         local preview; preview="$(csa_redact "$match")"
-        local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$match")"
+        local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$match")"
         jq -nc \
           --arg rule_id "$RULE_ID" \
           --arg file "$target_file" \
