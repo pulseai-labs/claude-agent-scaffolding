@@ -2270,8 +2270,17 @@ pin "$_PRW_WP" "Never auto-merge." \
 
 # merge-bar 0.10.1 / ossify 1.36.5 (#1061 C8, C9) - the fallback loop's second exit offers the
 # design change at every stop and recommends it on one mechanism over open input, as merge-bar's stop does.
-pin "$_PRW_LOOP" 'design — offered at every such stop, recommended when every fix extends one' \
-  "loop.md's second exit does not offer the design change at every stop (#1061 C9)"
+pin "$_PRW_LOOP" 'recommended when every fix extends one' \
+  "loop.md's second exit does not recommend the design change when every fix extends one mechanism (#1061 C9)"
+# ossify 1.36.8 (#1071 C4, orchestrator ruling: keep the cap): the offer is "at every such stop
+# until the change has been redesigned once", so it agrees with "do not restructure twice", and
+# the staleness sentence lists changing the design among the ways out of the second exit.
+pin "$_PRW_LOOP" 'offered at every such stop until the change has' \
+  "loop.md's second exit offers the design change at every stop with no end, against its own 'do not restructure twice' (#1071 C4)"
+pin "$_PRW_LOOP" 'input; do not restructure twice, and say so.' \
+  "loop.md's second exit drops its cap on a second restructure (#1071 C4)"
+pin "$_PRW_LOOP" 'cutting, narrowing, changing the design, or' \
+  "loop.md's staleness sentence omits changing the design from the second exit's ways out (#1071 C4)"
 
 # --- /close <wi-id> --pr: the work item's PR instead of a local merge --------------
 # Control first: the default path (section 4's local merge) is byte-for-byte what it

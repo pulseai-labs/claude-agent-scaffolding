@@ -8,6 +8,10 @@ not "see its section below", and 1.15.0 drops "which is why it is listed above r
 Some versions have no entry. The GitHub releases tagged `ossify-v*` carry notes for the versions
 they cover.
 
+## 1.36.8
+
+Since 1.36.8 (#1073, #1071), spine close's fields check halts a `Door:` line that joins `one-way` and `two-way` with `,`, `/` or `|` (spaces optional) as well as `or` across any whitespace (a tab included), and the CRLF and heading-order checks halt with a message saying the check could not run when their awk fails, instead of passing the file on or naming the wrong problem. The fallback work-pr loop's second exit offers the design change at every such stop until the change has been redesigned once, agreeing with its "do not restructure twice", and lists changing the design among its ways out; both are pinned. The remaining changes pin behaviour already right (`two-wayFoo`, `two-way2`, `two-way_x`, a `3)` line, a numbered Evidence line, a bar line quoted under `## Claim`).
+
 ## 1.36.7
 
 Since 1.36.7, the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the pre-rename name; an entry under the new name wins. The marketplace was renamed (pulsestack rename). No other change.
