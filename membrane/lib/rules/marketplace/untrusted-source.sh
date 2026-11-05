@@ -40,7 +40,7 @@ detect() {
     | while IFS= read -r url; do
         # Flag if URL does not start with https://
         if [[ "$url" != https://* ]]; then
-          local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$url")"
+          local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$url")"
           jq -nc \
             --arg rule_id "$RULE_ID" \
             --arg file "$target_file" \

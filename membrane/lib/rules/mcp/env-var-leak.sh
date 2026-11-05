@@ -45,7 +45,7 @@ detect() {
     # Match secret-shaped patterns: sk- prefix, ghp_, eyJ (JWT), AKIA, or 40+ char alnum/+/= blob
     if [[ "$val" =~ $secret_re ]]; then
       local preview; preview="$(csa_redact "$val")"
-      local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$val")"
+      local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$val")"
       found+="$(jq -nc \
         --arg rule_id "$RULE_ID" \
         --arg file "$target_file" \

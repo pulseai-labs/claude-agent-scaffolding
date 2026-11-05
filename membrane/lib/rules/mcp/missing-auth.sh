@@ -52,7 +52,7 @@ detect() {
   while IFS= read -r server_name; do
     [[ -n "$server_name" ]] || continue
     local msg="mcpServers.${server_name} has url but no Authorization header or env-based auth"
-    local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$server_name")"
+    local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$server_name")"
     jq -nc \
       --arg rule_id "$RULE_ID" \
       --arg file "$target_file" \

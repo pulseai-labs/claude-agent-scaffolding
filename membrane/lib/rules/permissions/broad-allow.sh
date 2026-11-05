@@ -38,7 +38,7 @@ detect() {
     | grep -E '^(Bash|Read|Write)\(\*\)$' \
     | while read -r entry; do
         local match; match="$entry"
-        local fuid; fuid="$(csa_finding_uid "$RULE_ID" "$target_file" "$match")"
+        local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$match")"
         jq -nc \
           --arg rule_id "$RULE_ID" \
           --arg file "$target_file" \

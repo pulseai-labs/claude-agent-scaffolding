@@ -324,6 +324,36 @@ test_dispatcher_reports_malformed_settings_and_an_unreadable_target() {
   assert_eq "1" "$(printf '%s\n' "$out" | jq -s '[.[] | select(.rule_id == "SCANNER-003")] | length')" "one SCANNER-003 for the chmod 000 target: $out" || return 1
 }
 
+test_dispatcher_secrets004_skips_hex_and_path_keeps_the_rest() {
+  # SECRETS-004 (#1034) under bin/csa (set -euo pipefail): a file of only skipped runs reads clean, and a file with
+  # the AWS documentation key beside them still reports exactly one SECRETS-004, at its own line.
+  local project="$_tmp/b64-project"
+  mkdir -p "$project"
+  printf 'commit 346080b0331055824b1cb88b01494ba057fcd4bb\nsee pulsestack/actions/runs/41344090802/rerun\n' > "$project/CLAUDE.md"
+  local out ec=0
+  out="$(HOME=/nonexistent "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" secrets 2>&1)" || ec=$?
+  assert_eq "0" "$ec" "dispatcher exit code, skipped runs only" || return 1
+  assert_eq "" "$(printf '%s\n' "$out" | grep -c SECRETS-004 | grep -v '^0$')" "skipped runs read clean" || return 1
+  printf 'aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n' >> "$project/CLAUDE.md"
+  ec=0; out="$(HOME=/nonexistent "$CSA_PLUGIN_ROOT/bin/csa" rule_engine_scan_all "$project" secrets 2>&1)" || ec=$?
+  assert_eq "0" "$ec" "dispatcher exit code, with the control" || return 1
+  assert_eq "1" "$(printf '%s\n' "$out" | grep -c SECRETS-004)" "one SECRETS-004 for the AWS key" || return 1
+  assert_contains "$out" '"line":3' "the finding is on the AWS line" || return 1
+}
+
+test_dispatcher_chat_groups_plugin_fixture_findings() {
+  # #1034 under bin/csa (set -euo pipefail): the group count line prints, the real finding is listed, rc 0.
+  local p="$_tmp/grp-project" home="$_tmp/grp-home" f out ec=0
+  f="$(jq -nc --arg a "$home/.claude/plugins/cache/mkt/plug/1.0.0/tests/t.sh" --arg b "$p/.claude/settings.json" '
+    {rule_id:"HOOK-001",file:$a,line:3,offset:0,preview:"x",severity:"critical",finding_uid:"FUID-aaaaaaaa",state:"NEW",display_id:"SA-2026-11-05-001"},
+    {rule_id:"PERM-001",file:$b,line:7,offset:0,preview:"y",severity:"high",finding_uid:"FUID-bbbbbbbb",state:"NEW",display_id:"SA-2026-11-05-002"}')"
+  out="$(CSA_PROJECT_ROOT="$p" "$CSA_PLUGIN_ROOT/bin/csa" report_render_chat "$f" 2>&1)" || ec=$?
+  assert_eq "0" "$ec" "dispatcher exit code" || return 1
+  assert_contains "$out" "1 finding in plugin fixtures/tests and agent scratch copies (1 critical, 0 high, 0 medium); listed in the report" "count line" || return 1
+  assert_contains "$out" "PERM-001 at $p/.claude/settings.json:7" "real finding listed" || return 1
+  [[ "$out" != *"HOOK-001 at"* ]] || return 1
+}
+
 csa_test_run test_dispatcher_reports_unresolved_plugin_and_shape_warning || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_dispatcher_scan_fails_on_unreadable_install_record || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_dispatcher_resolves_plugin_through_install_record || _csa_failed=$((_csa_failed + 1))
@@ -344,4 +374,6 @@ if [[ "${CSA_DISPATCHER_LEAK_PROBE:-}" != "1" ]]; then
 fi
 csa_test_run test_dispatcher_reports_malformed_settings_and_an_unreadable_target || _csa_failed=$((_csa_failed + 1))
 
+csa_test_run test_dispatcher_secrets004_skips_hex_and_path_keeps_the_rest || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_dispatcher_chat_groups_plugin_fixture_findings || _csa_failed=$((_csa_failed + 1))
 [[ "$_csa_failed" -eq 0 ]] || exit 1

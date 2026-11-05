@@ -105,6 +105,12 @@ Scanner failures are findings too, not a clean read: SCANNER-001 (a rule failed 
 
 Critical findings **cannot be suppressed**; they must be remediated.
 
+**What chat lists.** Findings in an enabled plugin's `fixtures/` or `tests/` directory and in the project's `.dagr/scratch/` are scanned like any other, but chat shows them as one line, `N findings in plugin fixtures/tests and agent scratch copies (C critical, H high, M medium); listed in the report`, and not one by one. The totals and the severity table count them, and the report lists each at full severity under a `Group:` line. `--verbose` lists them in chat. A project's own `tests/` is not in the group.
+
+**SECRETS-004 skips two shapes.** A run of 40 or more base64 characters is not reported when it is pure hex (a git SHA, a sha256 digest) on a line that names no credential, or a slash-heavy path (two or more `/`, every segment a lower-case, digit, Capitalized or UPPER-CASE word). A hex credential on a line with no credential word (`dop_v1_<64 hex>`) is therefore no longer reported by SECRETS-004; one beside `token`, `secret`, `passw`, `api_key`, `auth`, `credential` or `private_key` still is, and SECRETS-003 reports `NAME=value`. A documentation URL with `XXXX` segments, or a base32 or hex token as a path segment, is skipped too.
+
+**Upgrading to 0.5.0.** A finding's durable id (`FUID-...`) from the free-text rules (HOOK-001 to HOOK-003 in script files, PROMPT-INJ-001, PROMPT-INJ-002, SECRETS-001 to SECRETS-004, CLAUDE-MD-001, CLAUDE-MD-002, MCP-001 to MCP-003, MARKETPLACE-001, PERM-001, PERM-003, PERM-005, PROVENANCE-002) changes once when its excerpt is over 200 characters or holds a secret-shaped or 32-character run, so that a long match can no longer share the id of a different one. A suppression or baseline entry for such a finding reads NEW once and must be suppressed again. Short findings keep their ids. See the CHANGELOG.
+
 ## Composition
 
 `membrane` is fully standalone. It runs in any Claude Code project, with or without other plugins. It has no integration with any other plugin in v0.1.
