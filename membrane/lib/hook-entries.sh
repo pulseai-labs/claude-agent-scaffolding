@@ -160,10 +160,11 @@ csa_hook_entries() {
 }
 
 # csa_hook_entry_command <entry-json> — print the decoded command text of a
-# command entry; rc 1 (and no output) for anything else.
+# command entry; rc 1 (and no output) for anything else; rc 2 when jq itself
+# fails, so a caller can tell "not a command" from "could not read it" (#1072 C10).
 csa_hook_entry_command() {
   local t
-  t="$(printf '%s' "$1" | jq -j 'select(.type == "command" and (.text | type) == "string") | .text' 2>/dev/null)"
+  t="$(printf '%s' "$1" | jq -j 'select(.type == "command" and (.text | type) == "string") | .text' 2>/dev/null)" || return 2
   [[ -n "$t" ]] || return 1
   printf '%s' "$t"
 }
@@ -178,7 +179,7 @@ csa_hook_entry_command() {
 # (about 1 in 4.3 billion per pair); reformatting the file changes nothing.
 csa_hook_entry_emit() {
   local rule_id="$1" sev="$2" entry="$3" file="$4" text jp preview digest fuid sep
-  text="$(csa_hook_entry_command "$entry")" || return 1
+  text="$(csa_hook_entry_command "$entry")" || return $?
   jp="$(printf '%s' "$entry" | jq -r '.json_path // ""')"
   preview="$(csa_redact "$text")"
   sep="$(printf '\xe2\x90\x9f')"

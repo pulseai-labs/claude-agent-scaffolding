@@ -177,10 +177,14 @@ csa_report_render_chat() {
   # HOOK-006 is Info, so the table hides it; say that hooks went unchecked (#1059).
   if [[ "$verbose" != "true" && -n "$findings_jsonl" ]]; then
     local n_unchecked
-    n_unchecked="$(printf '%s\n' "$findings_jsonl" | jq -s '[.[] | select(.rule_id == "HOOK-006" and (.state // "NEW") != "SUPPRESSED")] | length' 2>/dev/null || echo 0)"
-    if [[ "${n_unchecked:-0}" -gt 0 ]]; then
-      printf '%d %s hooks the audit does not inspect (HOOK-006, Info; pass --verbose).\n\n' "$n_unchecked" \
-        "$([[ "$n_unchecked" -eq 1 ]] && printf 'file declares' || printf 'files declare')"
+    if n_unchecked="$(printf '%s\n' "$findings_jsonl" | jq -s '[.[] | select(.rule_id == "HOOK-006" and (.state // "NEW") != "SUPPRESSED")] | length' 2>/dev/null)"; then
+      if [[ "${n_unchecked:-0}" -gt 0 ]]; then
+        printf '%d %s hooks the audit does not inspect (HOOK-006, Info; pass --verbose).\n\n' "$n_unchecked" \
+          "$([[ "$n_unchecked" -eq 1 ]] && printf 'file declares' || printf 'files declare')"
+      fi
+    else
+      # A failed count is not zero (#1072 C7): say so, so an unchecked hook is not hidden.
+      printf 'HOOK-006 count unavailable (the findings could not be counted; pass --verbose to list them).\n\n'
     fi
   fi
 
@@ -220,7 +224,7 @@ csa_report_render_chat() {
         jpath="$(printf '%s' "$f" | jq -r '(.context | objects | .json_path) // ""')"
         if [[ -n "$jpath" ]]; then
           printf -- '- %s \xe2\x80\x94 %s at %s#%s\n' "$did" "$rule_id" "$file" "$jpath"
-        elif [[ -n "$line_no" ]]; then
+        elif [[ -n "$line_no" && "$line_no" != "0" ]]; then
           printf -- '- %s \xe2\x80\x94 %s at %s:%s\n' "$did" "$rule_id" "$file" "$line_no"
         else
           printf -- '- %s \xe2\x80\x94 %s at %s\n' "$did" "$rule_id" "$file"
@@ -296,6 +300,9 @@ csa_report_render_markdown() {
         jpath="$(printf '%s' "$finding" | jq -r '(.context | objects | .json_path) // ""')"
         if [[ -n "$jpath" ]]; then
           printf '**File:** %s#%s\n' "$file" "$jpath"
+        elif [[ "$line_no" == "0" ]]; then
+          # Line 0 means the finding has no line (#1072 r2 C12): the bare file, not file:0:0.
+          printf '**File:** %s\n' "$file"
         else
           printf '**File:** %s:%s:%s\n' "$file" "$line_no" "$offset"
         fi

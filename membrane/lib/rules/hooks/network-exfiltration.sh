@@ -57,7 +57,7 @@ detect() {
 # match the whole command. Skill-first question 3 (can only add a stop).
 detect_text() {
   local entry="$1" target_file="$2" text
-  text="$(csa_hook_entry_command "$entry")" || return 1
+  text="$(csa_hook_entry_command "$entry")" || return $?
   [[ "$text" =~ $RULE_NETWORK_RE ]] && [[ "$text" =~ $RULE_SENSITIVE_RE ]] || return 1
   csa_hook_entry_emit "$RULE_ID" "$RULE_SEVERITY" "$entry" "$target_file"
 }
