@@ -265,6 +265,8 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ['kill 123 $(echo ${x:-)}) -1', 'a ) inside ${…} inside $(…) ends the span early'],
   ["bash -co pipefail 'kill -1'", 'a shell option cluster holding both c and o'],
   ["bash -oc pipefail 'kill -1'", 'a shell option cluster holding both o and c'],
+  ["bash -cO extglob 'kill -1'", 'a shell option cluster holding both c and O'],
+  ["bash -oe pipefail -c 'kill -1'", 'a shell option cluster whose o is not its last letter'],
   ["pkill node '.*'", "a second pkill operand (procps rejects it; BSD and macOS pkill take several)"],
 ]
 
@@ -290,7 +292,7 @@ describe('killRule: known limits are not read (each is in the README)', () => {
 })
 
 describe('killRule: a ( inside ${…} inside $(…) leaves the span open, so the call is unread (a deliberate false stop)', () => {
-  test('echo $(echo ${x:-(}) ; kill 123 throws, and both glues refuse it as unread', () => {
+  test('echo $(echo ${x:-(}) ; kill 123 throws (a throw is refused as unread by both glues; see the depth-8 glue rows)', () => {
     expect(() => killRule('echo $(echo ${x:-(}) ; kill 123')).toThrow()
   })
 })

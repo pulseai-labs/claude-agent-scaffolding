@@ -237,7 +237,7 @@ It reads through `sudo` (with its options), `env`, `command`, `builtin`, `exec`,
 `setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock` (each with its common options, and `--`);
 through a path (`/bin/kill`), a quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and
 into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once (the shell's options before and after
-`-c`, `-o`/`-O` values and one `--` included; a cluster that holds both `c` and `o`, such as `-co`, is not read). A refusal says what to do instead: list first, read
+`-c`, a cluster's `-o`/`-O` value when `o` or `O` is its last letter, and one `--` included). A refusal says what to do instead: list first, read
 the PIDs, kill by literal PID in a separate call; to stop your own job use `write proc://<id>/kill` (OMP)
 or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never sees them. On OMP a
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
@@ -269,6 +269,7 @@ Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`
   (`kill $(cat pidfile)` is allowed on purpose), and a variable whose value is `-1`.
 - **Other ways to signal many processes.** `fuser -k`, `pkill`/`killall` selecting by `-s`, `-g`,
   `-P`, `-t`, `-G` or `-F` alone, `pkill -v` (inverted), system-scope `systemctl stop user@<uid>`.
+- **Spans and option clusters.** An unquoted `$(…)` span is bounded by counting parentheses: a `case` pattern's `)` or a `)` inside `${…}` ends it early, and an operand after it is missed. A shell option cluster that holds `c` together with `o` or `O` (`-co`, `-oc`, `-cO`, `-Oc`), or an `o`/`O` that is not its last letter (`-oe pipefail -c`), is not read.
 - **Patterns.** A second `pkill` operand is not read: procps `pkill` rejects it, but BSD and macOS `pkill` take several, so `pkill node '.*'` is a miss there. A `pkill` or `killall -r` pattern broad in some way the four probe names do not all
   match (`s`), one held in a variable or a quoted substitution (`pkill "$(cat f)"`), and one that is not a
   regular expression in JavaScript's reading, are not refused. An unquoted `$(…)` reads as the pattern
