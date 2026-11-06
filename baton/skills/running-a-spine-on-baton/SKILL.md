@@ -123,7 +123,8 @@ Confirm `<state>/runs/<run>/run.json` has `status` `armed` and
   Orca terminal. A run with no pointer sends notices to `fallback_notify`, or only to `notify.log`.
 - **Status on request.** `baton status <run>` or `baton report <run>`; read `out/<unit>/` files only
   for the unit asked about. Never read seat transcripts.
-- **The end.** baton sees the spine PR's merge and runs the second spine close itself.
+- **The end.** baton sees the spine PR's merge and runs the second spine close itself, then waits for
+  the AI close PR, where the workspace takes PRs only.
   Do not start `/ossify:close` beside it.
 
 ## Notices
@@ -143,6 +144,9 @@ operator.
 | "passed review … merge it" | check the pass against the rulings; send a finding the order sends to a fix back to `spine_work` | the merge, unless the project's governance grants this session merge authority |
 | PR conflict | merge the base into the spine branch, move `review.md` to `review-prev.md`, unpark `--to spine_review` | a closed PR |
 | `spine_finish` stop | a `user:` line: prepare the walk and evidence; any other stop: rule it as a close stop | a `user:` line's pass or fail: write it to `out/spine-pr/operator.md`, replacing any, unpark; move it aside as the next free `operator-<n>.md` before an unpark `--to` any other stage |
+| AI close PR recorded (`spine_finish` notice) | merge it if governance grants this session merge authority | otherwise the merge |
+| `spine_close_wait` park | the close PR merged but `origin/main` is not closed, it closed unmerged or conflicts, or `close-pr.txt` holds no PR URL: fix it, unpark | merging the close PR unless governance grants it; a seat must never merge it |
+| `run failed` park on a session stage | fix the cause; a plain unpark relaunches the seat and reruns the round; run the failed hook's remaining steps by hand, then `--to <next stage>` skips the rerun | none |
 | Item review stop (`item_wait` park, review 3) | `--to item_fix` after writing `out/<wi>/operator.md`, replacing any; or accept the findings with `--to land` | a finding the order sends to the operator |
 | PR URL stop (`item_ready` park) | fix the item's `pr_url` in the ossify state and in `queue/<wi>.json`, then `--to item_ready` | none |
 | Item moved stop (`item_moved` park, nothing merged) | `--to item_review` runs one more review | merging the PR by hand, then `--to land` ends the unit; `--to land` alone parks again |

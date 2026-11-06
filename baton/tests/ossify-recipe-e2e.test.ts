@@ -30,7 +30,7 @@ const STEP_MS = 5 * 60_000;
 
 const saved = { state: process.env.BATON_STATE_DIR, config: process.env.BATON_CONFIG, home: process.env.HOME };
 let root: string, state: string, aiRoot: string, stateFile: string, spineDir: string;
-let repo: string, origin: string, other: string, runDir: string, clock: number;
+let repo: string, origin: string, other: string, runDir: string, clock: number, aiOrigin: string;
 
 beforeEach(() => {
   root = realpathSync(mkdtempSync(join(tmpdir(), "baton-ossify-e2e-")));
@@ -66,6 +66,15 @@ beforeEach(() => {
   runDir = join(state, "runs", "r1");
   clock = T0;
   setState({ [W1]: 0, [W2]: 0 });
+  // The AI workspace: a git repo whose origin holds the state file, as spine_finish reads it (#1095).
+  aiOrigin = join(root, "ai-origin.git");
+  git(root, "init", "--bare", "-b", "main", aiOrigin);
+  git(aiRoot, "init", "-b", "main");
+  git(aiRoot, "remote", "add", "origin", aiOrigin);
+  for (const [k, v] of [["user.email", "t@example.com"], ["user.name", "t"], ["commit.gpgsign", "false"]]) git(aiRoot, "config", k, v);
+  git(aiRoot, "add", ".ossify/project-state.json");
+  git(aiRoot, "commit", "-m", "state");
+  git(aiRoot, "push", "origin", "main");
 });
 afterEach(() => {
   for (const [k, v] of [["BATON_STATE_DIR", saved.state], ["BATON_CONFIG", saved.config], ["HOME", saved.home]] as const) {
@@ -216,12 +225,28 @@ function seats(): Record<string, Effect> {
     item_fix: (u) => put(out(u, "round-done"), "x"),
     spine_review: (u) => put(out(u, "review.md"), "verdict: pass\nhead: abc123\nno findings\n"),
     spine_work: (u) => put(out(u, "round-done"), "x"),
+    // a workspace that pushes to main: the second pass closes the spine and lands the record at origin/main
     spine_finish: () => {
-      const s = readState();
-      s.spines.find((x) => x.id === SPINE)!.status = "closed";
-      writeFileSync(stateFile, JSON.stringify(s, null, 2));
+      closeLocally();
+      git(aiRoot, "commit", "-am", "close");
+      git(aiRoot, "push", "origin", "main");
     },
   };
+}
+function closeLocally(): void {
+  const s = readState();
+  s.spines.find((x) => x.id === SPINE)!.status = "closed";
+  writeFileSync(stateFile, JSON.stringify(s, null, 2));
+}
+const CLOSE_PR = "https://github.com/o/ai/pull/30";
+/** A workspace that lands records only through PRs: the close goes on a branch, its PR is recorded, the root goes back to main. */
+function closeOnBranch(prLine = CLOSE_PR): void {
+  git(aiRoot, "switch", "-c", "docs/close");
+  closeLocally();
+  git(aiRoot, "commit", "-am", "close");
+  git(aiRoot, "push", "origin", "docs/close");
+  put(out(SPINE_UNIT, "close-pr.txt"), prLine + "\n");
+  git(aiRoot, "switch", "main");
 }
 
 /** The verify seat's verdict file: Task 1's shape, one JSON object. */
@@ -938,4 +963,91 @@ test("a halting verdict runs verify, close, correct, then verify and close again
   expect(JSON.parse(readFileSync(out(W1, "verdict.json"), "utf8")).mutation).toEqual([]);
   expect(existsSync(out(W1, "verdict-2.json"))).toBe(false);
   expect(item(W1).dispatches).toBe(2); // implement and correct; verify is no dispatch
+});
+
+// ---- #1095: spine_finish reads origin/main, and a PR-only workspace waits for its close PR ----
+
+/** Drive a run with no items to the second close: the spine PR is merged by hand at the ack, and the finish seat does `finish`. */
+async function toFinish(finish: Effect, until: () => boolean, between: (r: Rig) => void = () => {}) {
+  await arm();
+  const host = newHost(() => put(join(runDir, "rounds.done"), "x"), { spine_finish: finish });
+  const r = rig(host);
+  r.forge.views.set(CLOSE_PR, { state: "OPEN", head: HEAD0, base: "main", mergeable: "MERGEABLE", checks: "green" });
+  await drive(r, 60, until, () => {
+    if (unit(SPINE_UNIT)?.stage === "spine_ack") {
+      r.forge.views.set(prUrl(SPINE_UNIT), { ...r.forge.views.get(prUrl(SPINE_UNIT))!, state: "MERGED", head: "spinehead" });
+    }
+    between(r);
+  });
+  return r;
+}
+const parkedIn = (stage: string) => () => unit(SPINE_UNIT)?.stage === stage && unit(SPINE_UNIT)?.parked !== undefined;
+const closeView = (r: Rig, v: Partial<PrView>) => r.forge.views.set(CLOSE_PR, { ...r.forge.views.get(CLOSE_PR)!, ...v });
+/** The close PR merges: the branch lands on origin/main. */
+const landClose = () => git(aiRoot, "push", "origin", "docs/close:main");
+const onMain = () => git(aiRoot, "symbolic-ref", "--short", "HEAD");
+
+test("a close that reached origin/main ends spine_finish done (#1095)", async () => {
+  await toFinish(seats().spine_finish, () => readRun().status === "done");
+  expect(moves(SPINE_UNIT).at(-1)).toBe("spine_finish>done");
+  expect(git(aiRoot, "show", "origin/main:.ossify/project-state.json")).toContain('"closed"');
+});
+
+test("a close only in the local state file is not done: origin/main still reads planned (#1095 regression)", async () => {
+  // the seat closes locally and neither pushes nor opens a PR: the old local read called that done
+  const r = await toFinish(closeLocally, parkedIn("spine_finish"));
+  expect(readRun().status).not.toBe("done");
+  expect(moves(SPINE_UNIT)).not.toContain("spine_finish>done");
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("no result");
+  expect(r.host.of(SPINE_UNIT, "spine_finish")).toHaveLength(3);
+});
+
+test("close-pr.txt routes spine_finish to spine_close_wait, and a merged close PR with origin/main closed ends done (#1095)", async () => {
+  const r = await toFinish(() => closeOnBranch(), () => unit(SPINE_UNIT)?.stage === "spine_close_wait");
+  expect(moves(SPINE_UNIT).at(-1)).toBe("spine_finish>spine_close_wait"); // the recipe's outcome, not the fake seat's own action
+  expect(r.host.of(SPINE_UNIT, "spine_finish")).toHaveLength(1);
+  expect(r.notes.some((n) => n.includes("close-pr.txt"))).toBe(true);
+  await settle(r, 3);
+  expect(unit(SPINE_UNIT).stage).toBe("spine_close_wait"); // an open PR waits, with no park
+  expect(unit(SPINE_UNIT).parked).toBeUndefined();
+  closeView(r, { state: "MERGED" });
+  landClose();
+  await drive(r, 10, () => readRun().status === "done");
+  expect(moves(SPINE_UNIT).slice(-2)).toEqual(["spine_finish>spine_close_wait", "spine_close_wait>done"]);
+});
+
+test("spine_close_wait parks a close PR that merged while origin/main does not read closed (#1095)", async () => {
+  const r = await toFinish(() => closeOnBranch(), () => unit(SPINE_UNIT)?.stage === "spine_close_wait");
+  closeView(r, { state: "MERGED" }); // merged, but the record never reached main
+  await drive(r, 10, parkedIn("spine_close_wait"));
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("outcome"); // not "exit0 error"
+  expect(readRun().status).not.toBe("done");
+});
+
+test("spine_close_wait parks a close PR closed without a merge (#1095)", async () => {
+  const r = await toFinish(() => closeOnBranch(), () => unit(SPINE_UNIT)?.stage === "spine_close_wait");
+  closeView(r, { state: "CLOSED" });
+  await drive(r, 10, parkedIn("spine_close_wait"));
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("outcome");
+});
+
+test("spine_close_wait parks a close PR in conflict (#1095)", async () => {
+  const r = await toFinish(() => closeOnBranch(), () => unit(SPINE_UNIT)?.stage === "spine_close_wait");
+  closeView(r, { mergeable: "CONFLICTING" });
+  await drive(r, 10, parkedIn("spine_close_wait"));
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("outcome");
+});
+
+test("spine_close_wait parks `pr url` when close-pr.txt holds no PR URL (#1095)", async () => {
+  await toFinish(() => closeOnBranch("not a url"), parkedIn("spine_close_wait"));
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("pr url");
+});
+
+test("spine_close_wait parks `exit0 error` when the PR is merged and origin cannot be reached (#1095 C3)", async () => {
+  const r = await toFinish(() => closeOnBranch(), () => unit(SPINE_UNIT)?.stage === "spine_close_wait");
+  closeView(r, { state: "MERGED" });
+  git(aiRoot, "remote", "set-url", "origin", join(root, "nowhere.git")); // the stale origin/main ref stays: the fetch failure must park, not read false
+  await drive(r, 10, parkedIn("spine_close_wait"));
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("exit0 error");
+  expect(readRun().status).not.toBe("done");
 });

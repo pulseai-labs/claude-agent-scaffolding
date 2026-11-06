@@ -217,7 +217,9 @@ config's `notify` argv, not a command to type: for a run-scoped key (the key's f
 run on this host) it writes the notice to `<state>/runs/<run>/notices/<key>.md` (mode 600; each
 character of the key outside `A-Za-z0-9._-` becomes `_`), then
 sends the registered terminal one line, `[crew message baton] baton notice <key>: read <file> and
-follow running-a-spine-on-baton §Notices.`, with `orca terminal send --enter --wait-submit 5`. A
+follow running-a-spine-on-baton §Notices.`, with `orca terminal send --enter --wait-submit 5`. Each way
+it fails to deliver adds a line `<iso> <key> notify-orchestrator <where>: <reason>` to
+`<state>/notify.log` (the reason capped at 300 characters of Orca's message). A
 queued receipt is a success. A host-wide key (`auth/<day>`, `down/<day>`), no pointer, an Orca
 restarted since the pointer was written (`orca status`'s `runtime.runtimeId` differs from the
 stored incarnation), or a failed send runs `fallback_notify` instead; the whole command stays
@@ -511,6 +513,19 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - **The spine PR ack.** On the "passed review … merge it" notice, read the PR's needs-you list, then
   merge it as the project's governance grants (otherwise the operator merges); baton sees the merge
   and runs the second spine close.
+- **A `spine_close_wait` park** (a workspace that lands records only through PRs; the finish seat
+  wrote the close PR's URL to `out/spine-pr/close-pr.txt`): the PR merged but `origin/main` does not
+  read the spine closed, it closed without a merge, it conflicts, or `close-pr.txt` holds no PR URL.
+  Fix the PR or the record, then `baton unpark <run> spine-pr`; for a PR closed without a merge,
+  reopen the PR; or replace `out/spine-pr/close-pr.txt` with a valid close-PR URL, then unpark; or
+  remove it and rerun the close with `baton unpark <run> spine-pr --to spine_finish` (a plain
+  unpark with the file gone parks again as `pr url`). `spine_finish` itself ends only when
+  the state file at `origin/main` reads the spine closed (a fetch in the AI root; no `origin`
+  remote, or a failed fetch, parks `exit0 error`; the fetch runs with `GIT_TERMINAL_PROMPT=0`, so git's
+  own credential prompt fails instead of hanging; an ssh remote's prompt is not covered).
+- **A `run failed` park on a session stage** (a round-end hook failed): fix the cause, then a plain
+  `baton unpark` relaunches the seat and reruns the round; run the failed hook's remaining steps by
+  hand, then `baton unpark <run> <unit> --to <next stage>` skips the rerun.
 - **`--to spine_work` is refused while `spine-pr` has a live session** (a review is running): wait
   for the review to end, then unpark.
 - **A `land` park** names its reason. `run failed`: the canonical root is not on the spine branch

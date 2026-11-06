@@ -2,7 +2,7 @@
 // state dir and config with HOME in a temp dir, and the `orca` CLI is tests/fake-orca: the real
 // binary is never reached, and nothing here sends to a real terminal.
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readConfig } from "../src/notify.ts";
@@ -59,6 +59,11 @@ const register = (r: Rig) => baton(r, ["orchestrator", "r1"], { ORCA_TERMINAL_HA
 const orcaCalls = (r: Rig): string[][] =>
   existsSync(join(r.orca, "argv.jsonl")) ? readFileSync(join(r.orca, "argv.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)) : [];
 const fallbackLines = (r: Rig): string[] => (existsSync(r.fb) ? readFileSync(r.fb, "utf8").trim().split("\n") : []);
+/** notify-orchestrator's own lines in notify.log: `<iso> <key> notify-orchestrator <where>: <reason>`. */
+const failureLines = (r: Rig): string[] => {
+  const f = join(r.state, "notify.log");
+  return existsSync(f) ? readFileSync(f, "utf8").trim().split("\n").filter((l) => l.includes(" notify-orchestrator ")) : [];
+};
 const noticeFile = (r: Rig) => join(r.state, "runs", "r1", "notices", noticeFileName(KEY));
 const mode = (p: string) => statSync(p).mode & 0o777;
 
@@ -272,11 +277,13 @@ describe("baton notify-orchestrator", () => {
     await run(spent, 27_500); // 28 s budget, 500 ms left: under the 1 s the send needs
     expect(orcaCalls(spent)).toEqual([["status", "--json"]]);
     expect(fallbackLines(spent)).toEqual([`${KEY}|${MSG}`]);
+    expect(failureLines(spent).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator send: budget used up before the send`]);
     const left = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_OK } });
     await register(left);
     await run(left, 0); // control: no skew, the budget is whole
     expect(orcaCalls(left).map((c) => c[0])).toEqual(["status", "terminal"]);
     expect(fallbackLines(left)).toEqual([]);
+    expect(failureLines(left)).toEqual([]);
   });
 
   test("an Orca that answers with garbage runs the fallback", async () => {
@@ -336,6 +343,156 @@ describe("baton notify-orchestrator", () => {
     expect(orcaCalls(r)).toEqual([]);
     expect(fallbackLines(r)).toEqual([`${KEY}|${MSG}`]);
   });
+
+  // #1053 C8: every way the notifier fails to deliver leaves its reason in notify.log.
+  describe("a failure says why in notify.log (#1053 C8)", () => {
+    const ok = { "status --json": STATUS(INC), "terminal send": SEND_OK };
+
+    test("control: an accepted send writes no failure line, and a missing pointer is normal", async () => {
+      const r = await rig({ replies: ok });
+      await register(r);
+      await baton(r, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(r)).toEqual([]);
+      const none = await rig({ replies: ok }); // no pointer registered
+      await baton(none, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(none)).toEqual([]);
+    });
+
+    test("a malformed config: the fallback cannot read it, and the line says so (the notice reaches nobody)", async () => {
+      const r = await rig({ replies: ok });
+      writeFileSync(r.cfg, "{not json");
+      expect((await baton(r, ["notify-orchestrator", "auth/2026-11-03", "host auth rejected"])).rc).toBe(0);
+      const lines = failureLines(r);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toMatch(/^\S+ auth\/2026-11-03 notify-orchestrator fallback config: .*JSON/);
+      expect(fallbackLines(r)).toEqual([]);
+    });
+
+    test.skipIf(process.getuid?.() === 0)("an unwritable notice directory: a notice line, and the fallback still runs", async () => {
+      const r = await rig({ replies: ok });
+      await register(r);
+      const dir = join(r.state, "runs", "r1", "notices");
+      mkdirSync(dir);
+      chmodSync(dir, 0o500);
+      try {
+        expect((await baton(r, ["notify-orchestrator", KEY, MSG])).rc).toBe(0);
+      } finally {
+        chmodSync(dir, 0o700);
+      }
+      const lines = failureLines(r);
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain(`${KEY} notify-orchestrator notice: `);
+      expect(lines[0]).toContain("EACCES");
+      expect(fallbackLines(r)).toEqual([`${KEY}|${MSG}`]);
+      expect(orcaCalls(r)).toEqual([]);
+    });
+
+    test("a stale incarnation, a refused send and a used-up budget each name their reason", async () => {
+      const stale = await rig({ replies: { "status --json": STATUS("00000000-0000-0000-0000-000000000000"), "terminal send": SEND_OK } });
+      await register(stale);
+      await baton(stale, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(stale).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator send: orca restarted: the registered incarnation is not the runtime's`]);
+
+      const refused = await rig({ replies: { "status --json": STATUS(INC), "terminal send": { ok: true, result: { send: { handle: "term_x", accepted: false, bytesWritten: 0 } } } } });
+      await register(refused);
+      await baton(refused, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(refused).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator send: terminal did not accept the line`]);
+
+      const gone = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_STALE } });
+      await register(gone);
+      await baton(gone, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(gone)).toHaveLength(1);
+      expect(failureLines(gone)[0]).toContain("notify-orchestrator send: terminal_handle_stale");
+    });
+
+    test("an unreadable status and a garbage reply are logged where they happen", async () => {
+      const unreadable = await rig({ replies: { "terminal send": SEND_OK } }); // no reply for status
+      await register(unreadable);
+      await baton(unreadable, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(unreadable)).toHaveLength(1);
+      expect(failureLines(unreadable)[0]).toContain("notify-orchestrator status: ");
+      expect(fallbackLines(unreadable)).toEqual([]); // the send still went
+
+      const garbage = await rig({ replies: ok });
+      await register(garbage);
+      await baton(garbage, ["notify-orchestrator", KEY, MSG], { FAKE_ORCA_GARBAGE: "1" });
+      expect(failureLines(garbage).map((l) => l.split(" ")[2] + " " + l.split(" ")[3])).toEqual(["notify-orchestrator status:", "notify-orchestrator send:"]);
+    });
+
+    test("a reason stays one line, and Orca's error message is capped at 300 characters (N5, N6)", async () => {
+      const err = (message: string) => ({ ok: false, error: { code: "boom", message } });
+      const a = await rig({ replies: { "status --json": STATUS(INC), "terminal send": err("line1\nline2") } });
+      await register(a);
+      await baton(a, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(a).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator send: boom: line1 line2`]);
+      expect(readFileSync(join(a.state, "notify.log"), "utf8").trim().split("\n")).toHaveLength(1);
+      const b = await rig({ replies: { "status --json": STATUS(INC), "terminal send": err("x".repeat(1000)) } });
+      await register(b);
+      await baton(b, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(b)[0].endsWith(`send: boom: ${"x".repeat(300)}`)).toBe(true);
+    });
+
+    test("a pointer that parses but has the wrong shape says why (C2)", async () => {
+      for (const body of ['{"handle":"","incarnation":"x"}', "[]", '{"handle":"h","incarnation":7}']) {
+        const r = await rig({ replies: ok });
+        writeFileSync(join(r.state, "runs", "r1", "orchestrator"), body);
+        await baton(r, ["notify-orchestrator", KEY, MSG]);
+        expect(failureLines(r).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator pointer: not a pointer: handle and incarnation must be non-empty strings`]);
+        expect(fallbackLines(r)).toEqual([`${KEY}|${MSG}`]);
+      }
+    });
+
+    test("a fallback that runs and exits non-zero says so; one that times out says so (C2)", async () => {
+      const f = await rig({ replies: ok });
+      writeFileSync(f.cfg, JSON.stringify({ orca: { cli: FAKE_ORCA }, fallback_notify: ["sh", "-c", "exit 3"] }));
+      await baton(f, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(f).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator fallback: exited 3`]);
+      // control: a fallback that exits 0 logs nothing
+      const g = await rig({ replies: ok });
+      await baton(g, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(g)).toEqual([]);
+      // timeout: the first Date.now() passes; every later one is 40 s on (host-wide key), so no Orca call happens and the 1 s floor applies
+      const t = await rig({ replies: ok });
+      writeFileSync(t.cfg, JSON.stringify({ orca: { cli: FAKE_ORCA }, fallback_notify: ["sleep", "30"] }));
+      const script = `import { notifyOrchestrator } from ${JSON.stringify(join(import.meta.dir, "..", "src", "hosts", "orchestrator.ts"))};
+        const real = Date.now; let first = true; Date.now = () => { if (first) { first = false; return real(); } return real() + 40_000; };
+        process.exit(notifyOrchestrator("auth/2026-11-03", ${JSON.stringify(MSG)}));`;
+      const env = { ...process.env, HOME: t.home, BATON_STATE_DIR: t.state, BATON_CONFIG: t.cfg, FAKE_ORCA_DIR: t.orca };
+      const t0 = Date.now();
+      const p = Bun.spawn(["bun", "-e", script], { env, stdout: "pipe", stderr: "pipe" });
+      expect(await p.exited).toBe(0);
+      expect(Date.now() - t0).toBeLessThan(15_000); // the fallback was cut at the 1 s floor, not left to sleep
+      expect(failureLines(t).map((l) => l.replace(/^\S+ /, ""))).toEqual(["auth/2026-11-03 notify-orchestrator fallback: timed out or killed (SIGTERM)"]);
+    }, 30_000);
+
+    test("a pointer that is not a pointer, and a fallback command that cannot run", async () => {
+      const r = await rig({ replies: ok });
+      writeFileSync(join(r.state, "runs", "r1", "orchestrator"), "{not json");
+      await baton(r, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(r)).toHaveLength(1);
+      expect(failureLines(r)[0]).toContain(`${KEY} notify-orchestrator pointer: `);
+
+      const f = await rig({ replies: ok });
+      writeFileSync(f.cfg, JSON.stringify({ orca: { cli: FAKE_ORCA }, fallback_notify: ["/nonexistent/fallback-cmd", "{key}"] }));
+      await baton(f, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(f)).toHaveLength(1);
+      expect(failureLines(f)[0]).toContain(`${KEY} notify-orchestrator fallback: `);
+    });
+  });
+
+  // #1053: the notifier's own bound is the kill bound of notify.ts (30 s); an Orca that never answers must not outlast it.
+  test("an Orca that never answers: status gives up at 4 s, the send at 12 s, the fallback runs, rc 0, inside 30 s", async () => {
+    const r = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_OK } });
+    await register(r);
+    const t0 = Date.now();
+    const x = await baton(r, ["notify-orchestrator", KEY, MSG], { FAKE_ORCA_HANG: "1" });
+    const elapsed = Date.now() - t0;
+    expect(x.rc).toBe(0);
+    expect(elapsed).toBeLessThan(30_000);
+    expect(fallbackLines(r)).toEqual([`${KEY}|${MSG}`]);
+    expect(orcaCalls(r).map((c) => c.slice(0, 2).join(" "))).toEqual(["status --json", "terminal send"]);
+    expect(failureLines(r).map((l) => l.split(" ")[2] + " " + l.split(" ")[3])).toEqual(["notify-orchestrator status:", "notify-orchestrator send:"]);
+  }, 60_000);
 
   test("the wrong argument count is usage, nothing sent", async () => {
     const r = await rig({ replies: { "status --json": STATUS(INC), "terminal send": SEND_OK } });
