@@ -173,7 +173,8 @@ csa_suppress_filter() {
 # csa_suppress_remove <project_root> <finding_uid>
 # Remove the suppression for finding_uid; every other entry is kept as jq emits it.
 # rc 0 removed; rc 1 no such suppression or no file (nothing is written, no file is
-# created); rc 2 suppressions.json is not a suppressions file. Atomic tmp+mv write.
+# created); rc 2 suppressions.json is not a suppressions file; rc 5 the write failed (the
+# file is as it was). Atomic tmp+mv write.
 csa_suppress_remove() {
   local root="$1"
   local fuid="$2"
@@ -199,7 +200,11 @@ csa_suppress_remove() {
 
   local tmp; tmp="$(dirname "$sup_file")/suppressions.json.tmp.$$"
   jq --arg k "$fuid" '.suppressions |= map(select(.finding_uid != $k))' \
-    "$sup_file" > "$tmp" && mv "$tmp" "$sup_file" || { rm -f "$tmp"; return 2; }
+    "$sup_file" > "$tmp" 2>/dev/null && mv "$tmp" "$sup_file" 2>/dev/null || {
+    rm -f "$tmp" 2>/dev/null
+    printf 'csa: could not write %s; the suppression was not removed\n' "$sup_file" >&2
+    return 5
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -207,7 +212,7 @@ csa_suppress_remove() {
 # ---------------------------------------------------------------------------
 
 # csa_suppress_stale <raw_findings_jsonl_file> <project_root> <focus>
-# Emit, as JSONL, each suppression whose finding_uid is absent from the raw (unfiltered)
+# Emit, as JSONL, {"finding_uid": …} for each suppression whose finding_uid is absent from the raw (unfiltered)
 # scan output. Deletes nothing. A suppression can match nothing for reasons outside the
 # file (another branch, a disabled plugin), so the caller words the list accordingly.
 # rc 0 listed (possibly nothing); rc 2 focus is not "all", or suppressions.json is not a
@@ -246,7 +251,9 @@ csa_suppress_stale() {
   jq -c --slurpfile f "$findings_file" \
     '([$f[] | .finding_uid // empty]) as $live
      | .suppressions[]
-     | select((.finding_uid | test("^FUID-tamper0[123]$") | not)
-              and (.finding_uid as $u | $live | index($u) | not))' \
+     | select(.finding_uid as $u
+              | (["FUID-tamper01","FUID-tamper02","FUID-tamper03"] | index($u) | not)
+                and ($live | index($u) | not))
+     | {finding_uid}' \
     "$sup_file"
 }

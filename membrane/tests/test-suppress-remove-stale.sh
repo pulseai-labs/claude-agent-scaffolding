@@ -157,19 +157,22 @@ test_e2e_uid_move_old_stale_new_is_new() {
   [[ -n "$new" && "$new" != "$old" ]] || { printf '    rename did not move the uid; setup is vacuous\n' >&2; return 1; }
   local out; out="$("$CSA" suppress_stale "$_CSA_TMP/rescan$_n.jsonl" "$root" all)" || return 1
   assert_eq "$old" "$(jq -r '.finding_uid' <<<"$out")" "old uid is stale" || return 1
-  local state; state="$(HOME=/nonexistent CSA_PROJECT_ROOT="$root" "$CSA" baseline_tag "$_CSA_TMP/rescan$_n.jsonl" "$root" 2>/dev/null \
-    | jq -r --arg u "$new" 'select(.finding_uid == $u) | .state')"
-  assert_eq "NEW" "$state" "new uid is NEW" || return 1
+  # The moved finding is no longer hidden: the rescan still emits the new uid through the filter.
+  "$CSA" suppress_filter "$_CSA_TMP/rescan$_n.jsonl" "$root" > "$_CSA_TMP/filtered$_n.jsonl" || return 1
+  assert_eq "1" "$(jq -r --arg u "$new" 'select(.finding_uid == $u) | .finding_uid' "$_CSA_TMP/filtered$_n.jsonl" | grep -c .)" "new uid passes the filter" || return 1
+  # Control: before the move the same suppression does hide the old uid.
+  "$CSA" suppress_filter "$_CSA_TMP/raw$_n.jsonl" "$root" > "$_CSA_TMP/filtered-old$_n.jsonl" || return 1
+  assert_eq "0" "$(jq -r --arg u "$old" 'select(.finding_uid == $u) | .finding_uid' "$_CSA_TMP/filtered-old$_n.jsonl" | grep -c . || true)" "old uid is hidden by its suppression" || return 1
 }
 
-# Every `csa <fn> <args>` call SKILL.md documents with arguments runs through the dispatcher
-# with its placeholders filled, and does not abort on arity. Mentions without arguments
-# (`csa report_render_chat`) make no arity claim and are skipped.
+# Every `csa <fn> ...` call SKILL.md documents, bare ones included, runs through the dispatcher
+# with its placeholders filled, and does not abort on arity. The `csa <fn-suffix>` contract
+# mention and `csa --list` name no function and are not matched.
 test_documented_csa_calls_run_through_dispatcher() {
   _mk_root
   local skill="$CSA_PLUGIN_ROOT/skills/auditing-claude-configs/SKILL.md" calls call ran=0
   : > "$_CSA_TMP/empty$_n.jsonl"
-  calls="$(grep -o '`csa [a-z_]* [^`]*`' "$skill" | tr -d '`')"
+  calls="$(grep -oE '`csa [a-z_]+( [^`]*)?`' "$skill" | tr -d '`')"
   [[ -n "$calls" ]] || { printf '    SKILL.md documents no csa call with arguments\n' >&2; return 1; }
   while IFS= read -r call; do
     call="${call//\"\$PWD\"/\"$root\"}"
@@ -179,6 +182,9 @@ test_documented_csa_calls_run_through_dispatcher() {
     call="${call//\"<id>\"/FUID-aaaaaaaa}"
     call="${call//\"<severity>\"/medium}"
     call="${call//\"<note>\"/note}"
+    call="${call//<run-index>/1}"
+    call="${call//<report-path>/$root/.claude/audits/r.md}"
+    call="${call//<metadata-json>/\{\}}"
     call="${call//<findings>/$_CSA_TMP/empty$_n.jsonl}"
     call="${call//<raw-file>/$_CSA_TMP/empty$_n.jsonl}"
     [[ "$call" != *"<"* ]] || { printf '    unfilled placeholder in: %s\n' "$call" >&2; return 1; }
@@ -188,7 +194,7 @@ test_documented_csa_calls_run_through_dispatcher() {
       || { printf '    documented call aborts: %s -> %s\n' "$call" "$out" >&2; return 1; }
     ran=$((ran + 1))
   done <<<"$calls"
-  [[ "$ran" -ge 8 ]] || { printf '    only %s documented calls ran\n' "$ran" >&2; return 1; }
+  [[ "$ran" -ge 12 ]] || { printf '    only %s documented calls ran\n' "$ran" >&2; return 1; }
 }
 
 # ---- exit codes and exact matching -----------------------------------------
@@ -256,6 +262,43 @@ test_stale_provenance_finding_refuses() {
   [[ "$out" != *"FUID-aaaaaaaa"* ]] || { printf '    refusal still listed uids\n' >&2; return 1; }
 }
 
+test_remove_write_failure_rc5() {
+  _mk_root
+  _write_sup "$root" FUID-aaaaaaaa FUID-bbbbbbbb
+  local f="$root/.claude/audits/suppressions.json" before; before="$(cksum < "$f")"
+  chmod a-w "$root/.claude/audits"
+  # Not a failure of the code: a process that ignores directory modes (root) cannot reach this branch.
+  if touch "$root/.claude/audits/.probe" 2>/dev/null; then
+    rm -f "$root/.claude/audits/.probe"; chmod u+w "$root/.claude/audits"
+    printf '    SKIP: directory modes are not enforced for this user (running as root?)\n'
+    return 0
+  fi
+  local rc=0 err; err="$("$CSA" suppress_remove "$root" FUID-aaaaaaaa 2>&1)" || rc=$?
+  chmod u+w "$root/.claude/audits"
+  assert_eq "5" "$rc" "write failure is rc 5" || return 1
+  assert_contains "$err" "could not write" "message names the write failure" || return 1
+  assert_eq "$before" "$(cksum < "$f")" "file left as it was" || return 1
+}
+
+test_stale_emits_only_the_uid() {
+  _mk_root
+  : > "$_CSA_TMP/empty$_n.jsonl"
+  _write_sup "$root" FUID-aaaaaaaa
+  local out; out="$("$CSA" suppress_stale "$_CSA_TMP/empty$_n.jsonl" "$root" all)" || return 1
+  assert_eq '{"finding_uid":"FUID-aaaaaaaa"}' "$out" "one object with the uid and nothing else" || return 1
+}
+
+test_stale_tamper_exclusion_is_exact() {
+  _mk_root
+  : > "$_CSA_TMP/empty$_n.jsonl"
+  _write_sup "$root" "FUID-tamper01" $'FUID-tamper01\n' "FUID-tamper04"
+  local out; out="$("$CSA" suppress_stale "$_CSA_TMP/empty$_n.jsonl" "$root" all)" || return 1
+  assert_eq "2" "$(printf '%s\n' "$out" | grep -c .)" "two listed" || return 1
+  # Control: the tamper uid itself is not listed; the one with a trailing newline is.
+  [[ "$(jq -c '.finding_uid' <<<"$out" | paste -sd' ' -)" == '"FUID-tamper01\n" "FUID-tamper04"' ]] \
+    || { printf '    wrong listing: %s\n' "$out" >&2; return 1; }
+}
+
 csa_test_run test_remove_keeps_other_entries_byte_for_byte  || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_remove_absent_uid_rc1_file_untouched      || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_remove_malformed_file_rc2                 || _csa_failed=$((_csa_failed + 1))
@@ -275,5 +318,8 @@ csa_test_run test_stale_matches_the_uid_exactly             || _csa_failed=$((_c
 csa_test_run test_stale_malformed_suppressions_rc2          || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_stale_missing_findings_file_rc4           || _csa_failed=$((_csa_failed + 1))
 csa_test_run test_stale_provenance_finding_refuses          || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_remove_write_failure_rc5                  || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_stale_emits_only_the_uid                  || _csa_failed=$((_csa_failed + 1))
+csa_test_run test_stale_tamper_exclusion_is_exact           || _csa_failed=$((_csa_failed + 1))
 
 [[ "$_csa_failed" -eq 0 ]] || exit 1
