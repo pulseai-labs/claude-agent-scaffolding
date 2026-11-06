@@ -14,7 +14,8 @@ A stage that launches again reads its outcomes first (#1100). The engine changes
   in-place unpark, cleared by a launch that starts a worker and by stage entry. A retry after a refused or
   orphaned first attempt is still a first launch, because no worker ran. A match logs `relaunch skipped`
   (`baton report` counts it), then runs that outcome's hooks and takes its move or park, with no seat. A
-  first launch (an outcome's move, `unpark --to`, a clone) is unchanged, so `--to <the same stage>` forces a fresh seat.
+  first launch (an outcome's move, `unpark --to`, a clone) is unchanged, so `--to <the same stage>` forces
+  a fresh seat.
   An evaluation error parks as it would at a seat's end; a `pending` result waits a tick; a matched
   `to: park` outcome parks again. A no-result read in the same tick is not read twice.
 - **Changed: wording.** A plain unpark after a `run failed` park reruns the hooks from the first when the
@@ -27,7 +28,7 @@ A stage that launches again reads its outcomes first (#1100). The engine changes
   - An outcome whose hooks removed their own trigger before a failure (`correct`: its first hook removes
     `corrected`) reads false afterwards, so the seat relaunches and reruns the round. Reordering its hooks
     is #1110.
-    - A result that reads true without the seat's work is taken: this is the check's failure direction, kept
+  - A result that reads true without the seat's work is taken: this is the check's failure direction, kept
     to visits where a worker has run.
   - A unit whose worker ended under 0.17.4 carries no `recheck` mark, so its next launch is a first launch
     and reruns the round, as 0.17.4 did. This covers a park left open at the upgrade and a relaunch due in

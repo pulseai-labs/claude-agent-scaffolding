@@ -1783,6 +1783,21 @@ const RELAUNCH_PATHS: Record<string, { launched: number; run: (file: boolean) =>
       await doTick();
     },
   },
+  "orphaned relaunch after a failed thread": {
+    launched: 1,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+      await doTick();
+      host.advance();
+      failNextLaunch(new HostDownError(), false);
+      at(1);
+      expect(exitCode(await doTick())).toBe(4);
+      if (file) done("a");
+      at(5);
+      await doTick();
+      expect(count("orphan")).toBe(1);
+    },
+  },
   "refused relaunch after a failed thread": {
     launched: 1,
     run: async (file) => {
