@@ -317,7 +317,9 @@ describe("README, skill and release wording (baton 0.17.4)", () => {
     expect(row).toContain("origin/main");
     expect(row).toContain("never merge");
     expect(row).toContain("`close-pr.txt` holds no PR URL");
-    expect(b).toContain("reopen the PR, or replace or remove `out/spine-pr/close-pr.txt` before the unpark");
+    // C1: a plain unpark after removing the file only re-parks (`pr url`); the rerun needs --to spine_finish
+    expect(b).toContain("reopen the PR; or replace `out/spine-pr/close-pr.txt` with a valid close-PR URL, then unpark; or remove it and rerun the close with `baton unpark <run> spine-pr --to spine_finish`");
+    expect(b).not.toContain("replace or remove");
     const notice = skill().split("\n").find((l) => l.startsWith("| AI close PR recorded (")) ?? "";
     expect(notice).toContain("merge it if governance grants this session merge authority");
     expect(flatSkill()).toContain("the AI close PR, where the workspace takes PRs only");

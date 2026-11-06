@@ -457,6 +457,21 @@ describe("ossify-spine recipe", () => {
     rmSync(t.dir, { recursive: true, force: true });
   });
 
+  test("both origin conditions run their fetch with GIT_TERMINAL_PROMPT=0, so a credential prompt fails instead of hanging (#1095)", () => {
+    const r = loadRecipe();
+    const wait = (r.stages.spine_close_wait as WaitStage).outcomes[0].when.map((sg) => ("exit0" in sg ? sg.exit0 : []));
+    const fin = (r.stages.spine_finish as SessionStage).outcomes[0].when.map((sg) => ("exit0" in sg ? sg.exit0 : []));
+    const dir = mkdtempSync(join(tmpdir(), "baton-fetchenv-"));
+    const log = join(dir, "env.log");
+    writeFileSync(join(dir, "git"), `#!/bin/sh\ncase " $* " in *" fetch "*) printf '%s\\n' "$GIT_TERMINAL_PROMPT" >> '${log}';; esac\nexit 0\n`, { mode: 0o755 });
+    for (const argv of [...fin, ...wait].filter((a) => a.length > 0)) {
+      const a = argv.map((x) => x.replace("{param.state_file}", "/ai/.ossify/project-state.json").replace("{param.spine}", "r0.s6"));
+      spawnSync(a[0], a.slice(1), { env: { ...process.env, PATH: `${dir}:${process.env.PATH}`, GIT_TERMINAL_PROMPT: "1" }, cwd: dir });
+    }
+    expect(readFileSync(log, "utf8")).toBe("0\n0\n"); // one fetch per condition, each with the prompt off
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("spine_finish ends done on origin/main and goes to spine_close_wait on close-pr.txt; the wait parks every other state (#1095)", () => {
     const r = loadRecipe();
     const fin = r.stages.spine_finish as SessionStage;

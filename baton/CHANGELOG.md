@@ -9,7 +9,8 @@ notifier says why it failed (#1053). The example recipe changes; the engine does
 
 - **Fixed: `spine_finish` (#1095).** Its done outcome reads the state file at `origin/main` after a
   `git fetch origin main` in the AI root (`origin/main` is fixed). A local file that reads closed no longer
-  ends it. An AI root with no `origin` remote, a failed fetch, an unknown spine or a bad file parks
+  ends it. The fetch runs with `GIT_TERMINAL_PROMPT=0`, so a credential prompt fails instead of hanging. An AI
+  root with no `origin` remote, a failed fetch, an unknown spine or a bad file parks
   `exit0 error`. When the seat wrote `out/spine-pr/close-pr.txt` (the AI close PR's URL), the unit goes to the
   new wait stage `spine_close_wait`: it ends done when the PR is merged and `origin/main` reads the spine
   closed, and parks when the PR merged but `origin/main` does not, closed without a merge, conflicts, or
@@ -20,7 +21,9 @@ notifier says why it failed (#1053). The example recipe changes; the engine does
   `main`. It never merges the close PR.
 - **Fixed: notifier (#1053 C8).** `notify-orchestrator` appends `<iso> <key> notify-orchestrator <where>:
   <reason>` to `notify.log` at each place it failed to deliver: the six bare catches, a stale incarnation, a
-  used-up budget and a send Orca did not accept. Delivery is unchanged.
+  used-up budget and a send Orca did not accept; a pointer file that parses but has the wrong shape; and a
+  `fallback_notify` that exits non-zero or times out. Orca's error text is capped at 300 characters. Delivery is
+  unchanged.
 - **Changed: wording (#1053 C4).** The README and the skill say that after a `run failed` park on a session
   stage a plain `baton unpark` relaunches the seat and reruns the round, and `--to <next stage>` skips it.
   The runbook and the skill gain a `spine_close_wait` row.

@@ -1038,7 +1038,16 @@ test("spine_close_wait parks a close PR in conflict (#1095)", async () => {
   expect(unit(SPINE_UNIT).parked?.reason).toBe("outcome");
 });
 
-test("spine_close_wait parks when its check errors: close-pr.txt holds no PR URL (#1095)", async () => {
+test("spine_close_wait parks `pr url` when close-pr.txt holds no PR URL (#1095)", async () => {
   await toFinish(() => closeOnBranch("not a url"), parkedIn("spine_close_wait"));
   expect(unit(SPINE_UNIT).parked?.reason).toBe("pr url");
+});
+
+test("spine_close_wait parks `exit0 error` when the PR is merged and origin cannot be reached (#1095 C3)", async () => {
+  const r = await toFinish(() => closeOnBranch(), () => unit(SPINE_UNIT)?.stage === "spine_close_wait");
+  closeView(r, { state: "MERGED" });
+  git(aiRoot, "remote", "set-url", "origin", join(root, "nowhere.git")); // the stale origin/main ref stays: the fetch failure must park, not read false
+  await drive(r, 10, parkedIn("spine_close_wait"));
+  expect(unit(SPINE_UNIT).parked?.reason).toBe("exit0 error");
+  expect(readRun().status).not.toBe("done");
 });

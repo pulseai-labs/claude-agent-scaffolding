@@ -59,6 +59,7 @@ export function readPointer(run: string, key?: string): Pointer | undefined {
     if (p !== null && typeof p === "object" && typeof p.handle === "string" && p.handle !== "" && typeof p.incarnation === "string" && p.incarnation !== "") {
       return { handle: p.handle, incarnation: p.incarnation };
     }
+    if (key !== undefined) logFailure(key, "pointer", "not a pointer: handle and incarnation must be non-empty strings");
   } catch (e) {
     // missing: no pointer, which is normal; unreadable or malformed: no pointer, and say why
     if (key !== undefined && (e as NodeJS.ErrnoException)?.code !== "ENOENT") logFailure(key, "pointer", e);
@@ -130,9 +131,11 @@ function runFallback(key: string, message: string, deadline: number): void {
   }
   if (!argv) return;
   try {
-    Bun.spawnSync(renderNotifyArgv(argv, key, message), {
+    const r = Bun.spawnSync(renderNotifyArgv(argv, key, message), {
       stdout: "ignore", stderr: "ignore", timeout: Math.max(1_000, deadline - Date.now()),
     });
+    if (r.exitCode === null || r.signalCode) logFailure(key, "fallback", `timed out or killed (${r.signalCode ?? "no exit code"})`);
+    else if (r.exitCode !== 0) logFailure(key, "fallback", `exited ${r.exitCode}`);
   } catch (e) {
     // a missing fallback command is the operator's to fix
     logFailure(key, "fallback", e);

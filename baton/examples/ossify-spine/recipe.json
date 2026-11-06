@@ -474,7 +474,7 @@
         {
           "when": [
             { "pr": { "url": ["sed", "-n", "1p", "{run.dir}/out/{unit.id}/close-pr.txt"], "test": "merged" } },
-            { "exit0": ["sh", "-c", "d=$(dirname -- \"$1\"); b=$(basename -- \"$1\"); git -C \"$d\" fetch -q origin main || exit 2; s=$(git -C \"$d\" show \"origin/main:./$b\") || exit 2; printf '%s\\n' \"$s\" | jq -e --arg s \"$2\" '.spines[] | select(.id == $s) | .status == \"closed\"' >/dev/null; r=$?; [ \"$r\" -le 1 ] || exit 2; exit \"$r\"", "sh", "{param.state_file}", "{param.spine}"] }
+            { "exit0": ["sh", "-c", "d=$(dirname -- \"$1\"); b=$(basename -- \"$1\"); GIT_TERMINAL_PROMPT=0 git -C \"$d\" fetch -q origin main || exit 2; s=$(git -C \"$d\" show \"origin/main:./$b\") || exit 2; printf '%s\\n' \"$s\" | jq -e --arg s \"$2\" '.spines[] | select(.id == $s) | .status == \"closed\"' >/dev/null; r=$?; [ \"$r\" -le 1 ] || exit 2; exit \"$r\"", "sh", "{param.state_file}", "{param.spine}"] }
           ],
           "to": "done",
           "notify": "AI close PR for {param.spine} is merged and origin/main reads the spine closed: pull the AI workspace root (move an untracked ledger aside first)."
@@ -506,7 +506,7 @@
       "handoff": { "file": "{run.dir}/out/{unit.id}/molt.log", "token": "handed-off", "message": "Continue from the handoff at {handoff_path}. Then read the brief named in it and finish the stage." },
       "outcomes": [
         {
-          "when": [{ "exit0": ["sh", "-c", "d=$(dirname -- \"$1\"); b=$(basename -- \"$1\"); git -C \"$d\" fetch -q origin main || exit 2; s=$(git -C \"$d\" show \"origin/main:./$b\") || exit 2; printf '%s\\n' \"$s\" | jq -e --arg s \"$2\" '.spines[] | select(.id == $s) | .status == \"closed\"' >/dev/null; r=$?; [ \"$r\" -le 1 ] || exit 2; exit \"$r\"", "sh", "{param.state_file}", "{param.spine}"] }],
+          "when": [{ "exit0": ["sh", "-c", "d=$(dirname -- \"$1\"); b=$(basename -- \"$1\"); GIT_TERMINAL_PROMPT=0 git -C \"$d\" fetch -q origin main || exit 2; s=$(git -C \"$d\" show \"origin/main:./$b\") || exit 2; printf '%s\\n' \"$s\" | jq -e --arg s \"$2\" '.spines[] | select(.id == $s) | .status == \"closed\"' >/dev/null; r=$?; [ \"$r\" -le 1 ] || exit 2; exit \"$r\"", "sh", "{param.state_file}", "{param.spine}"] }],
           "to": "done",
           "run": [["sh", "-c", "[ -e \"$1/$2$3\" ] || exit 0; n=1; while [ -e \"$1/$2-$n$3\" ]; do n=$((n+1)); done; mv -- \"$1/$2$3\" \"$1/$2-$n$3\"", "sh", "{run.dir}/out/{unit.id}", "operator", ".md"]]
         },

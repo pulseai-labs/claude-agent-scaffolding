@@ -368,7 +368,7 @@ describe("baton notify-orchestrator", () => {
       expect(fallbackLines(r)).toEqual([]);
     });
 
-    test("an unwritable notice directory: a notice line, and the fallback still runs", async () => {
+    test.skipIf(process.getuid?.() === 0)("an unwritable notice directory: a notice line, and the fallback still runs", async () => {
       const r = await rig({ replies: ok });
       await register(r);
       const dir = join(r.state, "runs", "r1", "notices");
@@ -431,6 +431,39 @@ describe("baton notify-orchestrator", () => {
       await baton(b, ["notify-orchestrator", KEY, MSG]);
       expect(failureLines(b)[0].endsWith(`send: boom: ${"x".repeat(300)}`)).toBe(true);
     });
+
+    test("a pointer that parses but has the wrong shape says why (C2)", async () => {
+      for (const body of ['{"handle":"","incarnation":"x"}', "[]", '{"handle":"h","incarnation":7}']) {
+        const r = await rig({ replies: ok });
+        writeFileSync(join(r.state, "runs", "r1", "orchestrator"), body);
+        await baton(r, ["notify-orchestrator", KEY, MSG]);
+        expect(failureLines(r).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator pointer: not a pointer: handle and incarnation must be non-empty strings`]);
+        expect(fallbackLines(r)).toEqual([`${KEY}|${MSG}`]);
+      }
+    });
+
+    test("a fallback that runs and exits non-zero says so; one that times out says so (C2)", async () => {
+      const f = await rig({ replies: ok });
+      writeFileSync(f.cfg, JSON.stringify({ orca: { cli: FAKE_ORCA }, fallback_notify: ["sh", "-c", "exit 3"] }));
+      await baton(f, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(f).map((l) => l.replace(/^\S+ /, ""))).toEqual([`${KEY} notify-orchestrator fallback: exited 3`]);
+      // control: a fallback that exits 0 logs nothing
+      const g = await rig({ replies: ok });
+      await baton(g, ["notify-orchestrator", KEY, MSG]);
+      expect(failureLines(g)).toEqual([]);
+      // timeout: the clock jumps past the 28 s budget once the first Orca call is logged... here no pointer, so jump from the start
+      const t = await rig({ replies: ok });
+      writeFileSync(t.cfg, JSON.stringify({ orca: { cli: FAKE_ORCA }, fallback_notify: ["sleep", "30"] }));
+      const script = `import { notifyOrchestrator } from ${JSON.stringify(join(import.meta.dir, "..", "src", "hosts", "orchestrator.ts"))};
+        const real = Date.now; let first = true; Date.now = () => { if (first) { first = false; return real(); } return real() + 40_000; };
+        process.exit(notifyOrchestrator("auth/2026-11-03", ${JSON.stringify(MSG)}));`;
+      const env = { ...process.env, HOME: t.home, BATON_STATE_DIR: t.state, BATON_CONFIG: t.cfg, FAKE_ORCA_DIR: t.orca };
+      const t0 = Date.now();
+      const p = Bun.spawn(["bun", "-e", script], { env, stdout: "pipe", stderr: "pipe" });
+      expect(await p.exited).toBe(0);
+      expect(Date.now() - t0).toBeLessThan(15_000); // the fallback was cut at the 1 s floor, not left to sleep
+      expect(failureLines(t).map((l) => l.replace(/^\S+ /, ""))).toEqual(["auth/2026-11-03 notify-orchestrator fallback: timed out or killed (SIGTERM)"]);
+    }, 30_000);
 
     test("a pointer that is not a pointer, and a fallback command that cannot run", async () => {
       const r = await rig({ replies: ok });
