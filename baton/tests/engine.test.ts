@@ -1783,27 +1783,18 @@ const RELAUNCH_PATHS: Record<string, { launched: number; run: (file: boolean) =>
       await doTick();
     },
   },
-  orphan: {
-    launched: 0,
+  "refused relaunch after a failed thread": {
+    launched: 1,
     run: async (file) => {
-      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
-      failNextLaunch(new HostDownError(), false);
-      expect(exitCode(await doTick())).toBe(4);
-      if (file) done("a");
-      at(3);
+      host = new FakeHost({ work: { ticks: 1, end: "failed" } });
       await doTick();
-      expect(count("orphan")).toBe(1);
-    },
-  },
-  "refused launch": {
-    launched: 0,
-    run: async (file) => {
-      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      host.advance();
       failNextLaunch(new LaunchError("refused"), false);
+      at(1);
       await doTick();
       expect(count("launch failed")).toBe(1);
       if (file) done("a");
-      at(1);
+      at(2);
       await doTick();
     },
   },
@@ -1860,11 +1851,53 @@ for (const [name, p] of Object.entries(RELAUNCH_PATHS)) {
   });
 }
 
+/**
+ * A retry after a first attempt that ran no worker (a refused launch, an orphan) is a first launch:
+ * it does not read the outcomes, so a result left in place does not move the unit (#1100 r1 C1).
+ */
+const FIRST_ATTEMPT_RETRIES: Record<string, { launched: number; run: (file: boolean) => Promise<void> }> = {
+  orphan: {
+    launched: 0,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      failNextLaunch(new HostDownError(), false);
+      expect(exitCode(await doTick())).toBe(4);
+      if (file) done("a");
+      at(3);
+      await doTick();
+      expect(count("orphan")).toBe(1);
+    },
+  },
+  "refused launch": {
+    launched: 0,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      failNextLaunch(new LaunchError("refused"), false);
+      await doTick();
+      expect(count("launch failed")).toBe(1);
+      if (file) done("a");
+      at(1);
+      await doTick();
+    },
+  },
+};
+
+for (const [name, p] of Object.entries(FIRST_ATTEMPT_RETRIES)) {
+  test(`a retry after ${name} with no worker before it launches the seat even with a result in place`, async () => {
+    await arm(recipe({ work: sess({ settle_minutes: 1, max_launches: 3 }) }, ["a"]));
+    await p.run(true);
+    expect(runState().units.a.stage).toBe("work");
+    expect(host.launches.length).toBe(p.launched + 1);
+    expect(skipped()).toEqual([]);
+  });
+}
+
 test("a crash between a seat's end and the move: the next tick takes the result, no second seat", async () => {
   await arm(recipe({ work: sess() }, ["a"]));
   host = new FakeHost({ work: { ticks: 100, end: "completed" } });
   const run = runState();
   run.units.a.launches.work = 1; // the unit is in `work`, launched once, with no session
+  run.units.a.recheck = true; // the seat's end saved the mark before the crash
   writeFileSync(join(runDir(), "run.json"), JSON.stringify(run));
   done("a");
   await doTick();
@@ -1975,7 +2008,7 @@ test("control: a before failure at a visit's first launch, then an in-place unpa
   expect(skipped()).toEqual([]);
 });
 
-test("recheck: set by an in-place unpark of a launched visit, cleared by the launch and by stage entry", async () => {
+test("recheck: set by a worker's end, kept by an in-place unpark, cleared by the launch and by stage entry", async () => {
   await arm(recipe({ work: sess({ stop_file: "{run.dir}/stop" }) }, ["a"]));
   host = new FakeHost({ work: { ticks: 100, end: "completed" } });
   await doTick();

@@ -135,9 +135,8 @@ export function unparkUnit(run: RunState, recipe: Recipe | undefined, u: UnitSta
     u.stalls = 0;
     delete u.merge_failures;
     delete u.forge_failures;
-    // The count below restarts, so the next launch would look like a first one: a visit that had
-    // launched keeps the mark that makes `launch()` read its outcomes first (#1100).
-    if ((own(u.launches, u.stage) ?? 0) > 0) u.recheck = true;
+    // The count restarts; the visit keeps its `recheck` mark, so a visit where a worker ran reads
+    // its outcomes before the next launch (#1100).
     u.launches[u.stage] = 0;
   }
   return consumed === undefined ? { stage: u.stage } : { stage: u.stage, consumed };
@@ -381,7 +380,9 @@ class RunTick {
     }
     delete u.session;
     delete u.quiet_since;
-    u.recheck = true; // a session ran in this visit: its next launch reads the outcomes first (#1100)
+    // A worker ran in this visit (it had a thread): the next launch reads the outcomes first (#1100).
+    // An orphan had none, so it leaves the mark as it was.
+    if (s.thread_id !== undefined) u.recheck = true;
     this.save();
   }
 
@@ -647,6 +648,7 @@ class RunTick {
 
   /** A launch that now has its thread: a counted launch, or a successor (not counted). */
   private counted(u: UnitState, s: Session): void {
+    delete u.recheck; // a live worker: its end reads the outcomes, and sets the mark again
     if (s.successor_of) {
       this.ev("successor", { unit: u.id, nonce: s.nonce, of: s.successor_of, thread: s.thread_id });
       return;
@@ -984,7 +986,6 @@ class RunTick {
 
   private begin(u: UnitState, s: Session): void {
     u.session = s;
-    delete u.recheck;
     this.ev("launching", { unit: u.id, nonce: s.nonce, dir: s.launch_dir });
     this.save();
   }
@@ -1089,10 +1090,11 @@ class RunTick {
     }
     if (!this.slotsFree(stage)) return;
     delete u.cwd_busy;
-    // A launch of a visit that has launched before reads the stage's outcomes first (#1100): the
+    // A launch of a visit where a worker has run reads the stage's outcomes first (#1100): the
     // worker may have finished, or the operator ruled, since the outcomes were last read.
-    // A first launch does not: the `before` hooks clear the earlier visit's files it would match.
-    if (((own(u.launches, u.stage) ?? 0) > 0 || u.recheck === true) && !this.noMatch.has(u.id)) {
+    // A first launch does not, nor a retry after a refused or orphaned attempt with no worker
+    // before it: the `before` hooks clear the earlier visit's files it would match.
+    if (u.recheck === true && !this.noMatch.has(u.id)) {
       const m = await this.firstOutcome(u, stage.outcomes, this.existingDir(cwd));
       if (m === "pending") return; // read again next tick, as live() does
       if (m) {

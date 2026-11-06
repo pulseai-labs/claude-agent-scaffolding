@@ -322,7 +322,7 @@ describe("README, skill and release wording (baton 0.18.0)", () => {
 
   test("the README names the relaunch read, the event and the report count (#1100)", () => {
     const r = readmeRaw().replace(/\s+/g, " ");
-    expect(r).toContain("A plain `unpark` of a stage that had launched reads the stage's outcomes before it launches again");
+    expect(r).toContain("A plain `unpark` of a stage where a worker had run reads the stage's outcomes before it launches again");
     expect(r).toContain("`unpark --to <stage>` enters a fresh visit and launches without reading them");
     expect(r).toContain("logs `relaunch skipped` (`unit`, `stage`, `to`, `outcome`: the matched outcome's 1-based place); `baton report` counts them");
   });

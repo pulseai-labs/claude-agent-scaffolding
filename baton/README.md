@@ -227,7 +227,7 @@ inside the 30 s bound and always exits 0. A line sent while the operator is typi
 join the operator's text.
 
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
-with rc 2. A plain `unpark` of a stage that had launched reads the stage's outcomes before it
+with rc 2. A plain `unpark` of a stage where a worker had run reads the stage's outcomes before it
 launches again, and a result already in place moves the unit with no seat (a `relaunch skipped`
 event); `unpark --to <stage>` enters a fresh visit and launches without reading them.
 
@@ -469,7 +469,7 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   `<path>.consumed-<iso>`, so it does not park the unit again. To make a seat apply a ruling, unpark
   `--to <the same stage>`: a plain unpark reads the stage's outcomes first, so if the seat had already
   written its result, the unit takes it and moves on with the ruling unapplied (a close,
-  spine-open or spine-finish stage's hook also archives `operator.md`).
+  spine-open, `item_fix`, `spine_work` or spine-finish stage's hook also archives `operator.md`).
 - **A round barrier is a stop.** A spine planned one round at a time halts the lane at the next
   round (`no spec for <work item>`), and the lane's stop file starts `round barrier:`. Plan the round
   (plan-spine for the spine), then `baton unpark <run> lane`. An unpark before the specs exist stops

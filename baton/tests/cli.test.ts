@@ -303,11 +303,13 @@ test("unpark resets the stage counters and logs an event", async () => {
   expect(ev[1].unit).toBe("planner");
 });
 
-test("unpark marks a launched visit for a recheck, and leaves an unlaunched one unmarked (#1100)", async () => {
+test("an in-place unpark keeps a visit's recheck mark and adds none (#1100)", async () => {
   const st = await armedWithParkedUnit();
   const run = runJson(st, "r1");
-  expect(run.units.planner.launches.planner).toBeGreaterThan(0); // a launched visit
-  run.units.work = { ...run.units.planner, id: "work", launches: { planner: 0 } }; // never launched
+  run.units.planner.recheck = true; // a worker ran in this visit
+  // launched, but only refused or orphaned attempts: no worker ran, so no mark
+  run.units.work = { ...run.units.planner, id: "work", launches: { planner: 2 } };
+  delete run.units.work.recheck;
   run.units.work.parked = { reason: "before failed", at: "t" };
   writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
   expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
