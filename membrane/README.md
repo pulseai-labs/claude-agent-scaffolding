@@ -111,6 +111,8 @@ Critical findings **cannot be suppressed**; they must be remediated.
 
 **Upgrading to 0.5.0.** A finding's durable id (`FUID-...`) from the free-text rules (HOOK-001 to HOOK-003 in script files, PROMPT-INJ-001, PROMPT-INJ-002, SECRETS-001 to SECRETS-004, CLAUDE-MD-001, CLAUDE-MD-002, MCP-001 to MCP-003, MARKETPLACE-001, PERM-001, PERM-003, PERM-005, PROVENANCE-002) changes once when its excerpt is over 200 characters or holds a secret-shaped or 32-character run, so that a long match can no longer share the id of a different one. A suppression or baseline entry for such a finding reads NEW once and must be suppressed again. Short findings keep their ids. See the CHANGELOG.
 
+**Upgrading to 0.5.1.** A HOOK-004 finding in a script file (`network-exfiltration`) gets a new durable id once, because the id now follows what the rule matched (the network commands and sensitive paths that fire, and the lines that hold both) and not the first 200 characters of the file. It reads NEW in the next audit and must be suppressed again; the old entry in `.claude/audits/suppressions.json` matches nothing and can be removed by hand. HOOK-004 read from `.claude/settings.json`, `.claude/settings.local.json`, or an enabled plugin's `hooks/hooks.json` or `.claude-plugin/plugin.json` keeps its id; any other file under `.claude/hooks/`, JSON included, is a script file and moves. See the CHANGELOG.
+
 ## Composition
 
 `membrane` is fully standalone. It runs in any Claude Code project, with or without other plugins. It has no integration with any other plugin in v0.1.
