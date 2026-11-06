@@ -2,6 +2,24 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.15.0 — 2026-11-06
+
+The kill rail reaches a plain omp session (#1102). Until now only `omp-seat`'s `-e` loaded seat-mods on OMP, so an
+omp session started by hand had no rail. seat-mods now ships a `package.json` with an `omp` manifest that names
+`omp/kill-rail.ts`: the rail alone, over bash's command and eval's string literals, calling the `killCheck` of
+`omp/extension.ts`, so the two cannot drift. omp loads it ambiently, so it reaches every omp session with seat-mods enabled after `omp plugin upgrade`, with no host step.
+
+- A plain session changes in nothing but the kill refusals: no role guard, no `SEAT_MODS_ROLE` read, no other denial.
+  The role guard (`omp/extension.ts`) stays `omp-seat`-only.
+- A text the rail cannot read is refused with `KILL_UNCHECKED`, as free roles are.
+- Under `omp-seat` the rail runs twice, from the manifest and inside the guard. Harmless: it only refuses, and the
+  first block wins. The one visible difference: for a text the rail cannot read, a guarded seat now gets the rail's
+  `KILL_UNCHECKED` stop first, not its role's own deny text. A load probe on omp 18.16.0 saw each of rail, guard and molt load once under `omp-seat`.
+- Off switch: `omp plugin disable seat-mods` turns the ambient entry off and leaves `omp-seat` alone. A session with
+  `--no-extensions` does not load it.
+- `package.json` carries no `version`: `.claude-plugin/plugin.json` owns it. A CI contract test pins the manifest.
+- Claude Code is unchanged.
+
 ## 0.14.2 — 2026-11-06
 
 The kill rail reads a shell call two ways (#1109). Every one of `sh|bash|zsh|dash` is now read with bash's

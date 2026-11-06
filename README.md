@@ -182,8 +182,8 @@ and the loader warns with this command if it ever needs a new download. Without 
 are not found and the skills that need them say so. A session started
 with `--no-extensions` needs `-e <that file>`.
 
-Guarded seats: install `omp-roles` and both mods, then launch with `omp-seat` (the extensions load only
-through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, and `seat-mods` and `molt` at the minimum versions `omp-roles/README.md` names; for a missing mod it refuses and names the mod; for one that is too old it refuses and names the version it needs.
+Guarded seats: install `omp-roles` and both mods, then launch with `omp-seat` (the guard and molt load only
+through it; seat-mods' kill rail loads in every omp session with seat-mods enabled). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, and `seat-mods` and `molt` at the minimum versions `omp-roles/README.md` names; for a missing mod it refuses and names the mod; for one that is too old it refuses and names the version it needs.
 
     omp plugin install omp-roles@pulsestack   # and seat-mods, molt
     omp-seat worker --via omp -p "..."

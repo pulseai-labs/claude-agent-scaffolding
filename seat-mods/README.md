@@ -213,6 +213,14 @@ it goes on to the role checks and the model exactly as if the rail were absent. 
 `Bash` and `Monitor` (Monitor's `command` field, as found in Claude Code 2.1.319); on OMP it reads `bash`,
 and `eval` best effort through its string literals, and an implementer's `debug` launch.
 
+**On OMP it also reaches a plain session** (#1102). `package.json`'s `omp` manifest names `omp/kill-rail.ts`, the rail
+alone (`bash` and `eval`; not `debug`), so every omp session with seat-mods enabled loads it after `omp plugin upgrade`, whether or not `omp-seat` launched it. That
+entry ignores `SEAT_MODS_ROLE` and the agent kind: a plain session keeps every other freedom, and the role
+guard stays `omp-seat`-only. A text the rail cannot read is refused with the same stop a free role gets. Under
+`omp-seat` the rail runs twice, once from the manifest and once inside the guard; that is harmless, as the first
+block wins. The one visible difference: for a text the rail cannot read, a guarded seat gets the rail's stop first,
+not its role's own deny text. `omp plugin disable seat-mods` turns the ambient entry off and leaves `omp-seat` alone.
+
 It refuses:
 
 - **A call that both lists processes and signals.** A `ps`, `pgrep`, `pidof` or `ls /proc…` head
@@ -259,10 +267,12 @@ no shell runs either string. Both
 readings go into one scan, so `bash -cO 'ps aux' 'kill 123'`, where one reading lists and the other signals,
 is refused as a call that lists and signals.
 
-**Known limits** (the rail does not read these; each is pinned by `tests/kill.test.ts`):
+**Known limits** (the rail does not read these; each is pinned by `tests/kill.test.ts`, except the #1102 items in the first bullet, which the recorded load probe shows):
 
-- **Seats and tools outside it.** A plain `omp` session that `omp-seat` did not launch has no
-  seat-mods at all (#1102). Devin and Codex seats, and an operator's `!cmd` on OMP, are not seats of
+- **Seats and tools outside it.** A plain `omp` session started with `--no-extensions`, one where
+  `omp plugin disable seat-mods` or a project `plugin-overrides.json` `disabled` turned the plugin off, a host
+  with seat-mods installed for Claude Code only, and a session whose entry fails to import (omp starts
+  without it) get no rail (#1102). Devin and Codex seats, and an operator's `!cmd` on OMP, are not seats of
   either kind. Claude Code tools other than `Bash` and `Monitor`; on OMP every tool other than
   `bash`, `eval` and an implementer's `debug` (the `debug` tool of a free role is not read; `eval`
   source is read only for the string literals it holds).
@@ -443,7 +453,7 @@ Under `SEAT_MODS_ROLE=orchestrator`, the OMP guard blocks the `task` tool and ev
 
 `omp/status-extension.ts` (0.8.0) is the status-block check and idle stop for an OMP orchestrator, over the same `hooks/status.ts`: one block per turn, then the warning as an OMP notification. `omp-seat` loads it last, after molt, for the orchestrator only, so its `session_stop` blocks win as they do beneath seat-mods on Claude Code; the guard stays first. OMP's `input` cannot tell typing from a herdr send, so a turn is status by its crew tag, or when no input started it (a job completion, an idle wake). **Known limit:** a turn that no prompt starts gets the check but not the status-turn context line.
 
-`omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`, so the Bash reading, the scratch places (`$TMPDIR` from the seat's environment) and the `cd` walk above apply to a `bash` call there as they do on Claude Code. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded (ambient coverage, kill rail included: #1102). The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
+`omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`, so the Bash reading, the scratch places (`$TMPDIR` from the seat's environment) and the `cd` walk above apply to a `bash` call there as they do on Claude Code. The guard loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session has no role guard. The kill rail alone, `omp/kill-rail.ts`, loads in every omp session through the plugin's `package.json` `omp` manifest (#1102), and omp loads each file once. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
 
 | Child agent | Rails |
 |---|---|

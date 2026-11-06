@@ -1,5 +1,5 @@
 // seat-mods on OMP: the same rules as hooks/register.ts, read through OMP's extension API.
-// Loaded only by omp-seat with -e (never ambient). Reads SEAT_MODS_ROLE / SEAT_MODS_ALLOW
+// Loaded only by omp-seat with -e (never ambient); the kill rail alone is ambient, as omp/kill-rail.ts (#1102). Reads SEAT_MODS_ROLE / SEAT_MODS_ALLOW
 // for the main session and ctx.agent.name for a task child, whose env is its parent's.
 import { realpathSync, existsSync, lstatSync, readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
@@ -175,7 +175,7 @@ function hasExpandableKey(args: object): boolean {
 
 // The kill rail over the shell texts of a call: bash's command, and eval's string literals (best effort, as the
 // other eval checks). `unread`: the rail could not read a text; the call then fails closed after the role's own checks.
-function killCheck(toolName: string, input: Record<string, unknown>): { deny?: string; unread: boolean } {
+export function killCheck(toolName: string, input: Record<string, unknown>): { deny?: string; unread: boolean } {
   let unread = false
   const texts = toolName === 'bash' ? [input.command] : toolName === 'eval' ? evalCommands(String(input.code ?? '')) : []
   for (const text of texts) {
