@@ -318,7 +318,7 @@ path and model read, then the layer file's send route (its second detection ask 
 the path as its first instruction on either. From the handoff on, this session writes nothing to the run file and
 takes no dispatch action; a wake that reaches it before it stands down is handed to the successor, never acted on.
 Confirm its turn started, then **stand down**: stop this session's armed
-background waits and its heartbeat by job id (OMP `proc://<id>/kill`, Claude Code `TaskStop`), write nothing more to the run file and take no dispatch action. One report must
+background waits and its heartbeat by job id (OMP `write proc://<id>/kill`, Claude Code `TaskStop`), write nothing more to the run file and take no dispatch action. One report must
 wake one top. A worker pings whichever pane `run.orchestrator` names, so after the rebind a worker on the successor's machine pings the successor. A stale ping — tagged `[crew report <role>]`, or the legacy `REPORT READY: <task id> <kind> <path>`
 from a brief older than 0.3.1 — that reaches this pane after the rebind, like a `[DAGR OPERATOR MESSAGE]` envelope dagr queued here before the rebind, is read and handed to the successor, never acted on.
 Then tell the operator which tab to use and that this one can close.
@@ -385,7 +385,7 @@ only where it does not; it always rewrites `run.orchestrator.session` (step 1), 
 and their notifications are its own. A heartbeat tick the handoff carries means that heartbeat
 has ended: the resumed top arms a fresh one. It runs the generation check once per live
 dispatch against the attempt's `locator.seen`, a carried wake included, so a report
-that landed across the clear is acted on once and retires its listed wait by id; the later
+that landed across the clear is acted on once and retires its listed wait by id (`TaskStop`); the later
 notification for that generation retires nothing. On OMP the clear cancels every background job the old session
 ran, and molt's seed says so (#855): after that check the resumed top re-arms the wait of each dispatch still live
 and one fresh heartbeat; there is no listed wait left to retire. With `/molt off` the marker goes, the hook

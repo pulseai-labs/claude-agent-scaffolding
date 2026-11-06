@@ -175,6 +175,8 @@ pin "$COMP" 'is a seat failure, not a failed task' "a stall is a seat failure, n
 pin "$COMP" "then launch the fallback the project file's" "a stall launches the declared fallback (#651 D)" flat
 pin "$COMP" 'stall with no fallback named, is reported to the operator once' "no declared fallback goes to the operator (#651 D)" flat
 pin "$COMP" 'Settle its dispatch first (stop its report-file wait and companion by job id' "a stalled dispatch is settled before its fallback launches (#651 D, round 1)" flat
+pin "$COMP" 'Stop a wait, companion or heartbeat by its job id: OMP `write proc://<job id>/kill`, Claude Code `TaskStop`, a shell process this session started by its exact PID or job id; never a process listing' "each host's job stop is named, never a listing fed to kill (#1099)" flat
+present "$SKILL_MD" 'Never signal processes by listing them' "the orchestrator rules forbid a listing-fed kill (#1099)" flat
 pin "$COMP" 'the seat'"'"'s last report when it wrote one' "a stall before any report still has a brief (#651 D, round 1)" flat
 pin "$COMP" 'A seat a fresh session cannot resume (the cuts the molt paragraph below lists) gets no fallback' "a non-resumable seat is never auto-replaced (#651 D, round 1)" flat
 pin "$REF" "a timeout is the checkpoint \`completion.md\` states (a doorbell companion's excepted: it lapses)" "the typed wait carries the companion's exception (#651 B, round 1)" flat
