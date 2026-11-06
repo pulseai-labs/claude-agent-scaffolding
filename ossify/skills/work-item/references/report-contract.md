@@ -29,7 +29,7 @@ an empty section reads as "considered, nothing to say", a missing section reads 
 
 | Section | Holds |
 |---|---|
-| `## 1. Work item` | Id, spine, release, branch, worktree absolute path, spec absolute path, timestamp. |
+| `## 1. Work item` | Id, spine and its class as the handoff's §2 states it, release, branch, worktree absolute path, spec absolute path, timestamp. |
 | `## 2. Summary` | What the item actually delivered, in a short paragraph. The one-line return `summary` is this, compressed. |
 | `## 3. ACs — verification status` | **A table**, one row per `auto:` AC. See §2 below. |
 | `## 4. Files changed` | Every file created or edited, with a one-line note on what changed in it. |

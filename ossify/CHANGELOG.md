@@ -5,8 +5,13 @@ All notable changes to the `ossify` plugin, newest first.
 Up to 1.36.7 these notes were "Since x.y" paragraphs in `README.md`. They moved here word for word,
 with two edits that fix a pointer to a place on the old page: 1.11.0 says "see its entry above",
 not "see its section below", and 1.15.0 drops "which is why it is listed above rather than below".
+The 1.24.0 entry's parenthesis about adopt and a marked stub, added in 1.35.0, said adopt replaced a stub as of 1.24.0; 1.37.1 corrects it (#1107).
 Some versions have no entry. The GitHub releases tagged `ossify-v*` carry notes for the versions
 they cover.
+
+## 1.37.1
+
+Since 1.37.1 (#1121, #1107), a work item's handoff says where the spine's class comes from. `handoff-contract.md` §2 now says to copy it from `oss get '.spines[] | select(.id == "<spine-id>") | .class'` and never to derive it from the bones list, because a spine that registers no bones is `bone` whenever its plan touches a registered surface; the report contract's work-item row takes the class as the handoff's §2 states it. Before, §2 asked for the class and named no source (`base_branch` had one), and a lane seat recorded `flesh` for a `bone` spine in all three handoffs and reports. It never ran an `oss get` for the class, its reads of the spine skipped the `Class:` line, and its header text (`bones registered: none`) suggests it took the class from the spine's "Bones this spine registers: None.". That was a record defect with no behavioural effect: spine close reads the class from the state file, and nothing in ossify reads it from a handoff. Four pins in `test-prose-contracts.sh` hold the wording. The 1.24.0 entry is corrected: `/start` replaces a marked `AGENTS.md` stub from 1.24.0, and adopt merges into it until 1.35.0, as adopt's `AGENTS.md` row at ossify-v1.25.0 and ossify-v1.34.0 (merge only), the 1.35.0 entry and `plain-repo.md` §5 say. Closes #1121 and #1107. Existing handoffs and reports are not rewritten.
 
 ## 1.37.0
 
@@ -241,8 +246,8 @@ Since 1.24.0 (#768, #554), `/start` and `/adopt` author `AGENTS.md`, the one
 instruction file: Claude Code loads it when no `CLAUDE.md` exists, and Codex and
 OMP read it directly. Neither writes `CLAUDE.md`. `/start` replaces a
 workspace-init stub (marker on line 1) without asking; `adopt` merges its loop
-section into an `AGENTS.md` that exists (a marked stub it replaces, policy sections carried)
-and authors one that does not. `doctor`'s
+section into an `AGENTS.md` that exists, a marked stub included (from 1.35.0 adopt replaces a marked
+stub, policy sections carried), and authors one that does not. `doctor`'s
 interop check fails on a leftover `CLAUDE.md` at the AI workspace root or in
 `.claude/`, and its repair — offered only on the operator's explicit yes, after
 showing every change, and never committed — moves or merges that file into
