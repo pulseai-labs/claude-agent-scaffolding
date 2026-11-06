@@ -47,7 +47,7 @@ export function readConfig(): Config {
   return out;
 }
 
-const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ");
+export const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ");
 
 /** An argv with `{key}` and `{message}` rendered; the one rendering `notify` and `fallback_notify` share. */
 export function renderNotifyArgv(argv: string[], key: string, message: string): string[] {

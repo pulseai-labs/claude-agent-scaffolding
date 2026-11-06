@@ -294,3 +294,47 @@ describe("briefs wording (baton 0.17.3)", () => {
     expect(c).not.toContain("whose `A:` names the file");
   });
 });
+
+// 0.17.4 wording (#1095, #1053 C4): the runbook lines an operator or an orchestrator acts on.
+describe("README, skill and release wording (baton 0.17.4)", () => {
+  const readmeRaw = () => readFileSync(join(import.meta.dir, "..", "README.md"), "utf8");
+  const bullet = (title: string): string => readmeRaw().split("\n- **").find((b) => b.startsWith(title))?.replace(/\s+/g, " ") ?? "";
+  const changelog = () => readFileSync(join(import.meta.dir, "..", "CHANGELOG.md"), "utf8");
+
+  test("a run failed park on a session stage: a plain unpark relaunches the seat and reruns the round; --to skips it (#1053 C4)", () => {
+    const b = bullet("A `run failed` park on a session stage");
+    expect(b).toContain("a plain `baton unpark` relaunches the seat and reruns the round");
+    expect(b).toContain("run the failed hook's remaining steps by hand, then `baton unpark <run> <unit> --to <next stage>` skips the rerun");
+    const row = skill().split("\n").find((l) => l.startsWith("| `run failed` park on a session stage |")) ?? "";
+    expect(row).toContain("plain unpark relaunches the seat");
+    expect(row).toContain("run the failed hook's remaining steps by hand, then `--to <next stage>` skips the rerun");
+  });
+
+  test("spine_close_wait: the README names the close PR and its parks, the skill has a row (#1095)", () => {
+    const b = bullet("A `spine_close_wait` park");
+    for (const s of ["close-pr.txt", "merged but `origin/main` does not read the spine closed", "closed without a merge", "conflict"]) expect(b).toContain(s);
+    const row = skill().split("\n").find((l) => l.startsWith("| `spine_close_wait` park |")) ?? "";
+    expect(row).toContain("origin/main");
+    expect(row).toContain("never merge");
+    expect(row).toContain("`close-pr.txt` holds no PR URL");
+    expect(b).toContain("reopen the PR, or replace or remove `out/spine-pr/close-pr.txt` before the unpark");
+    const notice = skill().split("\n").find((l) => l.startsWith("| AI close PR recorded (")) ?? "";
+    expect(notice).toContain("merge it if governance grants this session merge authority");
+    expect(flatSkill()).toContain("the AI close PR, where the workspace takes PRs only");
+  });
+
+  test("the README names the failure lines in notify.log (N4)", () => {
+    const r = readmeRaw().replace(/\s+/g, " ");
+    expect(r).toContain("`<iso> <key> notify-orchestrator <where>: <reason>`");
+  });
+
+  test("the version is 0.17.4 in plugin.json and the changelog; the upgrade note says when to copy the recipe (#1095)", () => {
+    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", ".claude-plugin", "plugin.json"), "utf8")).version).toBe("0.17.4");
+    const top = changelog().split("\n## ")[1];
+    expect(top.startsWith("0.17.4 - ")).toBe(true);
+    expect(top).toContain("only when no run is armed or parked there");
+    expect(top).toContain("origin/main");
+    expect(top).toContain("the archive snippet's ten copies");
+    expect(top).not.toContain("nine copies");
+  });
+});

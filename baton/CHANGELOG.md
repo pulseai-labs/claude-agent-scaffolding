@@ -2,6 +2,36 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.17.4 - 2026-11-06
+
+`spine_finish` no longer takes the AI workspace's local state file as the result of a close (#1095), and the
+notifier says why it failed (#1053). The example recipe changes; the engine does not.
+
+- **Fixed: `spine_finish` (#1095).** Its done outcome reads the state file at `origin/main` after a
+  `git fetch origin main` in the AI root (`origin/main` is fixed). A local file that reads closed no longer
+  ends it. An AI root with no `origin` remote, a failed fetch, an unknown spine or a bad file parks
+  `exit0 error`. When the seat wrote `out/spine-pr/close-pr.txt` (the AI close PR's URL), the unit goes to the
+  new wait stage `spine_close_wait`: it ends done when the PR is merged and `origin/main` reads the spine
+  closed, and parks when the PR merged but `origin/main` does not, closed without a merge, conflicts, or
+  `close-pr.txt` holds no PR URL. A PR that stays open waits with no timeout.
+- **Changed: the `spine-finish.md` brief.** It fetches first; if `origin/main` already reads the spine closed,
+  or `close-pr.txt` exists, it ends without rerunning close. In a workspace that lands records only through
+  PRs it commits on a branch, opens the PR, writes `close-pr.txt` at once, and switches the AI root back to
+  `main`. It never merges the close PR.
+- **Fixed: notifier (#1053 C8).** `notify-orchestrator` appends `<iso> <key> notify-orchestrator <where>:
+  <reason>` to `notify.log` at each place it failed to deliver: the six bare catches, a stale incarnation, a
+  used-up budget and a send Orca did not accept. Delivery is unchanged.
+- **Changed: wording (#1053 C4).** The README and the skill say that after a `run failed` park on a session
+  stage a plain `baton unpark` relaunches the seat and reruns the round, and `--to <next stage>` skips it.
+  The runbook and the skill gain a `spine_close_wait` row.
+- **Tests.** A hung Orca (`FAKE_ORCA_HANG`) ends the notifier inside 30 s with the fallback run; the
+  recipe's origin condition is executed on a scratch origin, with a local-only `closed` as its control; the
+  end-to-end run covers a close at `origin/main`, a close PR through `spine_close_wait`, and each park.
+- **Upgrade.** Copy the new recipe and briefs (`cp -r <plugin root>/examples/ossify-spine ~/baton-recipes/`)
+  only when no run is armed or parked there: every armed run reads its briefs from the shared copy. A
+  workspace with no `origin` remote parks at finish. Not changed: the archive snippet's ten copies (#1053
+  C7; this release adds one) and a relaunch that does not re-read outcomes first (#1100).
+
 ## 0.17.3 - 2026-11-05
 
 A sweep of the review findings left on the item review loop and the ruling files (#1079, #1075, #1053).

@@ -374,7 +374,7 @@ describe("ossify-spine recipe", () => {
     const hooks = archiveHooks(r);
     expect(hooks.map(([w]) => w).sort()).toEqual([
       "close.outcomes[0].run[0]", "close.outcomes[1].run[0]", "correct.outcomes[0].run[1]", "item_fix.outcomes[0].run[0]",
-      "spine_finish.outcomes[0].run[0]", "spine_open.outcomes[0].run[0]", "spine_work.outcomes[0].run[1]", "verify.before[1]",
+      "spine_finish.outcomes[0].run[0]", "spine_finish.outcomes[1].run[0]", "spine_open.outcomes[0].run[0]", "spine_work.outcomes[0].run[1]", "verify.before[1]",
     ]);
     for (const [where, a] of hooks) expect([where, a[2]]).toEqual([where, script]);
     // control: a copy whose one hook runs another script is caught by the same comparison
@@ -393,9 +393,88 @@ describe("ossify-spine recipe", () => {
     const runs = (n: string) => (r.stages[n] as SessionStage).outcomes.map((o) => o.run);
     expect(runs("close")).toEqual([[archiveOf, prUrlHook], [archiveOf]]);
     expect(runs("spine_open")).toEqual([[archiveOf]]);
-    expect(runs("spine_finish")).toEqual([[archiveOf]]);
+    expect(runs("spine_finish")).toEqual([[archiveOf], [archiveOf]]);
     // control: a hook list with one extra command no longer equals the pin
     expect([[archiveOf, ["rm", "-rf", OUT]]]).not.toEqual(runs("spine_finish"));
+  });
+
+  // ---- #1095: spine_finish reads origin/main, never the local state file ----------------------
+  /** The first outcome's origin/main condition of spine_finish: the argv of its one exit0 signal. */
+  const originClosed = (r: Recipe): string[] => (r.stages.spine_finish as SessionStage).outcomes[0].when.map((sg) => ("exit0" in sg ? sg.exit0 : []))[0];
+  const gitIn = (cwd: string, ...a: string[]) => {
+    const p = spawnSync("git", a, { cwd, encoding: "utf8" });
+    if (p.status !== 0) throw new Error(`git ${a.join(" ")}: ${p.stderr}`);
+    return p.stdout.trim();
+  };
+  /** A bare origin, a clone of it holding .ossify/project-state.json, and a runner for the condition's argv in that clone. */
+  function stateRepo(originStatus: string | null) {
+    const dir = mkdtempSync(join(tmpdir(), "baton-origin-closed-"));
+    const origin = join(dir, "origin.git"), ai = join(dir, "ai");
+    gitIn(dir, "init", "-q", "--bare", "-b", "main", origin);
+    gitIn(dir, "clone", "-q", origin, ai);
+    for (const [k, v] of [["user.email", "t@example.com"], ["user.name", "t"], ["commit.gpgsign", "false"]]) gitIn(ai, "config", k, v);
+    mkdirSync(join(ai, ".ossify"));
+    const sf = join(ai, ".ossify", "project-state.json");
+    const write = (status: string) => writeFileSync(sf, JSON.stringify({ spines: [{ id: "r0.s6", status }] }));
+    write(originStatus ?? "planned");
+    gitIn(ai, "add", "."); gitIn(ai, "commit", "-q", "-m", "state"); gitIn(ai, "push", "-q", "origin", "main");
+    const rc = (spine = "r0.s6", file = sf) => {
+      const argv = originClosed(loadRecipe()).map((a) => a.replace("{param.state_file}", file).replace("{param.spine}", spine));
+      return spawnSync(argv[0], argv.slice(1), { cwd: ai, encoding: "utf8" }).status;
+    };
+    return { dir, ai, origin, sf, write, rc };
+  }
+  test("spine_finish's first outcome reads the state file at origin/main: 0 closed there, 1 not, 2 on every error (#1095)", () => {
+    const t = stateRepo(null);
+    expect(t.rc()).toBe(1); // origin reads planned
+    // the #1095 control: closed only in the local file, uncommitted, and then committed on a branch that is not origin/main; the old local jq read 0 here
+    t.write("closed");
+    expect(t.rc()).toBe(1);
+    gitIn(t.ai, "checkout", "-q", "-b", "docs/close"); gitIn(t.ai, "commit", "-q", "-am", "close");
+    expect(t.rc()).toBe(1);
+    expect(spawnSync("jq", ["-e", ".spines[] | select(.id == \"r0.s6\") | .status == \"closed\"", t.sf]).status).toBe(0); // the old form says done
+    // origin/main closed: another clone pushes it
+    const other = join(t.dir, "other");
+    gitIn(t.dir, "clone", "-q", t.origin, other);
+    for (const [k, v] of [["user.email", "t@example.com"], ["user.name", "t"], ["commit.gpgsign", "false"]]) gitIn(other, "config", k, v);
+    writeFileSync(join(other, ".ossify", "project-state.json"), JSON.stringify({ spines: [{ id: "r0.s6", status: "closed" }] }));
+    gitIn(other, "commit", "-q", "-am", "closed"); gitIn(other, "push", "-q", "origin", "main");
+    expect(t.rc()).toBe(0); // fetch-first: the clone had not seen it
+    expect(t.rc("r9.s9")).toBe(2); // an unknown spine
+    writeFileSync(join(other, ".ossify", "project-state.json"), "{nope");
+    gitIn(other, "commit", "-q", "-am", "bad"); gitIn(other, "push", "-q", "origin", "main");
+    expect(t.rc()).toBe(2); // bad JSON
+    expect(t.rc("r0.s6", join(t.ai, ".ossify", "missing.json"))).toBe(2); // a path origin does not hold
+    // N5: the fetch fails while a stale origin/main ref still exists (bad JSON is already there): rc 2, never a silent false
+    writeFileSync(join(other, ".ossify", "project-state.json"), JSON.stringify({ spines: [{ id: "r0.s6", status: "planned" }] }));
+    gitIn(other, "commit", "-q", "-am", "ok"); gitIn(other, "push", "-q", "origin", "main");
+    expect(t.rc()).toBe(1); // control: a good fetch reads planned
+    gitIn(t.ai, "remote", "set-url", "origin", join(t.dir, "nowhere.git"));
+    expect(gitIn(t.ai, "rev-parse", "--verify", "origin/main")).toMatch(/^[0-9a-f]{40}$/); // the stale ref is still there
+    expect(t.rc()).toBe(2);
+    gitIn(t.ai, "remote", "remove", "origin");
+    expect(t.rc()).toBe(2); // no origin remote: every error parks
+    rmSync(t.dir, { recursive: true, force: true });
+  });
+
+  test("spine_finish ends done on origin/main and goes to spine_close_wait on close-pr.txt; the wait parks every other state (#1095)", () => {
+    const r = loadRecipe();
+    const fin = r.stages.spine_finish as SessionStage;
+    expect(fin.outcomes.map((o) => [o.to, o.when.map((sg) => Object.keys(sg)[0])])).toEqual([["done", ["exit0"]], ["spine_close_wait", ["file"]]]);
+    expect(fin.outcomes[1].when).toEqual([{ file: `${OUT}/close-pr.txt` }]);
+    const w = r.stages.spine_close_wait as WaitStage;
+    expect(w.kind).toBe("wait");
+    const url = ["sed", "-n", "1p", `${OUT}/close-pr.txt`];
+    const pr = (test: string) => ({ pr: { url, test } });
+    expect(w.outcomes.map((o) => [o.to, o.when.map((sg) => ("pr" in sg ? sg.pr.test : "exit0" in sg ? "origin" : "?"))])).toEqual([
+      ["done", ["merged", "origin"]], ["park", ["merged"]], ["park", ["closed"]], ["park", ["conflict"]],
+    ]);
+    expect(w.outcomes[0].when[0]).toEqual(pr("merged"));
+    expect(w.outcomes[0].when[1]).toEqual({ exit0: originClosed(r) }); // the one condition, not a second copy
+    for (const o of w.outcomes.slice(1)) expect(o.when[0]).toEqual(pr(("pr" in o.when[0] ? o.when[0].pr.test : "")));
+    expect(w.outcomes.map((o) => o.run)).toEqual([undefined, undefined, undefined, undefined]); // the entry outcome already archived the ruling
+    expect(w.outcomes[0].notify).toContain("origin/main");
+    expect(fin.outcomes[1].notify).toContain("close-pr.txt");
   });
 
   test("the archive hook of a non-spine_work stage, executed: once per stage end, every ruling kept under its own number, no file needed (#1057)", () => {
@@ -1077,6 +1156,22 @@ describe("ossify-spine briefs", () => {
 
   test("spine_finish pushes the AI workspace commit the close made", () => {
     expect(brief("spine-finish.md")).toContain("git push");
+  });
+
+  test("spine_finish fetches first, ends without a rerun when closed at origin/main or close-pr.txt exists, and on a PR-only workspace opens the PR, records it and ends on main (#1095)", () => {
+    const b = brief("spine-finish.md").replace(/\s+/g, " ");
+    expect(b).toContain("git fetch");
+    expect(b).toContain("origin/main");
+    expect(b).toContain("close-pr.txt");
+    expect(b).toContain("git switch main");
+    expect(b).toContain("Never treat the branch's own state file as the result");
+    const count = (t: string) => b.split(t).length - 1;
+    // N1, N2: every ending leaves the root on main; the PR-only rule comes before any bare push step
+    expect(count("git switch main")).toBe(2);
+    expect(b.indexOf("do not push to `main`")).toBeGreaterThan(-1);
+    expect(b.indexOf("do not push to `main`")).toBeLessThan(b.indexOf("`git push`"));
+    expect(count("Never merge the close PR")).toBe(2); // after the close-pr.txt guard and after the PR-only path
+    expect(count("without rerunning close")).toBe(2); // the origin/main guard and the close-pr.txt guard
   });
 
   test("common tells a seat to read a named Ruling file first; spine-work uses the same label (#1057)", () => {

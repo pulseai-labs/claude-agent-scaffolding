@@ -5,11 +5,11 @@
 // to a file and the orchestrator's terminal is sent one tagged line that names it. Every failure
 // ends in `fallback_notify`, if the config has one; notify.log already holds the line.
 
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { loadOrcaConfig } from "./orca.ts";
 import { runOrca } from "./orca-cli.ts";
-import { readConfig, renderNotifyArgv } from "../notify.ts";
+import { oneLine, readConfig, renderNotifyArgv } from "../notify.ts";
 import { isProtoName, RUN_ID_RE } from "../recipe.ts";
 import { replaceFileSync, stateDir } from "../state.ts";
 
@@ -20,6 +20,21 @@ const SEND_MS = 12_000;
 const WAIT_SUBMIT_S = "5";
 
 export type Pointer = { handle: string; incarnation: string };
+
+const reasonOf = (e: unknown): string => (e instanceof Error ? e.message : String(e));
+
+/**
+ * Append `<iso> <key> notify-orchestrator <where>: <reason>` to notify.log. It only records and
+ * changes no delivery; its own failure is swallowed, since the notifier's rc stays 0.
+ */
+function logFailure(key: string, where: string, reason: unknown): void {
+  try {
+    mkdirSync(stateDir(), { recursive: true, mode: 0o700 });
+    appendFileSync(join(stateDir(), "notify.log"), `${new Date().toISOString()} ${oneLine(key)} notify-orchestrator ${where}: ${oneLine(reasonOf(reason))}\n`, { mode: 0o600 });
+  } catch {
+    // nowhere left to say it
+  }
+}
 
 const pointerPath = (run: string) => join(stateDir(), "runs", run, "orchestrator");
 
@@ -38,14 +53,15 @@ export function runOfKey(key: string): string | undefined {
 /** A key as one file name: every character outside `A-Za-z0-9._-` becomes `_`. */
 export const noticeFileName = (key: string): string => key.replace(/[^A-Za-z0-9._-]/g, "_") + ".md";
 
-export function readPointer(run: string): Pointer | undefined {
+export function readPointer(run: string, key?: string): Pointer | undefined {
   try {
     const p = JSON.parse(readFileSync(pointerPath(run), "utf8"));
     if (p !== null && typeof p === "object" && typeof p.handle === "string" && p.handle !== "" && typeof p.incarnation === "string" && p.incarnation !== "") {
       return { handle: p.handle, incarnation: p.incarnation };
     }
-  } catch {
-    // missing or malformed: no pointer
+  } catch (e) {
+    // missing: no pointer, which is normal; unreadable or malformed: no pointer, and say why
+    if (key !== undefined && (e as NodeJS.ErrnoException)?.code !== "ENOENT") logFailure(key, "pointer", e);
   }
   return undefined;
 }
@@ -73,7 +89,7 @@ export const noticeLine = (key: string, file: string): string =>
   `[crew message baton] baton notice ${key}: read ${file} and follow running-a-spine-on-baton §Notices.`;
 
 /** True when the terminal accepted the line, queued behind a running turn included. */
-function sendToOrchestrator(cli: string, p: Pointer, text: string, deadline: number): boolean {
+function sendToOrchestrator(key: string, cli: string, p: Pointer, text: string, deadline: number): boolean {
   try {
     // The runtime id is Orca's incarnation: ORCA_RUNTIME_SOURCE_INCARNATION is `orca status`'s
     // runtime.runtimeId. A different one means Orca restarted and the handle is stale. A status
@@ -81,15 +97,25 @@ function sendToOrchestrator(cli: string, p: Pointer, text: string, deadline: num
     try {
       const st = runOrca(cli, ["status"], Math.min(STATUS_MS, Math.max(1, deadline - Date.now())));
       const id = st.ok ? st.result?.runtime?.runtimeId : undefined;
-      if (typeof id === "string" && id !== p.incarnation) return false;
-    } catch {
+      if (typeof id === "string" && id !== p.incarnation) {
+        logFailure(key, "send", "orca restarted: the registered incarnation is not the runtime's");
+        return false;
+      }
+    } catch (e) {
       // Orca unreachable: the send below fails the same way
+      logFailure(key, "status", e);
     }
     const left = deadline - Date.now();
-    if (left < 1_000) return false;
+    if (left < 1_000) {
+      logFailure(key, "send", "budget used up before the send");
+      return false;
+    }
     const r = runOrca(cli, ["terminal", "send", "--terminal", p.handle, "--enter", "--wait-submit", WAIT_SUBMIT_S, "--text", text], Math.min(SEND_MS, left));
+    if (!r.ok) logFailure(key, "send", `${r.code}: ${r.message.slice(0, 300)}`);
+    else if (r.result?.send?.accepted === false) logFailure(key, "send", "terminal did not accept the line");
     return r.ok && r.result?.send?.accepted !== false;
-  } catch {
+  } catch (e) {
+    logFailure(key, "send", e);
     return false;
   }
 }
@@ -98,7 +124,8 @@ function runFallback(key: string, message: string, deadline: number): void {
   let argv: string[] | undefined;
   try {
     argv = readConfig().fallback_notify;
-  } catch {
+  } catch (e) {
+    logFailure(key, "fallback config", e);
     return;
   }
   if (!argv) return;
@@ -106,8 +133,9 @@ function runFallback(key: string, message: string, deadline: number): void {
     Bun.spawnSync(renderNotifyArgv(argv, key, message), {
       stdout: "ignore", stderr: "ignore", timeout: Math.max(1_000, deadline - Date.now()),
     });
-  } catch {
-    // a missing fallback command is the operator's to fix; notify.log already has the line
+  } catch (e) {
+    // a missing fallback command is the operator's to fix
+    logFailure(key, "fallback", e);
   }
 }
 
@@ -119,10 +147,11 @@ export function notifyOrchestrator(key: string, message: string): number {
   if (run !== undefined) {
     try {
       const file = writeNotice(run, key, message);
-      const p = readPointer(run);
-      if (p) sent = sendToOrchestrator(loadOrcaConfig().cli, p, noticeLine(key, file), deadline);
-    } catch {
+      const p = readPointer(run, key);
+      if (p) sent = sendToOrchestrator(key, loadOrcaConfig().cli, p, noticeLine(key, file), deadline);
+    } catch (e) {
       // an unwritable notice or an unreadable config: the fallback below
+      logFailure(key, "notice", e);
     }
   }
   if (!sent) runFallback(key, message, deadline);
