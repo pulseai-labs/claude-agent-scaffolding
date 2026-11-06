@@ -236,8 +236,11 @@ An unquoted `$(…)` or `$((…))` counts as one word of its command, so `kill 1
 It reads through `sudo` (with its options), `env`, `command`, `builtin`, `exec`, `nohup`, `time`, `timeout`,
 `setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock` (each with its common options, and `--`);
 through a path (`/bin/kill`), a quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and
-into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once (the shell's options before and after
-`-c`, one value for each `o` or `O` in a short option cluster wherever it sits, and one `--` included). A refusal says what to do instead: list first, read
+into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once. The string is found twice, as bash reads
+the options (before and after `-c`, one value for each `o` or `O` in a short option cluster wherever it sits, one
+`--`; after `-c`, a bare `-` ends the options and a bare `+` is skipped) and as zsh reads them (`-O` takes no value, `o` takes
+the rest of its cluster, a bare `-`, a bare `+`, `--`, a cluster holding `b` or a cluster ending in `-` ends the options, and a leading
+`--emulate` takes a value), for every one of the four names, and the call is refused if either string is. A refusal says what to do instead: list first, read
 the PIDs, kill by literal PID in a separate call; to stop your own job use `write proc://<id>/kill` (OMP)
 or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never sees them. On OMP a
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
@@ -248,7 +251,13 @@ forged marker, text it throws on, a substitution that never closes, a substituti
 deep (a chain that long is not walked).
 
 Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`), `kill -1 <pid>`
-(SIGHUP; write `kill -HUP`), and `kill -$SIG <pid>`. Split the call, or spell the number.
+(SIGHUP; write `kill -HUP`), and `kill -$SIG <pid>`. Split the call, or spell the number. A shell call
+whose options one shell reads one way and another reads another way is refused when either reading's string is
+refused, though the shell that runs it runs at most one of the strings, and often none (`zsh -cO extglob 'kill -1'`).
+A bare `-` before `-c` is also skipped by the bash reading, so `bash - -c 'kill -1'` stays refused as in 0.14.1, though
+no shell runs either string. Both
+readings go into one scan, so `bash -cO 'ps aux' 'kill 123'`, where one reading lists and the other signals,
+is refused as a call that lists and signals.
 
 **Known limits** (the rail does not read these; each is pinned by `tests/kill.test.ts`):
 
@@ -261,7 +270,8 @@ Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`
   written and then run (in this call or an earlier one), a shell string inside a shell string,
   `eval "$VAR"`, `python3 -c`, `node -e`, `perl -e`, `su -c`, `ssh host …`, `watch`, `parallel`,
   `script -c`, `systemd-run`, `find … -exec kill`, `env -S '…'` / `--split-string`, `flock <file> -c '…'`,
-  `coproc`.
+  `coproc`. Shells other than `sh`, `bash`, `zsh` and `dash` are not read at all: `ksh`, `mksh`, `ash`,
+  `busybox sh`, `yash`, `rbash` and `fish -c '…'` are misses (#1116).
 - **A command word the rail cannot name.** An alias, a function, a word held in a variable
   (`$K -1`) or built by expansion (`kill${IFS}-1`), a word split by a line continuation, and a wrapper
   not in the list above (`doas`, `runuser`, `unshare`).
@@ -270,9 +280,6 @@ Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`
 - **Other ways to signal many processes.** `fuser -k`, `pkill`/`killall` selecting by `-s`, `-g`,
   `-P`, `-t`, `-G` or `-F` alone, `pkill -v` (inverted), system-scope `systemctl stop user@<uid>`.
 - **Spans.** An unquoted `$(…)` span is bounded by counting parentheses: a `case` pattern's `)` or a `)` inside `${…}` ends it early, and an operand after it is missed.
-- **Bare `-` and `+`, and other shells' grammar.** A bare `-` or `+` after `-c` is read as the string
-  (`bash -c - 'kill -1'` is a miss). The cluster reading is bash's for `sh`, `bash`, `zsh` and `dash` alike, so a
-  `dash -cO …` or `zsh -cO …` that the shell itself rejects or runs differently may be refused.
 - **Patterns.** A second `pkill` operand is not read: procps `pkill` rejects it, but BSD and macOS `pkill` take several, so `pkill node '.*'` is a miss there. A `pkill` or `killall -r` pattern broad in some way the four probe names do not all
   match (`s`), one held in a variable or a quoted substitution (`pkill "$(cat f)"`), and one that is not a
   regular expression in JavaScript's reading, are not refused. An unquoted `$(…)` reads as the pattern

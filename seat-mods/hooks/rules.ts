@@ -953,7 +953,7 @@ export function invalidText(value: string): string {
 // wherever each sits in the call, substitutions included; (b) kill with -1, 0, or a negative operand that holds a
 // `$`; (c) pkill and killall by user, with no pattern, or with a pattern that matches every name of a fixed probe
 // set; (d) killall5, and the session-wide systemctl and loginctl verbs. It reads a literal `eval '…'` or
-// `sh|bash|zsh|dash -c '…'` string once, as a command, removes quotes from a command word, and skips the wrappers
+// `sh|bash|zsh|dash -c '…'` string once, as a command (a shell's options read as bash reads them and as zsh reads them, refused if either string is), removes quotes from a command word, and skips the wrappers
 // below. Everything else it does not read is a known limit, listed in the README and pinned by tests/kill.test.ts.
 // ---------------------------------------------------------------------------------------------------------
 
@@ -1037,21 +1037,32 @@ function killHead(tokens: readonly string[], pieces: readonly string[]): { name:
   }
 }
 
-// The string a literal runner is given: eval's words joined, or the word after a shell's -c.
-function runnerText(name: string, args: readonly string[], raw: readonly string[], pieces: readonly string[]): string | undefined {
-  const literal = (token: string): string => {
-    const whole = expand(token, pieces)
-    if (/^'[^]*'$/.test(whole) && whole.length >= 2) return whole.slice(1, -1)
-    if (/^"[^]*"$/.test(whole) && whole.length >= 2) return whole.slice(1, -1).replace(/\\(["\\$`])/g, '$1')
-    return whole.replace(/['"]/g, '')
-  }
-  if (name === 'eval') return (args[0] === '--' ? raw.slice(1) : raw).map(literal).join(' ')
-  if (!KILL_SHELLS.has(name)) return undefined
-  // Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
-  // After -c: more options (the same four take a value) and one `--`, then the string.
-  // A short cluster (-x…, +x…) takes one following word for each o or O it holds, wherever the letter sits
-  // (`-euo pipefail`, `-oe pipefail`, `-oo a b`) until `--`, after which the next word is the string; a cluster that holds c sets -c (`+c` too: the shells read it as -c), before or after its values are skipped.
-  // --rcfile and --init-file take one value.
+// A shell string as the shell hands it on: one quoted token with its quotes taken off.
+function killLiteral(token: string, pieces: readonly string[]): string {
+  const whole = expand(token, pieces)
+  if (/^'[^]*'$/.test(whole) && whole.length >= 2) return whole.slice(1, -1)
+  if (/^"[^]*"$/.test(whole) && whole.length >= 2) return whole.slice(1, -1).replace(/\\(["\\$`])/g, '$1')
+  return whole.replace(/['"]/g, '')
+}
+
+// The strings a literal runner may be given: eval's words joined, or for a shell the word after its -c as bash reads
+// the options and as zsh reads them. The shells disagree, and a name is not a closed input (sh is dash, bash, ash or
+// zsh by host), so every name in KILL_SHELLS gets both readings and the rail refuses if either string is refused.
+function runnerTexts(name: string, args: readonly string[], raw: readonly string[], pieces: readonly string[]): string[] {
+  if (name === 'eval') return [(args[0] === '--' ? raw.slice(1) : raw).map(token => killLiteral(token, pieces)).join(' ')]
+  if (!KILL_SHELLS.has(name)) return []
+  const texts = [bashText(args, raw, pieces), zshText(args, raw, pieces)]
+  return [...new Set(texts.filter((text): text is string => text !== undefined))]
+}
+
+// bash's reading (dash's and ash's too, but for -O): the word after -c.
+// Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
+// After -c: more options (the same four take a value) and one `--`, then the string; a bare `-` ends the options as
+// `--` does, and a bare `+` is skipped (0.14.1 returned either as the string).
+// A short cluster (-x…, +x…) takes one following word for each o or O it holds, wherever the letter sits
+// (`-euo pipefail`, `-oe pipefail`, `-oo a b`) until `--`, after which the next word is the string; a cluster that holds c sets -c (`+c` too: the shells read it as -c), before or after its values are skipped.
+// --rcfile and --init-file take one value.
+function bashText(args: readonly string[], raw: readonly string[], pieces: readonly string[]): string | undefined {
   let seenC = false
   let dashed = false
   for (let k = 0; k < args.length; k++) {
@@ -1066,9 +1077,40 @@ function runnerText(name: string, args: readonly string[], raw: readonly string[
       if (arg === '--' || (!arg.startsWith('-') && !arg.startsWith('+'))) return undefined
       continue
     }
+    if (!dashed && arg === '-') { dashed = true; continue }
+    if (!dashed && arg === '+') continue
     if (arg === '--' && !dashed) { dashed = true; continue }
     if (!dashed && arg.length > 1 && (arg.startsWith('-') || arg.startsWith('+'))) continue
-    return literal(raw[k]!)
+    return killLiteral(raw[k]!, pieces)
+  }
+  return undefined
+}
+
+// zsh's reading: -O takes no value; o takes the rest of its cluster as the option name, or the next word when it ends
+// the cluster; a letter that is a digit is an ordinary option; a bare `-`, a bare `+`, `--`, a cluster that holds b and a
+// cluster that ends in `-` end the options (the next word is then the string, even one that starts with `-`); a long option takes no value, but
+// a leading `--emulate` takes one.
+function zshText(args: readonly string[], raw: readonly string[], pieces: readonly string[]): string | undefined {
+  let seenC = false
+  const after = (k: number): string | undefined => (seenC && k < args.length ? killLiteral(raw[k]!, pieces) : undefined)
+  for (let k = 0; k < args.length; k++) {
+    const arg = args[k]!
+    if (k === 0 && arg === '--emulate') { k += 1; continue }
+    if (arg === '-' || arg === '+' || arg === '--') return after(k + 1)
+    if (arg.startsWith('--')) continue
+    if (/^[-+]./.test(arg)) {
+      let ends = false
+      for (let j = 1; j < arg.length; j++) {
+        const letter = arg[j]!
+        if (letter === 'c') seenC = true
+        else if (letter === 'b') ends = true
+        else if (letter === '-' && j === arg.length - 1) ends = true
+        else if (letter === 'o') { if (j === arg.length - 1) k += 1; break }
+      }
+      if (ends) return after(k + 1)
+      continue
+    }
+    return seenC ? killLiteral(raw[k]!, pieces) : undefined
   }
   return undefined
 }
@@ -1234,8 +1276,7 @@ function killScan(command: string, scan: KillScan, runners: boolean): void {
       if (depth >= 8) throw new Error('xargs nested more than 8 deep')
       if (at < args.length) visit(rest.slice(at), depth + 1)
     } else if (runners && (name === 'eval' || KILL_SHELLS.has(name))) {
-      const inner = runnerText(name, args, rest, pieces)
-      if (inner !== undefined) killRead(inner, scan, false)
+      for (const inner of runnerTexts(name, args, rest, pieces)) killRead(inner, scan, false)
     }
   }
   for (const segment of segments) visit(killHeads(tokensOf(segment)), 0)
