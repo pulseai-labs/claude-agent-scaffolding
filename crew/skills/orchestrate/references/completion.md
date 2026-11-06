@@ -45,7 +45,9 @@ takes it to `blocked` and it writes no report while the dialog stands, so the do
 would sleep to its timeout. Add the layer's Wait for `blocked` alone beside it; that `blocked`
 wake is the dialog above, handled as any `blocked` wake is, and it ends the doorbell.
 The doorbell's return — a new report or its timeout — ends the companion, so a dispatch leaves
-at most one armed wait. The companion's own timeout, while the doorbell is still armed, is no
+at most one armed wait. Stop a wait, companion or heartbeat by its job id: OMP `write proc://<job id>/kill`, Claude Code
+`TaskStop`, a shell process this session started by its exact PID or job id; never a process listing (`ps`, `pgrep`,
+`pidof`, `/proc`) fed to `kill`. The companion's own timeout, while the doorbell is still armed, is no
 checkpoint: it lapses silently, with no read and no report, and the doorbell (and the
 heartbeat, where armed) covers the rest of the dispatch. An answered dialog re-arms the pair:
 the fresh bounded wait after the answer is the doorbell and its companion again, not one wait.
@@ -116,12 +118,12 @@ silent `working`: a seat read `working` at two consecutive ticks with no new rep
 takes the next tick's one check as a read (the layer's Read), and a read showing only provider
 errors and retries (API errors, request timeouts, rate-limit waits), nothing else advancing, is
 a seat failure, not a failed task — named in the tick's line and the handoff. Settle its
-dispatch first (kill its report-file wait and companion), then launch the fallback the project
+dispatch first (stop its report-file wait and companion by job id: OMP `write proc://<id>/kill`, Claude Code `TaskStop`), then launch the fallback the project
 file's `## Conditions` names for that seat as a fresh seat is launched (below), from the
 fallback's row, its brief re-sent whole, with `RESUME FROM:` the seat's last report when it
 wrote one. A seat a fresh session cannot resume (the cuts the molt paragraph below lists) gets
 no fallback; it, and a stall with no fallback named, is reported to the operator once.
-`## Conditions` may set another bound. The heartbeat is killed when the last dispatch settles,
+`## Conditions` may set another bound. The heartbeat is stopped when the last dispatch settles,
 at teardown and at stand-down, where the successor arms a fresh one.
 
 ## A child past molt's warnings
@@ -145,7 +147,8 @@ that unit's report is read. A `rotate:` or `open:` return is respawned as `lifec
 and the `handed-off` line beside it is that return, not a second one. On a report `handoff:
 <path>`, or a last status line `handed-off <path>` whose seat has returned no `rotate:`,
 `open:` or `handoff:`, settle the predecessor's dispatch first — a status-only handoff writes
-no report generation, so kill its report-file wait and companion — then launch a fresh seat.
+no report generation, so stop its report-file wait and companion by job id (OMP `write proc://<id>/kill`, Claude Code
+`TaskStop`) — then launch a fresh seat.
 **A fresh seat** — every respawn, after `rotate:` and `open:` included — is launched from the
 same row, marked the same, with a fresh `REPORT_PATH` in the same report directory, so its
 status file starts empty; it reuses its predecessor's scratch directory (and an ossify

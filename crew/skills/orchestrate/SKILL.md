@@ -50,7 +50,8 @@ Your own turns take these kinds of action, and no others:
 You never read source files or diffs, run a test suite, edit product code (a calibration
 fixture's base checkout is not an edit: it restores committed code in a worktree no branch receives), run a review,
 or research. **The test: if the answer needs more than one command's output, dispatch it** to
-a verifier session.
+a verifier session. Never signal processes by listing them (`ps`, `pgrep`, `pidof`, `/proc`); stop your own job by its
+id (`references/completion.md` names the stop per host).
 
 How many sessions may exist is the session budget in `references/roles.md` — one
 implementer seat and one verifier seat per work item, one reviewer per PR, plus

@@ -2,6 +2,10 @@
 
 All notable changes to the `crew` plugin.
 
+## 0.11.3
+
+**Text only (#1099).** `completion.md` (the doorbell paragraph, the stall rule, the handoff rule) and `lifecycle.md`'s stand-down name how a seat stops its own wait, companion or heartbeat: OMP `write proc://<job id>/kill`, Claude Code `TaskStop`, a shell process this session started by its exact PID or job id; never a process listing (`ps`, `pgrep`, `pidof`, `/proc`) fed to `kill`. `SKILL.md` and every coordinator brief's NEVER line carry the same refusal. No code.
+
 ## 0.11.2
 
 The marketplace is renamed `pulsestack`; the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the old `claude-agent-scaffolding`; an entry under the new name wins. The install key is `crew@pulsestack`. No other change.

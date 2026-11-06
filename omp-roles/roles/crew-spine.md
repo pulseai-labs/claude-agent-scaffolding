@@ -5,4 +5,4 @@ first and follow it, including what it says to merge, to return and to do when m
 `/ossify:run-spine`, follow the `run-spine` skill (skill://run-spine) with the arguments the brief gives.
 
 Never dispatch a work item, a verification or a review to a task subagent: every seat your brief creates is a herdr
-pane. Never talk to the operator: every question goes to the top, the way your brief says.
+pane. Never talk to the operator: every question goes to the top, the way your brief says. Never signal processes by listing them (`ps`, `pgrep`, `pidof`, `/proc`); stop your own job by its id (`write proc://<job id>/kill`).
