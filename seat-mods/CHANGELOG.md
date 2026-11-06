@@ -2,6 +2,42 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.14.0 — 2026-11-06
+
+The kill rail (#1099). On 2026-11-05 an OMP orchestrator seat ran `kill $(ps -eo pid,args …)` to stop
+one background job and signalled every process on the host. Neither seat kind had a rail for it, and
+both returned before any check for the free roles.
+
+- **A refusal for every role.** `killRule` in `hooks/rules.ts` runs before the free-role and invalid-role
+  returns in `hooks/register.ts` and `omp/extension.ts`, so `orchestrator`, `coordinator`, unset, invalid,
+  guarded and child agents are all covered. It refuses a call that both lists processes (`ps`, `pgrep`,
+  `pidof`, `ls /proc`) and signals (`kill`, `xargs … kill`); `kill` with `-1`, `0` or a negative operand
+  holding a `$`; `pkill`/`killall` by user, with no pattern, or with a pattern that matches every name of a
+  fixed probe set; `killall5`; and `systemctl --user` `exit`/`isolate`/`kill`/`stop default.target` and
+  `loginctl` `terminate-user`/`kill-user`/`terminate-session`/`kill-session`. A miss changes nothing: the
+  call goes on to the role checks as before. The refusal says to list first, read the PIDs and kill by
+  literal PID, and to stop one's own job with `write proc://<id>/kill` (OMP) or `TaskStop` (Claude Code).
+- **Three closed transforms.** A literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string is read once as a
+  command; quotes are removed from the command word; and the rail skips `timeout`, `setsid`, `nice`,
+  `ionice`, `stdbuf`, `chrt`, `taskset`, `flock` and `sudo` with its options. The shared `WRAPPERS` the
+  git, gh and rm rules use is unchanged.
+- **Claude Code `Monitor`** goes through the rail (its `command` field). On OMP the rail reads `bash`,
+  `eval` string literals and an implementer's `debug` launch.
+- **OMP: a guarded role may `write` an exact `proc://<id>/kill`**, the stop the refusal names. omp scopes a
+  job or agent id to its owner; a service name is stopped project-wide, as `kill <pid>` through bash already allows.
+- **The README's "Unguarded" row** for `orchestrator` and `coordinator` now reads "unguarded except the kill
+  rail". A new section lists the known limits. Ambient coverage of a plain `omp` session is #1102.
+- **What the rail reads, in detail.** A user option inside a `pkill`/`killall` cluster (`-fU`); `--` and shell
+  options around `-c` (`bash -O extglob -c`, `bash -c -- '…'`, `eval -- '…'`); `time -p` and `builtin --`
+  with their options; `-01`, `kill 00` and `kill -- -0` as `-1` and `0`; and a backtick in a negative operand.
+  A substitution nested more than 8 deep, and an `xargs` chain more than 8 deep, are refused as unread.
+  Words after an unquoted `$(…)` stay operands of the command (`kill 123 $(cat p) 0`); the span is bounded by
+  counting parentheses, so a `case` pattern or a paren inside `${…}` is a known limit. `bash -euo pipefail -c`
+  and `--rcfile`/`--init-file` are read (a cluster holding `c` with `o`/`O`, or an `o`/`O` not last, is not); `command -v NAME` passes. `pkill --help` and `--version` pass. The rail splits each command once (the second, 0.3.1 split cuts nowhere
+  the first does not).
+- omp-roles 0.11.0 raises its seat-mods floor to 0.14.0, and holds the orchestrator to it too (its own
+  0.8.0 minimum had replaced the floor for that role).
+
 ## 0.13.0 — 2026-10-31
 
 The status block's fields can run for several lines (#994). Each label starts a field, and the

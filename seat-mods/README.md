@@ -11,7 +11,7 @@ export fails closed, and its status line reads
 `seat: implementer (default: SEAT_MODS_ROLE unset or empty)`.
 A session that is not a worker marks itself explicitly: `SEAT_MODS_ROLE=orchestrator` for the top
 orchestrator (or any session you start to drive work) and `SEAT_MODS_ROLE=coordinator` for spine,
-close, work-PR and doctor sessions and lane drivers; both are unguarded.
+close, work-PR and doctor sessions and lane drivers; both are unguarded except for the kill rail (below).
 
 **Rollout: do not install 0.2.0 until every launcher you use — and your own interactive sessions —
 marks its free sessions.** `crew` does — so did the pre-rename line from 0.2.7; for any other
@@ -26,8 +26,8 @@ Two environment variables, both set **per spawn**:
 |---|---|---|
 | `SEAT_MODS_ROLE` | unset or empty | Guarded as `implementer` by default. The status line reads `seat: implementer (default: SEAT_MODS_ROLE unset or empty)`. |
 | | `implementer`, `verifier`, `reviewer` | That role's guards are on. The status line shows `seat: <role>`. |
-| | `orchestrator`, `coordinator` | Unguarded: no denies, no write placement checks. On OMP an orchestrator may not spawn subagents (0.4.4). The status line shows `seat: <role>`. |
-| | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles. Respawn the seat with a valid value. |
+| | `orchestrator`, `coordinator` | Unguarded except the kill rail (0.14.0): no role denies, no write placement checks. On OMP an orchestrator may not spawn subagents (0.4.4). The status line shows `seat: <role>`. |
+| | anything else | Fail closed. Every tool call is denied with a message that names the bad value and the valid roles (a kill-rail refusal comes first, with its own text). Respawn the seat with a valid value. |
 | `SEAT_MODS_ALLOW` | `:`-separated absolute directories | Extra directories the seat may write to: its report directory and its scratch directory. Relative entries and `/` are ignored. Unset, only the worktree and the scratch places (`/tmp`, `$TMPDIR`; see below) are writable — and a reviewer, whose profile may write only in these directories and the scratch places, then writes only there. |
 
 The pre-rename line's 0.2.2 through 0.2.6 export both in the pane of each implementer, verifier
@@ -48,7 +48,7 @@ the variables; with none installed, you are the launcher. Set the role on each c
 a session:
 
 ```bash
-# Sessions you drive yourself: unguarded.
+# Sessions you drive yourself: unguarded except for the kill rail.
 alias claude-orch='SEAT_MODS_ROLE=orchestrator claude'
 
 # Worker sessions you start by hand: guarded by role.
@@ -201,6 +201,79 @@ unknown variable and the `rm` after it is unresolved.
   `export`, `read`, `printf` and the other builtins that run text or change shell state end the walk: no variable is
   read after them, and a directory a `cd` moved to is unknown. Limits lists what the walk does not
   model.
+
+## Kill rail (#1099)
+
+On 2026-11-05 an OMP orchestrator seat stopped one of its own background jobs by running
+`kill $(ps -eo pid,args 2>/dev/null) 2>/dev/null; true` and signalled every process on the host. The
+rail refuses that class of call. **It covers every role**: `orchestrator` and `coordinator`
+included, unset and invalid roles, and OMP child agents; it runs before each role check. Skill-first
+question 3: a mechanical check on open shell text that can only refuse. A call it passes is not approved;
+it goes on to the role checks and the model exactly as if the rail were absent. On Claude Code it reads
+`Bash` and `Monitor` (Monitor's `command` field, as found in Claude Code 2.1.319); on OMP it reads `bash`,
+and `eval` best effort through its string literals, and an implementer's `debug` launch.
+
+It refuses:
+
+- **A call that both lists processes and signals.** A `ps`, `pgrep`, `pidof` or `ls /proc…` head
+  anywhere in the call (substitutions, pipes and loops included) together with `kill` or
+  `xargs … kill`. So `kill $(pgrep -f x)`, `ps … | xargs kill`, `for p in $(pgrep x); do kill $p; done`
+  and `P=$(pgrep x); kill $P` are refused. `kill $(cat pidfile)` is not, and neither is a call that
+  only lists.
+- **`kill` with `-1`** in any operand position (also `-01`, and with blanks around it), **`0`** (`kill 0`,
+  `kill 00`, `kill -- 0`, `kill -- -0`; `kill -0 <pid>` is allowed), or **a negative operand that
+  holds a `$` or a backtick** (`-$X`, `-"$X"`, `-${X}`, `-$((…))`, ``-`cat f` ``): a variable may be empty
+  or `-1`. Spell a process group with its number (`kill -- -4242`).
+- **`pkill` and `killall` by user** (`-u`, `-U`, `--euid`, `--uid`, `--user`; also inside a cluster such as `-fU`),
+  **with no pattern** (`--help`, `--version`, `-V` and `-h` name none and pass), or with **a
+  pattern that matches every name of a fixed probe set** (`systemd`, `bash`, `node`, `x`; `.`, `.*`, `''`,
+  `[a-z]`). `killall -r` gets the same test. A signal word (`-9`, `-HUP`, `-SIGUSR1`) is not read as an option.
+- **`killall5`**, **`systemctl --user`** with `exit`, `isolate`, `kill` or `stop default.target` (any argument
+  order), and **`loginctl`** `terminate-user`, `kill-user`, `terminate-session` or `kill-session`.
+
+An unquoted `$(…)` or `$((…))` counts as one word of its command, so `kill 123 $(cat p) 0` is read whole. The span is bounded by counting parentheses, not by the shell's grammar: a `case` pattern's `)` or a `)` inside `${…}` ends it early (a known limit), and a `(` inside `${…}` leaves it open, so the call is refused as unread. `command -v NAME` and `command -V NAME` run nothing and pass.
+
+It reads through `sudo` (with its options), `env`, `command`, `builtin`, `exec`, `nohup`, `time`, `timeout`,
+`setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock` (each with its common options, and `--`);
+through a path (`/bin/kill`), a quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and
+into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once (the shell's options before and after
+`-c`, a cluster's `-o`/`-O` value when `o` or `O` is its last letter, and one `--` included). A refusal says what to do instead: list first, read
+the PIDs, kill by literal PID in a separate call; to stop your own job use `write proc://<id>/kill` (OMP)
+or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never sees them. On OMP a
+guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
+omp scopes a job or agent id to its owner; a service name is stopped project-wide, as `kill <pid>` through bash already allows. Every other spelling, and `edit` of it, is placed as before.
+
+A command the rail cannot read is refused, after a guarded role's own reader has had its say: a
+forged marker, text it throws on, a substitution that never closes, a substitution nested more than 8 deep, and an `xargs` chain more than 8
+deep (a chain that long is not walked).
+
+Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`), `kill -1 <pid>`
+(SIGHUP; write `kill -HUP`), and `kill -$SIG <pid>`. Split the call, or spell the number.
+
+**Known limits** (the rail does not read these; each is pinned by `tests/kill.test.ts`):
+
+- **Seats and tools outside it.** A plain `omp` session that `omp-seat` did not launch has no
+  seat-mods at all (#1102). Devin and Codex seats, and an operator's `!cmd` on OMP, are not seats of
+  either kind. Claude Code tools other than `Bash` and `Monitor`; on OMP every tool other than
+  `bash`, `eval` and an implementer's `debug` (the `debug` tool of a free role is not read; `eval`
+  source is read only for the string literals it holds).
+- **Text a runner will run, other than the literal one-level form.** A heredoc fed to a shell, a script
+  written and then run (in this call or an earlier one), a shell string inside a shell string,
+  `eval "$VAR"`, `python3 -c`, `node -e`, `perl -e`, `su -c`, `ssh host …`, `watch`, `parallel`,
+  `script -c`, `systemd-run`, `find … -exec kill`, `env -S '…'` / `--split-string`, `flock <file> -c '…'`,
+  `coproc`.
+- **A command word the rail cannot name.** An alias, a function, a word held in a variable
+  (`$K -1`) or built by expansion (`kill${IFS}-1`), a word split by a line continuation, and a wrapper
+  not in the list above (`doas`, `runuser`, `unshare`).
+- **State across calls.** A PID list written in one call and killed from in a later one
+  (`kill $(cat pidfile)` is allowed on purpose), and a variable whose value is `-1`.
+- **Other ways to signal many processes.** `fuser -k`, `pkill`/`killall` selecting by `-s`, `-g`,
+  `-P`, `-t`, `-G` or `-F` alone, `pkill -v` (inverted), system-scope `systemctl stop user@<uid>`.
+- **Spans and option clusters.** An unquoted `$(…)` span is bounded by counting parentheses: a `case` pattern's `)` or a `)` inside `${…}` ends it early, and an operand after it is missed. A shell option cluster that holds `c` together with `o` or `O` (`-co`, `-oc`, `-cO`, `-Oc`), or an `o`/`O` that is not its last letter (`-oe pipefail -c`), is not read.
+- **Patterns.** A second `pkill` operand is not read: procps `pkill` rejects it, but BSD and macOS `pkill` take several, so `pkill node '.*'` is a miss there. A `pkill` or `killall -r` pattern broad in some way the four probe names do not all
+  match (`s`), one held in a variable or a quoted substitution (`pkill "$(cat f)"`), and one that is not a
+  regular expression in JavaScript's reading, are not refused. An unquoted `$(…)` reads as the pattern
+  `$`, which matches everything, so `pkill $(cat f)` is refused.
 
 ## Status block (orchestrator)
 
@@ -359,7 +432,7 @@ Under `SEAT_MODS_ROLE=orchestrator`, the OMP guard blocks the `task` tool and ev
 
 `omp/status-extension.ts` (0.8.0) is the status-block check and idle stop for an OMP orchestrator, over the same `hooks/status.ts`: one block per turn, then the warning as an OMP notification. `omp-seat` loads it last, after molt, for the orchestrator only, so its `session_stop` blocks win as they do beneath seat-mods on Claude Code; the guard stays first. OMP's `input` cannot tell typing from a herdr send, so a turn is status by its crew tag, or when no input started it (a job completion, an idle wake). **Known limit:** a turn that no prompt starts gets the check but not the status-turn context line.
 
-`omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`, so the Bash reading, the scratch places (`$TMPDIR` from the seat's environment) and the `cd` walk above apply to a `bash` call there as they do on Claude Code. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded. The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
+`omp/extension.ts` is the same guard for OMP, over the same `hooks/rules.ts`, so the Bash reading, the scratch places (`$TMPDIR` from the seat's environment) and the `cd` walk above apply to a `bash` call there as they do on Claude Code. It loads only through `omp-roles`' `omp-seat` (`-e`, never ambient), so a plain `omp` session stays unguarded (ambient coverage, kill rail included: #1102). The main session follows `SEAT_MODS_ROLE`; a `task` child inherits its parent's env, so the guard reads the child's agent name:
 
 | Child agent | Rails |
 |---|---|
@@ -372,8 +445,8 @@ Under any guarded role, a tool call passes only if its name is on the allow list
 |---|---|
 | `read`, `grep`, `glob`, `find`, `ast_grep`, `web_search`, `recall`, `todo`, `wait`, `yield`, `think`, `advise` | allowed |
 | `ask`, `goal`, `task` | the top-level session only; a child is denied |
-| `bash`, `eval` | the command rules; `eval` source read best effort, and blocked for a reviewer |
-| `write`, `edit` (and its `apply_patch` wire name), `ast_edit` | every target placed as omp reads it: a `[path#HHHH]` header unwrapped, `~`, `@/`, `:/` and `file://` expanded, any other `scheme:/` outside; since 0.4.5 (#844) `write` to an exact `local://<name>` is allowed for every guarded role: omp's per-session scratch, which omp confines itself |
+| `bash`, `eval` | the command rules; `eval` source read best effort, and blocked for a reviewer. The kill rail reads both first, for every role |
+| `write`, `edit` (and its `apply_patch` wire name), `ast_edit` | every target placed as omp reads it: a `[path#HHHH]` header unwrapped, `~`, `@/`, `:/` and `file://` expanded, any other `scheme:/` outside; since 0.4.5 (#844) `write` to an exact `local://<name>` is allowed for every guarded role: omp's per-session scratch, which omp confines itself; since 0.14.0 (#1099) so is `write` to an exact `proc://<id>/kill`, which cancels a job or agent the caller owns, or a named service (project-wide) |
 | `lsp` | omp's read-only actions only (`diagnostics`, `definition`, `type_definition`, `implementation`, `references`, `hover`, `symbols`, `status`, `capabilities`) |
 | `github` | omp's read-only ops; `pr_create`/`pr_push` follow the PR and push rails; `pr_checkout` and every other op denied; `forceWithLease` is a force-push |
 | `debug` | an implementer only, its launch read like `eval`; denied for a verifier or reviewer |

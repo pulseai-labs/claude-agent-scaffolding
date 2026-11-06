@@ -7,7 +7,7 @@ import { dirname, basename, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide,
-  uncheckedRmText, invalidText, statusText,
+  uncheckedRmText, invalidText, statusText, killRule, KILL_UNCHECKED,
 } from '../hooks/rules'
 import type { Place, Role, RoleState, RuleId } from '../hooks/rules'
 
@@ -173,7 +173,31 @@ function hasExpandableKey(args: object): boolean {
   return false
 }
 
+// The kill rail over the shell texts of a call: bash's command, and eval's string literals (best effort, as the
+// other eval checks). `unread`: the rail could not read a text; the call then fails closed after the role's own checks.
+function killCheck(toolName: string, input: Record<string, unknown>): { deny?: string; unread: boolean } {
+  let unread = false
+  const texts = toolName === 'bash' ? [input.command] : toolName === 'eval' ? evalCommands(String(input.code ?? '')) : []
+  for (const text of texts) {
+    try {
+      const kill = typeof text === 'string' ? killRule(text) : undefined
+      if (kill !== undefined) return { deny: kill, unread }
+    } catch {
+      unread = true
+    }
+  }
+  return { unread }
+}
+
+// The kill rail (#1099) runs first, for every role and every agent: free and invalid ones included. A miss goes on
+// to the role checks exactly as before; a text the rail could not read is refused once they have passed.
 export async function guard(deps: GuardDeps, toolName: string, input: Record<string, unknown>, agent: Agent, label = ''): Promise<string | undefined> {
+  const kill = killCheck(toolName, input)
+  if (kill.deny !== undefined) return kill.deny
+  return (await roleGuard(deps, toolName, input, agent, label)) ?? (kill.unread ? KILL_UNCHECKED : undefined)
+}
+
+async function roleGuard(deps: GuardDeps, toolName: string, input: Record<string, unknown>, agent: Agent, label: string): Promise<string | undefined> {
   const state = roleFor(deps.env.SEAT_MODS_ROLE, agent)
   if (state.kind === 'free') return state.role === 'orchestrator' && toolName === 'task' ? orchestratorSpawnDeny() : undefined
   if (state.kind === 'invalid') return invalidText(state.value)
@@ -226,6 +250,7 @@ export async function guard(deps: GuardDeps, toolName: string, input: Record<str
       if (role !== 'implementer') return runDeny(role, label + toolName)
       const argv = [input.program, ...(Array.isArray(input.args) ? input.args : [])].filter(a => typeof a === 'string')
       const commands = [argv.join(' '), ...evalCommands(String(input.expression ?? '')), String(input.command ?? '')]
+      for (const command of commands) { const kill = killCheck('bash', { command }); if (kill.deny !== undefined) return kill.deny; if (kill.unread) return KILL_UNCHECKED }
       const cwd = typeof input.cwd === 'string' && input.cwd !== '' ? input.cwd : undefined // debug.ts: resolveToCwd
       return shellCheck(deps, role, commands.filter(c => c !== ''), () => cwd === undefined ? deps.cwd : ompPlace(cwd, deps.cwd, deps.env.HOME, 'cwd'))
     }
@@ -283,6 +308,7 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
     // `write xd://resolve` / `xd://reject` confirm or discard a preview an earlier, already-checked ast_edit staged.
     const places: Place[] = []
     if (toolName === 'write' && CONFIRM_ONLY.test(raw)) continue // names no file; acts on a preview already placed
+    if (toolName === 'write' && PROC_KILL.test(raw)) continue // stops a job or agent the caller owns, or a named service; omp scopes the id (#1099)
     if (toolName === 'write' && LOCAL_SCRATCH.test(raw)) continue // session scratch omp confines (#844)
     else for (const reading of readings(raw, toolName === 'ast_edit')) {
       const path = toolName === 'ast_edit' ? globBase(reading) : reading
@@ -307,6 +333,10 @@ const SCHEME = /[A-Za-z][A-Za-z0-9+.-]*:\//
 // device writes are checked as their inner tool in guard(), with raw-arg key and force-flag guards. Every other
 // device name (docs included), special name and malformed device URL still fails placement.
 const CONFIRM_ONLY = /^\s*xd:\/\/(?:resolve|reject)\s*$/
+// #1099: the write tool's `proc://<id>/kill` cancels a job, agent or service. omp scopes a job or agent id to its owner
+// (job-control visibleJobs), but a service name is stopped project-wide (as kill <pid> through bash already allows). It is the stop the kill rail's deny text names, so a guarded seat may write it.
+// Skill-first Q2: closed input, an exact URL shape. Every other spelling and every other tool keeps write placement.
+const PROC_KILL = /^proc:\/\/[A-Za-z0-9_-]+\/kill$/
 // #844: the write tool's `local://<name>` is omp's per-session scratch. omp confines it itself (absolute paths and `..`
 // refused after URL decoding, real-path containment under the session's local root), so a guarded seat may write it.
 // Only this exact lowercase form with a closed character set is taken: every other spelling, and every other tool,

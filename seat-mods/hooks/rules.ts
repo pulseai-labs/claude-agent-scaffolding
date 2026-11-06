@@ -11,7 +11,7 @@ export const FREE_ROLES: readonly FreeRole[] = ['orchestrator', 'coordinator']
 export type RoleState =
   | { kind: 'on'; role: Role }         // explicit implementer, verifier, reviewer
   | { kind: 'default'; role: Role }    // SEAT_MODS_ROLE unset or empty: guarded as implementer
-  | { kind: 'free'; role: FreeRole }   // orchestrator, coordinator: unguarded
+  | { kind: 'free'; role: FreeRole }   // orchestrator, coordinator: unguarded, except the kill rail
   | { kind: 'invalid'; value: string } // any other non-empty value: deny everything
 
 export type RuleId =
@@ -940,4 +940,314 @@ export function invalidText(value: string): string {
   return `seat-mods: SEAT_MODS_ROLE="${value}" is not a role ` +
     '(valid: implementer, verifier, reviewer, orchestrator, coordinator). ' +
     'Every tool call is denied; respawn this seat with a valid role.'
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The kill rail (#1099). Skill-first question 3: a mechanical check on open shell text that can only refuse.
+// A miss returns undefined and the call goes on exactly as if the rail were absent, to the role guard (if the
+// role has one) and to the model. New declarations only: none is in the parity list shared with molt, so
+// nothing above is edited or exported for it. Both glues call killRule before their free-role returns, so it
+// covers every role; its text exists once, here.
+//
+// It refuses (a) a call that both lists processes (ps, pgrep, pidof, ls /proc) and signals (kill, xargs kill),
+// wherever each sits in the call, substitutions included; (b) kill with -1, 0, or a negative operand that holds a
+// `$`; (c) pkill and killall by user, with no pattern, or with a pattern that matches every name of a fixed probe
+// set; (d) killall5, and the session-wide systemctl and loginctl verbs. It reads a literal `eval '…'` or
+// `sh|bash|zsh|dash -c '…'` string once, as a command, removes quotes from a command word, and skips the wrappers
+// below. Everything else it does not read is a known limit, listed in the README and pinned by tests/kill.test.ts.
+// ---------------------------------------------------------------------------------------------------------
+
+export const KILL_REMEDY = 'List first, read the PIDs, then kill by literal PID in a separate call (kill 12345). To stop your own job use `write proc://<id>/kill` (OMP) or TaskStop (Claude Code). Never signal processes you did not name.'
+function killText(reason: string): string {
+  return `seat-mods kill rail (#1099): refused — ${reason}. ${KILL_REMEDY}`
+}
+// A throw while reading: the rail fails closed, as the rm reader does.
+export const KILL_UNCHECKED = killText('this command could not be read safely')
+
+// Words that run the next word; each takes `val` options with a value and then `pos` positional words.
+const KILL_WRAPPER_SHAPES: Readonly<Record<string, { val: string; long: readonly string[]; pos: number }>> = {
+  sudo: { val: 'ughpCDRTUrt', long: ['user', 'group', 'host', 'prompt', 'chdir', 'chroot', 'role', 'type', 'other-user', 'close-from', 'command-timeout'], pos: 0 },
+  env: { val: 'uCS', long: ['unset', 'chdir', 'split-string'], pos: 0 },
+  command: { val: '', long: [], pos: 0 },
+  builtin: { val: '', long: [], pos: 0 },
+  exec: { val: 'a', long: [], pos: 0 },
+  nohup: { val: '', long: [], pos: 0 },
+  time: { val: 'fo', long: ['format', 'output'], pos: 0 },
+  timeout: { val: 'sk', long: ['signal', 'kill-after'], pos: 1 },
+  setsid: { val: '', long: [], pos: 0 },
+  nice: { val: 'n', long: ['adjustment'], pos: 0 },
+  ionice: { val: 'cnptPu', long: ['class', 'classdata', 'pid', 'pgid', 'uid'], pos: 0 },
+  stdbuf: { val: 'ioe', long: ['input', 'output', 'error'], pos: 0 },
+  chrt: { val: 'TPD', long: [], pos: 1 },
+  taskset: { val: '', long: [], pos: 1 },
+  flock: { val: 'wE', long: ['timeout', 'conflict-exit-code'], pos: 1 },
+}
+const KILL_SHELLS = new Set(['sh', 'bash', 'zsh', 'dash'])
+const KILL_SIGNAL = /^-(?:SIG)?(?:HUP|INT|QUIT|ILL|TRAP|ABRT|IOT|BUS|FPE|KILL|USR1|SEGV|USR2|PIPE|ALRM|TERM|STKFLT|CHLD|CLD|CONT|STOP|TSTP|TTIN|TTOU|URG|XCPU|XFSZ|VTALRM|PROF|WINCH|IO|POLL|PWR|SYS|RTMIN(?:\+\d+)?|RTMAX(?:-\d+)?)$/
+const KILL_PROBES = ['systemd', 'bash', 'node', 'x']
+// ASCII reading of the POSIX bracket classes, so a pattern such as [[:alpha:]] tests as pkill reads it.
+const POSIX_CLASSES: Readonly<Record<string, string>> = {
+  alpha: 'a-zA-Z', alnum: 'a-zA-Z0-9', lower: 'a-z', upper: 'A-Z', digit: '0-9', space: ' \\t\\n\\r\\f\\v', blank: ' \\t',
+  punct: '!-\\/:-@\\[-`{-~', print: ' -~', graph: '!-~', word: 'A-Za-z0-9_', xdigit: '0-9A-Fa-f', cntrl: '\\x00-\\x1f\\x7f',
+}
+
+// A token as the shell hands it on: its quoted pieces put back, then its quotes removed.
+function killWord(token: string, pieces: readonly string[]): string {
+  return expand(token, pieces).replace(/\$(?=['"])/g, '').replace(/['"]/g, '')
+}
+
+// The words after a wrapper's own, from `i`: its options, their values and its positional words.
+function skipWrapper(name: string, words: readonly string[], i: number): number {
+  const shape = KILL_WRAPPER_SHAPES[name]!
+  while (i < words.length) {
+    const word = words[i]!
+    if (word === '--') { i += 1; break }
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(word) && name === 'env') { i += 1; continue }
+    if (word.startsWith('--')) {
+      const bare = word.slice(2)
+      i += !bare.includes('=') && shape.long.includes(bare) ? 2 : 1
+      continue
+    }
+    if (word.length > 1 && word.startsWith('-')) {
+      // A short cluster: an option that takes a value takes the rest of the word, or the next word.
+      let taken = false
+      for (let k = 1; k < word.length && !taken; k++)
+        if (shape.val.includes(word[k]!)) { taken = true; if (k === word.length - 1) i += 1 }
+      i += 1
+      continue
+    }
+    break
+  }
+  return Math.min(words.length, i + shape.pos)
+}
+
+// The command a segment runs: assignments and wrappers skipped, quotes and a path removed from its word.
+function killHead(tokens: readonly string[], pieces: readonly string[]): { name: string; args: string[] } | undefined {
+  const words = tokens.map(token => killWord(token, pieces))
+  let i = 0
+  for (;;) {
+    const word = words[i]
+    if (word === undefined) return undefined
+    if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(word)) { i += 1; continue }
+    const name = word.replace(/^.*\//, '')
+    if (!Object.hasOwn(KILL_WRAPPER_SHAPES, name)) return { name, args: words.slice(i + 1) }
+    // `command -v NAME` and `command -V NAME` print what NAME is and run nothing.
+    if (name === 'command' && /^-[A-Za-z]*[vV]/.test(words[i + 1] ?? '')) return undefined
+    i = skipWrapper(name, words, i + 1)
+  }
+}
+
+// The string a literal runner is given: eval's words joined, or the word after a shell's -c.
+function runnerText(name: string, args: readonly string[], raw: readonly string[], pieces: readonly string[]): string | undefined {
+  const literal = (token: string): string => {
+    const whole = expand(token, pieces)
+    if (/^'[^]*'$/.test(whole) && whole.length >= 2) return whole.slice(1, -1)
+    if (/^"[^]*"$/.test(whole) && whole.length >= 2) return whole.slice(1, -1).replace(/\\(["\\$`])/g, '$1')
+    return whole.replace(/['"]/g, '')
+  }
+  if (name === 'eval') return (args[0] === '--' ? raw.slice(1) : raw).map(literal).join(' ')
+  if (!KILL_SHELLS.has(name)) return undefined
+  // Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
+  // After -c: more options (the same four take a value) and one `--`, then the string.
+  // A short cluster that ends in o or O takes the next word (`-euo pipefail`); so do --rcfile and --init-file.
+  const valued = (arg: string) => /^[-+][A-Za-z]*[oO]$/.test(arg) || arg === '--rcfile' || arg === '--init-file'
+  let seenC = false
+  let dashed = false
+  for (let k = 0; k < args.length; k++) {
+    const arg = args[k]!
+    if (valued(arg)) { k += 1; continue }
+    if (!seenC) {
+      if (arg === '--' || (!arg.startsWith('-') && !arg.startsWith('+'))) return undefined
+      if (/^-[A-Za-z]*c[A-Za-z]*$/.test(arg)) seenC = true
+      continue
+    }
+    if (arg === '--' && !dashed) { dashed = true; continue }
+    if (!dashed && arg.length > 1 && (arg.startsWith('-') || arg.startsWith('+'))) continue
+    return literal(raw[k]!)
+  }
+  return undefined
+}
+
+// A pattern that matches every name in the probe set. A pattern that is not a regular expression to JS matches nothing here.
+function broadPattern(pattern: string, anchored: boolean, ignoreCase: boolean): boolean {
+  if (pattern === '') return true
+  try {
+    const source = pattern.replace(/\[:([a-z]+):\]/g, (whole, name: string) => POSIX_CLASSES[name] ?? whole)
+    const re = new RegExp(anchored ? `^(?:${source})$` : source, ignoreCase ? 'i' : '')
+    return KILL_PROBES.every(probe => re.test(probe))
+  } catch {
+    return false
+  }
+}
+
+// pkill and killall: the reason to refuse, or undefined.
+function killByName(name: 'pkill' | 'killall', args: readonly string[]): string | undefined {
+  const values = name === 'pkill' ? 'GgPstF' : 'syoZ'
+  const longValues = name === 'pkill' ? ['group', 'pgroup', 'parent', 'session', 'terminal', 'pidfile', 'signal', 'ns', 'nslist'] : ['signal']
+  const criteria = name === 'pkill' ? 'GgPstF' : ''
+  let exact = false
+  let ignoreCase = false
+  let regexp = false
+  let selected = false
+  let help = false
+  const patterns: string[] = []
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!
+    if (arg === '--') { patterns.push(...args.slice(i + 1)); break }
+    if (arg.startsWith('--')) {
+      if (arg === '--help' || arg === '--version') help = true
+      if (/^--(?:euid|uid|user)(?:=|$)/.test(arg)) return 'pkill and killall by user (-u, -U, --euid, --uid) cannot be read'
+      const bare = arg.slice(2).split('=')[0]!
+      if (bare === 'exact') exact = true
+      if (bare === 'ignore-case') ignoreCase = true
+      if (bare === 'regexp') regexp = true
+      if (name === 'pkill' && ['group', 'pgroup', 'parent', 'session', 'terminal', 'pidfile', 'ns'].includes(bare)) selected = true
+      if (!arg.includes('=') && longValues.includes(bare)) i += 1
+      continue
+    }
+    if (arg.startsWith('-') && arg.length > 1) {
+      if (arg === '-V' || arg === '-h') help = true
+      if (/^-\d+$/.test(arg) || KILL_SIGNAL.test(arg)) continue // a signal word: -9, -HUP, -SIGUSR1 (its U is not an option)
+      if (/^-[A-Za-z0-9]*[uU]/.test(arg)) return 'pkill and killall by user (-u, -U, --euid, --uid) cannot be read'
+      for (let k = 1; k < arg.length; k++) {
+        const flag = arg[k]!
+        if (flag === 'x') exact = true
+        if (flag === 'i') ignoreCase = true
+        if (flag === 'r' && name === 'killall') regexp = true
+        if (criteria.includes(flag)) selected = true
+        if (values.includes(flag)) { if (k === arg.length - 1) i += 1; break }
+      }
+      continue
+    }
+    patterns.push(arg)
+  }
+  if (patterns.length === 0) return selected || help ? undefined : `${name} with no pattern`
+  const literal = name === 'killall' && !regexp
+  // pkill takes its pattern from the first operand; killall takes every operand as a name.
+  for (const pattern of name === 'pkill' ? patterns.slice(0, 1) : patterns)
+    if (literal ? pattern === '' : broadPattern(pattern, exact, ignoreCase)) return `${name} with a pattern that matches every process name`
+  return undefined
+}
+
+// kill's operands: the reason to refuse, or undefined.
+function killOperands(args: readonly string[]): string | undefined {
+  let dashed = false
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!
+    if (arg === '--') { dashed = true; continue }
+    if (!dashed && (arg === '-s' || arg === '-n' || arg === '--signal')) { i += 1; continue }
+    if (/^\s*-0*1$/.test(arg)) return 'kill -1 signals every process the user may signal'
+    if (/^0+$/.test(arg) || (dashed && /^-0+$/.test(arg))) return 'kill 0 signals the caller\'s whole process group'
+    if (arg.startsWith('-') && (arg.includes('$') || arg.includes('`')) && !/^(?:-[sn]|--.)/.test(arg)) return `kill with a negative operand held in a variable (${arg}): empty or -1 it signals everything`
+  }
+  return undefined
+}
+
+// The first word of an xargs's command: past its options and their values.
+function xargsCommand(words: readonly string[]): number {
+  const longValues = ['max-args', 'max-procs', 'max-lines', 'delimiter', 'arg-file', 'eof', 'max-chars', 'process-slot-var']
+  let i = 0
+  while (i < words.length) {
+    const word = words[i]!
+    if (word === '--') return i + 1
+    if (word.startsWith('--')) { i += !word.includes('=') && longValues.includes(word.slice(2)) ? 2 : 1; continue }
+    if (word.length > 1 && word.startsWith('-')) {
+      let taken = false
+      for (let k = 1; k < word.length && !taken; k++)
+        if ('nILPsEda'.includes(word[k]!)) { taken = true; if (k === word.length - 1) i += 1 }
+      i += 1
+      continue
+    }
+    break
+  }
+  return i
+}
+
+// Reserved words that only introduce a command. `time` and `builtin` are not stripped here: they are wrappers with
+// options, left to KILL_WRAPPER_SHAPES. The shared afterHeads is not used because it strips them without their options.
+const KILL_HEADS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '('])
+function killHeads(tokens: string[]): string[] {
+  while (KILL_HEADS.has(tokens[0] ?? '')) tokens = tokens.slice(1)
+  return tokens
+}
+
+// The command text with each unquoted `$(…)` or `$((…))` span replaced by one `$`, so the words after a substitution
+// stay operands of the same command (COMMANDS would cut at its parentheses). `text` is the reader's blanked text, where
+// quotes, backtick spans and heredocs are already markers, so every `(` and `)` left is shell syntax. The span's inner
+// text is read on its own through substitutionsOf. A span that never closes is unread: it throws.
+function joinSubstitutions(text: string): string {
+  let out = ''
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '$' && text[i + 1] === '(') {
+      let depth = 0
+      let j = i + 1
+      for (; j < text.length; j++) {
+        if (text[j] === '(') depth += 1
+        else if (text[j] === ')' && --depth === 0) break
+      }
+      if (j >= text.length) throw new Error('a substitution that never closes')
+      out += '$'
+      i = j
+      continue
+    }
+    out += text[i]
+  }
+  return out
+}
+
+type KillScan = { lists: boolean; signals: boolean; reason: string | undefined }
+
+// One command (a call, or a substitution of it, or a literal runner string) read segment by segment.
+function killScan(command: string, scan: KillScan, runners: boolean): void {
+  const { text, pieces } = blank(command)
+  // One split is enough here: the seat-mods 0.3.1 split (TAG_COMMANDS) cuts only where COMMANDS cuts, so its segments
+  // are unions of COMMANDS segments and its heads are COMMANDS heads. The rail walks its own heads (see KILL_HEADS).
+  const segments = segmentsFor(joinSubstitutions(text), pieces, COMMANDS, true)
+  const visit = (tokens: readonly string[], depth: number): void => {
+    const head = killHead(tokens, pieces)
+    if (head === undefined) return
+    const { name, args } = head
+    // The raw tokens of the same words, for a runner's literal (its quotes are what mark it).
+    const rest = tokens.slice(tokens.length - args.length)
+    if (name === 'ps' || name === 'pgrep' || name === 'pidof') scan.lists = true
+    else if (name === 'ls' && args.some(arg => /^\/proc(?:\/|$)/.test(arg))) scan.lists = true
+    else if (name === 'kill') {
+      scan.signals = true
+      scan.reason ??= killOperands(args)
+    } else if (name === 'pkill' || name === 'killall') scan.reason ??= killByName(name, args)
+    else if (name === 'killall5') scan.reason ??= 'killall5 signals every process but the session\'s own'
+    else if (name === 'systemctl') {
+      const has = (word: string) => args.includes(word)
+      if (has('--user') && (has('exit') || has('isolate') || has('kill') || (has('stop') && has('default.target'))))
+        scan.reason ??= 'systemctl --user exit, isolate, kill or stop default.target ends the whole user session'
+    } else if (name === 'loginctl') {
+      if (['terminate-user', 'kill-user', 'terminate-session', 'kill-session'].some(verb => args.includes(verb)))
+        scan.reason ??= 'loginctl terminate or kill of a user or session ends the whole session'
+    } else if (name === 'xargs') {
+      const at = xargsCommand(args)
+      // Each level maps every word again: a chain past 8 is unread, not walked (fails closed in the glues).
+      if (depth >= 8) throw new Error('xargs nested more than 8 deep')
+      if (at < args.length) visit(rest.slice(at), depth + 1)
+    } else if (runners && (name === 'eval' || KILL_SHELLS.has(name))) {
+      const inner = runnerText(name, args, rest, pieces)
+      if (inner !== undefined) killRead(inner, scan, false)
+    }
+  }
+  for (const segment of segments) visit(killHeads(tokensOf(segment)), 0)
+}
+
+// A command and every substitution in it, each read as a command of its own.
+function killRead(command: string, scan: KillScan, runners: boolean): void {
+  for (const read of [command, ...substitutionsOf(command)])
+    if (read === SUBSTITUTION_TOO_DEEP) throw new Error('substitution nested more than 8 deep')
+    else killScan(read, scan, runners)
+}
+
+// The deny text for a command that signals processes it did not name, or undefined. A throw is the caller's to fail closed.
+export function killRule(command: string): string | undefined {
+  const scan: KillScan = { lists: false, signals: false, reason: undefined }
+  killRead(command, scan, true)
+  if (scan.reason !== undefined) return killText(scan.reason)
+  if (scan.lists && scan.signals) return killText('this call lists processes and signals in the same call')
+  return undefined
 }

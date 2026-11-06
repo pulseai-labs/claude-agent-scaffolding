@@ -183,7 +183,7 @@ are not found and the skills that need them say so. A session started
 with `--no-extensions` needs `-e <that file>`.
 
 Guarded seats: install `omp-roles` and both mods, then launch with `omp-seat` (the extensions load only
-through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, seat-mods 0.4.1 (the first release that maps `seat-reviewer` to the reviewer profile) and molt 0.3.0 (the first release with an OMP extension; with an older install it refuses with an "is missing" message).
+through it). Link its `bin/omp-seat` onto `PATH` as `omp-roles/README.md` shows. It needs `bun`, and `seat-mods` and `molt` at the minimum versions `omp-roles/README.md` names; with an older or missing install it refuses and names the version it needs.
 
     omp plugin install omp-roles@pulsestack   # and seat-mods, molt
     omp-seat worker --via omp -p "..."

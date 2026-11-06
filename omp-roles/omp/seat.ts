@@ -5,9 +5,10 @@ import { join } from 'node:path'
 import { installPaths, MARKETPLACE } from './bin-path'
 
 export const MODS = ['seat-mods', 'molt'] as const
-// Minimum supported versions: seat-mods must map seat-reviewer to the reviewer profile;
+// Minimum supported versions: seat-mods must map seat-reviewer to the reviewer profile and carry the kill rail
+// (0.14.0, #1099: every seat's bash is read before it runs, so a seat on an older seat-mods does not launch);
 // molt must ship its OMP extension.
-const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.4.1', molt: '0.3.0' }
+const MIN_VERSION: Record<(typeof MODS)[number], string> = { 'seat-mods': '0.14.0', molt: '0.3.0' }
 export const ROLES: Record<string, string | undefined> = {
   worker: undefined, 'spine-driver': 'spine-driver.md', close: 'close.md', 'work-pr': 'work-pr.md',
   orchestrator: 'orchestrator.md', 'crew-spine': 'crew-spine.md', 'crew-work-pr': 'crew-work-pr.md',
@@ -63,7 +64,10 @@ export function planLaunch(o: { role: string; via: string; args: string[]; ompRe
   for (const mod of MODS) {
     const root = omp.get(mod) ?? claude.get(mod)
     if (root === undefined) return { error: `omp-seat: ${mod} is not installed (looked in ${o.ompRecord} and ${o.claudeRecord})` }
-    const min = (Object.hasOwn(ROLE_MIN, o.role) ? ROLE_MIN[o.role][mod] : undefined) ?? MIN_VERSION[mod]
+    // A role's own minimum never lowers the floor: the orchestrator's 0.8.0 (its status entry) sits below the kill rail's
+    // 0.14.0 (#1099), and the orchestrator is the seat the rail exists for.
+    const roleMin = Object.hasOwn(ROLE_MIN, o.role) ? ROLE_MIN[o.role][mod] : undefined
+    const min = roleMin !== undefined && semver.order(roleMin, MIN_VERSION[mod]) > 0 ? roleMin : MIN_VERSION[mod]
     const ext = join(root, 'omp', 'extension.ts')
     if (!existsSync(ext)) return { error: `omp-seat: ${ext} is missing — install ${mod} ${min} or later` }
     const manifest = join(root, '.claude-plugin', 'plugin.json')
