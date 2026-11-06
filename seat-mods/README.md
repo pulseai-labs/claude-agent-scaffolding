@@ -231,13 +231,13 @@ It refuses:
 - **`killall5`**, **`systemctl --user`** with `exit`, `isolate`, `kill` or `stop default.target` (any argument
   order), and **`loginctl`** `terminate-user`, `kill-user`, `terminate-session` or `kill-session`.
 
-An unquoted `$(…)` or `$((…))` counts as one word of its command, so `kill 123 $(cat p) 0` is read whole. `command -v NAME` and `command -V NAME` run nothing and pass.
+An unquoted `$(…)` or `$((…))` counts as one word of its command, so `kill 123 $(cat p) 0` is read whole. The span is bounded by counting parentheses, not by the shell's grammar: a `case` pattern's `)` or a `)` inside `${…}` ends it early (a known limit), and a `(` inside `${…}` leaves it open, so the call is refused as unread. `command -v NAME` and `command -V NAME` run nothing and pass.
 
 It reads through `sudo` (with its options), `env`, `command`, `builtin`, `exec`, `nohup`, `time`, `timeout`,
 `setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock` (each with its common options, and `--`);
 through a path (`/bin/kill`), a quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and
 into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once (the shell's options before and after
-`-c`, `-o`/`-O` values and one `--` included). A refusal says what to do instead: list first, read
+`-c`, `-o`/`-O` values and one `--` included; a cluster that holds both `c` and `o`, such as `-co`, is not read). A refusal says what to do instead: list first, read
 the PIDs, kill by literal PID in a separate call; to stop your own job use `write proc://<id>/kill` (OMP)
 or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never sees them. On OMP a
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
@@ -269,7 +269,7 @@ Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`
   (`kill $(cat pidfile)` is allowed on purpose), and a variable whose value is `-1`.
 - **Other ways to signal many processes.** `fuser -k`, `pkill`/`killall` selecting by `-s`, `-g`,
   `-P`, `-t`, `-G` or `-F` alone, `pkill -v` (inverted), system-scope `systemctl stop user@<uid>`.
-- **Patterns.** A `pkill` or `killall -r` pattern broad in some way the four probe names do not all
+- **Patterns.** A second `pkill` operand is not read: procps `pkill` rejects it, but BSD and macOS `pkill` take several, so `pkill node '.*'` is a miss there. A `pkill` or `killall -r` pattern broad in some way the four probe names do not all
   match (`s`), one held in a variable or a quoted substitution (`pkill "$(cat f)"`), and one that is not a
   regular expression in JavaScript's reading, are not refused. An unquoted `$(…)` reads as the pattern
   `$`, which matches everything, so `pkill $(cat f)` is refused.

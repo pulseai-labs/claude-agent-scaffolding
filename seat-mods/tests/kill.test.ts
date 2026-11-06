@@ -178,6 +178,9 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   ['killall5; kill 123', 'killall node; kill 123'],
   ['systemctl --user exit; kill 123', 'systemctl --user status x; kill 123'],
   ['loginctl kill-user dev; kill 123', 'loginctl show-user dev; kill 123'],
+  // round 2 C9: killall reads every name; env's own -v is skipped
+  ["killall node ''", 'killall node bash'],
+  ['env -v pkill -u dev', 'env -v pkill node'],
   ["killall --regexp '.*'", "killall --regexp '^herdr'"],
   ["pkill --ignore-case 'X|S|N|B'", "pkill 'X|S|N|B'"],
   ['pkill --signal HUP', 'pkill --signal HUP node'],
@@ -201,7 +204,7 @@ const ALLOW: readonly string[] = [
   'exec bash', 'xargs echo', 'echo 123 | xargs kill',
   // fix r1 C1: words after a substitution are not a command of their own; C2/C3 controls
   'echo $(ps) kill', 'echo $(pgrep x) kill 1', 'echo $(date) kill -1', 'pkill -f foo $(echo x)',
-  "bash -- -c 'kill -1'", 'command -v pkill', 'command -V pkill', 'command -v killall', 'command -v pgrep >/dev/null && kill 123',
+  "bash -- -c 'kill -1'", 'command -v pkill', 'command -V pkill', 'command -pv pkill', 'command -v killall', 'command -v pgrep >/dev/null && kill 123',
   "pkill --exact '[a-z]'",
   // fix r0 N4: a help or version request names no process
   'pkill --help', 'pkill -V', 'pkill -h', 'killall --version', 'killall -V', 'pkill --version',
@@ -257,6 +260,12 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ['pkill --pidfile /tmp/p', 'pkill --pidfile'],
   ['pkill -F /tmp/pidfile', 'pkill -F'],
   ['pkill "$(cat /tmp/name)"', 'a pattern held in a quoted substitution'],
+  // round 2 C7, C8, C10
+  ['kill 123 $(case x in a) echo 1;; esac) -1', "a case pattern's ) inside $(…) ends the span early"],
+  ['kill 123 $(echo ${x:-)}) -1', 'a ) inside ${…} inside $(…) ends the span early'],
+  ["bash -co pipefail 'kill -1'", 'a shell option cluster holding both c and o'],
+  ["bash -oc pipefail 'kill -1'", 'a shell option cluster holding both o and c'],
+  ["pkill node '.*'", "a second pkill operand (procps rejects it; BSD and macOS pkill take several)"],
 ]
 
 describe('killRule: refuse, with a near-miss control beside each row', () => {
@@ -278,6 +287,12 @@ describe('killRule: what a seat does legitimately stays allowed', () => {
 
 describe('killRule: known limits are not read (each is in the README)', () => {
   for (const [command, why] of LIMITS) test(`${why}: ${JSON.stringify(command)} is allowed`, () => { expect(killRule(command)).toBeUndefined() })
+})
+
+describe('killRule: a ( inside ${…} inside $(…) leaves the span open, so the call is unread (a deliberate false stop)', () => {
+  test('echo $(echo ${x:-(}) ; kill 123 throws, and both glues refuse it as unread', () => {
+    expect(() => killRule('echo $(echo ${x:-(}) ; kill 123')).toThrow()
+  })
 })
 
 describe('killRule: the deny text says what to do instead', () => {

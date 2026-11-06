@@ -31,8 +31,9 @@ both returned before any check for the free roles.
   options around `-c` (`bash -O extglob -c`, `bash -c -- '…'`, `eval -- '…'`); `time -p` and `builtin --`
   with their options; `-01`, `kill 00` and `kill -- -0` as `-1` and `0`; and a backtick in a negative operand.
   A substitution nested more than 8 deep, and an `xargs` chain more than 8 deep, are refused as unread.
-  Words after an unquoted `$(…)` stay operands of the command (`kill 123 $(cat p) 0`); `bash -euo pipefail -c`
-  and `--rcfile`/`--init-file` are read; `command -v NAME` passes. `pkill --help` and `--version` pass. The rail splits each command once (the second, 0.3.1 split cuts nowhere
+  Words after an unquoted `$(…)` stay operands of the command (`kill 123 $(cat p) 0`); the span is bounded by
+  counting parentheses, so a `case` pattern or a paren inside `${…}` is a known limit. `bash -euo pipefail -c`
+  and `--rcfile`/`--init-file` are read (a cluster holding both `c` and `o` is not); `command -v NAME` passes. `pkill --help` and `--version` pass. The rail splits each command once (the second, 0.3.1 split cuts nowhere
   the first does not).
 - omp-roles 0.11.0 raises its seat-mods floor to 0.14.0, and holds the orchestrator to it too (its own
   0.8.0 minimum had replaced the floor for that role).
