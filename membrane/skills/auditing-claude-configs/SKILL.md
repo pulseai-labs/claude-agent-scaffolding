@@ -16,14 +16,15 @@ v0.1 catches **common, unobfuscated patterns**. A determined adversary who obfus
 ## Audit mode (default — `/security-audit`)
 
 1. Parse `$ARGUMENTS` for flags: `--focus <aspect>`, `--verbose`, `--show-suppressed`. Set `focus` to the selected aspect, or `all` when absent; `/secrets-scan` and `/permissions-review` set their respective focus.
-2. **First-run gitignore bootstrap** (only if `.claude/audits/state.json` does not yet exist): `csa state_bootstrap_gitignore` to add `.claude/audits/` to `.gitignore` (idempotent; covers nested git repos, missing gitignore, unwritable files — see references/auto-fix-policy.md).
+2. **First-run gitignore bootstrap** (only if `.claude/audits/state.json` does not yet exist): `csa state_bootstrap_gitignore "$PWD"` to add `.claude/audits/` to `.gitignore` (idempotent; covers nested git repos, missing gitignore, unwritable files — see references/auto-fix-policy.md).
 3. Resolve scan targets: `csa enum_targets_all "$PWD"` (project `.claude/`, `CLAUDE.md`, `.claude-plugin/marketplace.json`, Codex surfaces such as `.codex/`, `AGENTS.md`, `.agents/plugins/marketplace.json`, `.codex-plugin/plugin.json`, readable `~/.codex/config.toml`, plus enabled Claude plugins per the algorithm in references/threat-model.md §enumerate).
 4. Run the deterministic rule engine: `csa rule_engine_scan_all "$PWD" "$focus"` iterates concrete targets × applicable rules. Keep its stderr line `csa: hook-coverage ...` (printed for `all` and `hooks` scans) for step 8.
 5. Rule findings carry their durable `finding_uid`: the rule computes it; do not recompute it. SCANNER findings carry none, so they are reported on every run and not registered.
-6. Tag scanner findings NEW vs PERSISTED via `csa baseline_tag <findings>` against state.json's `findings` registry.
-7. Filter suppressed scanner findings via `csa suppress_filter <findings>` (unless `--show-suppressed`).
-8. Write the scanner report file `.claude/audits/<date>-<NN>.md` and return chat summary via `csa report_render_markdown` + `csa report_render_chat`; pass the hook-coverage line from step 4 as `metadata.scope_summary`.
-9. Update `state.json` with `csa state_record_audit`, passing step 1's `focus` as its fifth argument so a focused scan ages only its own aspect (last-audit-date, scanner findings registry with GC per references/severity-rubric.md §GC, `self_integrity.state_mtime_at_last_audit` per references/auto-fix-policy.md §tamper).
+6. Tag scanner findings NEW vs PERSISTED via `csa baseline_tag <findings> "$PWD"` against state.json's `findings` registry.
+7. Filter suppressed scanner findings via `csa suppress_filter <findings> "$PWD"` (unless `--show-suppressed`).
+   **Unmatched suppressions (full audits only).** Keep step 4's raw output in a file. Run it only when `focus` is `all`, step 4 exited 0 with no `csa: warning` line on its stderr, and the output holds no `SCANNER-*` or `PROVENANCE-002` finding (otherwise the scan was partial); then run `csa suppress_stale <raw-file> "$PWD" all`; it prints one JSON line, `{"finding_uid": …}`, per suppression whose uid is not in the scan. Print only uids that match `^FUID-[0-9a-f]{8}$` (the shape membrane mints) and skip any other string; `N` counts the uids you print. If it prints any such uid, add one chat line after the summary: `N suppression(s) match no finding in this scan: FUID-…, FUID-….  They may still be wanted (for example on another branch or with another plugin enabled). To remove one: /security-audit --unsuppress <FUID>`. Never run it on a focused scan, and never remove an entry yourself: the operator decides. If the command refuses, print nothing about suppressions.
+8. Write the scanner report file `.claude/audits/<date>-<NN>.md` and return chat summary via `csa report_render_markdown <findings> <metadata-json> <report-path>` + `csa report_render_chat <findings> <report-path>`; pass the hook-coverage line from step 4 as `metadata.scope_summary`.
+9. Update `state.json` with `csa state_record_audit "$PWD" <run-index> <report-path> <findings> "$focus"`, where `<run-index>` is the last `audit_history` entry's `run_index` plus 1, or 1 when there is none (`jq '((.audit_history | last | .run_index) // 0) + 1' .claude/audits/state.json`), passing step 1's `focus` as its fifth argument so a focused scan ages only its own aspect (last-audit-date, scanner findings registry with GC per references/severity-rubric.md §GC, `self_integrity.state_mtime_at_last_audit` per references/auto-fix-policy.md §tamper).
 10. If any rules failed to load, emit prominent chat banner: `"⚠ N rule(s) failed to load; results incomplete. See report for SCANNER-001 findings."`
 11. Emit chat summary inline (per references/severity-rubric.md §chat-summary-format).
 
@@ -34,7 +35,7 @@ Identical to audit mode but with `--focus <aspect>` baked in. Skill body parses 
 ## Apply-fix mode (`/apply-fix <finding-id>`)
 
 1. Parse `$ARGUMENTS` to extract finding ID. Accept either `display_id` (e.g., `SA-2026-05-24-013`) or `finding_uid` (e.g., `FUID-a3f9b21c`).
-2. Resolve via `csa apply_resolve_id "<id>"`: display_id → look up in latest report → finding_uid.
+2. Resolve via `csa apply_resolve_id "$PWD" "<id>"`: display_id → look up in latest report → finding_uid.
 3. Load finding record from `state.json`.
 4. Run defense-in-depth checks per references/auto-fix-policy.md:
    - Rule has `RULE_AUTO_FIXABLE=true` AND `RULE_MECHANICALLY_FIXABLE=true`
@@ -48,7 +49,11 @@ If any check fails, refuse with the specific message from references/auto-fix-po
 
 ## Suppression mode (`/security-audit --suppress <finding-id>`)
 
-Calls `csa suppress_add "<finding-id>"`. Refuses Critical-severity findings. Refuses if finding_uid was first_seen < 60s ago (race-window protection per references/auto-fix-policy.md §tamper).
+Look up the finding's severity in the latest report or state, then call `csa suppress_add "$PWD" "<finding-id>" "<severity>" "<note>"`. Refuses Critical-severity findings. Refuses if finding_uid was first_seen < 60s ago (race-window protection per references/auto-fix-policy.md §tamper).
+
+## Unsuppress mode (`/security-audit --unsuppress <FUID>`)
+
+Calls `csa suppress_remove "$PWD" "<FUID>"`. It removes that one entry from `.claude/audits/suppressions.json` and leaves the others as they were. Exit 1 means no such suppression (or no file) and nothing was written; exit 2 means the file is not a valid suppressions file (empty, not JSON, or no `suppressions` array); exit 5 means the write failed (the file is unchanged). Takes the id as stored in `suppressions.json` (the `FUID-…` id in the stale line), matched exactly. The finding, if it still fires, shows again in the next audit.
 
 ## When the user asks naturally (no slash command)
 

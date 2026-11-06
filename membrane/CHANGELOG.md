@@ -2,6 +2,27 @@
 
 Named `claude-security-audit` through 0.3.1.
 
+## 0.6.0 (2026-11-07)
+
+#1112: nothing removed a suppression, and nothing said which ones had stopped matching. Both are mechanical work on membrane's own state file and the uids it mints (skill-first question 2). The code never deletes on its own: whether to drop a listed entry stays the operator's call.
+
+### Added
+- **`/security-audit --unsuppress <FUID>`** removes one suppression from `.claude/audits/suppressions.json` (`csa suppress_remove <root> <uid>`). Every other entry is kept as it was. An unknown uid exits 1 and the file is not rewritten; a file that is not a suppressions file (empty, not JSON, no `suppressions` array) exits 2; no file exits 1 and none is created. A failed write exits 5 with a `csa:` message and leaves the file as it was. The write is atomic, as `--suppress` is.
+- **A full audit lists suppressions that match nothing.** (`suppress_stale` prints `{"finding_uid": …}` only, never a `note`, and the skill prints only uids of the form `FUID-` and 8 hex digits.) After a full audit (no focus) whose scan exited 0 with no `csa: warning` line and holds no `SCANNER-*` or `PROVENANCE-002` finding, chat gets one line naming the suppressions whose uid is not in the scan, with a reminder that they may still be wanted (another branch, a disabled plugin) and how to remove one. `csa suppress_stale <raw-findings> <root> <focus>` computes it from the raw scan output of that run, before suppressions are filtered out, and refuses on a focused scan or a malformed suppressions file (exit 2), a scan with a `SCANNER-*` or `PROVENANCE-002` finding (exit 3), or a findings file that is missing or not JSONL (exit 4). The skill runs it only after a scan that exited 0 with no `csa: warning` line, because a failed scan prints no findings and the function cannot see that. Stored runs cannot answer it, because a suppressed finding is filtered out before the run is recorded.
+
+### Fixed
+- SKILL.md documented `csa suppress_add "<finding-id>"`, `csa suppress_filter <findings>`, `csa baseline_tag <findings>` and `csa apply_resolve_id "<id>"`, each of which aborts through the dispatcher (`$2: unbound variable`); `csa state_bootstrap_gitignore`, `csa report_render_markdown`, `csa report_render_chat` and `csa state_record_audit` were documented with no arguments and aborted the same way. Each now documents its real arguments, and a test runs every `csa` call SKILL.md documents through `bin/csa`, bare calls included.
+
+### Migration
+- The dead suppression entries that 0.5.0, 0.5.1 and 0.5.2 left (a uid that moved, or a finding that stopped firing) are listed by the next full audit; remove each with `/security-audit --unsuppress <FUID>`. The entries under those versions below that say to edit the file by hand are left as written.
+
+### Known limits
+- The list never includes the three fixed tamper uids (`FUID-tamper01` to `FUID-tamper03`): the tamper check is not part of the rule-engine scan, so they never appear in one. A suppression of one of them stays until `--unsuppress` removes it.
+- A partial scan that exits 0 and prints no `SCANNER-*` or `PROVENANCE-002` finding is only caught by the `csa: warning` line the skill checks; the function does not see stderr.
+- Adding and removing a suppression take no lock, so concurrent calls can lose an update (as `--suppress` always could).
+- The list says "matches nothing in this scan", not "dead": a branch switch, a disabled plugin or another `HOME` also leaves an entry unmatched, and nothing is removed for you.
+- `--unsuppress` takes the id as stored in `suppressions.json`, matched exactly; it does not resolve a display id (a suppressed finding is not in the report).
+
 ## 0.5.2 (2026-11-06)
 
 #1113: HOOK-004's patterns matched more than they named. Both modes (a script file and a hook command read from JSON) test the same two patterns, and a detection that fired on an incidental token is now silent. A narrowing: it only removes stops, and what it misses goes to the model's judgment exactly as if the check were absent (skill-first question 3).
