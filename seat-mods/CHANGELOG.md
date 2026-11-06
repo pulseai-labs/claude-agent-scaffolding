@@ -11,7 +11,7 @@ omp session started by hand had no rail. seat-mods now ships a `package.json` wi
 
 - A plain session changes in nothing but the kill refusals: no role guard, no `SEAT_MODS_ROLE` read, no other denial.
   The role guard (`omp/extension.ts`) stays `omp-seat`-only.
-- A `bash` command the rail cannot read is refused with `KILL_UNCHECKED`, as free roles are. An `eval` string literal it cannot read passes: a literal is not necessarily shell (`print("cost: $(5")`), and a miss goes on to the next judge. A literal that lists and signals is still refused.
+- A `bash` command the rail cannot read is refused with `KILL_UNCHECKED`, as free roles are. An `eval` string literal it cannot read passes: a literal is not necessarily shell (`print("cost: $(5")`), and a miss goes on to the next judge. A literal that lists and signals is still refused. Known limit: an unreadable literal also turns off the joined reading of the whole code, the one reading that sees an argv list, so `x = "$(5"; subprocess.run(["kill","-1"])` passes on to the model.
 - Under `omp-seat` the rail runs twice, from the manifest and inside the guard. Harmless: it only refuses, and the
   first block wins. The one visible difference: for a bash command the rail cannot read, a guarded seat now gets the rail's
   `KILL_UNCHECKED` stop first, not its role's own deny text. A load probe on omp 18.16.0 saw each of rail, guard and molt load once under `omp-seat`; it is recorded in PR #1119's Evidence.

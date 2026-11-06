@@ -36,7 +36,7 @@
     },
     {
       "name": "seat-mods",
-      "description": "Role guards for worker seats as a Claude Code mod: SEAT_MODS_ROLE on a seat's spawn turns on that role's tool-call rails; unset or empty, it guards as an implementer by default, and orchestrator and coordinator are explicit roles unguarded except for the kill rail, which for every role refuses a call that lists processes and signals them, kill -1, and pkill/killall by user or with a pattern that matches everything; on OMP an orchestrator may not spawn subagents, and the kill rail alone also loads in every omp session with seat-mods enabled.",
+      "description": "Role guards for worker seats as a Claude Code mod: SEAT_MODS_ROLE on a seat's spawn turns on that role's tool-call rails; unset or empty, it guards as an implementer by default, and orchestrator and coordinator are explicit roles unguarded except for the kill rail, which for every role refuses a call that lists processes and signals them, kill -1, and pkill/killall by user or with a pattern that matches everything; on OMP an orchestrator may not spawn subagents, and the kill rail alone also loads in every omp session with seat-mods enabled (unless started with --no-extensions).",
       "category": "workflow",
       "source": "./seat-mods"
     },

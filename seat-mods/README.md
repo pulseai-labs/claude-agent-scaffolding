@@ -216,7 +216,7 @@ and `eval` best effort through its string literals, and an implementer's `debug`
 **On OMP it also reaches a plain session** (#1102). `package.json`'s `omp` manifest names `omp/kill-rail.ts`, the rail
 alone (`bash` and `eval`; not `debug`), so every omp session with seat-mods enabled, unless started with `--no-extensions`, loads it after `omp plugin upgrade`, whether or not `omp-seat` launched it. That
 entry ignores `SEAT_MODS_ROLE` and the agent kind: a plain session keeps every other freedom, and the role
-guard stays `omp-seat`-only. An unreadable `bash` command is refused with the same stop a free role gets; an unreadable `eval` string literal passes, as a literal need not be shell. Under
+guard stays `omp-seat`-only. An unreadable `bash` command is refused with the same stop a free role gets; an unreadable `eval` string literal passes, as a literal need not be shell; it also turns off the joined reading of the code, the one that sees an argv list, so an argv-list kill beside it goes on to the model. Under
 `omp-seat` the rail runs twice, once from the manifest and once inside the guard; that is harmless, as the first
 block wins. The one visible difference: for a bash command the rail cannot read, a guarded seat gets the rail's stop first,
 not its role's own deny text. `omp plugin disable seat-mods` turns the ambient entry off and leaves `omp-seat` alone.
