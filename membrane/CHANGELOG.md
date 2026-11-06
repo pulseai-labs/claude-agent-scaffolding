@@ -16,6 +16,7 @@ Named `claude-security-audit` through 0.3.1.
 - A finding that no longer fires (an input in Fixed above, with no real command beside it) leaves its baseline entry to the usual GC and its entry in `.claude/audits/suppressions.json` as an orphan that matches nothing: remove it by hand. A command to remove a suppression is #1112.
 
 ### Known limits
+- Only the `\n`, `\r` and `\t` escapes are read as a boundary. A name after another escape spelling of a newline (`\x0a`, `\u000a`, `\012`) follows a letter or digit, so it no longer fires; each is pinned silent by a test row.
 - `curlie` and `pycurl` (a Python `pycurl` call) no longer fire. Also no longer firing, each pinned by a test row: a name right after a letter, digit, `_`, `.` or `-` (`run_curl`, `x-curl`, `2curl`), `${CURL:-curl}` (also `${RSYNC:-rsync}`) and `sh.curl(` (a Python `sh` call).
 - Still firing on purpose: `/etc/ssh ` (a `/` may precede a name), `~/.sshd_config_backup`, `~/.ssh2/` and `/etc/passwdX` (the sensitive names have no end boundary), and `nc` then a newline.
 - Still silent: `$HOME/.ssh`, `${HOME}/.ssh`, `"$HOME"/.ssh`, `/Users/<name>/.ssh` and any path in a variable (`$HOME` forms are filed as #1118), an uppercase `CURL` or `~/.SSH`, `ncat`, `nc.openbsd`, and `spawn('scp', ...)` (a name followed by a quote).
