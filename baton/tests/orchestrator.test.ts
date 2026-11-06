@@ -451,7 +451,7 @@ describe("baton notify-orchestrator", () => {
       const g = await rig({ replies: ok });
       await baton(g, ["notify-orchestrator", KEY, MSG]);
       expect(failureLines(g)).toEqual([]);
-      // timeout: the clock jumps past the 28 s budget once the first Orca call is logged... here no pointer, so jump from the start
+      // timeout: the first Date.now() passes; every later one is 40 s on (host-wide key), so no Orca call happens and the 1 s floor applies
       const t = await rig({ replies: ok });
       writeFileSync(t.cfg, JSON.stringify({ orca: { cli: FAKE_ORCA }, fallback_notify: ["sleep", "30"] }));
       const script = `import { notifyOrchestrator } from ${JSON.stringify(join(import.meta.dir, "..", "src", "hosts", "orchestrator.ts"))};

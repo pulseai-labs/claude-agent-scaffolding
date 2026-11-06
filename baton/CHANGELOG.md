@@ -9,7 +9,7 @@ notifier says why it failed (#1053). The example recipe changes; the engine does
 
 - **Fixed: `spine_finish` (#1095).** Its done outcome reads the state file at `origin/main` after a
   `git fetch origin main` in the AI root (`origin/main` is fixed). A local file that reads closed no longer
-  ends it. The fetch runs with `GIT_TERMINAL_PROMPT=0`, so a credential prompt fails instead of hanging. An AI
+  ends it. The fetch runs with `GIT_TERMINAL_PROMPT=0`, so git's own credential prompt fails instead of hanging; an ssh remote's passphrase or host-key prompt is not covered. An AI
   root with no `origin` remote, a failed fetch, an unknown spine or a bad file parks
   `exit0 error`. When the seat wrote `out/spine-pr/close-pr.txt` (the AI close PR's URL), the unit goes to the
   new wait stage `spine_close_wait`: it ends done when the PR is merged and `origin/main` reads the spine

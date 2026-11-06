@@ -457,7 +457,7 @@ describe("ossify-spine recipe", () => {
     rmSync(t.dir, { recursive: true, force: true });
   });
 
-  test("both origin conditions run their fetch with GIT_TERMINAL_PROMPT=0, so a credential prompt fails instead of hanging (#1095)", () => {
+  test("both origin conditions run their fetch with GIT_TERMINAL_PROMPT=0 (#1095)", () => {
     const r = loadRecipe();
     const wait = (r.stages.spine_close_wait as WaitStage).outcomes[0].when.map((sg) => ("exit0" in sg ? sg.exit0 : []));
     const fin = (r.stages.spine_finish as SessionStage).outcomes[0].when.map((sg) => ("exit0" in sg ? sg.exit0 : []));
