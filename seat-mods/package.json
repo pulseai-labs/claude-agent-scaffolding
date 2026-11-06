@@ -1,0 +1,1 @@
+{ "name": "seat-mods", "private": true, "omp": { "extensions": ["omp/kill-rail.ts"] } }
