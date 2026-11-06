@@ -165,3 +165,88 @@ csa_suppress_filter() {
     fi
   done < "$findings_file"
 }
+
+# ---------------------------------------------------------------------------
+# Remove
+# ---------------------------------------------------------------------------
+
+# csa_suppress_remove <project_root> <finding_uid>
+# Remove the suppression for finding_uid; every other entry is kept as jq emits it.
+# rc 0 removed; rc 1 no such suppression or no file (nothing is written, no file is
+# created); rc 2 suppressions.json is not a suppressions file. Atomic tmp+mv write.
+csa_suppress_remove() {
+  local root="$1"
+  local fuid="$2"
+  local sup_file; sup_file="$(csa_suppress_path "$root")"
+
+  if [[ ! -f "$sup_file" ]]; then
+    printf 'csa: no suppressions file at %s\n' "$sup_file" >&2
+    return 1
+  fi
+
+  local present
+  present="$(jq -r --arg k "$fuid" \
+    'if (.suppressions | type) == "array" then any(.suppressions[]; .finding_uid == $k) else error("no suppressions array") end' \
+    "$sup_file" 2>/dev/null)" || present=""
+  if [[ -z "$present" ]]; then
+    printf 'csa: %s is not a valid suppressions file\n' "$sup_file" >&2
+    return 2
+  fi
+  if [[ "$present" != "true" ]]; then
+    printf 'csa: %s is not suppressed\n' "$fuid" >&2
+    return 1
+  fi
+
+  local tmp; tmp="$(dirname "$sup_file")/suppressions.json.tmp.$$"
+  jq --arg k "$fuid" '.suppressions |= map(select(.finding_uid != $k))' \
+    "$sup_file" > "$tmp" && mv "$tmp" "$sup_file" || { rm -f "$tmp"; return 2; }
+}
+
+# ---------------------------------------------------------------------------
+# Stale
+# ---------------------------------------------------------------------------
+
+# csa_suppress_stale <raw_findings_jsonl_file> <project_root> <focus>
+# Emit, as JSONL, each suppression whose finding_uid is absent from the raw (unfiltered)
+# scan output. Deletes nothing. A suppression can match nothing for reasons outside the
+# file (another branch, a disabled plugin), so the caller words the list accordingly.
+# rc 0 listed (possibly nothing); rc 2 focus is not "all", or suppressions.json is not a
+# suppressions file; rc 3 the scan holds a SCANNER-* or PROVENANCE-002 finding (a rule or
+# target failed, or an enabled plugin was not resolved, so uids may be missing from the
+# scan and not from the project); rc 4 the findings file is missing or is not JSONL.
+# The caller must also run it only when the scan exited 0 with no `csa: warning` on stderr:
+# a failed scan prints nothing, and this function cannot see that.
+# The fixed FUID-tamper01..03 uids never appear in a scan and are not listed.
+csa_suppress_stale() {
+  local findings_file="$1"
+  local root="$2"
+  local focus="$3"
+  local sup_file; sup_file="$(csa_suppress_path "$root")"
+
+  if [[ "$focus" != "all" ]]; then
+    printf 'csa: stale suppressions need a full scan (no focus); this scan was focused on %s\n' "$focus" >&2
+    return 2
+  fi
+  local partial
+  partial="$(jq -s 'any(.[]; (.rule_id // "") | (startswith("SCANNER-") or . == "PROVENANCE-002"))' "$findings_file" 2>/dev/null)" || {
+    printf 'csa: %s is missing or is not findings JSONL; stale list not computed\n' "$findings_file" >&2
+    return 4
+  }
+  if [[ "$partial" == "true" ]]; then
+    printf 'csa: the scan holds a SCANNER or PROVENANCE-002 finding, so it may be partial; stale list not computed\n' >&2
+    return 3
+  fi
+  [[ -f "$sup_file" ]] || return 0
+  if ! jq -e '(.suppressions | type) == "array" and all(.suppressions[]; (.finding_uid | type) == "string")' \
+      "$sup_file" >/dev/null 2>&1; then
+    printf 'csa: %s is not a valid suppressions file\n' "$sup_file" >&2
+    return 2
+  fi
+
+  jq -c --slurpfile f "$findings_file" \
+    '([$f[] | .finding_uid // empty]) as $live
+     | .suppressions[]
+     | select((.finding_uid | test("^FUID-tamper0[123]$") | not)
+              and (.finding_uid as $u | $live | index($u) | not))' \
+    "$sup_file"
+}
