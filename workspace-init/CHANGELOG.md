@@ -1,5 +1,9 @@
 # workspace-init changelog
 
+## 0.10.6
+
+Routing prose follows ossify 1.37.0 (#1042). The fresh-bootstrap next steps and their example put adopt's replacement of a marked `AGENTS.md` stub under "ossify 1.24.0 or later"; it is from 1.35.0, and on 1.24.0-1.34.x adopt merges into the stub. A headless `/ossify:start` (no operator to answer) refuses a canonical with any file at `HEAD` from ossify 1.37.0 (#1040); every place that sends a canonical with no product source to `/ossify:start` now says so: both READMEs, both stubs, and the next steps of the three skills with their examples. Prose only.
+
 ## 0.10.5
 
 The marketplace is renamed `pulsestack`; the OMP bin-path module it ships (`omp/bin-path.ts`, VERSION 2) reads installs under the new marketplace name `pulsestack` and, for one release, under the old `claude-agent-scaffolding`; an entry under the new name wins. The install key is `workspace-init@pulsestack`, and `ai-mentor` is `sage` in the README stub. No other change.

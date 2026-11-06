@@ -20,7 +20,7 @@ Production code, product docs (PRD/SRS/BACKLOG), product ADRs, test code. Those 
 ## Plugins involved
 
 - `workspace-init` (this plugin) — bootstrapped both repos.
-- `ossify` — authors the lean spec and lifecycle guidance; `/ossify:start` for a canonical with no product source (history alone is fine on ossify 1.34.0 or later). `/ossify:adopt` (ossify 1.35.0 or later) for a canonical with product source at `HEAD`, with or without the legacy scaffold stack.
+- `ossify` — authors the lean spec and lifecycle guidance; `/ossify:start` for a canonical with no product source (history alone is fine on ossify 1.34.0 or later; with no operator to answer, ossify 1.37.0 or later refuses a canonical with any file at `HEAD`). `/ossify:adopt` (ossify 1.35.0 or later) for a canonical with product source at `HEAD`, with or without the legacy scaffold stack.
 - `sage` — decision-making aids.
 
 See the marketplace README at the marketplace root for plugin details.

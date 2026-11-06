@@ -182,7 +182,7 @@ Next steps:
      This skill writes no project guidance.
   4. Run `/ossify:adopt` (ossify 1.35.0 or later) if the canonical carries product source at `HEAD`, with or
      without the legacy scaffold stack, or
-     `/ossify:start` if the canonical has no product source (history alone is fine on ossify 1.34.0 or later); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     `/ossify:start` if the canonical has no product source (history alone is fine on ossify 1.34.0 or later; with no operator to answer, ossify 1.37.0 or later refuses a canonical with any file at `HEAD`); on Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
      - **`/ossify:start` (no product source at `HEAD`):** on ossify 1.24.0 or later it replaces the marked
        `AGENTS.md`; it is the route that writes the one instruction file.
      - **`/ossify:adopt` (product source at `HEAD`):** on ossify 1.24.0 or later, adopt merges

@@ -284,7 +284,7 @@ Next steps:
      `/ossify:adopt` (ossify 1.35.0 or later), with or without the legacy scaffold stack — it
      reads that stack's roadmap state, active-context cursor and legacy spec only when they
      exist. `/ossify:start` sends such a repository to adopt; for a canonical with no product
-     source, history alone included on ossify 1.34.0 or later, `/ossify:start` onboards it. On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
+     source, history alone included on ossify 1.34.0 or later, `/ossify:start` onboards it; with no operator to answer, ossify 1.37.0 or later refuses a canonical with any file at `HEAD`. On Codex, invoke the corresponding ossify skill — `adopt`, or `start`.
      A canonical that holds a memory bank or `MASTER-SPEC.md` makes `/pair-workspace` abort; the
      plain route does not need it — make an AI workspace yourself (an empty directory, `git init`)
      and run `/ossify:adopt` there.
