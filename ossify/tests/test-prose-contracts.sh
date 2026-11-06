@@ -2711,4 +2711,13 @@ done
 _434_VERB="$(bash "$HERE/../bin/oss" spec_refresh 2>&1 || true)"
 case "$_434_VERB" in *"unknown subcommand"*) _pin 0 "#434 no refresh route: oss has no spec_refresh verb";; *) _pin 1 "#434 no refresh route: oss spec_refresh is not an unknown subcommand";; esac
 
+# ossify 1.37.1 (#1121): handoff §2 names the source of the spine class, as it does for base_branch; a seat that has no
+# source infers the class from "bones registered: none" and records flesh for a bone spine.
+pin "$WI/references/handoff-contract.md" 'select(.id == "<spine-id>") | .class' \
+  "handoff-contract §2 does not name oss get ... .class as the source of the spine class (#1121) - a writer with no source infers it"
+pin "$WI/references/handoff-contract.md" 'never derive it from the spine'"'"'s `## Bones this spine registers` list' \
+  "handoff-contract §2 does not say the class is never derived from the spine's bones list (#1121) - a spine that registers no bones is still bone when its plan touches a registered surface"
+pin "$WI/references/report-contract.md" "its class as the handoff's §2 states it" \
+  "report-contract §1 row does not take the spine class as the handoff's §2 states it (#1121) - a report may restate a class the handoff never sourced"
+
 t_summary

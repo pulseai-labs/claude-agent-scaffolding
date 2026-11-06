@@ -54,7 +54,12 @@ this contract) and skimming is how they get missed.
 ### `## 2. Spine context`
 
 The spine id, its class (`bone` / `flesh`), the release it belongs to, and a
-one-paragraph statement of what the spine is for. Then three branch facts:
+one-paragraph statement of what the spine is for. Copy the class from
+`oss get '.spines[] | select(.id == "<spine-id>") | .class'`
+(an empty result is a wrong id: stop, write no class). State holds it, however it
+became `bone`, so never derive it from the spine's `## Bones this spine registers` list:
+a spine that registers no bones is still `bone` when its plan touches a registered surface.
+Then three branch facts:
 
 - `repo:` the repo this work item targets — the same value as `target_repo` in
   §3. The spine branch is cut in every repo hosting at least one of the
