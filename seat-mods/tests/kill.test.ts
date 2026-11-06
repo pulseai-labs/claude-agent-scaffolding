@@ -196,33 +196,33 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   // zsh reads the word before the bare one as the string here, so only bash's reading sees the kill
   ["bash -c -oe pipefail - 'kill -1'", "bash -c -oe pipefail - 'kill 123'"],
   ["bash -c -oe pipefail + 'kill -1'", "bash -c -oe pipefail + 'kill 123'"],
-  // 0.14.2 (#1109, #1108 C6): a bare + before a later -c; bash and dash skip it, zsh ends the options
+  // 0.14.2 (#1109): a bare + before a later -c: bash and dash skip it, zsh ends the options, so each reading finds a different string
   ["bash -co pipefail + -c 'kill -1'", "bash -co pipefail + -c 'kill 123'"],
   ["bash +c + -c 'kill -1'", "bash +c + -c 'kill 123'"],
   ["bash +c + -ec 'kill -1'", "bash +c + -ec 'kill 123'"],
   ["bash +ec + -c 'kill -1'", "bash +ec + -c 'kill 123'"],
   ["dash +ec + -ec 'kill -1'", "dash +ec + -ec 'kill 123'"],
-  // 0.14.2 (#1109, #1108 C7): zsh's -O takes no value
+  // 0.14.2 (#1109): zsh's -O takes no value, so the string comes right after the cluster
   ["zsh -cO 'kill -1'", "zsh -cO 'kill 123'"],
   ["zsh -Oc 'kill -1'", "zsh -Oc 'kill 123'"],
   ["zsh +cO 'kill -1'", "zsh +cO 'kill 123'"],
   ["zsh -c -O 'kill -1'", "zsh -c -O 'kill 123'"],
   ["zsh -c +O 'kill -1'", "zsh -c +O 'kill 123'"],
   ["sudo -u dev zsh -cO 'kill -1'", "sudo -u dev zsh -cO 'kill 123'"],
-  // 0.14.2 (#1109, CodeRabbit on #1108): zsh's o takes the rest of its cluster as the option name
+  // 0.14.2 (#1109): zsh's o takes the rest of its cluster as the option name
   ["zsh -c -xoshwordsplit 'pkill -u alice'", "zsh -c -xoshwordsplit 'pkill node'"],
   ["zsh -c -oshwordsplit 'kill -1'", "zsh -c -oshwordsplit 'kill 123'"],
   ["zsh -xoshwordsplit -c 'kill -1'", "zsh -xoshwordsplit -c 'kill 123'"],
   ["zsh -coshwordsplit 'kill -1'", "zsh -coshwordsplit 'kill 123'"],
   ["zsh -c -opipefail 'kill -1'", "zsh -c -opipefail 'kill 123'"],
-  // 0.14.2 (#1109, ruling 3): two zsh forms the issue does not list; digits are ordinary zsh option letters, and --emulate takes a value
+  // 0.14.2 (#1109): two zsh forms whose strings a bash-only reading misses; digits are ordinary zsh option letters, and --emulate takes a value
   ["zsh -c1 'kill -1'", "zsh -c1 'kill 123'"],
   ["zsh --emulate sh -c 'kill -1'", "zsh --emulate sh -c 'kill 123'"],
   // 0.14.2 (#1109): zsh's b ends the options after its cluster, so the next word is the string even when it starts with -
   ["zsh -cb '-x; kill -1'", "zsh -cb '-x; kill 123'"],
   // 0.14.2 (#1109): zsh's bare + ends the options (bash skips it), so the next word is the string even when it starts with -
   ["zsh -c + '-x; kill -1'", "zsh -c + '-x; kill 123'"],
-  // 0.14.2 round 0 C1: a - that ends a zsh cluster ends the options too (bash, dash and ash reject these)
+  // 0.14.2 (#1109): a - that ends a zsh cluster ends the options too, so the next word is the string (bash and dash reject these; busybox ash accepts -c- and is not read, see LIMITS)
   ["zsh -c- '-x; kill -1'", "zsh -c- '-x; kill 123'"],
   ["zsh +c- '-x; kill -1'", "zsh +c- '-x; kill 123'"],
   ["zsh -xc- '-x; kill -1'", "zsh -xc- '-x; kill 123'"],
@@ -231,11 +231,15 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   ["zsh -c -f- '-y; kill -1'", "zsh -c -f- '-y; kill 123'"],
   ["zsh -c +- '-y; kill -1'", "zsh -c +- '-y; kill 123'"],
   ["sh -c- '-x; kill -1'", "sh -c- '-x; kill 123'"],
-  // round 0 C2: the zsh reading is read under every name, not only zsh
+  // the zsh reading is applied under every name in KILL_SHELLS, so dropping it for any one of them fails a row
   ["sh -cO 'kill -1'", "sh -cO 'kill 123'"],
   ["dash -cO 'kill -1'", "dash -cO 'kill 123'"],
   ["bash -cO 'kill -1'", "bash -cO 'kill 123'"],
-  // round 0 C3: a digit before the c is an ordinary zsh option letter too
+  // zsh's o ends a cluster and takes the next word, after a value-less O
+  ["zsh -cOo pipefail 'kill -1'", "zsh -cOo pipefail 'kill 123'"],
+  // a long option takes no value
+  ["zsh -c --braceccl 'kill -1'", "zsh -c --braceccl 'kill 123'"],
+  // a digit before the c is an ordinary zsh option letter too
   ["zsh -1c 'kill -1'", "zsh -1c 'kill 123'"],
   // 0.14.2 (#1109): forms 0.14.1 refused stay refused though the shell runs neither string (a false stop kept so the rail never loosens)
   ["bash - -c 'kill -1'", "bash - -c 'kill 123'"],
@@ -289,6 +293,8 @@ const ALLOW: readonly string[] = [
   "zsh -cO 'echo hi'", "zsh -cO extglob 'echo hi'", "bash -cO extglob 'echo hi'", "zsh -c -oshwordsplit 'echo hi'",
   "bash -c - -x 'kill -1'", "zsh -c - - 'kill -1'", "zsh -c -- -x 'kill -1'", "zsh -- -c 'kill -1'",
   "zsh -c1 'echo hi'", "zsh --emulate sh -c 'echo hi'", "bash -c + 'echo hi'", "zsh -cb 'echo hi'",
+  // zsh runs a word with no -c as a script path, not a string; --emulate after another option is an error in zsh; a long option takes no value, so an option-like word after it is not a string
+  "zsh 'kill -1'", "zsh -- 'kill -1'", "zsh -x --emulate sh -c 'kill -1'", "zsh -c --braceccl '-x; kill -1'",
 ]
 
 // Known limits: forms the rail does not read. Each is allowed here, and the README names it. A later
@@ -348,6 +354,7 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ["yash -c 'kill -1'", 'yash is not a shell the rail reads'],
   ["rbash -c 'kill -1'", 'rbash is not a shell the rail reads'],
   ["fish -c 'kill -1'", 'fish is not a shell the rail reads'],
+  ["sh -c- -e 'kill -1'", 'sh on a busybox ash host: ash accepts -c- and keeps reading options, a grammar neither reading covers'],
   // round 2 C7, C8, C10
   ['kill 123 $(case x in a) echo 1;; esac) -1', "a case pattern's ) inside $(…) ends the span early"],
   ['kill 123 $(echo ${x:-)}) -1', 'a ) inside ${…} inside $(…) ends the span early'],
@@ -375,7 +382,7 @@ describe('killRule: known limits are not read (each is in the README)', () => {
   for (const [command, why] of LIMITS) test(`${why}: ${JSON.stringify(command)} is allowed`, () => { expect(killRule(command)).toBeUndefined() })
 })
 
-// 0.14.2 (#1109, ruling 2): every shell name is read twice (bash's grammar and zsh's) into one scan. Where the two
+// 0.14.2 (#1109): every shell name is read twice (bash's grammar and zsh's) into one scan. Where the two
 // readings pick different words, one listing and the other signaling is refused as "lists and signals", though no
 // shell runs both. A deliberate false stop: it can only add a refusal.
 describe('killRule: the two readings share one scan (a deliberate false stop)', () => {
@@ -388,7 +395,7 @@ describe('killRule: the two readings share one scan (a deliberate false stop)', 
   })
 })
 
-// 0.14.2 (#1109, ruling 1): the rail never approves what 0.14.1 refused. LEGACY is 0.14.1's reader for the words of a
+// 0.14.2 (#1109): the rail never approves what 0.14.1 refused. LEGACY is 0.14.1's reader for the words of a
 // call, frozen here as the oracle: it returns the index of the word it read as the shell string. The grid is every
 // sequence of one to three option words, then two strings, run under each shell name in KILL_SHELLS and with the
 // kill in either string or both. Strings only: nothing here runs a command.

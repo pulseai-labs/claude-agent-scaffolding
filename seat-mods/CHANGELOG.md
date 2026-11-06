@@ -19,7 +19,7 @@ readings use one scan. 0.14.1 read one bash-shaped grammar for all four, which m
 Refuse-only: a grid of 6174 option forms, run under all four names, loosens nothing against 0.14.1's reader (a test
 carries it). Deliberate false stops, in the README and pinned: a call whose two readings pick different words is refused if
 either string is (`zsh -cO extglob 'kill -1'`, and `bash -cO 'ps aux' 'kill 123'` as lists-and-signals), though the shell
-that runs it runs at most one of the strings, and often none. Known limit: `ksh`, `mksh`, `ash`, `busybox sh`, `yash`, `rbash` and `fish` are not read (#1116).
+that runs it runs at most one of the strings, and often none. Known limit: `ksh`, `mksh`, `ash`, `busybox sh`, `yash`, `rbash` and `fish` are not read (#1116), and `sh` on a busybox ash host follows a grammar neither reading covers (ash accepts `-c-` and keeps reading options).
 omp-roles is unchanged; its seat-mods floor stays 0.14.0.
 
 ## 0.14.1 — 2026-11-06

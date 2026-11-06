@@ -271,7 +271,8 @@ is refused as a call that lists and signals.
   `eval "$VAR"`, `python3 -c`, `node -e`, `perl -e`, `su -c`, `ssh host …`, `watch`, `parallel`,
   `script -c`, `systemd-run`, `find … -exec kill`, `env -S '…'` / `--split-string`, `flock <file> -c '…'`,
   `coproc`. Shells other than `sh`, `bash`, `zsh` and `dash` are not read at all: `ksh`, `mksh`, `ash`,
-  `busybox sh`, `yash`, `rbash` and `fish -c '…'` are misses (#1116).
+  `busybox sh`, `yash`, `rbash` and `fish -c '…'` are misses (#1116). `sh` on a host where it is busybox ash (Alpine) follows ash's
+  grammar, which neither reading covers: ash accepts `-c-` and keeps reading options, so `sh -c- -e 'kill -1'` is a miss there.
 - **A command word the rail cannot name.** An alias, a function, a word held in a variable
   (`$K -1`) or built by expansion (`kill${IFS}-1`), a word split by a line continuation, and a wrapper
   not in the list above (`doas`, `runuser`, `unshare`).

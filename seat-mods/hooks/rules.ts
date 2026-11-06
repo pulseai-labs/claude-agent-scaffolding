@@ -1046,8 +1046,9 @@ function killLiteral(token: string, pieces: readonly string[]): string {
 }
 
 // The strings a literal runner may be given: eval's words joined, or for a shell the word after its -c as bash reads
-// the options and as zsh reads them. The shells disagree, and a name is not a closed input (sh is dash, bash, ash or
-// zsh by host), so every name in KILL_SHELLS gets both readings and the rail refuses if either string is refused.
+// the options and as zsh reads them. The shells disagree, and a name is not a closed input (sh is dash, bash or zsh on the hosts probed, and busybox ash
+// elsewhere, whose grammar neither reading covers), so every name in KILL_SHELLS gets both readings and the rail
+// refuses if either string is refused.
 function runnerTexts(name: string, args: readonly string[], raw: readonly string[], pieces: readonly string[]): string[] {
   if (name === 'eval') return [(args[0] === '--' ? raw.slice(1) : raw).map(token => killLiteral(token, pieces)).join(' ')]
   if (!KILL_SHELLS.has(name)) return []
@@ -1055,7 +1056,7 @@ function runnerTexts(name: string, args: readonly string[], raw: readonly string
   return [...new Set(texts.filter((text): text is string => text !== undefined))]
 }
 
-// bash's reading (dash's and ash's too, but for -O): the word after -c.
+// bash's reading (dash's too, but for -O; probed on dash, bash and zsh only): the word after -c.
 // Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
 // After -c: more options (the same four take a value) and one `--`, then the string; a bare `-` ends the options as
 // `--` does, and a bare `+` is skipped (0.14.1 returned either as the string).
