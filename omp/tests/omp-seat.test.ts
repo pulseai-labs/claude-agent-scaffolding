@@ -8,7 +8,7 @@ import { checkExtensions, expandRole, pinWarning, planLaunch, versionWarning } f
 
 let root: string, ompRecord: string, claudeRecord: string
 
-function install(name: string, withExt = true, version = ({ 'seat-mods': '0.4.1', molt: '0.3.0' } as Record<string, string>)[name] ?? '0.2.0'): string {
+function install(name: string, withExt = true, version = ({ 'seat-mods': '0.14.0', molt: '0.3.0' } as Record<string, string>)[name] ?? '0.2.0'): string {
   const p = join(root, 'cache', name)
   mkdirSync(join(p, 'omp'), { recursive: true })
   mkdirSync(join(p, '.claude-plugin'), { recursive: true })
@@ -54,7 +54,7 @@ describe('planLaunch', () => {
     expect(r.extensions).toHaveLength(2)
   })
   test('the orchestrator launches with seat-mods, molt and crew only; the status entry is the last -e', () => {
-    const [s, m] = [statusEntry(install('seat-mods', true, '0.8.0')), install('molt')]
+    const [s, m] = [statusEntry(install('seat-mods', true, '0.14.0')), install('molt')]
     record(ompRecord, { 'seat-mods': s, molt: m, crew: install('crew', false, '0.3.0') })
     const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
     const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir }) as { argv: string[] }
@@ -76,7 +76,7 @@ describe('planLaunch', () => {
     expect(launch('x')).toEqual({ error: 'omp-seat: unknown role "x" (known: worker, spine-driver, close, work-pr, orchestrator, crew-spine, crew-work-pr)' })
   })
   test("orchestrator appends its role file and loads seat-mods' status entry last (seat-mods 0.8.0, crew 0.3.0)", () => {
-    const [s, m] = [statusEntry(install('seat-mods', true, '0.8.0')), install('molt')]
+    const [s, m] = [statusEntry(install('seat-mods', true, '0.14.0')), install('molt')]
     record(ompRecord, { 'seat-mods': s, molt: m, 'crew': install('crew', false, '0.3.0') })
     const rolesDir = join(import.meta.dir, '../../omp-roles/roles')
     expect(planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir })).toMatchObject({
@@ -84,19 +84,25 @@ describe('planLaunch', () => {
         '-e', join(s, 'omp/status-extension.ts'), '--append-system-prompt', join(rolesDir, 'orchestrator.md')],
     })
   })
-  test('orchestrator refuses seat-mods 0.7.0, naming the 0.8.0 minimum (no top without the status check)', () => {
+  test('orchestrator refuses seat-mods 0.7.0 (no status check, no kill rail), naming the 0.14.0 floor', () => {
     record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.7.0')), molt: install('molt'), 'crew': install('crew', false, '0.3.0') })
     const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
     expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.7.0') })
-    expect((r as { error: string }).error).toContain('0.8.0')
+    expect((r as { error: string }).error).toContain('0.14.0')
+  })
+  test('the orchestrator is held to the kill rail floor too: seat-mods 0.13.0 has the status entry and no rail, so it is refused (#1099)', () => {
+    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.13.0')), molt: install('molt'), 'crew': install('crew', false, '0.3.0') })
+    const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
+    expect(r).toEqual({ error: expect.stringContaining('seat-mods 0.13.0') })
+    expect((r as { error: string }).error).toContain('0.14.0')
   })
   test('orchestrator refuses a seat-mods install with no omp/status-extension.ts', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.8.0'), molt: install('molt'), 'crew': install('crew', false, '0.3.0') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.14.0'), molt: install('molt'), 'crew': install('crew', false, '0.3.0') })
     const r = planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
     expect((r as { error: string }).error).toContain('status-extension.ts')
   })
   const orch = () => planLaunch({ role: 'orchestrator', via: 'omp-glm', args: [], ompRecord, claudeRecord, roleEnv: 'orchestrator', rolesDir: join(import.meta.dir, '../../omp-roles/roles') })
-  const orchMods = () => ({ 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt') })
+  const orchMods = () => ({ 'seat-mods': statusEntry(install('seat-mods', true, '0.14.0')), molt: install('molt') })
   test('orchestrator refuses a host with no crew, naming the plugin, the install command and the omp record', () => {
     record(ompRecord, orchMods())
     const r = orch() as { error: string }
@@ -127,7 +133,7 @@ describe('planLaunch', () => {
     expect(launch('worker')).toHaveProperty('argv')
   })
   test('control: a worker does not load the status entry, even when seat-mods ships it', () => {
-    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.8.0')), molt: install('molt') })
+    record(ompRecord, { 'seat-mods': statusEntry(install('seat-mods', true, '0.14.0')), molt: install('molt') })
     const r = launch('worker') as { argv: string[] }
     expect(r.argv.filter(a => a === '-e')).toHaveLength(2)
     expect(r.argv.some(a => a.endsWith('status-extension.ts'))).toBe(false)
@@ -136,8 +142,8 @@ describe('planLaunch', () => {
     record(ompRecord, { 'seat-mods': install('seat-mods'), molt: install('molt') })
     expect(launch('worker')).toHaveProperty('argv')
   })
-  test('control: worker still accepts seat-mods 0.4.1', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt') })
+  test('control: worker accepts seat-mods 0.14.0, the kill rail floor (#1099)', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.14.0'), molt: install('molt') })
     expect(launch('worker')).toHaveProperty('argv')
   })
   for (const role of ['spine-driver', 'close', 'work-pr', 'crew-spine', 'crew-work-pr']) {
@@ -185,20 +191,20 @@ describe('planLaunch', () => {
     record(ompRecord, { 'seat-mods': old, molt: install('molt') })
     const r = launch() as { error: string }
     expect(r.error).toContain(join(old, 'omp', 'extension.ts'))
-    expect(r.error).toContain('0.4.1')
+    expect(r.error).toContain('0.14.0')
   })
-  test('seat-mods 0.4.0 with an OMP extension is refused, naming the 0.4.1 minimum', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.0'), molt: install('molt') })
-    expect(launch()).toEqual({ error: expect.stringContaining('seat-mods 0.4.0') })
-    expect((launch() as { error: string }).error).toContain('0.4.1')
+  test('seat-mods 0.13.0 (no kill rail) with an OMP extension is refused, naming the 0.14.0 minimum (#1099)', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.13.0'), molt: install('molt') })
+    expect(launch()).toEqual({ error: expect.stringContaining('seat-mods 0.13.0') })
+    expect((launch() as { error: string }).error).toContain('0.14.0')
   })
-  test('seat-mods 0.4.1 with an OMP extension is accepted', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.4.1'), molt: install('molt') })
+  test('seat-mods 0.14.0 with an OMP extension is accepted', () => {
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.14.0'), molt: install('molt') })
     expect(launch()).toHaveProperty('argv')
     expect(launch()).not.toHaveProperty('error')
   })
   test('newer seat-mods is accepted without a lexicographic version comparison', () => {
-    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.10.0'), molt: install('molt') })
+    record(ompRecord, { 'seat-mods': install('seat-mods', true, '0.100.0'), molt: install('molt') })
     expect(launch()).toHaveProperty('argv')
   })
   test('a mod with an unreadable or invalid version refuses instead of launching unguarded', () => {
@@ -206,7 +212,7 @@ describe('planLaunch', () => {
     record(ompRecord, { 'seat-mods': s, molt: install('molt') })
     for (const content of ['{not json', JSON.stringify({ version: 'bad' }), JSON.stringify({})]) {
       writeFileSync(join(s, '.claude-plugin', 'plugin.json'), content)
-      expect(launch()).toEqual({ error: expect.stringContaining('0.4.1') })
+      expect(launch()).toEqual({ error: expect.stringContaining('0.14.0') })
     }
   })
   test('an unreadable record fails loud, naming the record, and execs nothing', () => {

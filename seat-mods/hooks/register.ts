@@ -1,5 +1,5 @@
 import type { EngineInterface, Register } from 'claude-code'
-import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText } from './rules'
+import { parseRole, parseAllow, scratchDirs, scratchAllow, bashRules, commitMessageFiles, rmTargets, removalOf, UNREAD, placeOf, decide, uncheckedRmText, invalidText, statusText, killRule, KILL_UNCHECKED } from './rules'
 import type { RoleState } from './rules'
 import { classifyPrompt, checkBlock, hasMoltHandoff, isIdleStop, rewriteReason, redoDrop, REDO_ORPHAN, STATUS_CONTEXT, STATUS_WARNING, IDLE_REASON, IDLE_WARNING } from './status'
 import { moltStagePath, seatLogPath } from './records'
@@ -123,8 +123,23 @@ export const register: Register = on => {
   })
 
   on('tool.call', async ($, e, next) => {
+    // The kill rail (#1099) runs first, for every role: free and invalid ones included. A command that signals
+    // processes it did not name is refused here; a miss goes on to the role checks below exactly as before.
+    // Monitor runs shell text in its `command` field (Claude Code 2.1.319); its websocket form has none.
+    // A command the rail cannot read fails closed, after the role's own reader has had its say (its text is the
+    // more exact one for a guarded seat): `pass` is the one way a call goes on.
+    let unread = false
+    if ((e.tool === 'Bash' || e.tool === 'Monitor') && typeof e.command === 'string') {
+      try {
+        const kill = killRule(e.command)
+        if (kill !== undefined) return { deny: kill }
+      } catch {
+        unread = true
+      }
+    }
+    const pass = () => unread ? { deny: KILL_UNCHECKED } : next(e)
     const state = await roleOf($)
-    if (state.kind === 'free') return next(e)
+    if (state.kind === 'free') return pass()
     if (state.kind === 'invalid') return { deny: invalidText(state.value) }
     const role = state.role // 'on' or 'default'
 
@@ -148,7 +163,7 @@ export const register: Register = on => {
       } catch {
         return { deny: uncheckedRmText(role) }
       }
-      return deny === undefined ? next(e) : { deny }
+      return deny === undefined ? pass() : { deny }
     }
 
     if (e.tool === 'Edit' || e.tool === 'Write') {
@@ -159,7 +174,7 @@ export const register: Register = on => {
       return deny === undefined ? next(e) : { deny }
     }
 
-    return next(e)
+    return pass()
   })
 
   on('prompt.submit', async ($, e, next) => {

@@ -1244,3 +1244,66 @@ describe('batch 5: rm after a literal cd or variable', () => {
     expect(await deny('S=/tmp/x; X=1 rm -f /tmp/x/a; rm -rf "$S/y"')).toBeUndefined()
   })
 })
+
+// The kill rail (#1099) on Claude Code: it runs before the role returns, so it covers every role. The incident string is
+// the one a seat ran on 2026-11-05; the planted-failure control is that it is refused under the two free roles, which
+// a rail placed after their early return would let through. Strings only: the mocked engine runs nothing.
+describe('kill rail (#1099): every role', () => {
+  const INCIDENT = 'kill $(ps -eo pid,args 2>/dev/null) 2>/dev/null; true'
+  const ROLE_ENVS: Array<[string, Record<string, string>]> = [
+    ['orchestrator', { SEAT_MODS_ROLE: 'orchestrator' }],
+    ['coordinator', { SEAT_MODS_ROLE: 'coordinator' }],
+    ['unset', {}],
+    ['implementer', { SEAT_MODS_ROLE: 'implementer' }],
+    ['verifier', { SEAT_MODS_ROLE: 'verifier' }],
+    ['reviewer', { SEAT_MODS_ROLE: 'reviewer' }],
+    ['invalid', { SEAT_MODS_ROLE: 'bogus' }],
+  ]
+  for (const [label, env] of ROLE_ENVS) {
+    test(`${label}: the incident string is refused, a kill by literal PID passes`, async ($, on) => {
+      world(on, env)
+      const refused = await $.tool.call({ tool: 'Bash', command: INCIDENT })
+      expect(refused.deny).toContain('kill rail')
+      expect(refused.deny).toContain('proc://<id>/kill')
+      expect(refused.deny).toContain('TaskStop')
+      expect(refused.result).toBeUndefined()
+      const monitored = await $.tool.call({ tool: 'Monitor', command: INCIDENT })
+      expect(monitored.deny).toContain('kill rail')
+      expect((await $.tool.call({ tool: 'Bash', command: 'kill -9 -1' })).deny).toContain('kill rail')
+      expect((await $.tool.call({ tool: 'Bash', command: 'pkill -u dev' })).deny).toContain('kill rail')
+      // controls: the near misses go on exactly as before
+      const ok = await $.tool.call({ tool: 'Bash', command: 'kill 12345' })
+      if (label === 'invalid') expect(ok.deny).toContain('bogus')
+      else { expect(ok.deny).toBeUndefined(); expect(ok.result).toBe('ran') }
+      if (label !== 'invalid') {
+        expect((await $.tool.call({ tool: 'Bash', command: "pkill -f 'herdr agent wait --pane wCH:p1'" })).result).toBe('ran')
+        expect((await $.tool.call({ tool: 'Monitor', command: 'tail -f /tmp/log' })).result).toBe('ran')
+      }
+    })
+  }
+  test('Monitor with no command field (its websocket form) is not read', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    expect((await $.tool.call({ tool: 'Monitor', ws: { url: 'wss://example.test/x' } } as never)).result).toBe('ran')
+  })
+  test('other tools are not read by the rail, even holding the same text', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    expect((await $.tool.call({ tool: 'Write', file_path: '/tmp/note.txt', content: INCIDENT })).result).toBe('ran')
+  })
+  test('a guarded role keeps its own rails: the role deny still wins on a command the rail passes', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'verifier' })
+    expect((await $.tool.call({ tool: 'Bash', command: 'git push origin HEAD' })).deny).toContain('no git push')
+  })
+  test('a text the rail cannot read fails closed, for a free role and for a guarded one on a tool the role reader skips', async ($, on) => {
+    const forged = 'echo "\u00000\u0000"'
+    world(on, { SEAT_MODS_ROLE: 'orchestrator' })
+    expect((await $.tool.call({ tool: 'Bash', command: forged })).deny).toContain('could not be read safely')
+    expect((await $.tool.call({ tool: 'Bash', command: 'echo "fine"' })).result).toBe('ran') // control
+  })
+  test('a text the rail cannot read: a guarded role is refused on Monitor by the rail, and on Bash by its own reader', async ($, on) => {
+    const forged = 'echo "\u00000\u0000"'
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    expect((await $.tool.call({ tool: 'Monitor', command: forged })).deny).toContain('could not be read safely')
+    // Bash: the role's own reader meets the same text first and its deny stands (the more exact text).
+    expect((await $.tool.call({ tool: 'Bash', command: forged })).deny).toContain('could not be checked')
+  })
+})

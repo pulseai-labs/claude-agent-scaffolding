@@ -890,3 +890,89 @@ describe('the default export through a fake host', () => {
     expect(await h.call('bash', { command: 'ls', cwd: h.tree })).toBeUndefined()
   })
 })
+
+// The kill rail (#1099) on OMP: guard() reads bash and eval before the role returns, for every role and every agent.
+// Strings only: nothing is executed. The planted-failure control is the free-role rows: a rail placed after the
+// free-role return would pass them.
+describe('kill rail (#1099)', () => {
+  const INCIDENT = 'kill $(ps -eo pid,args 2>/dev/null) 2>/dev/null; true'
+  const as = (role: string | undefined) => deps({ env: { ...(role === undefined ? {} : { SEAT_MODS_ROLE: role }), SEAT_MODS_ALLOW: '/tmp/allow', HOME: '/home/u' } })
+  const main = { kind: 'main' }
+  test('every main role refuses the incident string and passes a kill by literal PID', async () => {
+    for (const role of ['orchestrator', 'coordinator', undefined, 'implementer', 'verifier', 'reviewer']) {
+      expect(await guard(as(role), 'bash', { command: INCIDENT }, main)).toContain('kill rail')
+      expect(await guard(as(role), 'bash', { command: 'kill 12345' }, main)).toBeUndefined()
+      expect(await guard(as(role), 'bash', { command: "pkill -f 'herdr agent wait --pane wCH:p1'" }, main)).toBeUndefined()
+    }
+  })
+  test('an invalid role is refused either way, and the rail reads first', async () => {
+    expect(await guard(as('bogus'), 'bash', { command: INCIDENT }, main)).toContain('kill rail')
+    expect(await guard(as('bogus'), 'bash', { command: 'kill 12345' }, main)).toContain('bogus')
+  })
+  test('a child agent of every kind refuses it', async () => {
+    for (const name of ['implementer', 'task', 'reviewer', 'seat-reviewer', 'scout', undefined]) {
+      expect(await guard(as('coordinator'), 'bash', { command: INCIDENT }, child(name as string))).toContain('kill rail')
+      expect(await guard(as('coordinator'), 'bash', { command: 'kill 12345' }, child(name as string)) ?? '').not.toContain('kill rail')
+    }
+  })
+  test('the free roles keep everything else: push passes, an orchestrator still may not spawn', async () => {
+    for (const role of ['orchestrator', 'coordinator']) expect(await guard(as(role), 'bash', { command: 'git push origin HEAD' }, main)).toBeUndefined()
+    expect(await guard(as('orchestrator'), 'task', { agent: 'task' }, main)).toContain('no subagents')
+  })
+  test('eval: a string literal that holds the command is read, best effort; a clean one passes', async () => {
+    for (const role of ['orchestrator', 'coordinator', 'implementer']) {
+      expect(await guard(as(role), 'eval', { language: 'py', code: 'import os; os.system("kill $(ps -eo pid)")' }, main)).toContain('kill rail')
+      expect(await guard(as(role), 'eval', { language: 'py', code: "subprocess.run(['kill', '-1'])" }, main)).toContain('kill rail')
+      expect(await guard(as(role), 'eval', { language: 'py', code: 'print(1 + 1)' }, main)).toBeUndefined()
+    }
+  })
+  test('debug: read for an implementer, a known limit for a free role', async () => {
+    expect(await guard(as('implementer'), 'debug', { program: 'kill', args: ['-1'] }, main)).toContain('kill rail')
+    expect(await guard(as('implementer'), 'debug', { program: 'kill', args: ['12345'] }, main) ?? '').not.toContain('kill rail')
+    expect(await guard(as('coordinator'), 'debug', { program: 'kill', args: ['-1'] }, main)).toBeUndefined()
+  })
+  test('a tool that is neither bash nor eval is not read, even holding the same text', async () => {
+    expect(await guard(as('coordinator'), 'write', { path: '/tmp/allow/n.txt', content: INCIDENT }, main)).toBeUndefined()
+  })
+  test('a text the rail cannot read fails closed after the role checks, for a free role too', async () => {
+    const forged = 'echo "\u00000\u0000"'
+    expect(await guard(as('coordinator'), 'bash', { command: forged }, main)).toContain('could not be read safely')
+    expect(await guard(as('coordinator'), 'bash', { command: 'echo "fine"' }, main)).toBeUndefined()
+  })
+  test('through the extension: the tool_call handler blocks the incident string for a free role', async () => {
+    const handlers: Record<string, (e: unknown, c: unknown) => unknown> = {}
+    const prior = process.env.SEAT_MODS_ROLE
+    process.env.SEAT_MODS_ROLE = 'orchestrator'
+    try {
+      seatModsExtension({ on: (name: string, fn: (e: unknown, c: unknown) => unknown) => { handlers[name] = fn } })
+      const ctx = { cwd: '/repo/wt', agent: { kind: 'main' } }
+      expect(await handlers.tool_call!({ toolName: 'bash', input: { command: INCIDENT } }, ctx)).toEqual({ block: true, reason: expect.stringContaining('kill rail') })
+      expect(await handlers.tool_call!({ toolName: 'bash', input: { command: 'kill 12345' } }, ctx)).toBeUndefined()
+    } finally {
+      if (prior === undefined) delete process.env.SEAT_MODS_ROLE
+      else process.env.SEAT_MODS_ROLE = prior
+    }
+  })
+})
+
+describe('proc://<id>/kill write exemption (#1099)', () => {
+  const as = (role: string) => deps({ env: { SEAT_MODS_ROLE: role, SEAT_MODS_ALLOW: '/tmp/allow', HOME: '/home/u' } })
+  test('an exact proc://<id>/kill write passes for every guarded role and child', async () => {
+    for (const role of ['implementer', 'verifier', 'reviewer'])
+      expect(await guard(as(role), 'write', { path: 'proc://bg_7/kill', content: '' }, { kind: 'main' })).toBeUndefined()
+    for (const name of ['implementer', 'reviewer', 'seat-reviewer'])
+      expect(await guard(as('coordinator'), 'write', { path: 'proc://bg_7/kill' }, child(name))).toBeUndefined()
+  })
+  test('every other spelling keeps write placement: a near miss is still outside', async () => {
+    for (const path of ['proc://bg_7/killx', 'proc://bg_7/kill/', 'proc://bg_7/kill/../x', 'proc://bg_7/', 'proc://bg 7/kill', 'proc://bg_7/other',
+      'proc:///kill', 'PROC://bg_7/kill', 'proc://bg_7/kill\n', ' proc://bg_7/kill', 'proc://../kill', 'xproc://bg_7/kill'])
+      expect(await guard(as('implementer'), 'write', { path }, { kind: 'main' })).toContain('no writes outside')
+  })
+  test('only the write tool is exempt: edit and apply_patch of the same URL are still outside', async () => {
+    expect(await guard(as('implementer'), 'edit', { path: 'proc://bg_7/kill' }, { kind: 'main' })).toContain('no writes outside')
+    expect(await guard(as('implementer'), 'ast_edit', { path: 'proc://bg_7/kill' }, { kind: 'main' })).toContain('no writes outside')
+  })
+  test('one exempt target does not hide another outside it', async () => {
+    expect(await guard(as('implementer'), 'write', { path: 'proc://bg_7/kill', paths: ['proc://bg_7/kill', '/etc/x'] }, { kind: 'main' })).toContain('no writes outside')
+  })
+})
