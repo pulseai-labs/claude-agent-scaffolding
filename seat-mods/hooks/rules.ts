@@ -1050,7 +1050,7 @@ function runnerText(name: string, args: readonly string[], raw: readonly string[
   // Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
   // After -c: more options (the same four take a value) and one `--`, then the string.
   // A short cluster (-x…, +x…) takes one following word for each o or O it holds, wherever the letter sits
-  // (`-euo pipefail`, `-oe pipefail`, `-oo a b`) until `--`, after which the next word is the string; a - cluster that holds c sets -c, before or after its values are skipped.
+  // (`-euo pipefail`, `-oe pipefail`, `-oo a b`) until `--`, after which the next word is the string; a cluster that holds c sets -c (`+c` too: the shells read it as -c), before or after its values are skipped.
   // --rcfile and --init-file take one value.
   let seenC = false
   let dashed = false
@@ -1058,7 +1058,7 @@ function runnerText(name: string, args: readonly string[], raw: readonly string[
     const arg = args[k]!
     if (arg === '--rcfile' || arg === '--init-file') { k += 1; continue }
     if (!dashed && /^[-+][A-Za-z]+$/.test(arg)) {
-      if (arg.startsWith('-') && arg.includes('c')) seenC = true
+      if (arg.includes('c')) seenC = true
       k += arg.replace(/[^oO]/g, '').length
       continue
     }

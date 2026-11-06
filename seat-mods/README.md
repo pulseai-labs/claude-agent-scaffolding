@@ -270,6 +270,9 @@ Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`
 - **Other ways to signal many processes.** `fuser -k`, `pkill`/`killall` selecting by `-s`, `-g`,
   `-P`, `-t`, `-G` or `-F` alone, `pkill -v` (inverted), system-scope `systemctl stop user@<uid>`.
 - **Spans.** An unquoted `$(…)` span is bounded by counting parentheses: a `case` pattern's `)` or a `)` inside `${…}` ends it early, and an operand after it is missed.
+- **Bare `-` and `+`, and other shells' grammar.** A bare `-` or `+` after `-c` is read as the string
+  (`bash -c - 'kill -1'` is a miss). The cluster reading is bash's for `sh`, `bash`, `zsh` and `dash` alike, so a
+  `dash -cO …` or `zsh -cO …` that the shell itself rejects or runs differently may be refused.
 - **Patterns.** A second `pkill` operand is not read: procps `pkill` rejects it, but BSD and macOS `pkill` take several, so `pkill node '.*'` is a miss there. A `pkill` or `killall -r` pattern broad in some way the four probe names do not all
   match (`s`), one held in a variable or a quoted substitution (`pkill "$(cat f)"`), and one that is not a
   regular expression in JavaScript's reading, are not refused. An unquoted `$(…)` reads as the pattern

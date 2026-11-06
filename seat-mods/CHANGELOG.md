@@ -6,8 +6,8 @@ All notable changes to the `seat-mods` plugin.
 
 The kill rail reads shell option clusters whole (#1105). In `sh|bash|zsh|dash` options before or after
 `-c`, a short cluster (`-x…`, `+x…`) now takes one following word for each `o` or `O` it holds, wherever the
-letter sits, and a `-` cluster that holds `c` sets `-c`. So `bash -co pipefail 'kill -1'`, `-oc`, `-cO`,
-`-Oc`, `-ecO`, `-Oe extglob -c` and `sh -oe pipefail -c 'kill -1'` are refused like `bash -c 'kill -1'`.
+letter sits, and a cluster that holds `c` sets `-c` (`+c` included: bash, dash and zsh read it as `-c`). So `bash -co pipefail 'kill -1'`, `-oc`, `-cO`,
+`-Oc`, `-ecO`, `-Oe extglob -c`, `bash +c 'kill -1'` and `sh -oe pipefail -c 'kill -1'` are refused like `bash -c 'kill -1'`.
 0.14.0 read only a cluster ending in `o` or `O`, and the cluster limit listed there is gone, so its entry
 below understates what the rail reads now. The README drops that limit. A word that is not an option still
 ends the options before `-c` (`bash -eo pipefail script.sh -c …` is not a shell string). omp-roles is
