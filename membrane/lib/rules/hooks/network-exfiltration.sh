@@ -23,11 +23,34 @@ source "$_RULE_DIR/helpers.sh" 2>/dev/null || true
 # shellcheck source=/dev/null
 source "$_RULE_DIR/hook-entries.sh" 2>/dev/null || true
 
-# The alternatives, one array entry each. The two regexes are these arrays joined, and the excerpt's names are
-# derived from the same entries (the alternative without its trailing [[:space:]]), so a name cannot be dropped or
-# shifted without the alternative it names (#1098).
-_RULE_NETWORK_ALTS=('curl' 'wget' 'nc[[:space:]]' 'ssh[[:space:]]' 'scp[[:space:]]' 'rsync')
-_RULE_SENSITIVE_ALTS=('~/.ssh' '~/.gnupg' '~/.aws' '/etc/passwd')
+# The names are the source: each alternative is built from its name, and the excerpt's names are read from the same
+# arrays, so a name cannot be dropped or shifted apart from the alternative it names (#1098). The names are their own
+# arrays (not derived from the regex text) so the uid keeps the 0.5.1 names, and a file that fires on the same names
+# and lines keeps its uid (#1113).
+# Network names: a leading boundary (start, a byte that is not a letter, digit, "_", "." or "-", or a backslash and
+# n, r or t, the escaped newline, CR or tab of a JSON, JS or $'...' string) keeps "async",
+# "sync", "func", "openssh " and ".curlrc" from naming nc, ssh, curl or wget, and keeps "~/.ssh " from naming ssh.
+# curl, wget and rsync end at a non-letter or the end ("curly", "curling" and "rsyncd" do not name them; "curl.exe",
+# "wget2" and "curl_chrome116" do). nc, ssh and scp end at whitespace, so "ssh-keygen" and "ssh-add" do not name ssh.
+# Sensitive names have their dots escaped: the "." in "~/.ssh" is a dot, not any byte or a newline.
+# Lost on purpose, named in the CHANGELOG: a name after a letter, digit, "_", "." or "-" ("run_curl", "x-curl", "sh.curl(",
+# "${CURL:-curl}", "curlie" and "pycurl" at their ends).
+# ERE only: no \b, \< or [[:<:]], which are not portable. Not run on bash 3.2 or BSD grep (CI is ubuntu).
+_RULE_NETWORK_NAMES=('curl' 'wget' 'nc' 'ssh' 'scp' 'rsync')
+_RULE_SENSITIVE_NAMES=('~/.ssh' '~/.gnupg' '~/.aws' '/etc/passwd')
+_RULE_LEAD='(^|[^A-Za-z0-9_.-]|\\[nrt])'
+_RULE_NETWORK_ALTS=()
+for _n in "${_RULE_NETWORK_NAMES[@]}"; do
+  case "$_n" in
+    nc|ssh|scp) _RULE_NETWORK_ALTS+=("${_RULE_LEAD}${_n}[[:space:]]") ;;
+    *)          _RULE_NETWORK_ALTS+=("${_RULE_LEAD}${_n}([^A-Za-z]|\$)") ;;
+  esac
+done
+_RULE_SENSITIVE_ALTS=()
+for _n in "${_RULE_SENSITIVE_NAMES[@]}"; do
+  _RULE_SENSITIVE_ALTS+=("${_n//./\\.}")
+done
+unset _n
 RULE_NETWORK_RE="$(IFS='|'; printf '%s' "${_RULE_NETWORK_ALTS[*]}")"
 RULE_SENSITIVE_RE="$(IFS='|'; printf '%s' "${_RULE_SENSITIVE_ALTS[*]}")"
 
@@ -38,23 +61,23 @@ RULE_SENSITIVE_RE="$(IFS='|'; printf '%s' "${_RULE_SENSITIVE_ALTS[*]}")"
 # differ inside their trimmed ends never share a digest, and the digest holds no whitespace, so the squeeze in
 # csa_finding_uid_raw cannot equate two line sets. One test per alternative and no loop over matches (that is
 # quadratic on a file of many matches).
-# The line part (grep, sed, sort) runs under LC_ALL=C and does not depend on the locale. The names part follows the
-# locale, as detect does: an em space after nc fires nc under a UTF-8 locale and not under C, so that file's uid
-# differs between the two (the name tests must agree with detect's own matching).
+# The whole function runs under a local LC_ALL=C, as _csa_hook004_match does for detection, so the names and the line part
+# are both byte-wise and give the same uid in every locale. Bash 3.2's restore of a local LC_ALL is unverified (measured
+# on bash 5.3 only).
 # Skill-first: the names part is question 2, membrane's own fixed alternatives. The line part reads open text, but
 # it can only split a uid relative to the names part, so what it mishandles either reads NEW, an extra stop (a quote
 # change, any whitespace change inside a line), or adds no line and leaves the uid on the names floor (a command
-# split across lines, a path in a variable, a newline in a regex slot). The caller hashes this with
+# split across lines, a path in a variable). The caller hashes this with
 # csa_finding_uid_raw: the plain form would cap it at 200 characters. The lines go only to sha256, never to output.
 _csa_hook004_excerpt() {
-  local c="$1" i a net="" path="" lines suf='[[:space:]]' cr=$'\r' tab=$'\t'
+  local LC_ALL=C c="$1" i a net="" path="" lines cr=$'\r' tab=$'\t'
   for i in "${!_RULE_NETWORK_ALTS[@]}"; do
     a="${_RULE_NETWORK_ALTS[$i]}"
-    [[ "$c" =~ $a ]] && net+="${net:+,}${a%"$suf"}"
+    [[ "$c" =~ $a ]] && net+="${net:+,}${_RULE_NETWORK_NAMES[$i]}"
   done
   for i in "${!_RULE_SENSITIVE_ALTS[@]}"; do
     a="${_RULE_SENSITIVE_ALTS[$i]}"
-    [[ "$c" =~ $a ]] && path+="${path:+,}$a"
+    [[ "$c" =~ $a ]] && path+="${path:+,}${_RULE_SENSITIVE_NAMES[$i]}"
   done
   lines="$(printf '%s\n' "$c" | { LC_ALL=C grep -aE "$RULE_NETWORK_RE" || true; } | { LC_ALL=C grep -aE "$RULE_SENSITIVE_RE" || true; } \
     | LC_ALL=C sed -E "s/${cr}\$//; s/^[ ${tab}]+//; s/[ ${tab}]+\$//" | LC_ALL=C sort -u)"
@@ -62,6 +85,13 @@ _csa_hook004_excerpt() {
   [[ -z "$lines" ]] || printf ';lines=%s' "$(csa_sha256 "$lines")"
 }
 
+
+# _csa_hook004_match <text> — both patterns match the text, byte-wise in every locale. LC_ALL=C is local to this
+# function only, so the callers' later work (csa_redact's character cut of a preview) keeps the ambient locale.
+_csa_hook004_match() {
+  local LC_ALL=C
+  [[ "$1" =~ $RULE_NETWORK_RE ]] && [[ "$1" =~ $RULE_SENSITIVE_RE ]]
+}
 
 detect() {
   local target_file="$1"
@@ -77,10 +107,10 @@ detect() {
   # error is matched, and a match is emitted, never traded for the stop; no match in what was read
   # says nothing about the rest, so that is rc 2 (#1089). Skill-first question 3: only adds a stop.
   local content crc=0; content="$(cat "$target_file" 2>/dev/null)" || crc=$?
-  if [[ "$crc" -ne 0 ]] && ! { [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; }; then
+  if [[ "$crc" -ne 0 ]] && ! _csa_hook004_match "$content"; then
     return 2
   fi
-  if [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; then
+  if _csa_hook004_match "$content"; then
     # Emit a finding at line 1 (file-level rule)
     # File-level rule: one finding per file. The uid holds the rule, the file and the excerpt from
     # _csa_hook004_excerpt (the names that fire, plus a digest of the lines holding both matches), hashed raw so nothing past
@@ -104,6 +134,6 @@ detect() {
 detect_text() {
   local entry="$1" target_file="$2" text
   text="$(csa_hook_entry_command "$entry")" || return $?
-  [[ "$text" =~ $RULE_NETWORK_RE ]] && [[ "$text" =~ $RULE_SENSITIVE_RE ]] || return 1
+  _csa_hook004_match "$text" || return 1
   csa_hook_entry_emit "$RULE_ID" "$RULE_SEVERITY" "$entry" "$target_file"
 }
