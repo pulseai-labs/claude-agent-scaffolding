@@ -48,7 +48,7 @@ the variables; with none installed, you are the launcher. Set the role on each c
 a session:
 
 ```bash
-# Sessions you drive yourself: unguarded.
+# Sessions you drive yourself: unguarded except for the kill rail.
 alias claude-orch='SEAT_MODS_ROLE=orchestrator claude'
 
 # Worker sessions you start by hand: guarded by role.
@@ -231,6 +231,8 @@ It refuses:
 - **`killall5`**, **`systemctl --user`** with `exit`, `isolate`, `kill` or `stop default.target` (any argument
   order), and **`loginctl`** `terminate-user`, `kill-user`, `terminate-session` or `kill-session`.
 
+An unquoted `$(…)` or `$((…))` counts as one word of its command, so `kill 123 $(cat p) 0` is read whole. `command -v NAME` and `command -V NAME` run nothing and pass.
+
 It reads through `sudo` (with its options), `env`, `command`, `builtin`, `exec`, `nohup`, `time`, `timeout`,
 `setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock` (each with its common options, and `--`);
 through a path (`/bin/kill`), a quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and
@@ -239,10 +241,10 @@ into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once (the she
 the PIDs, kill by literal PID in a separate call; to stop your own job use `write proc://<id>/kill` (OMP)
 or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never sees them. On OMP a
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
-omp confines that write to the caller's own jobs. Every other spelling, and `edit` of it, is placed as before.
+omp scopes a job or agent id to its owner; a service name is stopped project-wide, as `kill <pid>` through bash already allows. Every other spelling, and `edit` of it, is placed as before.
 
 A command the rail cannot read is refused, after a guarded role's own reader has had its say: a
-forged marker, text it throws on, a substitution nested more than 8 deep, and an `xargs` chain more than 8
+forged marker, text it throws on, a substitution that never closes, a substitution nested more than 8 deep, and an `xargs` chain more than 8
 deep (a chain that long is not walked).
 
 Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`), `kill -1 <pid>`
@@ -443,7 +445,7 @@ Under any guarded role, a tool call passes only if its name is on the allow list
 | `read`, `grep`, `glob`, `find`, `ast_grep`, `web_search`, `recall`, `todo`, `wait`, `yield`, `think`, `advise` | allowed |
 | `ask`, `goal`, `task` | the top-level session only; a child is denied |
 | `bash`, `eval` | the command rules; `eval` source read best effort, and blocked for a reviewer. The kill rail reads both first, for every role |
-| `write`, `edit` (and its `apply_patch` wire name), `ast_edit` | every target placed as omp reads it: a `[path#HHHH]` header unwrapped, `~`, `@/`, `:/` and `file://` expanded, any other `scheme:/` outside; since 0.4.5 (#844) `write` to an exact `local://<name>` is allowed for every guarded role: omp's per-session scratch, which omp confines itself; since 0.14.0 (#1099) so is `write` to an exact `proc://<id>/kill`, which cancels one of the caller's own jobs |
+| `write`, `edit` (and its `apply_patch` wire name), `ast_edit` | every target placed as omp reads it: a `[path#HHHH]` header unwrapped, `~`, `@/`, `:/` and `file://` expanded, any other `scheme:/` outside; since 0.4.5 (#844) `write` to an exact `local://<name>` is allowed for every guarded role: omp's per-session scratch, which omp confines itself; since 0.14.0 (#1099) so is `write` to an exact `proc://<id>/kill`, which cancels a job or agent the caller owns, or a named service (project-wide) |
 | `lsp` | omp's read-only actions only (`diagnostics`, `definition`, `type_definition`, `implementation`, `references`, `hover`, `symbols`, `status`, `capabilities`) |
 | `github` | omp's read-only ops; `pr_create`/`pr_push` follow the PR and push rails; `pr_checkout` and every other op denied; `forceWithLease` is a force-push |
 | `debug` | an implementer only, its launch read like `eval`; denied for a verifier or reviewer |

@@ -155,6 +155,32 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   ["pkill '[[:alpha:]]'", "pkill -x '[[:alpha:]]'"],
   ["pkill -i 'X|S|N|B'", "pkill 'X|S|N|B'"],
   ["$'kill' -1", "$'kill' 123"],
+  // fix r1 C1: operands after an unquoted substitution are still operands of the same command
+  ['kill -s $(echo KILL) -1', 'kill -s $(echo KILL) 123'],
+  ['kill -9 $(cat p) -1', 'kill -9 $(cat p) 123'],
+  ['kill 123 $(cat p) 0', 'kill 123 $(cat p) 456'],
+  ['kill $(echo 5) -- -1', 'kill $(echo 5) -- 123'],
+  ['kill $((1+1)) -1', 'kill $((1+1)) 123'],
+  ['xargs kill $(echo 1) -1', 'xargs kill $(echo 1) 123'],
+  ['killall foo $(echo) -u dev', 'killall foo $(echo) bar'],
+  // fix r1 C2: a cluster that ends in o takes the next word; --rcfile and --init-file take a value
+  ["bash -euo pipefail -c 'kill -1'", "bash -euo pipefail -c 'kill 123'"],
+  ["bash -eo pipefail -c 'kill -1'", "bash -eo pipefail -c 'kill 123'"],
+  ["bash --rcfile /dev/null -c 'kill -1'", "bash --rcfile /dev/null -c 'kill 123'"],
+  ["bash --init-file x -c 'kill -1'", "bash --init-file x -c 'kill 123'"],
+  ["bash --norc -c 'kill -1'", "bash --norc -c 'kill 123'"],
+  ["bash -ec 'kill -1'", "bash -ec 'kill 123'"],
+  // fix r1 C3: command runs its operand unless it is -v or -V
+  ['command pkill -u dev', 'command -v pkill'],
+  // fix r1 C6: a clean command after a refused one does not clear the refusal (one row per site)
+  ['kill -1; kill 123', 'kill 123; kill 456'],
+  ['pkill -u dev; pkill node', 'pkill node; pkill bash'],
+  ['killall5; kill 123', 'killall node; kill 123'],
+  ['systemctl --user exit; kill 123', 'systemctl --user status x; kill 123'],
+  ['loginctl kill-user dev; kill 123', 'loginctl show-user dev; kill 123'],
+  ["killall --regexp '.*'", "killall --regexp '^herdr'"],
+  ["pkill --ignore-case 'X|S|N|B'", "pkill 'X|S|N|B'"],
+  ['pkill --signal HUP', 'pkill --signal HUP node'],
   // a call that both lists and signals is refused whichever way they are joined (a deliberate false stop)
   ['ps aux; kill 123', 'ps aux; echo 123'],
   ['pgrep -f foo && kill 123', 'pgrep -f foo && echo 123'],
@@ -173,6 +199,10 @@ const ALLOW: readonly string[] = [
   'git push origin HEAD', 'systemctl --user status foo.service', 'systemctl stop foo.service', 'loginctl list-sessions',
   'timeout 5 sleep 1', 'nice -n 5 make', 'sudo -u dev ls', 'bash -c "echo hi"', "sh -c 'ls /tmp'", 'eval "echo hi"', 'command -v kill',
   'exec bash', 'xargs echo', 'echo 123 | xargs kill',
+  // fix r1 C1: words after a substitution are not a command of their own; C2/C3 controls
+  'echo $(ps) kill', 'echo $(pgrep x) kill 1', 'echo $(date) kill -1', 'pkill -f foo $(echo x)',
+  "bash -- -c 'kill -1'", 'command -v pkill', 'command -V pkill', 'command -v killall', 'command -v pgrep >/dev/null && kill 123',
+  "pkill --exact '[a-z]'",
   // fix r0 N4: a help or version request names no process
   'pkill --help', 'pkill -V', 'pkill -h', 'killall --version', 'killall -V', 'pkill --version',
   'time -p ls', 'builtin echo hi', 'bash -c -- \'echo hi\'', 'bash -O extglob -c \'echo hi\'',
@@ -221,6 +251,10 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ['runuser -u dev kill -1', 'a wrapper not in the list (runuser)'],
   ['unshare kill -1', 'a wrapper not in the list (unshare)'],
   ['pkill -G 100', 'pkill -G'],
+  ['pkill --parent 1', 'pkill --parent'],
+  ['pkill --session 1', 'pkill --session'],
+  ['pkill --group 0', 'pkill --group'],
+  ['pkill --pidfile /tmp/p', 'pkill --pidfile'],
   ['pkill -F /tmp/pidfile', 'pkill -F'],
   ['pkill "$(cat /tmp/name)"', 'a pattern held in a quoted substitution'],
 ]
@@ -274,6 +308,17 @@ describe('killRule: bounds', () => {
   test('deeper than 8 substitutions is unread: it throws, so a glue refuses it', () => {
     expect(() => killRule(nest(9))).toThrow()
     expect(() => killRule(nest(9).replace('kill -9 -1', 'kill 123'))).toThrow()
+  })
+  test('a substitution that never closes is unread: it throws', () => {
+    expect(() => killRule('kill 123 $(echo 1')).toThrow()
+    expect(() => killRule('kill 123 $((1+1')).toThrow()
+  })
+  test('the first refusal stands: a later refused command of another kind does not replace its text', () => {
+    expect(killRule('kill -1; killall5')).toContain('kill -1')
+    expect(killRule('kill -1; killall5')).not.toContain('killall5')
+    expect(killRule('kill -1; systemctl --user exit')).not.toContain('systemctl')
+    expect(killRule('kill -1; loginctl kill-user dev')).not.toContain('loginctl')
+    expect(killRule('killall5; kill -1')).toContain('killall5')
   })
   test('8 nested xargs are read; 9 are unread', () => {
     expect(killRule('ps | ' + 'xargs '.repeat(8) + 'kill 1')).toContain('kill rail')

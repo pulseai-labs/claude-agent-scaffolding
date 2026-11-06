@@ -11,7 +11,7 @@ export const FREE_ROLES: readonly FreeRole[] = ['orchestrator', 'coordinator']
 export type RoleState =
   | { kind: 'on'; role: Role }         // explicit implementer, verifier, reviewer
   | { kind: 'default'; role: Role }    // SEAT_MODS_ROLE unset or empty: guarded as implementer
-  | { kind: 'free'; role: FreeRole }   // orchestrator, coordinator: unguarded
+  | { kind: 'free'; role: FreeRole }   // orchestrator, coordinator: unguarded, except the kill rail
   | { kind: 'invalid'; value: string } // any other non-empty value: deny everything
 
 export type RuleId =
@@ -1031,6 +1031,8 @@ function killHead(tokens: readonly string[], pieces: readonly string[]): { name:
     if (/^[A-Za-z_][A-Za-z0-9_]*=/.test(word)) { i += 1; continue }
     const name = word.replace(/^.*\//, '')
     if (!Object.hasOwn(KILL_WRAPPER_SHAPES, name)) return { name, args: words.slice(i + 1) }
+    // `command -v NAME` and `command -V NAME` print what NAME is and run nothing.
+    if (name === 'command' && /^-[A-Za-z]*[vV]/.test(words[i + 1] ?? '')) return undefined
     i = skipWrapper(name, words, i + 1)
   }
 }
@@ -1047,7 +1049,8 @@ function runnerText(name: string, args: readonly string[], raw: readonly string[
   if (!KILL_SHELLS.has(name)) return undefined
   // Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
   // After -c: more options (the same four take a value) and one `--`, then the string.
-  const valued = (arg: string) => arg === '-o' || arg === '+o' || arg === '-O' || arg === '+O'
+  // A short cluster that ends in o or O takes the next word (`-euo pipefail`); so do --rcfile and --init-file.
+  const valued = (arg: string) => /^[-+][A-Za-z]*[oO]$/.test(arg) || arg === '--rcfile' || arg === '--init-file'
   let seenC = false
   let dashed = false
   for (let k = 0; k < args.length; k++) {
@@ -1120,7 +1123,8 @@ function killByName(name: 'pkill' | 'killall', args: readonly string[]): string 
   }
   if (patterns.length === 0) return selected || help ? undefined : `${name} with no pattern`
   const literal = name === 'killall' && !regexp
-  for (const pattern of patterns)
+  // pkill takes its pattern from the first operand; killall takes every operand as a name.
+  for (const pattern of name === 'pkill' ? patterns.slice(0, 1) : patterns)
     if (literal ? pattern === '' : broadPattern(pattern, exact, ignoreCase)) return `${name} with a pattern that matches every process name`
   return undefined
 }
@@ -1167,6 +1171,30 @@ function killHeads(tokens: string[]): string[] {
   return tokens
 }
 
+// The command text with each unquoted `$(…)` or `$((…))` span replaced by one `$`, so the words after a substitution
+// stay operands of the same command (COMMANDS would cut at its parentheses). `text` is the reader's blanked text, where
+// quotes, backtick spans and heredocs are already markers, so every `(` and `)` left is shell syntax. The span's inner
+// text is read on its own through substitutionsOf. A span that never closes is unread: it throws.
+function joinSubstitutions(text: string): string {
+  let out = ''
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '$' && text[i + 1] === '(') {
+      let depth = 0
+      let j = i + 1
+      for (; j < text.length; j++) {
+        if (text[j] === '(') depth += 1
+        else if (text[j] === ')' && --depth === 0) break
+      }
+      if (j >= text.length) throw new Error('a substitution that never closes')
+      out += '$'
+      i = j
+      continue
+    }
+    out += text[i]
+  }
+  return out
+}
+
 type KillScan = { lists: boolean; signals: boolean; reason: string | undefined }
 
 // One command (a call, or a substitution of it, or a literal runner string) read segment by segment.
@@ -1174,7 +1202,7 @@ function killScan(command: string, scan: KillScan, runners: boolean): void {
   const { text, pieces } = blank(command)
   // One split is enough here: the seat-mods 0.3.1 split (TAG_COMMANDS) cuts only where COMMANDS cuts, so its segments
   // are unions of COMMANDS segments and its heads are COMMANDS heads. The rail walks its own heads (see KILL_HEADS).
-  const segments = segmentsFor(text, pieces, COMMANDS, true)
+  const segments = segmentsFor(joinSubstitutions(text), pieces, COMMANDS, true)
   const visit = (tokens: readonly string[], depth: number): void => {
     const head = killHead(tokens, pieces)
     if (head === undefined) return

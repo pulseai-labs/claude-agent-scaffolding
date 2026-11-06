@@ -308,7 +308,7 @@ async function writeCheck(deps: GuardDeps, role: Role, toolName: string, input: 
     // `write xd://resolve` / `xd://reject` confirm or discard a preview an earlier, already-checked ast_edit staged.
     const places: Place[] = []
     if (toolName === 'write' && CONFIRM_ONLY.test(raw)) continue // names no file; acts on a preview already placed
-    if (toolName === 'write' && PROC_KILL.test(raw)) continue // stops one of the caller's own jobs; omp confines it (#1099)
+    if (toolName === 'write' && PROC_KILL.test(raw)) continue // stops a job or agent the caller owns, or a named service; omp scopes the id (#1099)
     if (toolName === 'write' && LOCAL_SCRATCH.test(raw)) continue // session scratch omp confines (#844)
     else for (const reading of readings(raw, toolName === 'ast_edit')) {
       const path = toolName === 'ast_edit' ? globBase(reading) : reading
@@ -333,8 +333,8 @@ const SCHEME = /[A-Za-z][A-Za-z0-9+.-]*:\//
 // device writes are checked as their inner tool in guard(), with raw-arg key and force-flag guards. Every other
 // device name (docs included), special name and malformed device URL still fails placement.
 const CONFIRM_ONLY = /^\s*xd:\/\/(?:resolve|reject)\s*$/
-// #1099: the write tool's `proc://<id>/kill` cancels a job, agent or service. omp scopes it to the caller's own jobs
-// (job-control visibleJobs), and it is the stop the kill rail's deny text names, so a guarded seat may write it.
+// #1099: the write tool's `proc://<id>/kill` cancels a job, agent or service. omp scopes a job or agent id to its owner
+// (job-control visibleJobs), but a service name is stopped project-wide (as kill <pid> through bash already allows). It is the stop the kill rail's deny text names, so a guarded seat may write it.
 // Skill-first Q2: closed input, an exact URL shape. Every other spelling and every other tool keeps write placement.
 const PROC_KILL = /^proc:\/\/[A-Za-z0-9_-]+\/kill$/
 // #844: the write tool's `local://<name>` is omp's per-session scratch. omp confines it itself (absolute paths and `..`
