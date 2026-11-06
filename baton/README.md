@@ -227,7 +227,9 @@ inside the 30 s bound and always exits 0. A line sent while the operator is typi
 join the operator's text.
 
 `unpark` acts on a parked unit; a unit that is running (a live session, not parked) is refused
-with rc 2.
+with rc 2. A plain `unpark` of a stage where a worker had run reads the stage's outcomes before it
+launches again, and a result already in place moves the unit with no seat (a `relaunch skipped`
+event); `unpark --to <stage>` enters a fresh visit and launches without reading them.
 
 ### Clone
 
@@ -391,7 +393,11 @@ on `before failed`, `after_launch failed` and `run failed`, `hook` (the failed h
 in its list) and `argv` (its rendered argv). Those three parks' notices end with
 ` — hook <n> (<program>)`, the argv's first word without its directory, after the PR a merge-stage
 park names: a notice leaves the host, so the rendered arguments stay in the event; an escalated driver notice carries the same suffixes. The driver adds the events
-`driver`, `driver resume`, `driver escalate`, `driver stop` and `driver dropped`.
+`driver`, `driver resume`, `driver escalate`, `driver stop` and `driver dropped`. A relaunch that
+read a result already in place, with no seat, logs `relaunch skipped`
+(`unit`, `stage`, `to`, `outcome`: the matched outcome's 1-based place); `baton report` counts them.
+The event comes before the outcome's hooks run, so a move or a park (a failed hook, a `to: park`
+outcome, a notice that will not render) follows it.
 
 ```json
 {
@@ -460,7 +466,10 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   `## Clarifications` (or into the file the stop names; a close, spine-open or spine-finish stop
   takes `operator.md`, as the ruling bullet below says), delete the `stop` file, then
   `baton unpark <run> <unit>`. If the stop file is still there, `unpark` renames it to
-  `<path>.consumed-<iso>`, so it does not park the unit again.
+  `<path>.consumed-<iso>`, so it does not park the unit again. To make a seat apply a ruling, unpark
+  `--to <the same stage>`: a plain unpark reads the stage's outcomes first, so if the seat had already
+  written its result, the unit takes it and moves on with the ruling unapplied (a close,
+  spine-open, `item_fix`, `spine_work` or spine-finish stage's hook also archives `operator.md`).
 - **A round barrier is a stop.** A spine planned one round at a time halts the lane at the next
   round (`no spec for <work item>`), and the lane's stop file starts `round barrier:`. Plan the round
   (plan-spine for the spine), then `baton unpark <run> lane`. An unpark before the specs exist stops
@@ -469,7 +478,8 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - **A ruling for a close, spine-open or spine-finish stop**: write the whole current ruling to
   `out/<unit>/operator.md` (`<unit>` is the work item for a close, `lane` for spine-open, `spine-pr`
   for spine-finish), replacing any file already there: the file holds one ruling, and a seat records
-  a ruling when it applies it. Then `baton unpark <run> <unit>`; the stage's end archives it as
+  a ruling when it applies it. Then `baton unpark <run> <unit>` (or `--to <the same stage>` when
+  its result may already be written; see the stop bullet); the stage's end archives it as
   `operator-<n>.md`. Before `baton unpark <run> <unit> --to` any stage other than the one the ruling
   is for (for example `implement`, `regap`, `verify`, `correct`, `spine_review` or `item_review`,
   which name no Ruling file), move any `operator.md` aside as the next free `operator-<n>.md`: `--to`
@@ -524,8 +534,10 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
   remote, or a failed fetch, parks `exit0 error`; the fetch runs with `GIT_TERMINAL_PROMPT=0`, so git's
   own credential prompt fails instead of hanging; an ssh remote's prompt is not covered).
 - **A `run failed` park on a session stage** (a round-end hook failed): fix the cause, then a plain
-  `baton unpark` relaunches the seat and reruns the round; run the failed hook's remaining steps by
-  hand, then `baton unpark <run> <unit> --to <next stage>` skips the rerun.
+  `baton unpark` reads the stage's outcomes first: if the outcome still reads true, its hooks run again
+  from the first and the unit moves on with no seat; if an earlier hook removed the file it reads
+  (`correct`'s first hook removes `corrected`), the seat relaunches and reruns the round, so run the
+  remaining steps by hand, then `baton unpark <run> <unit> --to <next stage>`.
 - **`--to spine_work` is refused while `spine-pr` has a live session** (a review is running): wait
   for the review to end, then unpark.
 - **A `land` park** names its reason. `run failed`: the canonical root is not on the spine branch

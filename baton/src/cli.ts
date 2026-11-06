@@ -668,7 +668,7 @@ function reportCmd(args: string[]): number {
   const path = join(store.runDir(id), "events.jsonl");
   if (!existsSync(path)) return fail(`no such run: ${id}`);
   const counts: Record<string, number> = {
-    launched: 0, successor: 0, stall: 0, park: 0, unpark: 0, merged: 0,
+    launched: 0, successor: 0, stall: 0, park: 0, unpark: 0, merged: 0, "relaunch skipped": 0,
   };
   let armed: number | undefined;
   let last: number | undefined;

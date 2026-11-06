@@ -303,6 +303,27 @@ test("unpark resets the stage counters and logs an event", async () => {
   expect(ev[1].unit).toBe("planner");
 });
 
+test("an in-place unpark keeps a visit's recheck mark and adds none (#1100)", async () => {
+  const st = await armedWithParkedUnit();
+  const run = runJson(st, "r1");
+  run.units.planner.recheck = true; // a worker ran in this visit
+  // launched, but only refused or orphaned attempts: no worker ran, so no mark
+  run.units.work = { ...run.units.planner, id: "work", launches: { planner: 2 } };
+  delete run.units.work.recheck;
+  run.units.work.parked = { reason: "before failed", at: "t" };
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(run));
+  expect((await runIn(st, "unpark", "r1", "planner")).rc).toBe(0);
+  expect((await runIn(st, "unpark", "r1", "work")).rc).toBe(0);
+  expect(runJson(st, "r1").units.planner.recheck).toBe(true);
+  expect(runJson(st, "r1").units.work.recheck).toBeUndefined();
+  // --to enters a fresh visit: the mark goes
+  const r2 = runJson(st, "r1");
+  r2.units.planner.parked = { reason: "stalled", at: "t" };
+  writeFileSync(join(st, "runs", "r1", "run.json"), JSON.stringify(r2));
+  expect((await runIn(st, "unpark", "r1", "planner", "--to", "work")).rc).toBe(0);
+  expect(runJson(st, "r1").units.planner.recheck).toBeUndefined();
+});
+
 test("unpark clears the merge failure count", async () => {
   const st = await armedWithParkedUnit();
   const run = runJson(st, "r1");
@@ -405,7 +426,7 @@ test("report counts events by kind", async () => {
   const r = await runIn(st, "report", "r9");
   expect(r.rc).toBe(0);
   expect(r.out).toBe(
-    "launched 3\nsuccessor 1\nstall 2\npark 1\nunpark 1\nmerged 2\nwall_seconds 3600\n",
+    "launched 3\nsuccessor 1\nstall 2\npark 1\nunpark 1\nmerged 2\nrelaunch skipped 0\nwall_seconds 3600\n",
   );
   expect((await runIn(st, "report", "nope")).rc).toBe(2);
 });

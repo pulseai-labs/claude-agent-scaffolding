@@ -2,6 +2,40 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.18.0 - 2026-11-06
+
+A stage that launches again reads its outcomes first (#1100). The engine changes; the example recipe does not.
+
+- **Changed: a relaunch reads the outcomes before it launches (#1100).** Before a session stage launches
+  again in a visit where a worker has run, baton reads its outcomes once, before the cap check and the
+  `before` hooks. That means: after a no-result, a failed or gone thread or a stall; after a refused or
+  orphaned relaunch that followed one of those; or after a plain `unpark` or a driver resume in place of
+  such a visit. The unit carries a new `recheck` mark: set when a worker's session ends, kept by an
+  in-place unpark, cleared by a launch that starts a worker and by stage entry. A retry after a refused or
+  orphaned first attempt is still a first launch, because no worker ran. A match logs `relaunch skipped`
+  (`baton report` counts it), then runs that outcome's hooks and takes its move or park, with no seat. A
+  first launch (an outcome's move, `unpark --to`, a clone) is unchanged, so `--to <the same stage>` forces
+  a fresh seat.
+  An evaluation error parks as it would at a seat's end; a `pending` result waits a tick; a matched
+  `to: park` outcome parks again. A no-result read in the same tick is not read twice.
+- **Changed: wording.** A plain unpark after a `run failed` park reruns the hooks from the first when the
+  outcome still reads true; the README and the skill say so. The stop line gains: to make a seat apply a
+  ruling, `unpark --to <the same stage>`.
+- **Known limits.**
+  - If the seat had already written its result when a `stop` parked it, a plain unpark takes the result and
+    moves on with the ruling unapplied (a close, spine-open, `item_fix`, `spine_work` or spine-finish stage's
+    hook also archives `operator.md`).
+  - An outcome whose hooks removed their own trigger before a failure (`correct`: its first hook removes
+    `corrected`) reads false afterwards, so the seat relaunches and reruns the round. Reordering its hooks
+    is #1110.
+  - A result that reads true without the seat's work is taken: this is the check's failure direction, kept
+    to visits where a worker has run.
+  - A unit whose worker ended under 0.17.4 carries no `recheck` mark, so its next launch is a first launch
+    and reruns the round, as 0.17.4 did. This covers a park left open at the upgrade and a relaunch due in
+    the upgrade's first tick.
+- **Upgrade.** It reaches every armed run at its next tick: the engine reads each run's frozen recipe, so no
+  recipe copy is needed. Not changed: the example recipe and its briefs.
+
 ## 0.17.4 - 2026-11-06
 
 `spine_finish` no longer takes the AI workspace's local state file as the result of a close (#1095), and the

@@ -304,5 +304,5 @@ test("baton report passes triage and pending events from an old run, and counts 
   writeFileSync(join(runDir("old"), "events.jsonl"), evs.map((e) => JSON.stringify(e)).join("\n") + "\n");
   const r = await baton("report", "old");
   expect(r.rc).toBe(0);
-  expect(r.out).toBe("launched 1\nsuccessor 0\nstall 0\npark 2\nunpark 1\nmerged 0\nwall_seconds 3600\n");
+  expect(r.out).toBe("launched 1\nsuccessor 0\nstall 0\npark 2\nunpark 1\nmerged 0\nrelaunch skipped 0\nwall_seconds 3600\n");
 });

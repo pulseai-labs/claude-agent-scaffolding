@@ -135,6 +135,8 @@ export function unparkUnit(run: RunState, recipe: Recipe | undefined, u: UnitSta
     u.stalls = 0;
     delete u.merge_failures;
     delete u.forge_failures;
+    // The count restarts; the visit keeps its `recheck` mark, so a visit where a worker ran reads
+    // its outcomes before the next launch (#1100).
     u.launches[u.stage] = 0;
   }
   return consumed === undefined ? { stage: u.stage } : { stage: u.stage, consumed };
@@ -237,6 +239,8 @@ type Agent = { scope: Scope; instance: string; model: string; env: Record<string
 class RunTick {
   private saved: string;
   private held = new Set<string>();
+  /** Units whose outcomes read false this tick in live(): the launch that follows does not read them again. */
+  private noMatch = new Set<string>();
   private prViews = new Map<string, PrView>();
   /** Units that entered a stage this tick: steps 4 and 5 read them again next tick, not now. */
   private entered = new Set<string>();
@@ -376,6 +380,9 @@ class RunTick {
     }
     delete u.session;
     delete u.quiet_since;
+    // A worker ran in this visit (it had a thread): the next launch reads the outcomes first (#1100).
+    // An orphan had none, so it leaves the mark as it was.
+    if (s.thread_id !== undefined) u.recheck = true;
     this.save();
   }
 
@@ -641,6 +648,7 @@ class RunTick {
 
   /** A launch that now has its thread: a counted launch, or a successor (not counted). */
   private counted(u: UnitState, s: Session): void {
+    delete u.recheck; // a live worker: its end reads the outcomes, and sets the mark again
     if (s.successor_of) {
       this.ev("successor", { unit: u.id, nonce: s.nonce, of: s.successor_of, thread: s.thread_id });
       return;
@@ -841,6 +849,7 @@ class RunTick {
         const o = await this.firstOutcome(u, stage.outcomes, this.existingDir(launchedCwd));
         if (o === "pending") return;
         if (o) return this.takeOutcome(u, o, this.existingDir(s.launch_dir, launchedCwd));
+        this.noMatch.add(u.id);
         const handoff = this.handoffPath(stage, scope, s);
         if (handoff !== null) return this.successor(u, stage, s, handoff);
         u.quiet_since ??= this.nowIso();
@@ -1081,6 +1090,18 @@ class RunTick {
     }
     if (!this.slotsFree(stage)) return;
     delete u.cwd_busy;
+    // A launch of a visit where a worker has run reads the stage's outcomes first (#1100): the
+    // worker may have finished, or the operator ruled, since the outcomes were last read.
+    // A first launch does not, nor a retry after a refused or orphaned attempt with no worker
+    // before it: the `before` hooks clear the earlier visit's files it would match.
+    if (u.recheck === true && !this.noMatch.has(u.id)) {
+      const m = await this.firstOutcome(u, stage.outcomes, this.existingDir(cwd));
+      if (m === "pending") return; // read again next tick, as live() does
+      if (m) {
+        this.ev("relaunch skipped", { unit: u.id, stage: u.stage, to: m.o.to, outcome: stage.outcomes.indexOf(m.o) + 1 });
+        return this.takeOutcome(u, m, this.existingDir(cwd));
+      }
+    }
     if ((own(u.launches, u.stage) ?? 0) >= (stage.max_launches ?? DEFAULT_MAX_LAUNCHES)) return this.park(u, "cap");
     const failed = this.hooks(stage.before, scope, this.existingDir(cwd));
     if (failed) return this.park(u, "before failed", { hook: failed });

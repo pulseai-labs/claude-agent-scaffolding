@@ -295,19 +295,36 @@ describe("briefs wording (baton 0.17.3)", () => {
   });
 });
 
-// 0.17.4 wording (#1095, #1053 C4): the runbook lines an operator or an orchestrator acts on.
-describe("README, skill and release wording (baton 0.17.4)", () => {
+// 0.17.4 / 0.18.0 wording (#1095, #1053 C4, #1100): the runbook lines an operator or an orchestrator acts on.
+describe("README, skill and release wording (baton 0.18.0)", () => {
   const readmeRaw = () => readFileSync(join(import.meta.dir, "..", "README.md"), "utf8");
   const bullet = (title: string): string => readmeRaw().split("\n- **").find((b) => b.startsWith(title))?.replace(/\s+/g, " ") ?? "";
   const changelog = () => readFileSync(join(import.meta.dir, "..", "CHANGELOG.md"), "utf8");
 
-  test("a run failed park on a session stage: a plain unpark relaunches the seat and reruns the round; --to skips it (#1053 C4)", () => {
+  test("a run failed park on a session stage: a plain unpark reads the outcomes first; --to skips it (#1053 C4, #1100)", () => {
     const b = bullet("A `run failed` park on a session stage");
-    expect(b).toContain("a plain `baton unpark` relaunches the seat and reruns the round");
-    expect(b).toContain("run the failed hook's remaining steps by hand, then `baton unpark <run> <unit> --to <next stage>` skips the rerun");
+    expect(b).toContain("a plain `baton unpark` reads the stage's outcomes first");
+    expect(b).toContain("if the outcome still reads true, its hooks run again from the first and the unit moves on with no seat");
+    expect(b).toContain("(`correct`'s first hook removes `corrected`), the seat relaunches and reruns the round");
+    expect(b).toContain("run the remaining steps by hand, then `baton unpark <run> <unit> --to <next stage>`");
+    expect(b).not.toContain("a plain `baton unpark` relaunches the seat");
     const row = skill().split("\n").find((l) => l.startsWith("| `run failed` park on a session stage |")) ?? "";
-    expect(row).toContain("plain unpark relaunches the seat");
-    expect(row).toContain("run the failed hook's remaining steps by hand, then `--to <next stage>` skips the rerun");
+    expect(row).toContain("a plain unpark reruns the hooks and moves on with no seat if the outcome still reads true, else relaunches the seat");
+    expect(row).toContain("(`correct`: its hook removes `corrected`)");
+    expect(row).toContain("run the remaining steps by hand, then `--to <next stage>`");
+  });
+
+  test("a stop: to make a seat apply a ruling, unpark --to the same stage; a plain unpark takes a result already written (#1100)", () => {
+    const b = bullet("A stop parks the unit");
+    expect(b).toContain("To make a seat apply a ruling, unpark `--to <the same stage>`");
+    expect(b.replace(/\s+/g, " ")).toContain("if the seat had already written its result, the unit takes it and moves on with the ruling unapplied");
+  });
+
+  test("the README names the relaunch read, the event and the report count (#1100)", () => {
+    const r = readmeRaw().replace(/\s+/g, " ");
+    expect(r).toContain("A plain `unpark` of a stage where a worker had run reads the stage's outcomes before it launches again");
+    expect(r).toContain("`unpark --to <stage>` enters a fresh visit and launches without reading them");
+    expect(r).toContain("logs `relaunch skipped` (`unit`, `stage`, `to`, `outcome`: the matched outcome's 1-based place); `baton report` counts them");
   });
 
   test("spine_close_wait: the README names the close PR and its parks, the skill has a row (#1095)", () => {
@@ -330,13 +347,19 @@ describe("README, skill and release wording (baton 0.17.4)", () => {
     expect(r).toContain("`<iso> <key> notify-orchestrator <where>: <reason>`");
   });
 
-  test("the version is 0.17.4 in plugin.json and the changelog; the upgrade note says when to copy the recipe (#1095)", () => {
-    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", ".claude-plugin", "plugin.json"), "utf8")).version).toBe("0.17.4");
+  test("the version is 0.18.0 in plugin.json and the changelog; the upgrade note says no recipe copy is needed (#1100)", () => {
+    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", ".claude-plugin", "plugin.json"), "utf8")).version).toBe("0.18.0");
     const top = changelog().split("\n## ")[1];
-    expect(top.startsWith("0.17.4 - ")).toBe(true);
-    expect(top).toContain("only when no run is armed or parked there");
-    expect(top).toContain("origin/main");
-    expect(top).toContain("the archive snippet's ten copies");
-    expect(top).not.toContain("nine copies");
+    expect(top.startsWith("0.18.0 - ")).toBe(true);
+    expect(top.replace(/\s+/g, " ")).toContain("It reaches every armed run at its next tick");
+    expect(top.replace(/\s+/g, " ")).toContain("no recipe copy is needed");
+    expect(top.replace(/\s+/g, " ")).toContain("`relaunch skipped`");
+    expect(top).toContain("#1110");
+    // 0.17.4 keeps its own upgrade note
+    const prev = changelog().split("\n## ")[2];
+    expect(prev.startsWith("0.17.4 - ")).toBe(true);
+    expect(prev).toContain("only when no run is armed or parked there");
+    expect(prev).toContain("the archive snippet's ten copies");
+    expect(prev).not.toContain("nine copies");
   });
 });
