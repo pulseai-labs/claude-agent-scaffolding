@@ -199,8 +199,8 @@ csa_suppress_remove() {
   fi
 
   local tmp; tmp="$(dirname "$sup_file")/suppressions.json.tmp.$$"
-  jq --arg k "$fuid" '.suppressions |= map(select(.finding_uid != $k))' \
-    "$sup_file" > "$tmp" 2>/dev/null && mv "$tmp" "$sup_file" 2>/dev/null || {
+  { jq --arg k "$fuid" '.suppressions |= map(select(.finding_uid != $k))' \
+      "$sup_file" > "$tmp" && mv "$tmp" "$sup_file"; } 2>/dev/null || {
     rm -f "$tmp" 2>/dev/null
     printf 'csa: could not write %s; the suppression was not removed\n' "$sup_file" >&2
     return 5

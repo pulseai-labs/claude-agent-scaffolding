@@ -277,6 +277,7 @@ test_remove_write_failure_rc5() {
   chmod u+w "$root/.claude/audits"
   assert_eq "5" "$rc" "write failure is rc 5" || return 1
   assert_contains "$err" "could not write" "message names the write failure" || return 1
+  assert_eq "1" "$(printf '%s\n' "$err" | grep -c .)" "the csa line is the only stderr line" || return 1
   assert_eq "$before" "$(cksum < "$f")" "file left as it was" || return 1
 }
 
