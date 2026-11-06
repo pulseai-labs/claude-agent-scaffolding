@@ -34,8 +34,8 @@ RULE_SENSITIVE_RE="$(IFS='|'; printf '%s' "${_RULE_SENSITIVE_ALTS[*]}")"
 # _csa_hook004_excerpt <content> — what the uid hashes (#1098): the names of the alternatives that fire
 # ("net=..;path=.."), then, when some line holds both a network and a sensitive match, ";lines=" and the sha256 of
 # those lines. The line bytes are kept exact: a trailing CR is dropped, leading and trailing spaces and tabs are
-# trimmed, and the set is byte-sorted without duplicates. Nothing is squeezed
-# inside a line, so two different lines never share a digest, and the digest holds no whitespace, so the squeeze in
+# trimmed, and the set is byte-sorted without duplicates. Nothing is squeezed inside a line, so two lines that
+# differ inside their trimmed ends never share a digest, and the digest holds no whitespace, so the squeeze in
 # csa_finding_uid_raw cannot equate two line sets. One test per alternative and no loop over matches (that is
 # quadratic on a file of many matches).
 # The line part (grep, sed, sort) runs under LC_ALL=C and does not depend on the locale. The names part follows the
