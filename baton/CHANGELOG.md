@@ -10,8 +10,8 @@ The example recipe's `correct` outcome archives its packet first and removes its
   `corrected` in place: a plain `unpark` reads the outcome as true, reruns the hooks from the first and moves to
   `verify` with no second seat, and no second dispatch is spent. In 0.18.0 the first hook removed `corrected`, so a
   failure of the archive hook relaunched the seat on the same packet. Both hooks are safe to rerun. The
-  outcome still ends with `rm -f corrected`: the driver brief reads `corrected` as a used packet. Every outcome of
-  the example recipe now removes its own file in its last hook.
+  outcome still ends with `rm -f corrected`: the driver brief reads `corrected` as a used packet. No outcome of
+  the example recipe now removes a file it reads before its last hook.
 - **Known limits.**
   - A crash or host error after the last hook and before the move still relaunches the seat (lane, `correct`,
     `item_fix`, `spine_work`): the trigger is gone by then, and no reorder closes that window.
@@ -21,7 +21,8 @@ The example recipe's `correct` outcome archives its packet first and removes its
     archive still relaunches the seat: archive `correction.txt` by hand, then `baton unpark <run> <unit> --to verify`.
 - **Upgrade.** Example recipe only; briefs and engine unchanged. Armed runs keep the order they were armed with.
   Apply the swap to each project's `recipe.json` by hand, at any time (swap the two hooks of `correct`'s one
-  outcome); it takes effect at that project's next `baton arm`. Never `cp -r` over a customised copy.
+  outcome); it takes effect at that project's next `baton arm`, or on a clone made with
+  `baton clone <run> <new-id> --recipe <file>`. Never `cp -r` over a customised copy.
 
 ## 0.18.0 - 2026-11-06
 
