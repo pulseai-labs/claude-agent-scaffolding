@@ -2,6 +2,27 @@
 
 All notable changes to the `baton` plugin.
 
+## 0.18.1 - 2026-11-06
+
+The example recipe's `correct` outcome archives its packet first and removes its trigger last (#1110). The engine, the briefs and every other stage are unchanged.
+
+- **Fixed (#1110).** `correct` archives `correction.txt` before it removes `corrected`, so a hook failure leaves
+  `corrected` in place: a plain `unpark` reads the outcome as true, reruns the hooks from the first and moves to
+  `verify` with no second seat, and no second dispatch is spent. In 0.18.0 the first hook removed `corrected`, so a
+  failure of the archive hook relaunched the seat on the same packet. Both hooks are safe to rerun. The
+  outcome still ends with `rm -f corrected`: the driver brief reads `corrected` as a used packet. Every outcome of
+  the example recipe now removes its own file in its last hook.
+- **Known limits.**
+  - A crash or host error after the last hook and before the move still relaunches the seat (lane, `correct`,
+    `item_fix`, `spine_work`): the trigger is gone by then, and no reorder closes that window.
+  - `spine_work`'s last hook is one `rm -f review.md round-done operator.md`. If a per-file permission fault
+    makes it fail on `review.md` while `round-done` is removed, a plain unpark relaunches the seat.
+  - A run armed before 0.18.1 keeps the hook order it was armed with. There, a `correct` hook failure at the
+    archive still relaunches the seat: archive `correction.txt` by hand, then `baton unpark <run> <unit> --to verify`.
+- **Upgrade.** Example recipe only; briefs and engine unchanged. Armed runs keep the order they were armed with.
+  Apply the swap to each project's `recipe.json` by hand, at any time (swap the two hooks of `correct`'s one
+  outcome); it takes effect at that project's next `baton arm`. Never `cp -r` over a customised copy.
+
 ## 0.18.0 - 2026-11-06
 
 A stage that launches again reads its outcomes first (#1100). The engine changes; the example recipe does not.

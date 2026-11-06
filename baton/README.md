@@ -536,8 +536,9 @@ Each unit's files live in `<state>/runs/<run>/out/<unit>/`. Operator runbook:
 - **A `run failed` park on a session stage** (a round-end hook failed): fix the cause, then a plain
   `baton unpark` reads the stage's outcomes first: if the outcome still reads true, its hooks run again
   from the first and the unit moves on with no seat; if an earlier hook removed the file it reads
-  (`correct`'s first hook removes `corrected`), the seat relaunches and reruns the round, so run the
-  remaining steps by hand, then `baton unpark <run> <unit> --to <next stage>`.
+  (in a run armed before 0.18.1, `correct`'s first hook removes `corrected`: archive `correction.txt`
+  by hand, then `--to verify`), the seat relaunches and reruns the round, so run the remaining steps
+  by hand, then `baton unpark <run> <unit> --to <next stage>`.
 - **`--to spine_work` is refused while `spine-pr` has a live session** (a review is running): wait
   for the review to end, then unpark.
 - **A `land` park** names its reason. `run failed`: the canonical root is not on the spine branch
