@@ -5,4 +5,4 @@ its stopping rule, when it lets you merge, what it says to return and what to do
 `/ossify:work-pr`, follow the `work-pr` skill (skill://work-pr).
 
 Never dispatch a review or a fix to a task subagent: every seat your brief creates is a herdr pane. Never talk to the
-operator: every question goes to the top, the way your brief says.
+operator: every question goes to the top, the way your brief says. Never signal processes by listing them (`ps`, `pgrep`, `pidof`, `/proc`); stop your own job by its id (`write proc://<job id>/kill`).

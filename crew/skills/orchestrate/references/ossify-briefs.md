@@ -130,7 +130,7 @@ MOLT: if molt warns you, send one ping, `<PING_SEND> '[crew molt coordinator] <p
 NEVER: record an item task in the top's run.json; run a Claude subagent for a work item;
 fall back to the default lane when an item launch fails; restart the lane; select the
 reviewer; run `/ossify:close` at all — the top dispatches it to a fresh close session.
-If no item session will launch, stay alive, report that, and wait for the operator's decision.
+If no item session will launch, stay alive, report that, and wait for the operator's decision. Never signal processes by listing them (`ps`, `pgrep`, `pidof`, `/proc`); stop your own job by its id (OMP `write proc://<id>/kill`, Claude Code `TaskStop`).
 ```
 
 ---

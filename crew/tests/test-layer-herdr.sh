@@ -174,7 +174,7 @@ pin "$COMP" '**A stall** is the one exception to a silent `working`' \
 pin "$COMP" 'is a seat failure, not a failed task' "a stall is a seat failure, never a task failure (#651 D)" flat
 pin "$COMP" "then launch the fallback the project file's" "a stall launches the declared fallback (#651 D)" flat
 pin "$COMP" 'stall with no fallback named, is reported to the operator once' "no declared fallback goes to the operator (#651 D)" flat
-pin "$COMP" 'Settle its dispatch first (kill its report-file wait and companion)' "a stalled dispatch is settled before its fallback launches (#651 D, round 1)" flat
+pin "$COMP" 'Settle its dispatch first (stop its report-file wait and companion by job id' "a stalled dispatch is settled before its fallback launches (#651 D, round 1)" flat
 pin "$COMP" 'the seat'"'"'s last report when it wrote one' "a stall before any report still has a brief (#651 D, round 1)" flat
 pin "$COMP" 'A seat a fresh session cannot resume (the cuts the molt paragraph below lists) gets no fallback' "a non-resumable seat is never auto-replaced (#651 D, round 1)" flat
 pin "$REF" "a timeout is the checkpoint \`completion.md\` states (a doorbell companion's excepted: it lapses)" "the typed wait carries the companion's exception (#651 B, round 1)" flat

@@ -355,7 +355,7 @@ NEVER: run a second review — ossify's own gates are the lane's review; edit os
 contract or any other plugin; work an item yourself. Running this lane's subagents and
 merging at the barrier are this seat's job, not forbidden ones. When blocked, write the
 question to your report file and wait; when stuck, write an escalation there and stop;
-report refusals verbatim.
+report refusals verbatim. Never signal processes by listing them (`ps`, `pgrep`, `pidof`, `/proc`); stop your own job by its id (OMP `write proc://<id>/kill`, Claude Code `TaskStop`).
 ```
 
 ## Doctor dispatch
@@ -385,7 +385,7 @@ DONE: write your report file carrying that dispatch's own result, verbatim. Neve
 MOLT: if molt warns you, send one ping, `<PING_SEND> '[crew molt coordinator] <pct> <task id>'` (read as PING says; never when NOTIFY_RUN is `none`), finish this unit and start nothing new. Only on molt's handoff command mid-unit: write your handoff by hand to `<REPORT_PATH>.molt.md` — the one file besides your report your NEVER line lets you write; never with `/ossify:handoff`, never in a repository, never committed — write `handoff: <that path>` as your report, ping as PING says, end that reply with `MOLT-HANDOFF: <that path>`, and stop. A wake or message after that is added to the handoff verbatim, never acted on.
 NEVER: commit, push, open a PR, or merge. Questions and escalations go in your report
 file, not to the operator: when blocked, write the question there and wait; when stuck,
-write an escalation there and stop; report refusals verbatim.
+write an escalation there and stop; report refusals verbatim. Never signal processes by listing them (`ps`, `pgrep`, `pidof`, `/proc`); stop your own job by its id (OMP `write proc://<id>/kill`, Claude Code `TaskStop`).
 ```
 
 ## Direct work-item
@@ -464,7 +464,7 @@ NEVER: create a seat, merge on your own authority, re-invoke `/ossify:close`, or
 of your own — a halt settles this dispatch, and a remediated one is a fresh session the
 orchestrator dispatches.
 Questions go up in your report file: when blocked, write the question there and wait; when
-stuck, write an escalation there and stop; report refusals verbatim.
+stuck, write an escalation there and stop; report refusals verbatim. Never signal processes by listing them (`ps`, `pgrep`, `pidof`, `/proc`); stop your own job by its id (OMP `write proc://<id>/kill`, Claude Code `TaskStop`).
 ```
 
 Nothing dispatches a PR loop for this close: it is the operator's own dispatch, so its
