@@ -2,6 +2,26 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.14.2 — 2026-11-06
+
+The kill rail reads a shell call two ways (#1109). Every one of `sh|bash|zsh|dash` is now read with bash's
+option grammar and with zsh's, and the call is refused if either reading finds a refused string. Both
+readings use one scan. 0.14.1 read one bash-shaped grammar for all four, which missed:
+
+- zsh's `-O`, which takes no value: `zsh -cO 'kill -1'`, `-Oc`, `+cO`, `-c -O`, `-c +O`;
+- zsh's `o`, which takes the rest of its cluster as the option name: `zsh -c -xoshwordsplit '…'`, `-coshwordsplit`, `-c -opipefail`;
+- a bare `-` or `+` after `-c`, which 0.14.1 returned as the string: `bash -c - 'kill -1'`, `bash -c + '…'`. Bash now reads
+  `-` as the end of the options and skips `+`; zsh ends the options at either;
+- a bare `+` between a word that sets `-c` and a later `-c` (`bash -co pipefail + -c '…'`, `+c + -c`, `+c + -ec`, `+ec + -c`), which 0.14.0 refused;
+- two zsh forms the issue did not list: `zsh -c1 '…'` (digits are ordinary option letters) and `zsh --emulate sh -c '…'`;
+- a `-` that ends a zsh cluster, which ends the options: `zsh -c- '-x; kill -1'`, `+c-`, `-xc-`, `-c -x-`, `-c +-`.
+
+Refuse-only: a grid of 6174 option forms, run under all four names, loosens nothing against 0.14.1's reader (a test
+carries it). Deliberate false stops, in the README and pinned: a call whose two readings pick different words is refused if
+either string is (`zsh -cO extglob 'kill -1'`, and `bash -cO 'ps aux' 'kill 123'` as lists-and-signals), though the shell
+that runs it runs at most one of the strings, and often none. Known limit: `ksh`, `mksh`, `ash`, `busybox sh`, `yash`, `rbash` and `fish` are not read (#1116), and `sh` on a busybox ash host follows a grammar neither reading covers (ash accepts `-c-` and keeps reading options).
+omp-roles is unchanged; its seat-mods floor stays 0.14.0.
+
 ## 0.14.1 — 2026-11-06
 
 The kill rail reads shell option clusters whole (#1105). In `sh|bash|zsh|dash` options before or after

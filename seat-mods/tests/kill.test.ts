@@ -188,6 +188,64 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   ["bash -x +c 'kill -1'", "bash -x +c 'kill 123'"],
   ["bash -c -oe pipefail 'kill -1'", "bash -c -oe pipefail 'kill 123'"],
   ["bash -c -Oc extglob 'kill -1'", "bash -c -Oc extglob 'kill 123'"],
+  // 0.14.2 (#1109): a bare - or + after -c is not the string; the shells run the next word
+  ["bash -c - 'kill -1'", "bash -c - 'kill 123'"],
+  ["bash -c + 'kill -1'", "bash -c + 'kill 123'"],
+  ["sh -c - 'kill -1'", "sh -c - 'kill 123'"],
+  ["zsh -c + 'kill -1'", "zsh -c + 'kill 123'"],
+  // zsh reads the word before the bare one as the string here, so only bash's reading sees the kill
+  ["bash -c -oe pipefail - 'kill -1'", "bash -c -oe pipefail - 'kill 123'"],
+  ["bash -c -oe pipefail + 'kill -1'", "bash -c -oe pipefail + 'kill 123'"],
+  // 0.14.2 (#1109): a bare + before a later -c: bash and dash skip it, zsh ends the options, so each reading finds a different string
+  ["bash -co pipefail + -c 'kill -1'", "bash -co pipefail + -c 'kill 123'"],
+  ["bash +c + -c 'kill -1'", "bash +c + -c 'kill 123'"],
+  ["bash +c + -ec 'kill -1'", "bash +c + -ec 'kill 123'"],
+  ["bash +ec + -c 'kill -1'", "bash +ec + -c 'kill 123'"],
+  ["dash +ec + -ec 'kill -1'", "dash +ec + -ec 'kill 123'"],
+  // 0.14.2 (#1109): zsh's -O takes no value, so the string comes right after the cluster
+  ["zsh -cO 'kill -1'", "zsh -cO 'kill 123'"],
+  ["zsh -Oc 'kill -1'", "zsh -Oc 'kill 123'"],
+  ["zsh +cO 'kill -1'", "zsh +cO 'kill 123'"],
+  ["zsh -c -O 'kill -1'", "zsh -c -O 'kill 123'"],
+  ["zsh -c +O 'kill -1'", "zsh -c +O 'kill 123'"],
+  ["sudo -u dev zsh -cO 'kill -1'", "sudo -u dev zsh -cO 'kill 123'"],
+  // 0.14.2 (#1109): zsh's o takes the rest of its cluster as the option name
+  ["zsh -c -xoshwordsplit 'pkill -u alice'", "zsh -c -xoshwordsplit 'pkill node'"],
+  ["zsh -c -oshwordsplit 'kill -1'", "zsh -c -oshwordsplit 'kill 123'"],
+  ["zsh -xoshwordsplit -c 'kill -1'", "zsh -xoshwordsplit -c 'kill 123'"],
+  ["zsh -coshwordsplit 'kill -1'", "zsh -coshwordsplit 'kill 123'"],
+  ["zsh -c -opipefail 'kill -1'", "zsh -c -opipefail 'kill 123'"],
+  // 0.14.2 (#1109): two zsh forms whose strings a bash-only reading misses; digits are ordinary zsh option letters, and --emulate takes a value
+  ["zsh -c1 'kill -1'", "zsh -c1 'kill 123'"],
+  ["zsh --emulate sh -c 'kill -1'", "zsh --emulate sh -c 'kill 123'"],
+  // 0.14.2 (#1109): zsh's b ends the options after its cluster, so the next word is the string even when it starts with -
+  ["zsh -cb '-x; kill -1'", "zsh -cb '-x; kill 123'"],
+  // 0.14.2 (#1109): zsh's bare + ends the options (bash skips it), so the next word is the string even when it starts with -
+  ["zsh -c + '-x; kill -1'", "zsh -c + '-x; kill 123'"],
+  // 0.14.2 (#1109): a - that ends a zsh cluster ends the options too, so the next word is the string (bash and dash reject these; busybox ash accepts -c- and is not read, see LIMITS)
+  ["zsh -c- '-x; kill -1'", "zsh -c- '-x; kill 123'"],
+  ["zsh +c- '-x; kill -1'", "zsh +c- '-x; kill 123'"],
+  ["zsh -xc- '-x; kill -1'", "zsh -xc- '-x; kill 123'"],
+  ["zsh -fc- '-x; kill -1'", "zsh -fc- '-x; kill 123'"],
+  ["zsh -c -x- '-y; kill -1'", "zsh -c -x- '-y; kill 123'"],
+  ["zsh -c -f- '-y; kill -1'", "zsh -c -f- '-y; kill 123'"],
+  ["zsh -c +- '-y; kill -1'", "zsh -c +- '-y; kill 123'"],
+  ["sh -c- '-x; kill -1'", "sh -c- '-x; kill 123'"],
+  // the zsh reading is applied under every name in KILL_SHELLS, so dropping it for any one of them fails a row
+  ["sh -cO 'kill -1'", "sh -cO 'kill 123'"],
+  ["dash -cO 'kill -1'", "dash -cO 'kill 123'"],
+  ["bash -cO 'kill -1'", "bash -cO 'kill 123'"],
+  // zsh's o ends a cluster and takes the next word, after a value-less O
+  ["zsh -cOo pipefail 'kill -1'", "zsh -cOo pipefail 'kill 123'"],
+  // a long option takes no value
+  ["zsh -c --braceccl 'kill -1'", "zsh -c --braceccl 'kill 123'"],
+  // a digit before the c is an ordinary zsh option letter too
+  ["zsh -1c 'kill -1'", "zsh -1c 'kill 123'"],
+  // 0.14.2 (#1109): forms 0.14.1 refused stay refused though the shell runs neither string (a false stop kept so the rail never loosens)
+  ["bash - -c 'kill -1'", "bash - -c 'kill 123'"],
+  ["zsh + -c 'kill -1'", "zsh + -c 'kill 123'"],
+  ["zsh -cO extglob 'kill -1'", "zsh -cO extglob 'kill 123'"],
+  ["zsh -c -oe pipefail 'kill -1'", "zsh -c -oe pipefail 'kill 123'"],
   // fix r1 C3: command runs its operand unless it is -v or -V
   ['command pkill -u dev', 'command -v pkill'],
   // fix r1 C6: a clean command after a refused one does not clear the refusal (one row per site)
@@ -231,6 +289,12 @@ const ALLOW: readonly string[] = [
   // fix r0 N4: a help or version request names no process
   'pkill --help', 'pkill -V', 'pkill -h', 'killall --version', 'killall -V', 'pkill --version',
   'time -p ls', 'builtin echo hi', 'bash -c -- \'echo hi\'', 'bash -O extglob -c \'echo hi\'',
+  // 0.14.2 (#1109): the same shapes with a harmless string; and after a bare - the next word is the string in every shell
+  "zsh -cO 'echo hi'", "zsh -cO extglob 'echo hi'", "bash -cO extglob 'echo hi'", "zsh -c -oshwordsplit 'echo hi'",
+  "bash -c - -x 'kill -1'", "zsh -c - - 'kill -1'", "zsh -c -- -x 'kill -1'", "zsh -- -c 'kill -1'",
+  "zsh -c1 'echo hi'", "zsh --emulate sh -c 'echo hi'", "bash -c + 'echo hi'", "zsh -cb 'echo hi'",
+  // zsh runs a word with no -c as a script path, not a string; --emulate after another option is an error in zsh; a long option takes no value, so an option-like word after it is not a string
+  "zsh 'kill -1'", "zsh -- 'kill -1'", "zsh -x --emulate sh -c 'kill -1'", "zsh -c --braceccl '-x; kill -1'",
 ]
 
 // Known limits: forms the rail does not read. Each is allowed here, and the README names it. A later
@@ -282,7 +346,15 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ['pkill --pidfile /tmp/p', 'pkill --pidfile'],
   ['pkill -F /tmp/pidfile', 'pkill -F'],
   ['pkill "$(cat /tmp/name)"', 'a pattern held in a quoted substitution'],
-  ["bash -c - 'kill -1'", 'a bare - after -c read as the string'],
+  // 0.14.2 (#1109, #1116): shells outside KILL_SHELLS are not read; the grammar of ksh, mksh, yash and fish is unprobed
+  ["ksh -c 'kill -1'", 'ksh is not a shell the rail reads'],
+  ["mksh -c 'kill -1'", 'mksh is not a shell the rail reads'],
+  ["ash -c 'kill -1'", 'ash is not a shell the rail reads'],
+  ["busybox sh -c 'kill -1'", 'busybox sh is not a shell the rail reads'],
+  ["yash -c 'kill -1'", 'yash is not a shell the rail reads'],
+  ["rbash -c 'kill -1'", 'rbash is not a shell the rail reads'],
+  ["fish -c 'kill -1'", 'fish is not a shell the rail reads'],
+  ["sh -c- -e 'kill -1'", 'sh on a busybox ash host: ash accepts -c- and keeps reading options, a grammar neither reading covers'],
   // round 2 C7, C8, C10
   ['kill 123 $(case x in a) echo 1;; esac) -1', "a case pattern's ) inside $(…) ends the span early"],
   ['kill 123 $(echo ${x:-)}) -1', 'a ) inside ${…} inside $(…) ends the span early'],
@@ -308,6 +380,71 @@ describe('killRule: what a seat does legitimately stays allowed', () => {
 
 describe('killRule: known limits are not read (each is in the README)', () => {
   for (const [command, why] of LIMITS) test(`${why}: ${JSON.stringify(command)} is allowed`, () => { expect(killRule(command)).toBeUndefined() })
+})
+
+// 0.14.2 (#1109): every shell name is read twice (bash's grammar and zsh's) into one scan. Where the two
+// readings pick different words, one listing and the other signaling is refused as "lists and signals", though no
+// shell runs both. A deliberate false stop: it can only add a refusal.
+describe('killRule: the two readings share one scan (a deliberate false stop)', () => {
+  test("bash -cO 'ps aux' 'kill 123': bash's reading signals, zsh's lists, so the call is refused", () => {
+    expect(killRule("bash -cO 'ps aux' 'kill 123'")).toContain('lists processes and signals')
+  })
+  test('control: the same call with an echo in either slot is allowed', () => {
+    expect(killRule("bash -cO 'ps aux' 'echo hi'")).toBeUndefined()
+    expect(killRule("bash -cO 'echo hi' 'kill 123'")).toBeUndefined()
+  })
+})
+
+// 0.14.2 (#1109): the rail never approves what 0.14.1 refused. LEGACY is 0.14.1's reader for the words of a
+// call, frozen here as the oracle: it returns the index of the word it read as the shell string. The grid is every
+// sequence of one to three option words, then two strings, run under each shell name in KILL_SHELLS and with the
+// kill in either string or both. Strings only: nothing here runs a command.
+const GRID_WORDS = ['-c', '+c', '-cO', '-Oc', '-co', '-coshwordsplit', '-ec', '-e', '-b', '-o', '-oshwordsplit', '-O', '+O', '+ec', '+', 'pipefail', '-', '--']
+function legacyIndex(args: readonly string[]): number | undefined {
+  let seenC = false
+  let dashed = false
+  for (let k = 0; k < args.length; k++) {
+    const arg = args[k]!
+    if (arg === '--rcfile' || arg === '--init-file') { k += 1; continue }
+    if (!dashed && /^[-+][A-Za-z]+$/.test(arg)) {
+      if (arg.includes('c')) seenC = true
+      k += arg.replace(/[^oO]/g, '').length
+      continue
+    }
+    if (!seenC) {
+      if (arg === '--' || (!arg.startsWith('-') && !arg.startsWith('+'))) return undefined
+      continue
+    }
+    if (arg === '--' && !dashed) { dashed = true; continue }
+    if (!dashed && arg.length > 1 && (arg.startsWith('-') || arg.startsWith('+'))) continue
+    return k
+  }
+  return undefined
+}
+describe('killRule: the grid of option forms never loosens against the 0.14.1 reader', () => {
+  const forms: string[][] = []
+  const grow = (prefix: string[]): void => {
+    if (prefix.length > 0) forms.push([...prefix, 'S1', 'S2'])
+    if (prefix.length < 3) for (const w of GRID_WORDS) grow([...prefix, w])
+  }
+  grow([])
+  test('the grid holds 6174 forms', () => { expect(forms.length).toBe(6174) })
+  test('every form 0.14.1 refuses is still refused (0 loosened over 4 names x 3 kill placements)', () => {
+    const loosened: string[] = []
+    let refusedBefore = 0
+    for (const name of ['sh', 'bash', 'zsh', 'dash'])
+      for (const form of forms)
+        for (const kill of ['S1', 'S2', 'all']) {
+          const words = form.map(w => (w === 'S1' || w === 'S2') && (kill === 'all' || kill === w) ? "'kill -1'" : /^S\d$/.test(w) ? `'echo ${w}'` : w)
+          const at = legacyIndex(form)
+          if (at === undefined || words[at] !== "'kill -1'") continue
+          refusedBefore++
+          const command = `${name} ${words.join(' ')}`
+          if (killRule(command) === undefined) loosened.push(command)
+        }
+    expect(refusedBefore).toBe(24472)
+    expect(loosened).toEqual([])
+  })
 })
 
 describe('killRule: a ( inside ${…} inside $(…) leaves the span open, so the call is unread (a deliberate false stop)', () => {
