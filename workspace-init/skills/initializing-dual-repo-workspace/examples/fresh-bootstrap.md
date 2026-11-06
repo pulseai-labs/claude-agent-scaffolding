@@ -168,10 +168,10 @@ Next steps:
   1. cd /Users/example/projects/foo-ai && git status
   2. git commit -m "workspace-init: initial bootstrap"
   3. cd /Users/example/projects/foo-ai && claude      # Claude Code; on Codex, run `codex` in that directory instead
-  4. /ossify:start                         # canonical with no product source (history alone is fine on ossify 1.34.0 or later); routes to /ossify:adopt (ossify 1.35.0 or later) if product source is present
+  4. /ossify:start                         # canonical with no product source (history alone is fine on ossify 1.34.0 or later; with no operator to answer, ossify 1.37.0 or later refuses a canonical with any file at `HEAD`); routes to /ossify:adopt (ossify 1.35.0 or later) if product source is present
                                            # on Codex, invoke the corresponding ossify skill — `start`, or `adopt`
-                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub, and
-                                           # adopt replaces a marked stub too (policy sections carried); continue into ossify 1.24.0
+                                           # on ossify 1.24.0 or later this replaces the marked AGENTS.md stub; adopt replaces
+                                           # a marked stub from ossify 1.35.0 (policy sections carried), before that merges into it; continue into ossify 1.24.0
                                            # or later — on an older ossify, stop after pairing: do not run
                                            # /ossify:start, /ossify:adopt or the doctor repair until 1.24.0 is installed
 
