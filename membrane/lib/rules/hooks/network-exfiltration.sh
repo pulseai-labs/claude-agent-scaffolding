@@ -32,29 +32,34 @@ RULE_NETWORK_RE="$(IFS='|'; printf '%s' "${_RULE_NETWORK_ALTS[*]}")"
 RULE_SENSITIVE_RE="$(IFS='|'; printf '%s' "${_RULE_SENSITIVE_ALTS[*]}")"
 
 # _csa_hook004_excerpt <content> — what the uid hashes (#1098): the names of the alternatives that fire
-# ("net=..;path=.."), then every line that holds both a network and a sensitive match, each after a US (0x1f),
-# whitespace-squeezed, one pass, sort -u. One test per alternative and no loop over matches (that is quadratic on
-# a file of many matches). The grep, sed, sort and awk stages run under LC_ALL=C so the uid does not depend on the
-# ambient locale; the name tests do not, because they must agree with detect's own matching.
+# ("net=..;path=.."), then, when some line holds both a network and a sensitive match, ";lines=" and the sha256 of
+# those lines. The line bytes are kept exact: a trailing CR is dropped, leading and trailing spaces and tabs are
+# trimmed, and the set is byte-sorted without duplicates. Nothing is squeezed
+# inside a line, so two different lines never share a digest, and the digest holds no whitespace, so the squeeze in
+# csa_finding_uid_raw cannot equate two line sets. One test per alternative and no loop over matches (that is
+# quadratic on a file of many matches).
+# The line part (grep, sed, sort) runs under LC_ALL=C and does not depend on the locale. The names part follows the
+# locale, as detect does: an em space after nc fires nc under a UTF-8 locale and not under C, so that file's uid
+# differs between the two (the name tests must agree with detect's own matching).
 # Skill-first: the names part is question 2, membrane's own fixed alternatives. The line part reads open text, but
-# it can only split a uid relative to the names part (a US byte inside a line is folded to a space first), so what
-# it mishandles either reads NEW, an extra stop (a quote change), or adds no line and leaves the uid on the names
-# floor (a command split across lines, a path in a variable, a newline in a regex slot). The caller hashes this
-# with csa_finding_uid_raw: the plain form would cap it at 200 characters. The lines go only to sha256, never to
-# output.
+# it can only split a uid relative to the names part, so what it mishandles either reads NEW, an extra stop (a quote
+# change, any whitespace change inside a line), or adds no line and leaves the uid on the names floor (a command
+# split across lines, a path in a variable, a newline in a regex slot). The caller hashes this with
+# csa_finding_uid_raw: the plain form would cap it at 200 characters. The lines go only to sha256, never to output.
 _csa_hook004_excerpt() {
-  local c="$1" i a net="" path="" lines
+  local c="$1" i a net="" path="" lines suf='[[:space:]]' cr=$'\r' tab=$'\t'
   for i in "${!_RULE_NETWORK_ALTS[@]}"; do
     a="${_RULE_NETWORK_ALTS[$i]}"
-    [[ "$c" =~ $a ]] && net+="${net:+,}${a%'[[:space:]]'}"
+    [[ "$c" =~ $a ]] && net+="${net:+,}${a%"$suf"}"
   done
   for i in "${!_RULE_SENSITIVE_ALTS[@]}"; do
     a="${_RULE_SENSITIVE_ALTS[$i]}"
     [[ "$c" =~ $a ]] && path+="${path:+,}$a"
   done
   lines="$(printf '%s\n' "$c" | { LC_ALL=C grep -aE "$RULE_NETWORK_RE" || true; } | { LC_ALL=C grep -aE "$RULE_SENSITIVE_RE" || true; } \
-    | tr '\037' ' ' | LC_ALL=C sed -E 's/[[:space:]]+/ /g; s/^ //; s/ $//' | LC_ALL=C sort -u | LC_ALL=C awk '{printf "\037%s", $0}')"
-  printf 'net=%s;path=%s%s' "$net" "$path" "$lines"
+    | LC_ALL=C sed -E "s/${cr}\$//; s/^[ ${tab}]+//; s/[ ${tab}]+\$//" | LC_ALL=C sort -u)"
+  printf 'net=%s;path=%s' "$net" "$path"
+  [[ -z "$lines" ]] || printf ';lines=%s' "$(csa_sha256 "$lines")"
 }
 
 
@@ -78,7 +83,7 @@ detect() {
   if [[ "$content" =~ $RULE_NETWORK_RE ]] && [[ "$content" =~ $RULE_SENSITIVE_RE ]]; then
     # Emit a finding at line 1 (file-level rule)
     # File-level rule: one finding per file. The uid holds the rule, the file and the excerpt from
-    # _csa_hook004_excerpt (the names that fire, plus the lines holding both matches), hashed raw so nothing past
+    # _csa_hook004_excerpt (the names that fire, plus a digest of the lines holding both matches), hashed raw so nothing past
     # character 200 is lost (#1098). Skill-first: the names are question 2; the line part reads open text but can
     # only split a uid, so what it mishandles reads NEW or leaves the uid on the names (see the excerpt function).
     local fuid; fuid="$(csa_finding_uid_raw "$RULE_ID" "$target_file" "$(_csa_hook004_excerpt "$content")")"
