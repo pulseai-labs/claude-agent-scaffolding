@@ -174,7 +174,8 @@ function hasExpandableKey(args: object): boolean {
 }
 
 // The kill rail over the shell texts of a call: bash's command, and eval's string literals (best effort, as the
-// other eval checks). `unread`: the rail could not read a text; the call then fails closed after the role's own checks.
+// other eval checks). `unread`: the rail could not read a text. The guard (guard() below) then fails the call closed after the role's own
+// checks; the ambient entry (omp/kill-rail.ts) refuses an unread bash command at once and lets an unread eval literal pass.
 export function killCheck(toolName: string, input: Record<string, unknown>): { deny?: string; unread: boolean } {
   let unread = false
   const texts = toolName === 'bash' ? [input.command] : toolName === 'eval' ? evalCommands(String(input.code ?? '')) : []

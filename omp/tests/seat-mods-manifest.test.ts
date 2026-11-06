@@ -6,7 +6,7 @@ import { killRule } from '../../seat-mods/hooks/rules'
 
 // The ambient OMP entry of seat-mods (#1102). CI has no omp, so this is the contract of the manifest omp reads:
 // seat-mods/package.json names the entry, the entry exists, and what it exports registers the kill rail and nothing else.
-// The recorded live load probe (omp 18.16.0) proves omp loads it once. Every check runs on the shipped tree and on a
+// CI has no omp, so "omp loads it once" is shown by a live load probe on omp 18.16.0, recorded in PR #1119's Evidence. Every check runs on the shipped tree and on a
 // fixture with one planted defect; a check whose control stays green is broken.
 const SHIPPED = resolve(import.meta.dir, '../../seat-mods')
 const INCIDENT = 'kill $(ps -eo pid,args 2>/dev/null) 2>/dev/null; true'
@@ -60,9 +60,9 @@ async function railFindings(entryPath: string): Promise<string[]> {
         if (await call({ toolName: 'write', input: { path: '/etc/x', content: INCIDENT } }, ctx) !== undefined) out.push(`${tag}: a non-shell tool must pass`)
         if (await call({ toolName: 'task', input: {} }, ctx) !== undefined) out.push(`${tag}: task must pass`)
         // eval: double- and single-quoted literals and an argv list are read; a harmless eval passes.
-        for (const code of ['import os; os.system("kill -1")', "import os; os.system('kill -1')", "subprocess.run(['kill', '-1'])"])
+        for (const code of ['import os; os.system("kill -1")', 'x = "$(5"; import os; os.system("kill -1")', 'import os; os.system("kill $(pgrep x)")', "import os; os.system('kill -1')", "subprocess.run(['kill', '-1'])"])
           if ((await call({ toolName: 'eval', input: { language: 'py', code } }, ctx))?.block !== true) out.push(`${tag}: eval ${code} is not refused`)
-        for (const code of ['print("hello")', 'print(1 + 1)', "os.system('kill 12345')"])
+        for (const code of ['print("hello")', 'print(1 + 1)', 'print("cost: $(5")', 'x = "$("', 'console.log("a $(b")', "os.system('kill 12345')"])
           if (await call({ toolName: 'eval', input: { language: 'py', code } }, ctx) !== undefined) out.push(`${tag}: eval ${code} must pass`)
         const unread = await call({ toolName: 'bash', input: { command: 'echo "\u00000\u0000"' } }, ctx)
         if (unread?.block !== true || !String(unread.reason).includes('could not be read safely')) out.push(`${tag}: an unreadable text is not refused`)
@@ -138,8 +138,8 @@ describe('seat-mods package.json manifest (#1102)', () => {
   })
   test('control: a rail that approves-by-omission for an unreadable text is found', async () => {
     const real = readFileSync(join(SHIPPED, 'omp/kill-rail.ts'), 'utf8').replace("'../hooks/rules'", JSON.stringify(join(SHIPPED, 'hooks/rules'))).replace("'./extension'", JSON.stringify(join(SHIPPED, 'omp/extension')))
-    expect(real).toContain(': check.unread ? { block: true, reason: KILL_UNCHECKED } : undefined')
-    const root = fixture(good, { 'omp/kill-rail.ts': real.replace(': check.unread ? { block: true, reason: KILL_UNCHECKED } : undefined', ': undefined') })
+    expect(real).toContain(": check.unread && e?.toolName === 'bash' ? { block: true, reason: KILL_UNCHECKED } : undefined")
+    const root = fixture(good, { 'omp/kill-rail.ts': real.replace(": check.unread && e?.toolName === 'bash' ? { block: true, reason: KILL_UNCHECKED } : undefined", ': undefined') })
     expect((await railFindings(join(root, 'omp/kill-rail.ts'))).join('\n')).toContain('unreadable text is not refused')
   })
   test('control: an entry that sets an env var at import, sets a status, reads one literal style, or blocks every eval is found (R4)', async () => {
@@ -154,6 +154,12 @@ describe('seat-mods package.json manifest (#1102)', () => {
     expect((await railFindings(entry(real.replace('return check.deny !== undefined ? { block: true, reason: check.deny }', "return check.deny !== undefined ? { block: true, reason: KILL_UNCHECKED }")))).join('\n')).toContain("rail's own reason")
     expect((await railFindings(entry(real.replace("String(e?.toolName)", "(e?.toolName === 'eval' ? 'bash' : String(e?.toolName))")))).join('\n')).toContain('is not refused')
     expect((await railFindings(entry(real.replace('const check = killCheck(', "if (e?.toolName === 'eval') return { block: true, reason: 'x' }\n    const check = killCheck(")))).join('\n')).toContain('must pass')
+  })
+  test('control: an entry that refuses an eval literal it cannot read is found (C1)', async () => {
+    const real = readFileSync(join(SHIPPED, 'omp/kill-rail.ts'), 'utf8').replace("'../hooks/rules'", JSON.stringify(join(SHIPPED, 'hooks/rules'))).replace("'./extension'", JSON.stringify(join(SHIPPED, 'omp/extension')))
+    expect(real).toContain("check.unread && e?.toolName === 'bash'")
+    const root = fixture(good, { 'omp/kill-rail.ts': real.replace("check.unread && e?.toolName === 'bash'", 'check.unread') })
+    expect((await railFindings(join(root, 'omp/kill-rail.ts'))).join('\n')).toContain('must pass')
   })
   test('control: a rail that ignores free roles is found', async () => {
     const root = fixture(good, { 'omp/kill-rail.ts': `import { default as g } from ${JSON.stringify(join(SHIPPED, 'omp/kill-rail.ts'))}\nexport default function (pi: any) { g({ on: (n: string, f: any) => pi.on(n, (e: any, c: any) => (process.env.SEAT_MODS_ROLE === 'coordinator' ? undefined : f(e, c))) }) }\n` })

@@ -214,11 +214,11 @@ it goes on to the role checks and the model exactly as if the rail were absent. 
 and `eval` best effort through its string literals, and an implementer's `debug` launch.
 
 **On OMP it also reaches a plain session** (#1102). `package.json`'s `omp` manifest names `omp/kill-rail.ts`, the rail
-alone (`bash` and `eval`; not `debug`), so every omp session with seat-mods enabled loads it after `omp plugin upgrade`, whether or not `omp-seat` launched it. That
+alone (`bash` and `eval`; not `debug`), so every omp session with seat-mods enabled, unless started with `--no-extensions`, loads it after `omp plugin upgrade`, whether or not `omp-seat` launched it. That
 entry ignores `SEAT_MODS_ROLE` and the agent kind: a plain session keeps every other freedom, and the role
-guard stays `omp-seat`-only. A text the rail cannot read is refused with the same stop a free role gets. Under
+guard stays `omp-seat`-only. An unreadable `bash` command is refused with the same stop a free role gets; an unreadable `eval` string literal passes, as a literal need not be shell. Under
 `omp-seat` the rail runs twice, once from the manifest and once inside the guard; that is harmless, as the first
-block wins. The one visible difference: for a text the rail cannot read, a guarded seat gets the rail's stop first,
+block wins. The one visible difference: for a bash command the rail cannot read, a guarded seat gets the rail's stop first,
 not its role's own deny text. `omp plugin disable seat-mods` turns the ambient entry off and leaves `omp-seat` alone.
 
 It refuses:
@@ -254,7 +254,7 @@ or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never se
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
 omp scopes a job or agent id to its owner; a service name is stopped project-wide, as `kill <pid>` through bash already allows. Every other spelling, and `edit` of it, is placed as before.
 
-A command the rail cannot read is refused, after a guarded role's own reader has had its say: a
+A `bash` command the rail cannot read is refused (on the ambient OMP entry, an `eval` literal it cannot read passes), after a guarded role's own reader has had its say: a
 forged marker, text it throws on, a substitution that never closes, a substitution nested more than 8 deep, and an `xargs` chain more than 8
 deep (a chain that long is not walked).
 
@@ -267,7 +267,7 @@ no shell runs either string. Both
 readings go into one scan, so `bash -cO 'ps aux' 'kill 123'`, where one reading lists and the other signals,
 is refused as a call that lists and signals.
 
-**Known limits** (the rail does not read these; each is pinned by `tests/kill.test.ts`, except the #1102 items in the first bullet, which the recorded load probe shows):
+**Known limits** (the rail does not read these; each is pinned by `tests/kill.test.ts`, except the #1102 items in the first bullet, which are not pinned in this repo; PR #1119's Evidence records a live probe of `--no-extensions` and `omp plugin disable`, and the other items are untested):
 
 - **Seats and tools outside it.** A plain `omp` session started with `--no-extensions`, one where
   `omp plugin disable seat-mods` or a project `plugin-overrides.json` `disabled` turned the plugin off, a host
