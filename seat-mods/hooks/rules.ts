@@ -983,6 +983,7 @@ const KILL_WRAPPER_SHAPES: Readonly<Record<string, { val: string; long: readonly
   flock: { val: 'wE', long: ['timeout', 'conflict-exit-code'], pos: 1 },
 }
 const KILL_SHELLS = new Set(['sh', 'bash', 'zsh', 'dash'])
+const KILL_SIGNAL = /^-(?:SIG)?(?:HUP|INT|QUIT|ILL|TRAP|ABRT|IOT|BUS|FPE|KILL|USR1|SEGV|USR2|PIPE|ALRM|TERM|STKFLT|CHLD|CLD|CONT|STOP|TSTP|TTIN|TTOU|URG|XCPU|XFSZ|VTALRM|PROF|WINCH|IO|POLL|PWR|SYS|RTMIN(?:\+\d+)?|RTMAX(?:-\d+)?)$/
 const KILL_PROBES = ['systemd', 'bash', 'node', 'x']
 // ASCII reading of the POSIX bracket classes, so a pattern such as [[:alpha:]] tests as pkill reads it.
 const POSIX_CLASSES: Readonly<Record<string, string>> = {
@@ -1042,13 +1043,24 @@ function runnerText(name: string, args: readonly string[], raw: readonly string[
     if (/^"[^]*"$/.test(whole) && whole.length >= 2) return whole.slice(1, -1).replace(/\\(["\\$`])/g, '$1')
     return whole.replace(/['"]/g, '')
   }
-  if (name === 'eval') return raw.map(literal).join(' ')
+  if (name === 'eval') return (args[0] === '--' ? raw.slice(1) : raw).map(literal).join(' ')
   if (!KILL_SHELLS.has(name)) return undefined
+  // Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
+  // After -c: more options (the same four take a value) and one `--`, then the string.
+  const valued = (arg: string) => arg === '-o' || arg === '+o' || arg === '-O' || arg === '+O'
+  let seenC = false
+  let dashed = false
   for (let k = 0; k < args.length; k++) {
     const arg = args[k]!
-    if (arg === '-o' || arg === '+o') { k += 1; continue }
-    if (!arg.startsWith('-') && !arg.startsWith('+')) return undefined
-    if (/^-[A-Za-z]*c[A-Za-z]*$/.test(arg)) return raw[k + 1] === undefined ? undefined : literal(raw[k + 1]!)
+    if (valued(arg)) { k += 1; continue }
+    if (!seenC) {
+      if (arg === '--' || (!arg.startsWith('-') && !arg.startsWith('+'))) return undefined
+      if (/^-[A-Za-z]*c[A-Za-z]*$/.test(arg)) seenC = true
+      continue
+    }
+    if (arg === '--' && !dashed) { dashed = true; continue }
+    if (!dashed && arg.length > 1 && (arg.startsWith('-') || arg.startsWith('+'))) continue
+    return literal(raw[k]!)
   }
   return undefined
 }
@@ -1074,11 +1086,13 @@ function killByName(name: 'pkill' | 'killall', args: readonly string[]): string 
   let ignoreCase = false
   let regexp = false
   let selected = false
+  let help = false
   const patterns: string[] = []
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!
     if (arg === '--') { patterns.push(...args.slice(i + 1)); break }
     if (arg.startsWith('--')) {
+      if (arg === '--help' || arg === '--version') help = true
       if (/^--(?:euid|uid|user)(?:=|$)/.test(arg)) return 'pkill and killall by user (-u, -U, --euid, --uid) cannot be read'
       const bare = arg.slice(2).split('=')[0]!
       if (bare === 'exact') exact = true
@@ -1089,8 +1103,9 @@ function killByName(name: 'pkill' | 'killall', args: readonly string[]): string 
       continue
     }
     if (arg.startsWith('-') && arg.length > 1) {
-      if (/^-[A-Za-z0-9]*u/.test(arg) || /^-U(?!SR[12]$)/.test(arg)) return 'pkill and killall by user (-u, -U, --euid, --uid) cannot be read'
-      if (/^-\d+$/.test(arg) || /^-(?:SIG)?[A-Z][A-Z0-9]+$/.test(arg)) continue // a signal
+      if (arg === '-V' || arg === '-h') help = true
+      if (/^-\d+$/.test(arg) || KILL_SIGNAL.test(arg)) continue // a signal word: -9, -HUP, -SIGUSR1 (its U is not an option)
+      if (/^-[A-Za-z0-9]*[uU]/.test(arg)) return 'pkill and killall by user (-u, -U, --euid, --uid) cannot be read'
       for (let k = 1; k < arg.length; k++) {
         const flag = arg[k]!
         if (flag === 'x') exact = true
@@ -1103,7 +1118,7 @@ function killByName(name: 'pkill' | 'killall', args: readonly string[]): string 
     }
     patterns.push(arg)
   }
-  if (patterns.length === 0) return selected ? undefined : `${name} with no pattern`
+  if (patterns.length === 0) return selected || help ? undefined : `${name} with no pattern`
   const literal = name === 'killall' && !regexp
   for (const pattern of patterns)
     if (literal ? pattern === '' : broadPattern(pattern, exact, ignoreCase)) return `${name} with a pattern that matches every process name`
@@ -1112,12 +1127,14 @@ function killByName(name: 'pkill' | 'killall', args: readonly string[]): string 
 
 // kill's operands: the reason to refuse, or undefined.
 function killOperands(args: readonly string[]): string | undefined {
+  let dashed = false
   for (let i = 0; i < args.length; i++) {
     const arg = args[i]!
-    if (arg === '-s' || arg === '-n' || arg === '--signal') { i += 1; continue }
-    if (arg === '-1') return 'kill -1 signals every process the user may signal'
-    if (arg === '0') return 'kill 0 signals the caller\'s whole process group'
-    if (arg.startsWith('-') && arg.includes('$') && !/^(?:-[sn]|--.)/.test(arg)) return `kill with a negative operand held in a variable (${arg}): empty or -1 it signals everything`
+    if (arg === '--') { dashed = true; continue }
+    if (!dashed && (arg === '-s' || arg === '-n' || arg === '--signal')) { i += 1; continue }
+    if (/^\s*-0*1$/.test(arg)) return 'kill -1 signals every process the user may signal'
+    if (/^0+$/.test(arg) || (dashed && /^-0+$/.test(arg))) return 'kill 0 signals the caller\'s whole process group'
+    if (arg.startsWith('-') && (arg.includes('$') || arg.includes('`')) && !/^(?:-[sn]|--.)/.test(arg)) return `kill with a negative operand held in a variable (${arg}): empty or -1 it signals everything`
   }
   return undefined
 }
@@ -1142,16 +1159,23 @@ function xargsCommand(words: readonly string[]): number {
   return i
 }
 
+// Reserved words that only introduce a command. `time` and `builtin` are not stripped here: they are wrappers with
+// options, left to KILL_WRAPPER_SHAPES. The shared afterHeads is not used because it strips them without their options.
+const KILL_HEADS = new Set(['if', 'then', 'elif', 'else', 'do', 'while', 'until', '!', '{', '('])
+function killHeads(tokens: string[]): string[] {
+  while (KILL_HEADS.has(tokens[0] ?? '')) tokens = tokens.slice(1)
+  return tokens
+}
+
 type KillScan = { lists: boolean; signals: boolean; reason: string | undefined }
 
 // One command (a call, or a substitution of it, or a literal runner string) read segment by segment.
 function killScan(command: string, scan: KillScan, runners: boolean): void {
   const { text, pieces } = blank(command)
-  const segments = [
-    ...segmentsFor(text, pieces, COMMANDS, true),
-    ...segmentsFor(text, pieces, TAG_COMMANDS, false),
-  ]
-  const visit = (tokens: readonly string[]): void => {
+  // One split is enough here: the seat-mods 0.3.1 split (TAG_COMMANDS) cuts only where COMMANDS cuts, so its segments
+  // are unions of COMMANDS segments and its heads are COMMANDS heads. The rail walks its own heads (see KILL_HEADS).
+  const segments = segmentsFor(text, pieces, COMMANDS, true)
+  const visit = (tokens: readonly string[], depth: number): void => {
     const head = killHead(tokens, pieces)
     if (head === undefined) return
     const { name, args } = head
@@ -1173,19 +1197,22 @@ function killScan(command: string, scan: KillScan, runners: boolean): void {
         scan.reason ??= 'loginctl terminate or kill of a user or session ends the whole session'
     } else if (name === 'xargs') {
       const at = xargsCommand(args)
-      if (at < args.length) visit(rest.slice(at))
+      // Each level maps every word again: a chain past 8 is unread, not walked (fails closed in the glues).
+      if (depth >= 8) throw new Error('xargs nested more than 8 deep')
+      if (at < args.length) visit(rest.slice(at), depth + 1)
     } else if (runners && (name === 'eval' || KILL_SHELLS.has(name))) {
       const inner = runnerText(name, args, rest, pieces)
       if (inner !== undefined) killRead(inner, scan, false)
     }
   }
-  for (const segment of segments) visit(afterHeads(tokensOf(segment)))
+  for (const segment of segments) visit(killHeads(tokensOf(segment)), 0)
 }
 
 // A command and every substitution in it, each read as a command of its own.
 function killRead(command: string, scan: KillScan, runners: boolean): void {
   for (const read of [command, ...substitutionsOf(command)])
-    if (read !== SUBSTITUTION_TOO_DEEP) killScan(read, scan, runners)
+    if (read === SUBSTITUTION_TOO_DEEP) throw new Error('substitution nested more than 8 deep')
+    else killScan(read, scan, runners)
 }
 
 // The deny text for a command that signals processes it did not name, or undefined. A throw is the caller's to fail closed.

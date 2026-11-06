@@ -119,6 +119,42 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   ["sudo bash -c 'kill -1'", "sudo bash -c 'kill 123'"],
   ["timeout 9 sh -c 'pkill -u dev'", "timeout 9 sh -c 'pkill node'"],
   ["xargs sh -c 'kill -1'", "xargs sh -c 'kill 123'"],
+  // fix r0 B1: a user option inside a cluster (-U is found anywhere; a signal word such as -HUP or -SIGUSR1 is not an option)
+  ['pkill -fU 1001', 'pkill -HUP node'],
+  ['pkill -9U dev', 'pkill -SIGUSR1 x'],
+  ['pkill -eU dev', 'pkill -HUP node'],
+  ['pkill -cU dev', 'pkill -c node'],
+  ['killall -qU dev', 'killall -q node'],
+  // fix r0 B2: eval --, and shell options before or after -c
+  ["eval -- 'kill -9 -1'", "eval -- 'kill -9 123'"],
+  ["bash -c -- 'kill -9 -1'", "bash -c -- 'kill -9 123'"],
+  ["sh -c -e 'kill -9 -1'", "sh -c -e 'kill -9 123'"],
+  ["bash -c -- '-x; kill -1'", "bash -c -- '-x; kill 123'"],
+  ["bash -c -x -o pipefail 'kill -1'", "bash -c -x -o pipefail 'kill 123'"],
+  ["bash -c +O extglob 'kill -1'", "bash -c +O extglob 'kill 123'"],
+  ["bash -O extglob -c 'kill -9 -1'", "bash -O extglob -c 'kill -9 123'"],
+  ["bash +O extglob -c 'kill -9 -1'", "bash +O extglob -c 'kill -9 123'"],
+  ["bash -o pipefail -c 'kill -1'", "bash -o pipefail -c 'kill 123'"],
+  // fix r0 B3: time and builtin keep their options for the rail's own wrapper table
+  ['time -p kill -1', 'time -p kill 123'],
+  ['time -p pkill -u dev', 'time -p pkill node'],
+  ['time -f %e kill -9 -1', 'time -f %e kill -9 123'],
+  ['builtin -- kill -9 -1', 'builtin -- kill -9 123'],
+  // fix r0 N1: other spellings of -1 and 0, and a backtick negative operand
+  ['kill -9 -01', 'kill -9 -012'],
+  ['kill -- -01', 'kill -- 123'],
+  ['kill -9 " -1"', 'kill -9 " 12"'],
+  ['kill 00', 'kill 10'],
+  ['kill -- -0', 'kill -0 123'],
+  ['kill -9 -`cat /tmp/pgid`', 'kill -9 `cat /tmp/pgid`'],
+  ['kill -- -"`cat /tmp/pgid`"', 'kill -- "`cat /tmp/pgid`"'],
+  // fix r0 N4: an unquoted substitution reads as the pattern `$` (refused); the quoted one is not
+  ['pkill $(cat /tmp/name)', 'pkill "$(cat /tmp/name)"'],
+  ['killall -r $(cat /tmp/name)', 'killall -r "$(cat /tmp/name)"'],
+  // fix r0 N6: pins for the mutants that survived the review
+  ["pkill '[[:alpha:]]'", "pkill -x '[[:alpha:]]'"],
+  ["pkill -i 'X|S|N|B'", "pkill 'X|S|N|B'"],
+  ["$'kill' -1", "$'kill' 123"],
   // a call that both lists and signals is refused whichever way they are joined (a deliberate false stop)
   ['ps aux; kill 123', 'ps aux; echo 123'],
   ['pgrep -f foo && kill 123', 'pgrep -f foo && echo 123'],
@@ -137,6 +173,9 @@ const ALLOW: readonly string[] = [
   'git push origin HEAD', 'systemctl --user status foo.service', 'systemctl stop foo.service', 'loginctl list-sessions',
   'timeout 5 sleep 1', 'nice -n 5 make', 'sudo -u dev ls', 'bash -c "echo hi"', "sh -c 'ls /tmp'", 'eval "echo hi"', 'command -v kill',
   'exec bash', 'xargs echo', 'echo 123 | xargs kill',
+  // fix r0 N4: a help or version request names no process
+  'pkill --help', 'pkill -V', 'pkill -h', 'killall --version', 'killall -V', 'pkill --version',
+  'time -p ls', 'builtin echo hi', 'bash -c -- \'echo hi\'', 'bash -O extglob -c \'echo hi\'',
 ]
 
 // Known limits: forms the rail does not read. Each is allowed here, and the README names it. A later
@@ -174,6 +213,16 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ['pkill "$PATTERN"', 'a pattern held in a variable'],
   ['pkill "foo("', 'a pattern that is not a regular expression'],
   ['script -c "kill -1" /dev/null', 'script -c'],
+  ["env -S 'kill -1'", 'env -S (the value is the command)'],
+  ["env --split-string='kill -1'", 'env --split-string'],
+  ["flock /tmp/l -c 'kill -1'", 'flock <file> -c'],
+  ['coproc kill -1', 'coproc'],
+  ['doas kill -1', 'a wrapper not in the list (doas)'],
+  ['runuser -u dev kill -1', 'a wrapper not in the list (runuser)'],
+  ['unshare kill -1', 'a wrapper not in the list (unshare)'],
+  ['pkill -G 100', 'pkill -G'],
+  ['pkill -F /tmp/pidfile', 'pkill -F'],
+  ['pkill "$(cat /tmp/name)"', 'a pattern held in a quoted substitution'],
 ]
 
 describe('killRule: refuse, with a near-miss control beside each row', () => {
@@ -210,5 +259,29 @@ describe('killRule: the deny text says what to do instead', () => {
   test('names the reason in its own words', () => {
     expect(killRule('kill -1')).toContain('-1')
     expect(killRule('pkill -u dev')).toContain('-u')
+  })
+})
+
+// fix r0 N2 and N3: what the rail cannot bound it does not read, and a throw is the glues' fail-closed (KILL_UNCHECKED).
+describe('killRule: bounds', () => {
+  const nest = (depth: number): string => {
+    let text = 'kill -9 -1'
+    for (let i = 0; i < depth; i++) text = `echo "$(${text})"`
+    return text
+  }
+  test('8 substitutions deep is still read and refused', () => { expect(killRule(nest(8))).toContain('kill rail') })
+  test('control: 8 deep and clean is allowed', () => { expect(killRule(nest(8).replace('kill -9 -1', 'kill 123'))).toBeUndefined() })
+  test('deeper than 8 substitutions is unread: it throws, so a glue refuses it', () => {
+    expect(() => killRule(nest(9))).toThrow()
+    expect(() => killRule(nest(9).replace('kill -9 -1', 'kill 123'))).toThrow()
+  })
+  test('8 nested xargs are read; 9 are unread', () => {
+    expect(killRule('ps | ' + 'xargs '.repeat(8) + 'kill 1')).toContain('kill rail')
+    expect(() => killRule('ps | ' + 'xargs '.repeat(9) + 'kill 1')).toThrow()
+  })
+  test('a 30 KB xargs chain finishes under a second', () => {
+    const started = performance.now()
+    try { killRule('ps | ' + 'xargs '.repeat(5000) + 'kill 1') } catch {}
+    expect(performance.now() - started).toBeLessThan(1000)
   })
 })

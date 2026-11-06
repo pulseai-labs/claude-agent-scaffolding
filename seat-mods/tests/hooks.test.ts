@@ -1306,4 +1306,22 @@ describe('kill rail (#1099): every role', () => {
     // Bash: the role's own reader meets the same text first and its deny stands (the more exact text).
     expect((await $.tool.call({ tool: 'Bash', command: forged })).deny).toContain('could not be checked')
   })
+  for (const role of ['orchestrator', 'coordinator']) {
+    test(`fix r0: ${role}: deeper than 8 substitutions, and an xargs chain past the cap, are refused as unread`, async ($, on) => {
+      let deep = 'kill 123'
+      for (let i = 0; i < 9; i++) deep = `echo "$(${deep})"`
+      world(on, { SEAT_MODS_ROLE: role })
+      expect((await $.tool.call({ tool: 'Bash', command: deep })).deny).toContain('could not be read safely')
+      expect((await $.tool.call({ tool: 'Bash', command: 'ps | ' + 'xargs '.repeat(9) + 'kill 1' })).deny).toContain('could not be read safely')
+      expect((await $.tool.call({ tool: 'Bash', command: 'echo ok' })).result).toBe('ran') // control
+    })
+  }
+  test('fix r0: a guarded Bash call that only the rail cannot read is refused by the rail (the role reader passes it)', async ($, on) => {
+    world(on, { SEAT_MODS_ROLE: 'implementer' })
+    const chain = 'ps | ' + 'xargs '.repeat(9) + 'kill 1'
+    const refused = await $.tool.call({ tool: 'Bash', command: chain })
+    expect(refused.deny).toContain('could not be read safely')
+    expect(refused.result).toBeUndefined()
+    expect((await $.tool.call({ tool: 'Bash', command: 'echo ok' })).result).toBe('ran') // control
+  })
 })

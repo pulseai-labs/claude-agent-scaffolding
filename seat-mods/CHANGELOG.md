@@ -27,6 +27,12 @@ both returned before any check for the free roles.
   it to the caller's own jobs.
 - **The README's "Unguarded" row** for `orchestrator` and `coordinator` now reads "unguarded except the kill
   rail". A new section lists the known limits. Ambient coverage of a plain `omp` session is #1102.
+- **What the rail reads, in detail.** A user option inside a `pkill`/`killall` cluster (`-fU`); `--` and shell
+  options around `-c` (`bash -O extglob -c`, `bash -c -- '…'`, `eval -- '…'`); `time -p` and `builtin --`
+  with their options; `-01`, `kill 00` and `kill -- -0` as `-1` and `0`; and a backtick in a negative operand.
+  A substitution nested more than 8 deep, and an `xargs` chain more than 8 deep, are refused as unread.
+  `pkill --help` and `--version` pass. The rail splits each command once (the second, 0.3.1 split cuts nowhere
+  the first does not).
 - omp-roles 0.11.0 raises its seat-mods floor to 0.14.0, and holds the orchestrator to it too (its own
   0.8.0 minimum had replaced the floor for that role).
 

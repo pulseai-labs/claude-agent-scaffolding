@@ -220,26 +220,30 @@ It refuses:
   `xargs … kill`. So `kill $(pgrep -f x)`, `ps … | xargs kill`, `for p in $(pgrep x); do kill $p; done`
   and `P=$(pgrep x); kill $P` are refused. `kill $(cat pidfile)` is not, and neither is a call that
   only lists.
-- **`kill` with `-1`** in any operand position, **`0`** (`kill 0`, `kill -- 0`), or **a negative operand that
-  holds a `$`** (`-$X`, `-"$X"`, `-${X}`, `-$((…))`): a variable may be empty or `-1`. Spell a
-  process group with its number (`kill -- -4242`).
-- **`pkill` and `killall` by user** (`-u`, `-U`, `--euid`, `--uid`, `--user`), **with no pattern**, or with **a
+- **`kill` with `-1`** in any operand position (also `-01`, and with blanks around it), **`0`** (`kill 0`,
+  `kill 00`, `kill -- 0`, `kill -- -0`; `kill -0 <pid>` is allowed), or **a negative operand that
+  holds a `$` or a backtick** (`-$X`, `-"$X"`, `-${X}`, `-$((…))`, ``-`cat f` ``): a variable may be empty
+  or `-1`. Spell a process group with its number (`kill -- -4242`).
+- **`pkill` and `killall` by user** (`-u`, `-U`, `--euid`, `--uid`, `--user`; also inside a cluster such as `-fU`),
+  **with no pattern** (`--help`, `--version`, `-V` and `-h` name none and pass), or with **a
   pattern that matches every name of a fixed probe set** (`systemd`, `bash`, `node`, `x`; `.`, `.*`, `''`,
-  `[a-z]`). `killall -r` gets the same test.
+  `[a-z]`). `killall -r` gets the same test. A signal word (`-9`, `-HUP`, `-SIGUSR1`) is not read as an option.
 - **`killall5`**, **`systemctl --user`** with `exit`, `isolate`, `kill` or `stop default.target` (any argument
   order), and **`loginctl`** `terminate-user`, `kill-user`, `terminate-session` or `kill-session`.
 
 It reads through `sudo` (with its options), `env`, `command`, `builtin`, `exec`, `nohup`, `time`, `timeout`,
-`setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock`; through a path (`/bin/kill`), a
-quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and into a literal
-`eval '…'` or `sh|bash|zsh|dash -c '…'` string, once. A refusal says what to do instead: list first, read
+`setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock` (each with its common options, and `--`);
+through a path (`/bin/kill`), a quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and
+into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once (the shell's options before and after
+`-c`, `-o`/`-O` values and one `--` included). A refusal says what to do instead: list first, read
 the PIDs, kill by literal PID in a separate call; to stop your own job use `write proc://<id>/kill` (OMP)
 or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never sees them. On OMP a
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
 omp confines that write to the caller's own jobs. Every other spelling, and `edit` of it, is placed as before.
 
-A command the rail cannot read (a forged marker, text it throws on) is refused, after a guarded
-role's own reader has had its say.
+A command the rail cannot read is refused, after a guarded role's own reader has had its say: a
+forged marker, text it throws on, a substitution nested more than 8 deep, and an `xargs` chain more than 8
+deep (a chain that long is not walked).
 
 Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`), `kill -1 <pid>`
 (SIGHUP; write `kill -HUP`), and `kill -$SIG <pid>`. Split the call, or spell the number.
@@ -254,19 +258,19 @@ Deliberate false stops: a call that lists and signals in one (`ps aux; kill 123`
 - **Text a runner will run, other than the literal one-level form.** A heredoc fed to a shell, a script
   written and then run (in this call or an earlier one), a shell string inside a shell string,
   `eval "$VAR"`, `python3 -c`, `node -e`, `perl -e`, `su -c`, `ssh host …`, `watch`, `parallel`,
-  `script -c`, `systemd-run`, `find … -exec kill`.
+  `script -c`, `systemd-run`, `find … -exec kill`, `env -S '…'` / `--split-string`, `flock <file> -c '…'`,
+  `coproc`.
 - **A command word the rail cannot name.** An alias, a function, a word held in a variable
   (`$K -1`) or built by expansion (`kill${IFS}-1`), a word split by a line continuation, and a wrapper
-  not in the list above.
+  not in the list above (`doas`, `runuser`, `unshare`).
 - **State across calls.** A PID list written in one call and killed from in a later one
   (`kill $(cat pidfile)` is allowed on purpose), and a variable whose value is `-1`.
 - **Other ways to signal many processes.** `fuser -k`, `pkill`/`killall` selecting by `-s`, `-g`,
   `-P`, `-t`, `-G` or `-F` alone, `pkill -v` (inverted), system-scope `systemctl stop user@<uid>`.
 - **Patterns.** A `pkill` or `killall -r` pattern broad in some way the four probe names do not all
-  match (`s`), one held in a variable or substitution, and one that is not a regular expression in
-  JavaScript's reading, are not refused.
-- **A substitution nested more than 8 deep** is not read by this rail. A guarded role's own reader
-  still refuses it.
+  match (`s`), one held in a variable or a quoted substitution (`pkill "$(cat f)"`), and one that is not a
+  regular expression in JavaScript's reading, are not refused. An unquoted `$(…)` reads as the pattern
+  `$`, which matches everything, so `pkill $(cat f)` is refused.
 
 ## Status block (orchestrator)
 

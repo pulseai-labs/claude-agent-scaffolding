@@ -939,6 +939,22 @@ describe('kill rail (#1099)', () => {
     expect(await guard(as('coordinator'), 'bash', { command: forged }, main)).toContain('could not be read safely')
     expect(await guard(as('coordinator'), 'bash', { command: 'echo "fine"' }, main)).toBeUndefined()
   })
+  test('fix r0: deeper than 8 substitutions, and an xargs chain past the cap, fail closed for every role', async () => {
+    let deep = 'kill 123'
+    for (let i = 0; i < 9; i++) deep = `echo "$(${deep})"`
+    const chain = 'ps | ' + 'xargs '.repeat(9) + 'kill 1'
+    for (const role of ['orchestrator', 'coordinator', undefined, 'implementer']) {
+      // A guarded role's own reader refuses a substitution nested that deep first (as no force-push); the chain only the rail rejects.
+      if (role !== undefined && role !== 'implementer') expect(await guard(as(role), 'bash', { command: deep }, main)).toContain('could not be read safely')
+      expect(await guard(as(role), 'bash', { command: chain }, main)).toContain('could not be read safely')
+    }
+    expect(await guard(as('coordinator'), 'bash', { command: 'echo ok' }, main)).toBeUndefined() // control
+  })
+  test('fix r0: an implementer debug launch the rail cannot read is refused', async () => {
+    const chain = 'ps | ' + 'xargs '.repeat(9) + 'kill 1'
+    expect(await guard(as('implementer'), 'debug', { program: 'x', command: chain }, main)).toContain('could not be read safely')
+    expect(await guard(as('implementer'), 'debug', { program: 'x', command: 'echo ok' }, main) ?? '').not.toContain('could not be read safely') // control
+  })
   test('through the extension: the tool_call handler blocks the incident string for a free role', async () => {
     const handlers: Record<string, (e: unknown, c: unknown) => unknown> = {}
     const prior = process.env.SEAT_MODS_ROLE
