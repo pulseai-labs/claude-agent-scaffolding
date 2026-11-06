@@ -295,8 +295,8 @@ describe("briefs wording (baton 0.17.3)", () => {
   });
 });
 
-// 0.17.4 / 0.18.0 wording (#1095, #1053 C4, #1100): the runbook lines an operator or an orchestrator acts on.
-describe("README, skill and release wording (baton 0.18.0)", () => {
+// 0.17.4 / 0.18.0 / 0.18.1 wording (#1095, #1053 C4, #1100): the runbook lines an operator or an orchestrator acts on.
+describe("README, skill and release wording (baton 0.18.1)", () => {
   const readmeRaw = () => readFileSync(join(import.meta.dir, "..", "README.md"), "utf8");
   const bullet = (title: string): string => readmeRaw().split("\n- **").find((b) => b.startsWith(title))?.replace(/\s+/g, " ") ?? "";
   const changelog = () => readFileSync(join(import.meta.dir, "..", "CHANGELOG.md"), "utf8");
@@ -305,12 +305,12 @@ describe("README, skill and release wording (baton 0.18.0)", () => {
     const b = bullet("A `run failed` park on a session stage");
     expect(b).toContain("a plain `baton unpark` reads the stage's outcomes first");
     expect(b).toContain("if the outcome still reads true, its hooks run again from the first and the unit moves on with no seat");
-    expect(b).toContain("(`correct`'s first hook removes `corrected`), the seat relaunches and reruns the round");
+    expect(b).toContain("(in a run armed before 0.18.1, `correct`'s first hook removes `corrected`: archive `correction.txt` by hand, then `--to verify`), the seat relaunches and reruns the round");
     expect(b).toContain("run the remaining steps by hand, then `baton unpark <run> <unit> --to <next stage>`");
     expect(b).not.toContain("a plain `baton unpark` relaunches the seat");
     const row = skill().split("\n").find((l) => l.startsWith("| `run failed` park on a session stage |")) ?? "";
     expect(row).toContain("a plain unpark reruns the hooks and moves on with no seat if the outcome still reads true, else relaunches the seat");
-    expect(row).toContain("(`correct`: its hook removes `corrected`)");
+    expect(row).toContain("(a run armed before 0.18.1: `correct`'s first hook removes `corrected`)");
     expect(row).toContain("run the remaining steps by hand, then `--to <next stage>`");
   });
 
@@ -347,16 +347,25 @@ describe("README, skill and release wording (baton 0.18.0)", () => {
     expect(r).toContain("`<iso> <key> notify-orchestrator <where>: <reason>`");
   });
 
-  test("the version is 0.18.0 in plugin.json and the changelog; the upgrade note says no recipe copy is needed (#1100)", () => {
-    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", ".claude-plugin", "plugin.json"), "utf8")).version).toBe("0.18.0");
-    const top = changelog().split("\n## ")[1];
-    expect(top.startsWith("0.18.0 - ")).toBe(true);
-    expect(top.replace(/\s+/g, " ")).toContain("It reaches every armed run at its next tick");
-    expect(top.replace(/\s+/g, " ")).toContain("no recipe copy is needed");
-    expect(top.replace(/\s+/g, " ")).toContain("`relaunch skipped`");
+  test("the version is 0.18.1 in plugin.json and the changelog; the upgrade note is recipe-only and by hand (#1110)", () => {
+    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", ".claude-plugin", "plugin.json"), "utf8")).version).toBe("0.18.1");
+    const top = changelog().split("\n## ")[1].replace(/\s+/g, " ");
+    expect(top.startsWith("0.18.1 - ")).toBe(true);
+    expect(top).toContain("`correct` archives `correction.txt` before it removes `corrected`");
     expect(top).toContain("#1110");
+    expect(top).toContain("Armed runs keep the order they were armed with");
+    expect(top).toContain("takes effect at that project's next `baton arm`");
+    expect(top).toContain("Never `cp -r` over a customised copy");
+    expect(top).toContain("`rm -f review.md round-done operator.md`");
+    // 0.18.0 keeps its own upgrade note and its #1110 known limit as history
+    const v18 = changelog().split("\n## ")[2].replace(/\s+/g, " ");
+    expect(v18.startsWith("0.18.0 - ")).toBe(true);
+    expect(v18).toContain("It reaches every armed run at its next tick");
+    expect(v18).toContain("no recipe copy is needed");
+    expect(v18).toContain("`relaunch skipped`");
+    expect(v18).toContain("Reordering its hooks is #1110");
     // 0.17.4 keeps its own upgrade note
-    const prev = changelog().split("\n## ")[2];
+    const prev = changelog().split("\n## ")[3];
     expect(prev.startsWith("0.17.4 - ")).toBe(true);
     expect(prev).toContain("only when no run is armed or parked there");
     expect(prev).toContain("the archive snippet's ten copies");

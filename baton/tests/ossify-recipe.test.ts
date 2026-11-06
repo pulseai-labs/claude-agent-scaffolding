@@ -269,8 +269,10 @@ describe("ossify-spine recipe", () => {
     expect(c.message).toContain(`Correction packet: ${PACKET}.`);
     // cleared on the way to verify, never before a launch: a relaunched correction still reads it
     // the used packet stays as correction-<n>.txt, and no packet remains to route a later close (#1005)
-    expect(c.outcomes[0].run[0]).toEqual(["rm", "-f", `${OUT}/corrected`]);
-    expect(c.outcomes[0].run[1].slice(3)).toEqual(["sh", OUT, "correction", ".txt"]);
+    // the packet is archived first and `corrected` is removed last, so a failed hook leaves the trigger (#1110)
+    expect(c.outcomes[0].run[0].slice(3)).toEqual(["sh", OUT, "correction", ".txt"]);
+    expect(c.outcomes[0].run[1]).toEqual(["rm", "-f", `${OUT}/corrected`]);
+    expect(c.outcomes[0].run).toHaveLength(2);
     expect(c.before.flat()).not.toContain(PACKET);
   });
 
@@ -373,7 +375,7 @@ describe("ossify-spine recipe", () => {
     const script = (r.stages.spine_finish as SessionStage).outcomes[0].run![0][2];
     const hooks = archiveHooks(r);
     expect(hooks.map(([w]) => w).sort()).toEqual([
-      "close.outcomes[0].run[0]", "close.outcomes[1].run[0]", "correct.outcomes[0].run[1]", "item_fix.outcomes[0].run[0]",
+      "close.outcomes[0].run[0]", "close.outcomes[1].run[0]", "correct.outcomes[0].run[0]", "item_fix.outcomes[0].run[0]",
       "spine_finish.outcomes[0].run[0]", "spine_finish.outcomes[1].run[0]", "spine_open.outcomes[0].run[0]", "spine_work.outcomes[0].run[1]", "verify.before[1]",
     ]);
     for (const [where, a] of hooks) expect([where, a[2]]).toEqual([where, script]);
@@ -930,6 +932,89 @@ describe("ossify-spine recipe", () => {
       const want = ["implement", "correct", "verify", "item_fix"].includes(name) ? ["session", "build"] : ["session"];
       expect([name, s.slots]).toEqual([name, want]);
     }
+  });
+});
+
+// #1110: an outcome's hooks never remove the file the outcome reads before the last hook, so a failed hook
+// leaves the trigger and a plain unpark reruns the hooks instead of relaunching the seat.
+describe("outcome hooks remove their own trigger last (#1110)", () => {
+  /** True when argv removes or moves `path`: an rm naming it, or the archive snippet on its dir, name and ext. */
+  const consumes = (argv: string[], path: string): boolean => {
+    if (argv[0] === "rm") return argv.slice(1).includes(path);
+    if (argv[0] === "sh" && argv[1] === "-c" && argv.length === 7) return `${argv[4]}/${argv[5]}${argv[6]}` === path;
+    return false;
+  };
+  const earlyConsumers = (r: Recipe): string[] => {
+    const bad: string[] = [];
+    for (const [n, st] of sessions(r)) {
+      st.outcomes.forEach((o, i) => {
+        const files = o.when.flatMap((sig) => ("file" in sig ? [sig.file] : []));
+        const run = o.run ?? [];
+        run.forEach((argv, k) => {
+          if (k < run.length - 1 && files.some((f) => consumes(argv, f))) bad.push(`${n}.outcomes[${i}].run[${k}]`);
+        });
+      });
+    }
+    return bad;
+  };
+
+  test("T1: no hook but the last removes a file its outcome reads; a swapped copy is caught", () => {
+    const r = loadRecipe();
+    expect(earlyConsumers(r)).toEqual([]);
+    // control: correct's two hooks in the 0.18.0 order are caught, and so is item_fix's swapped
+    const old = structuredClone(r);
+    const co = (old.stages.correct as SessionStage).outcomes[0];
+    co.run = [co.run![1], co.run![0]];
+    expect(earlyConsumers(old)).toEqual(["correct.outcomes[0].run[0]"]);
+    const swapped = structuredClone(r);
+    const fo = (swapped.stages.item_fix as SessionStage).outcomes[0];
+    fo.run = [fo.run![1], fo.run![0]];
+    expect(earlyConsumers(swapped)).toEqual(["item_fix.outcomes[0].run[0]"]);
+  });
+
+  test("T2: at every file-triggered outcome, a failure at any hook leaves the trigger and a rerun from the first succeeds", () => {
+    const r = loadRecipe();
+    const lost: string[] = [];
+    let sites = 0;
+    for (const [n, st] of sessions(r)) {
+      st.outcomes.forEach((o, i) => {
+        const run = o.run ?? [];
+        const files = o.when.flatMap((sig) => ("file" in sig ? [sig.file] : []));
+        if (run.length === 0 || files.length === 0) return;
+        sites++;
+        for (let k = 0; k < run.length; k++) {
+          const base = mkdtempSync(join(tmpdir(), "baton-1110t-"));
+          const outDir = join(base, "out", "u");
+          mkdirSync(outDir, { recursive: true });
+          mkdirSync(join(base, "spine"), { recursive: true });
+          const sub = (s: string) => s.replaceAll(OUT, outDir).replaceAll("{run.dir}", base);
+          for (const f of ["operator.md", "review.md", "correction.txt", "corrected", "round-done", "lane.done", "close-pr.txt"]) writeFileSync(join(outDir, f), f);
+          for (const f of files) writeFileSync(sub(f), "t");
+          for (let j = 0; j < k; j++) expect(spawnSync(run[j][0], run[j].slice(1).map(sub)).status).toBe(0); // hooks before k ran, hook k failed
+          for (const f of files) if (!existsSync(sub(f))) lost.push(`${n}.outcomes[${i}] fail at hook ${k + 1}: ${f.split("/").pop()} gone`);
+          for (const argv of run) expect([n, i, argv[0], spawnSync(argv[0], argv.slice(1).map(sub)).status]).toEqual([n, i, argv[0], 0]);
+          rmSync(base, { recursive: true });
+        }
+      });
+    }
+    expect(sites).toBe(9);
+    expect(lost).toEqual([]);
+  });
+
+  test("T3: correct's hooks executed: the first alone leaves `corrected`; a full rerun archives once; another rerun is a no-op", () => {
+    const run = (loadRecipe().stages.correct as SessionStage).outcomes[0].run!;
+    const dir = mkdtempSync(join(tmpdir(), "baton-1110-"));
+    const sh = (argv: string[]) => spawnSync(argv[0], argv.slice(1).map((a) => a.replaceAll(OUT, dir)));
+    writeFileSync(join(dir, "corrected"), "x");
+    writeFileSync(join(dir, "correction.txt"), "packet");
+    expect(sh(run[0]).status).toBe(0); // a partial run: the first hook ran, a later one failed
+    expect(readdirSync(dir).sort()).toEqual(["corrected", "correction-1.txt"]); // the trigger survives
+    for (const argv of run) expect(sh(argv).status).toBe(0); // rerun from the first
+    expect(readdirSync(dir).sort()).toEqual(["correction-1.txt"]);
+    expect(readFileSync(join(dir, "correction-1.txt"), "utf8")).toBe("packet");
+    for (const argv of run) expect(sh(argv).status).toBe(0); // nothing left to do, still 0
+    expect(readdirSync(dir).sort()).toEqual(["correction-1.txt"]);
+    rmSync(dir, { recursive: true });
   });
 });
 

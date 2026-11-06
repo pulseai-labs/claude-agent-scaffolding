@@ -15,7 +15,7 @@ import { notifyOnce } from "../src/notify.ts";
 import { openStore, type RunState } from "../src/state.ts";
 import { commit, FakeForge, git } from "./fake-forge.ts";
 import { type Behaviour, FakeHost } from "./fake-host.ts";
-import { loadRecipe, RECIPE_PATH } from "./ossify-recipe-helpers.ts";
+import { loadRecipe, raw, RECIPE_PATH } from "./ossify-recipe-helpers.ts";
 
 const FAKE_OSS = join(import.meta.dir, "fixtures", "fake-oss");
 const BRIEFS = join(import.meta.dir, "..", "examples", "ossify-spine", "briefs");
@@ -282,7 +282,7 @@ const SEATS = Object.fromEntries(
   }]),
 );
 
-async function arm(): Promise<void> {
+async function arm(recipePath: string = RECIPE_PATH): Promise<void> {
   loadRecipe(); // throws with baton's errors if the example does not validate
   const params: Record<string, string> = {
     spine: SPINE, spine_branch: BRANCH, spine_dir: spineDir, ai_root: aiRoot, ai_project: "demo-ai",
@@ -290,7 +290,7 @@ async function arm(): Promise<void> {
   };
   const seatsFile = join(root, "seats.json");
   writeFileSync(seatsFile, JSON.stringify(SEATS));
-  const args = ["arm", RECIPE_PATH, "--run", "r1", "--seats", seatsFile, "--no-timer"];
+  const args = ["arm", recipePath, "--run", "r1", "--seats", seatsFile, "--no-timer"];
   for (const [k, v] of Object.entries(params)) args.push("--param", `${k}=${v}`);
   expect(await main(args)).toBe(0);
 }
@@ -934,6 +934,77 @@ test("a red close at any layer routes through the correction packet", async () =
   expect(existsSync(out(W1, "correction.txt"))).toBe(false); // moved aside on the way to verify
   expect(readFileSync(out(W1, "correction-1.txt"), "utf8")).toContain("[AC] AC1 fails: exit 1"); // the first round's packet stays (#1005)
   expect(item(W1).dispatches).toBe(2);
+});
+
+// #1110: a hook of correct's outcome fails after the seat wrote `corrected`; a plain unpark must take the
+// outcome again, not launch a second correct seat. The recipe copy wraps only the tested hook's argv: it fails
+// while the flag file exists and otherwise runs the shipped argv unchanged.
+function faultRecipe(hook: number): { path: string; flag: string } {
+  const r = raw();
+  const run = r.stages.correct.outcomes[0].run as string[][];
+  const flag = join(root, "fail-hook");
+  run[hook] = ["sh", "-c", '[ ! -e "$0" ] || exit 1; exec "$@"', flag, ...run[hook]];
+  const path = join(root, "recipe-fault.json");
+  writeFileSync(path, JSON.stringify(r));
+  return { path, flag };
+}
+const toCorrect = () => newHost((_u, n) => {
+  if (n === 1) { queue(W1, 1, 1); put(out("lane", "lane.done"), "x"); }
+}, {
+  close: (u, n) => (n === 1 ? put(out(u, "correction.txt"), packet(u, "[AC] AC1 fails: exit 1")) : oss("work_item_pr", u, prUrl(u))),
+  correct: (u) => put(out(u, "corrected"), "x"),
+});
+const finished = () => unit(W1)?.stage === "done" || unit(W1)?.parked !== undefined;
+const skipped = () => events().filter((e) => e.kind === "relaunch skipped" && e.unit === W1 && e.stage === "correct");
+
+test("a failed hook at the last step of correct's outcome: a plain unpark takes the outcome again, with no second seat (#1110)", async () => {
+  const f = faultRecipe(1); // the second hook, `rm -f corrected` in the shipped order
+  await arm(f.path);
+  writeFileSync(f.flag, "");
+  const host = toCorrect();
+  const r = rig(host);
+  await drive(r, 40, finished);
+  expect([unit(W1).stage, unit(W1).parked?.reason]).toEqual(["correct", "run failed"]);
+  expect(existsSync(out(W1, "corrected"))).toBe(true); // the trigger survived the failure
+  rmSync(f.flag);
+  expect(await main(["unpark", "r1", W1])).toBe(0);
+  await drive(r, 40, finished);
+  expect(unit(W1).stage).toBe("done");
+  expect(host.of(W1, "correct")).toHaveLength(1);
+  expect(item(W1).dispatches).toBe(2);
+  expect(skipped()).toHaveLength(1);
+  expect(existsSync(out(W1, "corrected"))).toBe(false);
+  expect(existsSync(out(W1, "correction.txt"))).toBe(false);
+  expect(readFileSync(out(W1, "correction-1.txt"), "utf8")).toContain("AC1 fails");
+  expect(existsSync(out(W1, "correction-2.txt"))).toBe(false);
+});
+
+test("control: a failure at correct's first hook also reruns the hooks with no second seat (#1110)", async () => {
+  const f = faultRecipe(0);
+  await arm(f.path);
+  writeFileSync(f.flag, "");
+  const host = toCorrect();
+  const r = rig(host);
+  await drive(r, 40, finished);
+  expect([unit(W1).stage, unit(W1).parked?.reason]).toEqual(["correct", "run failed"]);
+  expect(existsSync(out(W1, "corrected"))).toBe(true);
+  rmSync(f.flag);
+  expect(await main(["unpark", "r1", W1])).toBe(0);
+  await drive(r, 40, finished);
+  expect(unit(W1).stage).toBe("done");
+  expect(host.of(W1, "correct")).toHaveLength(1);
+  expect(skipped()).toHaveLength(1);
+  expect(readdirSync(dirname(out(W1, "x"))).filter((n) => n.startsWith("correction-"))).toEqual(["correction-1.txt"]);
+});
+
+test("control: with no hook failure the correction runs once and nothing is skipped (#1110)", async () => {
+  const f = faultRecipe(1); // wrapped, flag never written
+  await arm(f.path);
+  const host = toCorrect();
+  await drive(rig(host), 40, finished);
+  expect(unit(W1).stage).toBe("done");
+  expect(host.of(W1, "correct")).toHaveLength(1);
+  expect(skipped()).toHaveLength(0);
 });
 
 test("a halting verdict runs verify, close, correct, then verify and close again", async () => {
