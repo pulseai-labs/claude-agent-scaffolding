@@ -2714,7 +2714,9 @@ case "$_434_VERB" in *"unknown subcommand"*) _pin 0 "#434 no refresh route: oss 
 # ossify 1.37.1 (#1121): handoff §2 names the source of the spine class, as it does for base_branch; a seat that has no
 # source infers the class from "bones registered: none" and records flesh for a bone spine.
 pin "$WI/references/handoff-contract.md" 'select(.id == "<spine-id>") | .class' \
-  "handoff-contract §2 does not name oss get ... .class as the source of the spine class (#1121) - a writer with no source infers it"
+  "handoff-contract §2 does not name the state query for the spine class (#1121) - a writer with no source infers it"
+pin "$WI/references/handoff-contract.md" '(an empty result is a wrong id: stop, write no class)' \
+  "handoff-contract §2 does not stop on an empty class query (#1121) - a wrong spine id would yield an empty class"
 pin "$WI/references/handoff-contract.md" 'never derive it from the spine'"'"'s `## Bones this spine registers` list' \
   "handoff-contract §2 does not say the class is never derived from the spine's bones list (#1121) - a spine that registers no bones is still bone when its plan touches a registered surface"
 pin "$WI/references/report-contract.md" "its class as the handoff's §2 states it" \
