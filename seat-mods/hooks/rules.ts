@@ -1049,16 +1049,21 @@ function runnerText(name: string, args: readonly string[], raw: readonly string[
   if (!KILL_SHELLS.has(name)) return undefined
   // Before -c: options (-o/+o/-O/+O take a value); a word that is not an option, or `--`, ends them with no -c.
   // After -c: more options (the same four take a value) and one `--`, then the string.
-  // A short cluster that ends in o or O takes the next word (`-euo pipefail`); so do --rcfile and --init-file.
-  const valued = (arg: string) => /^[-+][A-Za-z]*[oO]$/.test(arg) || arg === '--rcfile' || arg === '--init-file'
+  // A short cluster (-x…, +x…) takes one following word for each o or O it holds, wherever the letter sits
+  // (`-euo pipefail`, `-oe pipefail`, `-oo a b`) until `--`, after which the next word is the string; a - cluster that holds c sets -c, before or after its values are skipped.
+  // --rcfile and --init-file take one value.
   let seenC = false
   let dashed = false
   for (let k = 0; k < args.length; k++) {
     const arg = args[k]!
-    if (valued(arg)) { k += 1; continue }
+    if (arg === '--rcfile' || arg === '--init-file') { k += 1; continue }
+    if (!dashed && /^[-+][A-Za-z]+$/.test(arg)) {
+      if (arg.startsWith('-') && arg.includes('c')) seenC = true
+      k += arg.replace(/[^oO]/g, '').length
+      continue
+    }
     if (!seenC) {
       if (arg === '--' || (!arg.startsWith('-') && !arg.startsWith('+'))) return undefined
-      if (/^-[A-Za-z]*c[A-Za-z]*$/.test(arg)) seenC = true
       continue
     }
     if (arg === '--' && !dashed) { dashed = true; continue }
