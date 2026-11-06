@@ -170,6 +170,24 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   ["bash --init-file x -c 'kill -1'", "bash --init-file x -c 'kill 123'"],
   ["bash --norc -c 'kill -1'", "bash --norc -c 'kill 123'"],
   ["bash -ec 'kill -1'", "bash -ec 'kill 123'"],
+  // 0.14.1 (#1105): `-o1` is not read as a cluster; bash itself rejects it (`-o` takes the next word as an invalid option name), so this refusal is on input bash refuses
+  ["bash -c -o1 'kill -1'", "bash -c -o1 'kill 123'"],
+  // 0.14.1 (#1105): a short cluster takes one value per o or O it holds, wherever the letter sits, and a cluster holding c sets -c
+  ["bash -co pipefail 'kill -1'", "bash -co pipefail 'kill 123'"],
+  ["bash -oc pipefail 'kill -1'", "bash -oc pipefail 'kill 123'"],
+  ["bash -cO extglob 'kill -1'", "bash -cO extglob 'kill 123'"],
+  ["bash -oe pipefail -c 'kill -1'", "bash -oe pipefail -c 'kill 123'"],
+  ["bash -Oc extglob 'kill -1'", "bash -Oc extglob 'kill 123'"],
+  ["bash -ecO extglob 'kill -1'", "bash -ecO extglob 'kill 123'"],
+  ["bash -Oe extglob -c 'kill -1'", "bash -Oe extglob -c 'kill 123'"],
+  ["sh -oe pipefail -c 'kill -1'", "sh -oe pipefail -c 'kill 123'"],
+  ["bash -oo pipefail errexit -c 'kill -1'", "bash -oo pipefail errexit -c 'kill 123'"],
+  // PR 1108 r1: a + cluster holding c is -c in bash, dash and zsh; a non-last o after -c still takes its value
+  ["bash +c 'kill -1'", "bash +c 'kill 123'"],
+  ["bash +co pipefail 'kill -1'", "bash +co pipefail 'kill 123'"],
+  ["bash -x +c 'kill -1'", "bash -x +c 'kill 123'"],
+  ["bash -c -oe pipefail 'kill -1'", "bash -c -oe pipefail 'kill 123'"],
+  ["bash -c -Oc extglob 'kill -1'", "bash -c -Oc extglob 'kill 123'"],
   // fix r1 C3: command runs its operand unless it is -v or -V
   ['command pkill -u dev', 'command -v pkill'],
   // fix r1 C6: a clean command after a refused one does not clear the refusal (one row per site)
@@ -206,6 +224,10 @@ const ALLOW: readonly string[] = [
   'echo $(ps) kill', 'echo $(pgrep x) kill 1', 'echo $(date) kill -1', 'pkill -f foo $(echo x)',
   "bash -- -c 'kill -1'", 'command -v pkill', 'command -V pkill', 'command -pv pkill', 'command -v killall', 'command -v pgrep >/dev/null && kill 123',
   "pkill --exact '[a-z]'",
+  // 0.14.1 (#1105): a word that is not an option ends the options before -c, so a script's own -c is not a shell string
+  "bash -eo pipefail script.sh -c 'kill -1'", "bash -oe pipefail script.sh -c 'kill -1'",
+  // after `--` the next word is the string, even one that looks like a cluster (bash runs it as the command)
+  "bash -c -- -x 'kill -1'", "bash -c -- -o 'kill -1'",
   // fix r0 N4: a help or version request names no process
   'pkill --help', 'pkill -V', 'pkill -h', 'killall --version', 'killall -V', 'pkill --version',
   'time -p ls', 'builtin echo hi', 'bash -c -- \'echo hi\'', 'bash -O extglob -c \'echo hi\'',
@@ -260,13 +282,10 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ['pkill --pidfile /tmp/p', 'pkill --pidfile'],
   ['pkill -F /tmp/pidfile', 'pkill -F'],
   ['pkill "$(cat /tmp/name)"', 'a pattern held in a quoted substitution'],
+  ["bash -c - 'kill -1'", 'a bare - after -c read as the string'],
   // round 2 C7, C8, C10
   ['kill 123 $(case x in a) echo 1;; esac) -1', "a case pattern's ) inside $(…) ends the span early"],
   ['kill 123 $(echo ${x:-)}) -1', 'a ) inside ${…} inside $(…) ends the span early'],
-  ["bash -co pipefail 'kill -1'", 'a shell option cluster holding both c and o'],
-  ["bash -oc pipefail 'kill -1'", 'a shell option cluster holding both o and c'],
-  ["bash -cO extglob 'kill -1'", 'a shell option cluster holding both c and O'],
-  ["bash -oe pipefail -c 'kill -1'", 'a shell option cluster whose o is not its last letter'],
   ["pkill node '.*'", "a second pkill operand (procps rejects it; BSD and macOS pkill take several)"],
 ]
 
