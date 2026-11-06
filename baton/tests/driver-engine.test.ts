@@ -210,6 +210,21 @@ test("resume in place", async () => {
   expect(seatLaunches().length).toBe(2);
 });
 
+test("resume in place: a result the seat had already written moves the unit, no second seat (#1100)", async () => {
+  await parked(driverWrites(resume()));
+  put(join(runDir(), "out", "a.done"), "ok");
+  await driverEnds();
+  const u = runState().units.a;
+  expect(u.parked).toBeUndefined();
+  expect(u.drivers).toEqual(["work/stop"]);
+  expect(u.recheck).toBe(true);
+  at(3);
+  await doTick();
+  expect(runState().units.a.stage).toBe("done");
+  expect(seatLaunches().length).toBe(1);
+  expect(events().filter((e) => e.kind === "relaunch skipped").length).toBe(1);
+});
+
 test("resume to an allowed stage", async () => {
   await parked(driverWrites(resume({ to: "fix" })));
   host.advance();

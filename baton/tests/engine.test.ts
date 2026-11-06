@@ -1735,3 +1735,342 @@ test("a park with no session records neither a thread nor questions", async () =
   expect("thread" in e).toBe(false);
   expect("questions" in e).toBe(false);
 });
+
+// ---- a relaunch reads the stage's outcomes first (#1100, baton 0.18.0) -----------------------
+
+const skipped = () => events().filter((e) => e.kind === "relaunch skipped");
+
+/**
+ * Each path that launches a visit's stage again, driven to the tick that would relaunch.
+ * `file` puts the stage's result in place just before that tick. `launched` is how many launches
+ * the host has seen by then; a skipped relaunch adds none.
+ */
+const RELAUNCH_PATHS: Record<string, { launched: number; run: (file: boolean) => Promise<void> }> = {
+  "failed thread": {
+    launched: 1,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+      await doTick();
+      host.advance();
+      if (file) done("a");
+      at(1);
+      await doTick();
+    },
+  },
+  "gone thread": {
+    launched: 1,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      await doTick();
+      if (file) done("a");
+      host.drop("thread-1");
+      at(1);
+      await doTick();
+    },
+  },
+  stall: {
+    launched: 1,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      await doTick();
+      at(1);
+      await doTick();
+      at(46);
+      await doTick(); // the stall ends the session; the relaunch waits a tick
+      expect(count("stall")).toBe(1);
+      if (file) done("a");
+      at(47);
+      await doTick();
+    },
+  },
+  orphan: {
+    launched: 0,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      failNextLaunch(new HostDownError(), false);
+      expect(exitCode(await doTick())).toBe(4);
+      if (file) done("a");
+      at(3);
+      await doTick();
+      expect(count("orphan")).toBe(1);
+    },
+  },
+  "refused launch": {
+    launched: 0,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      failNextLaunch(new LaunchError("refused"), false);
+      await doTick();
+      expect(count("launch failed")).toBe(1);
+      if (file) done("a");
+      at(1);
+      await doTick();
+    },
+  },
+  "unpark after a stop": {
+    launched: 1,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+      await doTick();
+      if (file) done("a");
+      writeFileSync(join(runDir(), "stop"), "");
+      at(1);
+      await doTick();
+      expect(runState().units.a.parked?.reason).toBe("stop");
+      expect(await main(["unpark", "r1", "a"])).toBe(0);
+      at(2);
+      await doTick();
+    },
+  },
+  "unpark after no result at max": {
+    launched: 1,
+    run: async (file) => {
+      host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+      await doTick();
+      host.advance();
+      at(1);
+      await doTick();
+      at(2);
+      await doTick();
+      expect(runState().units.a.parked?.reason).toBe("no result");
+      if (file) done("a");
+      expect(await main(["unpark", "r1", "a"])).toBe(0);
+      at(3);
+      await doTick();
+    },
+  },
+};
+
+for (const [name, p] of Object.entries(RELAUNCH_PATHS)) {
+  const rec = () => recipe({ work: sess({ settle_minutes: 1, max_launches: name.includes("max") ? 1 : 3, stop_file: "{run.dir}/stop" }) }, ["a"]);
+  test(`relaunch after ${name}: a result already in place moves the unit with no seat`, async () => {
+    await arm(rec());
+    await p.run(true);
+    expect(runState().units.a.stage).toBe("done");
+    expect(host.launches.length).toBe(p.launched);
+    expect(skipped()).toEqual([expect.objectContaining({ unit: "a", stage: "work", to: "done", outcome: 1 })]);
+    expect(claimFiles()).toEqual([]);
+  });
+  test(`control: relaunch after ${name} with no result launches the seat`, async () => {
+    await arm(rec());
+    await p.run(false);
+    expect(runState().units.a.stage).toBe("work");
+    expect(host.launches.length).toBe(p.launched + 1);
+    expect(skipped()).toEqual([]);
+  });
+}
+
+test("a crash between a seat's end and the move: the next tick takes the result, no second seat", async () => {
+  await arm(recipe({ work: sess() }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  const run = runState();
+  run.units.a.launches.work = 1; // the unit is in `work`, launched once, with no session
+  writeFileSync(join(runDir(), "run.json"), JSON.stringify(run));
+  done("a");
+  await doTick();
+  expect(runState().units.a.stage).toBe("done");
+  expect(host.launches.length).toBe(0);
+  expect(skipped().length).toBe(1);
+});
+
+test("a relaunch reads the outcomes before `before`: a hook that archives the result does not hide it", async () => {
+  const archive = ["sh", "-c", "mv -f {run.dir}/out/{unit.id}.done {run.dir}/out/{unit.id}.old 2>/dev/null; true"];
+  await arm(recipe({ work: sess({ before: [archive] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  await doTick();
+  host.advance();
+  done("a");
+  at(1);
+  await doTick();
+  expect(runState().units.a.stage).toBe("done");
+  expect(host.launches.length).toBe(1);
+  expect(existsSync(join(runDir(), "out", "a.done"))).toBe(true);
+  expect(existsSync(join(runDir(), "out", "a.old"))).toBe(false);
+});
+
+test("an outcome's hooks run on a skipped relaunch, and a failing hook parks run failed (unpark reruns them)", async () => {
+  const hook = ["sh", "-c", "test -e {run.dir}/flag"];
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "done", run: [hook] }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  await doTick();
+  host.advance();
+  done("a");
+  at(1);
+  await doTick(); // the relaunch reads the result, the hook fails
+  expect(runState().units.a.parked?.reason).toBe("run failed");
+  expect(host.launches.length).toBe(1);
+  writeFileSync(join(runDir(), "flag"), "");
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  at(2);
+  await doTick();
+  expect(runState().units.a.stage).toBe("done");
+  expect(host.launches.length).toBe(1);
+});
+
+test("a matched park outcome parks again on a relaunch", async () => {
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ file: "{run.dir}/out/{unit.id}.done" }], to: "park" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  await doTick();
+  host.advance();
+  done("a");
+  at(1);
+  await doTick();
+  expect(runState().units.a.parked?.reason).toBe("outcome");
+  expect(host.launches.length).toBe(1);
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  at(2);
+  await doTick();
+  expect(runState().units.a.parked?.reason).toBe("outcome");
+  expect(host.launches.length).toBe(1);
+});
+
+// A first launch reads nothing: the `before` hooks clear what an earlier visit left.
+
+test("control: a first launch does not read the outcomes; before clears the stale result", async () => {
+  const clear = ["rm", "-f", "{run.dir}/out/{unit.id}.done"];
+  await arm(recipe({ work: sess({ before: [clear] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  done("a"); // left by an earlier visit
+  await doTick();
+  expect(runState().units.a.stage).toBe("work");
+  expect(host.launches.length).toBe(1);
+  expect(existsSync(join(runDir(), "out", "a.done"))).toBe(false);
+  expect(skipped()).toEqual([]);
+  expect(runState().units.a.recheck).toBeUndefined();
+});
+
+test("control: unpark --to the same stage is a first launch even with the result in place", async () => {
+  await arm(recipe({ work: sess({ stop_file: "{run.dir}/stop" }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  await doTick();
+  done("a");
+  writeFileSync(join(runDir(), "stop"), "");
+  at(1);
+  await doTick();
+  expect(runState().units.a.parked?.reason).toBe("stop");
+  expect(await main(["unpark", "r1", "a", "--to", "work"])).toBe(0);
+  at(2);
+  await doTick();
+  expect(host.launches.length).toBe(2);
+  expect(runState().units.a.stage).toBe("work");
+  expect(runState().units.a.recheck).toBeUndefined();
+  expect(skipped()).toEqual([]);
+});
+
+test("control: a before failure at a visit's first launch, then an in-place unpark, still runs before", async () => {
+  const gate = ["sh", "-c", "test -e {run.dir}/ok && rm -f {run.dir}/out/{unit.id}.done"];
+  await arm(recipe({ work: sess({ before: [gate] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  done("a"); // stale
+  await doTick();
+  expect(runState().units.a.parked?.reason).toBe("before failed");
+  expect(runState().units.a.recheck).toBeUndefined();
+  writeFileSync(join(runDir(), "ok"), "");
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  at(1);
+  await doTick();
+  expect(runState().units.a.stage).toBe("work");
+  expect(host.launches.length).toBe(1);
+  expect(existsSync(join(runDir(), "out", "a.done"))).toBe(false);
+  expect(skipped()).toEqual([]);
+});
+
+test("recheck: set by an in-place unpark of a launched visit, cleared by the launch and by stage entry", async () => {
+  await arm(recipe({ work: sess({ stop_file: "{run.dir}/stop" }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 100, end: "completed" } });
+  await doTick();
+  expect(runState().units.a.recheck).toBeUndefined(); // a live first launch
+  writeFileSync(join(runDir(), "stop"), "");
+  at(1);
+  await doTick();
+  expect(runState().units.a.recheck).toBe(true);
+  expect(await main(["unpark", "r1", "a"])).toBe(0);
+  expect(runState().units.a.recheck).toBe(true);
+  expect(runState().units.a.launches.work).toBe(0); // the count alone would call the next launch a first one
+  at(2);
+  await doTick();
+  expect(host.launches.length).toBe(2);
+  expect(runState().units.a.recheck).toBeUndefined();
+});
+
+// Evaluation errors and pending results.
+
+test("an evaluation error on a relaunch parks, and launches nothing", async () => {
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ exit0: ["sh", "-c", "exit 2"] }], to: "done" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick();
+  expect(runState().units.a.parked?.reason).toBe("exit0 error");
+  expect(host.launches.length).toBe(1);
+  expect(claimFiles()).toEqual([]);
+});
+
+test("a transient forge failure on a relaunch waits, and parks at the third in a row", async () => {
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ pr: { url: ["echo", PR], test: "merged" } }], to: "done" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  const forge = mergedForge();
+  forge.viewFails = 3;
+  await doTick({ forge });
+  host.advance();
+  for (const m of [1, 2]) {
+    at(m);
+    await doTick({ forge });
+    expect(runState().units.a.parked).toBeUndefined();
+    expect(host.launches.length).toBe(1);
+  }
+  at(3);
+  await doTick({ forge });
+  expect(runState().units.a.parked?.reason).toBe("pr view failed");
+  expect(host.launches.length).toBe(1);
+});
+
+test("a pending outcome on a relaunch waits a tick; green then moves with no seat", async () => {
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ pr: { url: ["echo", PR], test: "open" } }, { pr: { url: ["echo", PR], test: "checks_green" } }], to: "done" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  const forge = new FakeForge();
+  forge.views.set(PR, { state: "OPEN", head: "abc123", base: "main", mergeable: "MERGEABLE", checks: "pending" });
+  await doTick({ forge });
+  host.advance();
+  at(1);
+  await doTick({ forge });
+  expect(runState().units.a.stage).toBe("work");
+  expect(runState().units.a.session).toBeUndefined();
+  expect(host.launches.length).toBe(1);
+  forge.views.set(PR, { state: "OPEN", head: "abc123", base: "main", mergeable: "MERGEABLE", checks: "green" });
+  at(2);
+  await doTick({ forge });
+  expect(runState().units.a.stage).toBe("done");
+  expect(host.launches.length).toBe(1);
+});
+
+test("control: a pending outcome with checks red launches the seat", async () => {
+  await arm(recipe({ work: sess({ outcomes: [{ when: [{ pr: { url: ["echo", PR], test: "open" } }, { pr: { url: ["echo", PR], test: "checks_green" } }], to: "done" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "failed" } });
+  const forge = new FakeForge();
+  forge.views.set(PR, { state: "OPEN", head: "abc123", base: "main", mergeable: "MERGEABLE", checks: "red" });
+  await doTick({ forge });
+  host.advance();
+  at(1);
+  await doTick({ forge });
+  expect(host.launches.length).toBe(2);
+});
+
+// Same-tick memo.
+
+test("a no-result read this tick is not read again before the relaunch", async () => {
+  const probe = ["sh", "-c", "echo x >> {run.dir}/reads; exit 1"];
+  await arm(recipe({ work: sess({ settle_minutes: 1, outcomes: [{ when: [{ exit0: probe }], to: "done" }] }) }, ["a"]));
+  host = new FakeHost({ work: { ticks: 1, end: "completed" } });
+  await doTick();
+  host.advance();
+  at(1);
+  await doTick(); // completed: read once in live(), quiet from here
+  const before = lines(join(runDir(), "reads")).length;
+  at(2);
+  await doTick(); // the window is up: one read in live(), then the relaunch
+  expect(count("no-result")).toBe(1);
+  expect(host.launches.length).toBe(2);
+  expect(lines(join(runDir(), "reads")).length - before).toBe(1);
+});

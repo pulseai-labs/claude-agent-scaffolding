@@ -74,7 +74,7 @@ async function source(id = "r1") {
     driver: { key: "k", session: session("d"), result_file: "/tmp/r" }, drivers: ["planner/stall"],
     // triage and triaged: state armed before baton 0.14.0 removed triage; a clone still leaves them behind
     triage: { request_id: "REQ-9", session: session("t") }, triaged: ["REQ-9"], cwd_busy: "n", quiet_since: "t",
-    merge_failures: 2, forge_failures: 2, kept: [{ thread: "T-KEPT", project: "p", cwd: "/c", dir: "/d", until: "unpark" }],
+    merge_failures: 2, forge_failures: 2, recheck: true, kept: [{ thread: "T-KEPT", project: "p", cwd: "/c", dir: "/d", until: "unpark" }],
     record_seen: "sha-seen", record_at_entry: "sha-entry", vars: { note: `${d}/note.md` },
   };
   r.units.w1 = {
@@ -155,7 +155,7 @@ test("no session, thread, driver, triage, park or count carries over; the stage 
   await source();
   expect((await cli("clone", "r1", "c1")).rc).toBe(0);
   const text = readFileSync(join(dirOf("c1"), "run.json"), "utf8");
-  for (const leak of ["T-LIVE", "T-KEPT", "REQ-9", "session", "driver", "triage", "kept", "claim", "cwd_busy", "seq"]) {
+  for (const leak of ["T-LIVE", "T-KEPT", "REQ-9", "session", "driver", "triage", "kept", "claim", "cwd_busy", "seq", "recheck"]) {
     expect(text).not.toContain(leak);
   }
   const p = rawRun("c1").units.planner;
@@ -165,7 +165,7 @@ test("no session, thread, driver, triage, park or count carries over; the stage 
   expect(p.parked).toBeUndefined();
   // control: the source has every one of them
   const src = readFileSync(join(dirOf("r1"), "run.json"), "utf8");
-  for (const kept of ["T-LIVE", "T-KEPT", "REQ-9", "session", "driver", "triage"]) expect(src).toContain(kept);
+  for (const kept of ["T-LIVE", "T-KEPT", "REQ-9", "session", "driver", "triage", "recheck"]) expect(src).toContain(kept);
   // identity and the file digests stand
   expect(p.record_seen).toBe("sha-seen");
   expect(rawRun("c1").units.w1.group).toBe(1);

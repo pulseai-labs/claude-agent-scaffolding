@@ -64,6 +64,9 @@ export type UnitState = {
   merge_failures?: number;
   /** Consecutive failed forge reads (PR view, PR-URL argv, landed check); three park the unit. */
   forge_failures?: number;
+  /** A session ran in this visit (or an in-place unpark followed one): the next launch reads the
+   *  stage's outcomes first. Cleared by a launch and by stage entry; see `launch()`. */
+  recheck?: true;
   /** Ended sessions' threads kept open; absent when there are none. */
   kept?: KeptThread[];
 };
@@ -80,6 +83,7 @@ export function enterStage(u: UnitState, stage: string): void {
   u.record_at_entry = u.record_seen;
   u.launches[stage] = 0;
   u.stalls = 0;
+  delete u.recheck;
   delete u.cwd_busy;
   delete u.merge_failures;
   delete u.forge_failures;
