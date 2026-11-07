@@ -1270,8 +1270,9 @@ function joinSubstitutions(text: string): string {
   return out
 }
 
-// `unread`: the first throw met while reading. It is held, not thrown, so that a refusal anywhere else in the call still
-// wins; killRule throws it only when nothing refused.
+// `unread`: the first throw met while reading. It is held, not thrown, so that a refusal in another reading, segment,
+// runner string or substitution still wins; killRule throws it only when nothing refused. An unclosed `$(` outside quotes
+// makes its whole string unread before any segment is read, so a refusal earlier in that same string is not found.
 type KillScan = { lists: boolean; signals: boolean; reason: string | undefined; unread?: unknown }
 function deferred(scan: KillScan, read: () => void): void {
   try { read() } catch (err) { scan.unread ??= err }
@@ -1309,6 +1310,7 @@ function killScan(command: string, scan: KillScan, runners: boolean): void {
       if (depth >= 8) throw new Error('xargs nested more than 8 deep')
       if (at < args.length) visit(rest.slice(at), depth + 1)
     } else if (runners && (name === 'eval' || KILL_SHELLS.has(name))) {
+      // killRead holds its own throws; this hold only keeps a future throw in runnerTexts from escaping.
       for (const inner of runnerTexts(name, args, rest, pieces)) deferred(scan, () => killRead(inner, scan, false))
     }
   }
@@ -1325,8 +1327,8 @@ function killRead(command: string, scan: KillScan, runners: boolean): void {
 // The deny text for a command that signals processes it did not name, or undefined. A throw is the caller's to fail closed.
 export function killRule(command: string): string | undefined {
   const scan: KillScan = { lists: false, signals: false, reason: undefined }
-  // A throw in any reading, segment or substitution is held while the rest of the call is read, so it never hides a
-  // refusal found before it or after it; it is thrown only when nothing refused.
+  // A throw in a reading, segment, runner string or substitution is held while the rest of the call is read, so it does
+  // not hide a refusal there, before it or after it; it is thrown only when nothing refused.
   killRead(command, scan, true)
   if (scan.reason !== undefined) return killText(scan.reason)
   if (scan.lists && scan.signals) return killText('this call lists processes and signals in the same call')

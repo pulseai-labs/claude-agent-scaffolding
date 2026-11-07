@@ -563,6 +563,16 @@ describe('killRule: a refusal from one reading survives a throw from another', (
   test('control: the refusal first, then the throwing string, still refuses', () => {
     expect(killRule("kill -1; ksh -c '$(x'")).toContain('kill rail')
   })
+  // A throw inside a substitution, or a substitution nested too deep, beside a refusal: each hold in killRead is read.
+  const DEEP = '$('.repeat(10) + 'x' + ')'.repeat(10)
+  for (const command of ['echo $(echo $(x;kill -1)', 'echo $(kill -1; echo $(x)', `echo ${DEEP}; kill -1`, `kill -1; echo ${DEEP}`])
+    test(`refuses ${JSON.stringify(command)} with the kill reason, not a throw`, () => {
+      expect(killRule(command)).toContain('kill rail')
+    })
+  test('known limit: an unclosed $( outside quotes makes its whole string unread, so a refusal before it in the same string is not found', () => {
+    expect(() => killRule('kill -1; echo $(x')).toThrow()
+    expect(killRule('echo $(x; kill -1')).toContain('kill rail')
+  })
 })
 
 // Deliberate false stops: the shell does not run the string, but a reading that finds it as the string refuses.
@@ -583,7 +593,7 @@ describe('killRule: deliberate false stops of the ksh and yash grammar', () => {
 // runner spelling and several option forms. Every command refused before busybox and the new names were read is in the
 // refused set below (checked against that reader when it was frozen); a form that throws and also carries a refusal
 // fails here, because the refused set would lose it.
-describe('killRule: a throw anywhere in a call never hides a refusal elsewhere in it', () => {
+describe('killRule: a throw in a runner string never hides a refusal elsewhere in the call', () => {
   const NAMES = ['sh', 'bash', 'zsh', 'dash', 'rbash', 'ash', 'static-sh', 'ksh', 'ksh93', 'mksh', 'yash', 'busybox sh', 'busybox ash']
   const OPTS = ['-c', '-c-o', '-cO', '-c- -e', '-Oc', '-ec']
   const TAILS = ['; kill -1', ' && kill -1', '; pkill -u dev', '; ps; kill 1', ' | xargs kill -1', '; echo ok']
