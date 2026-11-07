@@ -43,7 +43,7 @@ _RULE_LEAD='(^|[^A-Za-z0-9_.-]|\\[nrt])'
 # The three dot-dirs match under any home root, for any user: "~", "$HOME" and "${HOME}" (each optionally followed by a
 # closing quote, as in "$HOME"/.ssh), "/home/<one segment>", "/Users/<one segment>" and "/root". The names above stay
 # "~/.ssh" etc., so the names part of the uid is unchanged. "/etc/passwd" has no root. The bracket forms [$] and [{]
-# are used because "\{" is undefined in POSIX ERE. A root is not anchored on the left ("/var/root/.ssh" fires).
+# keep the pattern free of backslash escapes, which bash and grep read the same way. A root is not anchored on the left ("/var/root/.ssh" fires).
 # Silent on purpose, named in the CHANGELOG: "${HOME:-x}", "~user", "$HOMEDIR", "$HOME_OLD" and a project path such as
 # "/home/me/proj/.ssh" (a second segment), and any path held in a variable, "os.homedir()" or "Path.home()".
 _RULE_HOME_ROOT='(~|[$]HOME"?|[$][{]HOME[}]"?|/home/[^/[:space:]]+|/Users/[^/[:space:]]+|/root)'
