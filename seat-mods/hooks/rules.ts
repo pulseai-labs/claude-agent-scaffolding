@@ -1270,7 +1270,12 @@ function joinSubstitutions(text: string): string {
   return out
 }
 
-type KillScan = { lists: boolean; signals: boolean; reason: string | undefined }
+// `unread`: the first throw met while reading. It is held, not thrown, so that a refusal anywhere else in the call still
+// wins; killRule throws it only when nothing refused.
+type KillScan = { lists: boolean; signals: boolean; reason: string | undefined; unread?: unknown }
+function deferred(scan: KillScan, read: () => void): void {
+  try { read() } catch (err) { scan.unread ??= err }
+}
 
 // One command (a call, or a substitution of it, or a literal runner string) read segment by segment.
 function killScan(command: string, scan: KillScan, runners: boolean): void {
@@ -1304,25 +1309,27 @@ function killScan(command: string, scan: KillScan, runners: boolean): void {
       if (depth >= 8) throw new Error('xargs nested more than 8 deep')
       if (at < args.length) visit(rest.slice(at), depth + 1)
     } else if (runners && (name === 'eval' || KILL_SHELLS.has(name))) {
-      for (const inner of runnerTexts(name, args, rest, pieces)) killRead(inner, scan, false)
+      for (const inner of runnerTexts(name, args, rest, pieces)) deferred(scan, () => killRead(inner, scan, false))
     }
   }
-  for (const segment of segments) visit(killHeads(tokensOf(segment)), 0)
+  for (const segment of segments) deferred(scan, () => visit(killHeads(tokensOf(segment)), 0))
 }
 
 // A command and every substitution in it, each read as a command of its own.
 function killRead(command: string, scan: KillScan, runners: boolean): void {
   for (const read of [command, ...substitutionsOf(command)])
-    if (read === SUBSTITUTION_TOO_DEEP) throw new Error('substitution nested more than 8 deep')
-    else killScan(read, scan, runners)
+    if (read === SUBSTITUTION_TOO_DEEP) scan.unread ??= new Error('substitution nested more than 8 deep')
+    else deferred(scan, () => killScan(read, scan, runners))
 }
 
 // The deny text for a command that signals processes it did not name, or undefined. A throw is the caller's to fail closed.
 export function killRule(command: string): string | undefined {
   const scan: KillScan = { lists: false, signals: false, reason: undefined }
-  // A throw in one reading (an unclosed `$(` in one of the strings) does not hide a refusal another reading already found.
-  try { killRead(command, scan, true) } catch (err) { if (scan.reason === undefined && !(scan.lists && scan.signals)) throw err }
+  // A throw in any reading, segment or substitution is held while the rest of the call is read, so it never hides a
+  // refusal found before it or after it; it is thrown only when nothing refused.
+  killRead(command, scan, true)
   if (scan.reason !== undefined) return killText(scan.reason)
   if (scan.lists && scan.signals) return killText('this call lists processes and signals in the same call')
+  if (scan.unread !== undefined) throw scan.unread
   return undefined
 }

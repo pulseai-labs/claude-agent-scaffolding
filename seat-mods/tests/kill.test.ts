@@ -495,7 +495,7 @@ describe('killRule: the grid of option forms never loosens against the 0.14.1 re
 
 // The refusals of this grid under `sh`, as the reader before busybox ash was added read it: the same 8342 commands, so
 // the ash reading and the new names add no refusal here. The digest is of the refused commands, one per line, in grid
-// order (a thrown read counts as refused); a refusal added or dropped changes it.
+// order (no grid form throws); a refusal added or dropped changes it.
 // cyrb53: a 53-bit string hash (the hooks module may import nothing but its own files).
 function cyrb53(str: string): number {
   let h1 = 0xdeadbeef, h2 = 0x41c6ce57
@@ -516,13 +516,20 @@ describe('killRule: the grid adds no refusal and every name is read alike', () =
     if (prefix.length < 3) for (const w of GRID_WORDS) grow([...prefix, w])
   }
   grow([])
-  const refuses = (command: string): boolean => { try { return killRule(command) !== undefined } catch { return true } }
+  // A throw is not a refusal: a form origin refused that now throws fails these tests.
+  const refuses = (command: string): boolean => {
+    try { return killRule(command) !== undefined } catch { return false }
+  }
+  const unreadBy = (command: string): boolean => {
+    try { killRule(command); return false } catch { return true }
+  }
   const commands: string[] = []
   for (const form of forms)
     for (const kill of ['S1', 'S2', 'all'])
       commands.push(form.map(w => (w === 'S1' || w === 'S2') && (kill === 'all' || kill === w) ? "'kill -1'" : /^S\d$/.test(w) ? `'echo ${w}'` : w).join(' '))
   test('the refused commands under sh are the 8342 the earlier reader refused', () => {
     const refused = commands.map(c => `sh ${c}`).filter(refuses)
+    expect(commands.filter(c => unreadBy(`sh ${c}`))).toEqual([])
     expect(refused.length).toBe(8342)
     expect(cyrb53(refused.join('\n'))).toBe(DIGEST)
   })
@@ -537,13 +544,24 @@ describe('killRule: the grid adds no refusal and every name is read alike', () =
 
 // A reading whose string cannot be read (an unclosed `$(`) must not hide a refusal another reading found.
 describe('killRule: a refusal from one reading survives a throw from another', () => {
-  for (const command of ["sh -c-o '$(x' 'kill -1'", "bash -cO '$(x' 'kill -1'", "zsh -c-o '$(x' 'ps; kill 1'"])
+  for (const command of [
+    "sh -c-o '$(x' 'kill -1'", "bash -cO '$(x' 'kill -1'", "zsh -c-o '$(x' 'ps; kill 1'",
+    // the throwing string comes first, and the refusal after it
+    "ksh -c '$(x'; kill -1", "busybox sh -c '$(x'; kill -1", "sh -c-o '$(x'; kill -1", "mksh -c '$(x' && kill -1",
+    "yash -c '$(x'; pkill -u dev", "bash -Oc 'kill -1' '$(x'", "busybox ash -c '$(x'; kill -1",
+    "ksh -c '$(((((((((((x)))))))))))'; kill -1", 'xargs busybox '.repeat(9) + 'echo; kill -1',
+  ])
     test(`refuses ${JSON.stringify(command)} with the kill reason, not a throw`, () => {
       expect(killRule(command)).toContain('kill rail')
     })
   test('control: a harmless unreadable string is still thrown, to be refused as unread by the glue', () => {
     expect(() => killRule("sh -c-o '$(x' 'echo ok'")).toThrow()
     expect(() => killRule("bash -cO '$(x' 'echo ok'")).toThrow()
+    expect(() => killRule("ksh -c '$(x'; echo ok")).toThrow()
+    expect(() => killRule("busybox sh -c '$(x'; kill 123")).toThrow()
+  })
+  test('control: the refusal first, then the throwing string, still refuses', () => {
+    expect(killRule("kill -1; ksh -c '$(x'")).toContain('kill rail')
   })
 })
 
@@ -558,6 +576,32 @@ describe('killRule: deliberate false stops of the ksh and yash grammar', () => {
   test('control: the same shapes with a harmless string are allowed', () => {
     expect(killRule("ksh +c 'echo ok'")).toBeUndefined()
     expect(killRule("yash -c + 'echo ok'")).toBeUndefined()
+  })
+})
+
+// Throw-first forms: a string no reading can finish (an unclosed `$(`) beside a refusal, in either order, under every
+// runner spelling and several option forms. Every command refused before busybox and the new names were read is in the
+// refused set below (checked against that reader when it was frozen); a form that throws and also carries a refusal
+// fails here, because the refused set would lose it.
+describe('killRule: a throw anywhere in a call never hides a refusal elsewhere in it', () => {
+  const NAMES = ['sh', 'bash', 'zsh', 'dash', 'rbash', 'ash', 'static-sh', 'ksh', 'ksh93', 'mksh', 'yash', 'busybox sh', 'busybox ash']
+  const OPTS = ['-c', '-c-o', '-cO', '-c- -e', '-Oc', '-ec']
+  const TAILS = ['; kill -1', ' && kill -1', '; pkill -u dev', '; ps; kill 1', ' | xargs kill -1', '; echo ok']
+  const commands: string[] = []
+  for (const n of NAMES)
+    for (const o of OPTS) {
+      for (const t of TAILS) commands.push(`${n} ${o} '$(x'${t}`)
+      commands.push(`${n} ${o} '$(x' 'kill -1'`, `${n} ${o} 'kill -1' '$(x'`, `${n} ${o} '$(x' 'echo ok'`)
+    }
+  const refused: string[] = []
+  const unread: string[] = []
+  for (const c of commands) {
+    try { if (killRule(c) !== undefined) refused.push(c) } catch { unread.push(c) }
+  }
+  test('702 forms: 507 refused, and the other 195 throw only because nothing in them refuses', () => {
+    expect(commands.length).toBe(702)
+    expect({ refused: refused.length, hash: cyrb53(refused.join('\n')) }).toEqual({ refused: 507, hash: 2828278963702788 })
+    expect({ unread: unread.length, hash: cyrb53(unread.join('\n')) }).toEqual({ unread: 195, hash: 2579890534524799 })
   })
 })
 

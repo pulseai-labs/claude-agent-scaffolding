@@ -254,6 +254,8 @@ or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never se
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
 omp scopes a job or agent id to its owner; a service name is stopped project-wide, as `kill <pid>` through bash already allows. Every other spelling, and `edit` of it, is placed as before.
 
+A string the rail cannot finish reading (an unclosed `$(`, a nesting too deep) does not hide a refusal elsewhere in the call: the rail reads the rest and refuses with the kill reason if any part refuses, and treats the call as unread only when nothing refused.
+
 A `bash` command the rail cannot read is refused (on the ambient OMP entry, an `eval` literal it cannot read passes), after a guarded role's own reader has had its say: a
 forged marker, text it throws on, a substitution that never closes, a substitution nested more than 8 deep, and an `xargs` chain more than 8
 deep (a chain that long is not walked).
