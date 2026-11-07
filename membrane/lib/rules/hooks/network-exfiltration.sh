@@ -32,13 +32,21 @@ source "$_RULE_DIR/hook-entries.sh" 2>/dev/null || true
 # "sync", "func", "openssh " and ".curlrc" from naming nc, ssh, curl or wget, and keeps "~/.ssh " from naming ssh.
 # curl, wget and rsync end at a non-letter or the end ("curly", "curling" and "rsyncd" do not name them; "curl.exe",
 # "wget2" and "curl_chrome116" do). nc, ssh and scp end at whitespace, so "ssh-keygen" and "ssh-add" do not name ssh.
-# Sensitive names have their dots escaped: the "." in "~/.ssh" is a dot, not any byte or a newline.
+# Sensitive names have their dots escaped: the "." in "~/.ssh" is a dot, not any byte or a newline. The three "~/" names
+# are preceded by the home root group below.
 # Lost on purpose, named in the CHANGELOG: a name after a letter, digit, "_", "." or "-" ("run_curl", "x-curl", "sh.curl(",
 # "${CURL:-curl}", "curlie" and "pycurl" at their ends).
 # ERE only: no \b, \< or [[:<:]], which are not portable. Not run on bash 3.2 or BSD grep (CI is ubuntu).
 _RULE_NETWORK_NAMES=('curl' 'wget' 'nc' 'ssh' 'scp' 'rsync')
 _RULE_SENSITIVE_NAMES=('~/.ssh' '~/.gnupg' '~/.aws' '/etc/passwd')
 _RULE_LEAD='(^|[^A-Za-z0-9_.-]|\\[nrt])'
+# The three dot-dirs match under any home root, for any user: "~", "$HOME" and "${HOME}" (each optionally followed by a
+# closing quote, as in "$HOME"/.ssh), "/home/<one segment>", "/Users/<one segment>" and "/root". The names above stay
+# "~/.ssh" etc., so the names part of the uid is unchanged. "/etc/passwd" has no root. The bracket forms [$] and [{]
+# keep the pattern free of backslash escapes, which bash and grep read the same way. A root is not anchored on the left ("/var/root/.ssh" fires).
+# Silent on purpose, named in the CHANGELOG: "${HOME:-x}", "~user", "$HOMEDIR", "$HOME_OLD" and a project path such as
+# "/home/me/proj/.ssh" (a second segment), and any path held in a variable, "os.homedir()" or "Path.home()".
+_RULE_HOME_ROOT='(~|[$]HOME"?|[$][{]HOME[}]"?|/home/[^/[:space:]]+|/Users/[^/[:space:]]+|/root)'
 _RULE_NETWORK_ALTS=()
 for _n in "${_RULE_NETWORK_NAMES[@]}"; do
   case "$_n" in
@@ -48,7 +56,10 @@ for _n in "${_RULE_NETWORK_NAMES[@]}"; do
 done
 _RULE_SENSITIVE_ALTS=()
 for _n in "${_RULE_SENSITIVE_NAMES[@]}"; do
-  _RULE_SENSITIVE_ALTS+=("${_n//./\\.}")
+  case "$_n" in
+    '~/'*) _n="${_n#\~}"; _RULE_SENSITIVE_ALTS+=("${_RULE_HOME_ROOT}${_n//./\\.}") ;;
+    *)     _RULE_SENSITIVE_ALTS+=("${_n//./\\.}") ;;
+  esac
 done
 unset _n
 RULE_NETWORK_RE="$(IFS='|'; printf '%s' "${_RULE_NETWORK_ALTS[*]}")"
