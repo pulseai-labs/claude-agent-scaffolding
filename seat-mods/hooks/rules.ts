@@ -953,7 +953,7 @@ export function invalidText(value: string): string {
 // wherever each sits in the call, substitutions included; (b) kill with -1, 0, or a negative operand that holds a
 // `$`; (c) pkill and killall by user, with no pattern, or with a pattern that matches every name of a fixed probe
 // set; (d) killall5, and the session-wide systemctl and loginctl verbs. It reads a literal `eval '…'` or
-// `sh|bash|zsh|dash -c '…'` string once, as a command (a shell's options read as bash reads them and as zsh reads them, refused if either string is), removes quotes from a command word, and skips the wrappers
+// `sh|bash|rbash|zsh|dash|ash|static-sh|ksh|ksh93|mksh|yash -c '…'` string once, as a command (a shell's options read as bash reads them, as zsh reads them and, for a cluster with an inner `-`, as Debian busybox ash reads them, refused if any string is), reads `busybox` as its applet, removes quotes from a command word, and skips the wrappers
 // below. Everything else it does not read is a known limit, listed in the README and pinned by tests/kill.test.ts.
 // ---------------------------------------------------------------------------------------------------------
 
@@ -981,8 +981,10 @@ const KILL_WRAPPER_SHAPES: Readonly<Record<string, { val: string; long: readonly
   chrt: { val: 'TPD', long: [], pos: 1 },
   taskset: { val: '', long: [], pos: 1 },
   flock: { val: 'wE', long: ['timeout', 'conflict-exit-code'], pos: 1 },
+  // busybox runs its applet: the next word, path stripped (busybox /bin/sh runs sh)
+  busybox: { val: '', long: [], pos: 0 },
 }
-const KILL_SHELLS = new Set(['sh', 'bash', 'zsh', 'dash'])
+const KILL_SHELLS = new Set(['sh', 'bash', 'rbash', 'zsh', 'dash', 'ash', 'static-sh', 'ksh', 'ksh93', 'mksh', 'yash'])
 const KILL_SIGNAL = /^-(?:SIG)?(?:HUP|INT|QUIT|ILL|TRAP|ABRT|IOT|BUS|FPE|KILL|USR1|SEGV|USR2|PIPE|ALRM|TERM|STKFLT|CHLD|CLD|CONT|STOP|TSTP|TTIN|TTOU|URG|XCPU|XFSZ|VTALRM|PROF|WINCH|IO|POLL|PWR|SYS|RTMIN(?:\+\d+)?|RTMAX(?:-\d+)?)$/
 const KILL_PROBES = ['systemd', 'bash', 'node', 'x']
 // ASCII reading of the POSIX bracket classes, so a pattern such as [[:alpha:]] tests as pkill reads it.
@@ -1047,12 +1049,11 @@ function killLiteral(token: string, pieces: readonly string[]): string {
 
 // The strings a literal runner may be given: eval's words joined, or for a shell the word after its -c as bash reads
 // the options and as zsh reads them. The shells disagree, and a name is not a closed input (sh is dash, bash or zsh on the hosts probed, and busybox ash
-// elsewhere, whose grammar neither reading covers), so every name in KILL_SHELLS gets both readings and the rail
-// refuses if either string is refused.
+// elsewhere), so every name in KILL_SHELLS gets all three readings and the rail refuses if any string is refused.
 function runnerTexts(name: string, args: readonly string[], raw: readonly string[], pieces: readonly string[]): string[] {
   if (name === 'eval') return [(args[0] === '--' ? raw.slice(1) : raw).map(token => killLiteral(token, pieces)).join(' ')]
   if (!KILL_SHELLS.has(name)) return []
-  const texts = [bashText(args, raw, pieces), zshText(args, raw, pieces)]
+  const texts = [bashText(args, raw, pieces), zshText(args, raw, pieces), ashText(args, raw, pieces)]
   return [...new Set(texts.filter((text): text is string => text !== undefined))]
 }
 
@@ -1083,6 +1084,32 @@ function bashText(args: readonly string[], raw: readonly string[], pieces: reado
     if (arg === '--' && !dashed) { dashed = true; continue }
     if (!dashed && arg.length > 1 && (arg.startsWith('-') || arg.startsWith('+'))) continue
     return killLiteral(raw[k]!, pieces)
+  }
+  return undefined
+}
+
+// Debian/Ubuntu busybox ash's reading (probed on 1:1.37.0-7ubuntu1; Alpine's 1.37.0 rejects these): a `-` inside a
+// - cluster ends that cluster and the rest of the word is ignored, and the options go on (`-c- -e S`, `-c-o S`).
+// Otherwise as bash's: one value per o, a bare `-` or `--` ends the options, a bare `+` is skipped.
+function ashText(args: readonly string[], raw: readonly string[], pieces: readonly string[]): string | undefined {
+  // Read only a call with a cluster that holds an inner -: elsewhere bash's reading already finds ash's string.
+  let seenC = false
+  let ashOnly = false
+  for (let k = 0; k < args.length; k++) {
+    const arg = args[k]!
+    if (arg === '-' || arg === '--') return ashOnly && seenC && k + 1 < args.length ? killLiteral(raw[k + 1]!, pieces) : undefined
+    if (arg === '+') continue
+    if (/^[-+]./.test(arg)) {
+      let values = 0
+      if (arg.indexOf('-', 1) > 0) ashOnly = true
+      for (let j = 1; j < arg.length && arg[j] !== '-'; j++) {
+        if (arg[j] === 'c') seenC = true
+        else if (arg[j] === 'o') values += 1
+      }
+      k += values
+      continue
+    }
+    return ashOnly && seenC ? killLiteral(raw[k]!, pieces) : undefined
   }
   return undefined
 }
@@ -1293,7 +1320,8 @@ function killRead(command: string, scan: KillScan, runners: boolean): void {
 // The deny text for a command that signals processes it did not name, or undefined. A throw is the caller's to fail closed.
 export function killRule(command: string): string | undefined {
   const scan: KillScan = { lists: false, signals: false, reason: undefined }
-  killRead(command, scan, true)
+  // A throw in one reading (an unclosed `$(` in one of the strings) does not hide a refusal another reading already found.
+  try { killRead(command, scan, true) } catch (err) { if (scan.reason === undefined && !(scan.lists && scan.signals)) throw err }
   if (scan.reason !== undefined) return killText(scan.reason)
   if (scan.lists && scan.signals) return killText('this call lists processes and signals in the same call')
   return undefined
