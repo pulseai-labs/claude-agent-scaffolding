@@ -222,7 +222,7 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   ["zsh -cb '-x; kill -1'", "zsh -cb '-x; kill 123'"],
   // 0.14.2 (#1109): zsh's bare + ends the options (bash skips it), so the next word is the string even when it starts with -
   ["zsh -c + '-x; kill -1'", "zsh -c + '-x; kill 123'"],
-  // 0.14.2 (#1109): a - that ends a zsh cluster ends the options too, so the next word is the string (bash and dash reject these; busybox ash accepts -c- and is not read, see LIMITS)
+  // 0.14.2 (#1109): a - that ends a zsh cluster ends the options too, so the next word is the string (bash and dash reject these)
   ["zsh -c- '-x; kill -1'", "zsh -c- '-x; kill 123'"],
   ["zsh +c- '-x; kill -1'", "zsh +c- '-x; kill 123'"],
   ["zsh -xc- '-x; kill -1'", "zsh -xc- '-x; kill 123'"],
@@ -263,6 +263,40 @@ const REFUSE: ReadonlyArray<readonly [string, string]> = [
   // a call that both lists and signals is refused whichever way they are joined (a deliberate false stop)
   ['ps aux; kill 123', 'ps aux; echo 123'],
   ['pgrep -f foo && kill 123', 'pgrep -f foo && echo 123'],
+  // every name the rail reads as a shell gets all three readings: dropping a name from KILL_SHELLS fails its row
+  ["rbash -c 'kill -1'", "rbash -c 'kill 123'"],
+  ["ash -c 'kill -1'", "ash -c 'kill 123'"],
+  ["static-sh -c 'kill -1'", "static-sh -c 'kill 123'"],
+  ["ksh -c 'kill -1'", "ksh -c 'kill 123'"],
+  ["ksh93 -c 'kill -1'", "ksh93 -c 'kill 123'"],
+  ["mksh -c 'kill -1'", "mksh -c 'kill 123'"],
+  ["yash -c 'kill -1'", "yash -c 'kill 123'"],
+  ["/bin/ksh -c 'kill -1'", "/bin/ksh -c 'kill 123'"],
+  ["env yash -c 'kill -1'", "env yash -c 'kill 123'"],
+  ["ksh -ec 'kill -1'", "ksh -ec 'kill 123'"],
+  ["mksh -c -o pipefail 'kill -1'", "mksh -c -o pipefail 'kill 123'"],
+  // busybox runs the applet that follows: a shell, kill, killall, ps, xargs
+  ["busybox sh -c 'kill -1'", "busybox sh -c 'kill 123'"],
+  ["busybox ash -c 'kill -1'", "busybox ash -c 'kill 123'"],
+  ["/usr/bin/busybox /bin/sh -c 'kill -1'", "/usr/bin/busybox /bin/sh -c 'kill 123'"],
+  ["busybox static-sh -c 'kill -1'", "busybox static-sh -c 'kill 123'"],
+  ['busybox kill -1', 'busybox kill 123'],
+  ['busybox killall -u dev', 'busybox killall node'],
+  ['busybox ps; kill 123', 'busybox ls; kill 123'],
+  ['busybox xargs kill -1', 'busybox xargs kill 123'],
+  ['sudo busybox sh -c "kill -1"', 'sudo busybox sh -c "kill 123"'],
+  // busybox ash (Debian and Ubuntu builds): a - inside a cluster ends it and the options go on, so the string follows -c- -e
+  ["sh -c- -e 'kill -1'", "sh -c- -e 'kill 123'"],
+  ["busybox sh -c- -e 'kill -1'", "busybox sh -c- -e 'kill 123'"],
+  ["ash -c-o 'kill -1' x", "ash -c-o 'kill 123' x"],
+  ["ash -c- - 'kill -1'", "ash -c- - 'kill 123'"],
+  ["ash -c- -o pipefail 'kill -1'", "ash -c- -o pipefail 'kill 123'"],
+  ["ash -ec- -x 'kill -1'", "ash -ec- -x 'kill 123'"],
+  ["ksh -c- -e 'kill -1'", "ksh -c- -e 'kill 123'"],
+  ["ash -c- + 'kill -1'", "ash -c- + 'kill 123'"],
+  // a --name word is a cluster busybox ends at its second -, and --rcfile takes no value
+  ["busybox sh -c -b --rcfile 'kill -1' x", "busybox sh -c -b --rcfile 'kill 123' x"],
+  ["sh -c -b --rcfile 'kill -1' x", "sh -c -b --rcfile 'kill 123' x"],
 ]
 
 // What a seat does legitimately, and text that only mentions kill.
@@ -295,6 +329,12 @@ const ALLOW: readonly string[] = [
   "zsh -c1 'echo hi'", "zsh --emulate sh -c 'echo hi'", "bash -c + 'echo hi'", "zsh -cb 'echo hi'",
   // zsh runs a word with no -c as a script path, not a string; --emulate after another option is an error in zsh; a long option takes no value, so an option-like word after it is not a string
   "zsh 'kill -1'", "zsh -- 'kill -1'", "zsh -x --emulate sh -c 'kill -1'", "zsh -c --braceccl '-x; kill -1'",
+  // harmless commands under each runner stay allowed
+  "ksh -c 'echo ok'", "ksh93 -c 'echo ok'", "mksh -c 'echo ok'", "yash -c 'echo ok'", "rbash -c 'echo ok'", "ash -c 'echo ok'",
+  "static-sh -c 'echo ok'", 'busybox ls', 'busybox --list', "busybox sh -c 'echo ok'", "busybox ash -c 'echo ok'",
+  'busybox kill 123', "ash -c-o pipefail 'echo ok'", "ash -c- -e 'echo ok'",
+  // the narrowed ash reading is only for a cluster with an inner -: zsh runs the first string here, whose $0 is the kill text
+  "zsh -cO -oshwordsplit -c 'echo S1' 'kill -1'",
 ]
 
 // Known limits: forms the rail does not read. Each is allowed here, and the README names it. A later
@@ -346,15 +386,19 @@ const LIMITS: ReadonlyArray<readonly [string, string]> = [
   ['pkill --pidfile /tmp/p', 'pkill --pidfile'],
   ['pkill -F /tmp/pidfile', 'pkill -F'],
   ['pkill "$(cat /tmp/name)"', 'a pattern held in a quoted substitution'],
-  // 0.14.2 (#1109, #1116): shells outside KILL_SHELLS are not read; the grammar of ksh, mksh, yash and fish is unprobed
-  ["ksh -c 'kill -1'", 'ksh is not a shell the rail reads'],
-  ["mksh -c 'kill -1'", 'mksh is not a shell the rail reads'],
-  ["ash -c 'kill -1'", 'ash is not a shell the rail reads'],
-  ["busybox sh -c 'kill -1'", 'busybox sh is not a shell the rail reads'],
-  ["yash -c 'kill -1'", 'yash is not a shell the rail reads'],
-  ["rbash -c 'kill -1'", 'rbash is not a shell the rail reads'],
-  ["fish -c 'kill -1'", 'fish is not a shell the rail reads'],
-  ["sh -c- -e 'kill -1'", 'sh on a busybox ash host: ash accepts -c- and keeps reading options, a grammar neither reading covers'],
+  // shells and applets outside KILL_SHELLS, and grammar of the shells in it that is known from source only (#1126, #1127)
+  ["fish -c 'kill -1'", 'fish is not a shell the rail reads (#1127: -c takes a value; fish syntax differs)'],
+  ["rksh -c 'kill -1'", 'rksh (the pdksh line) is not read; unprobed, source not read'],
+  ["lksh -c 'kill -1'", 'lksh (the pdksh line) is not read; unprobed, source not read'],
+  ["oksh -c 'kill -1'", 'oksh (the pdksh line) is not read; unprobed, source not read'],
+  ["pdksh -c 'kill -1'", 'pdksh is not read; unprobed, source not read'],
+  ["posh -c 'kill -1'", 'posh is not read; unprobed, source not read'],
+  ["toybox sh -c 'kill -1'", 'toybox is not a wrapper the rail reads'],
+  ["ksh -o -c 'kill -1'", 'ksh93 -o with an optional value takes -c as its value or not: from source, unprobed (#1126)'],
+  ["mksh -T /dev/tty2 -c 'kill -1'", 'mksh -T takes a value: from source, unprobed (#1126)'],
+  ["yash --profile p -c 'kill -1'", 'yash --profile takes a value: from source, unprobed (#1126)'],
+  ["yash -c --prof p 'kill -1'", 'yash long options take a value under any unambiguous prefix: from source, unprobed (#1126)'],
+  ["yash --rc p -c 'kill -1'", 'yash --rcfile prefixed: from source, unprobed (#1126)'],
   // round 2 C7, C8, C10
   ['kill 123 $(case x in a) echo 1;; esac) -1', "a case pattern's ) inside $(…) ends the span early"],
   ['kill 123 $(echo ${x:-)}) -1', 'a ) inside ${…} inside $(…) ends the span early'],
@@ -421,6 +465,7 @@ function legacyIndex(args: readonly string[]): number | undefined {
   }
   return undefined
 }
+const GRID_NAMES = ['sh', 'bash', 'zsh', 'dash', 'rbash', 'ash', 'static-sh', 'ksh', 'ksh93', 'mksh', 'yash']
 describe('killRule: the grid of option forms never loosens against the 0.14.1 reader', () => {
   const forms: string[][] = []
   const grow = (prefix: string[]): void => {
@@ -429,10 +474,10 @@ describe('killRule: the grid of option forms never loosens against the 0.14.1 re
   }
   grow([])
   test('the grid holds 6174 forms', () => { expect(forms.length).toBe(6174) })
-  test('every form 0.14.1 refuses is still refused (0 loosened over 4 names x 3 kill placements)', () => {
-    const loosened: string[] = []
-    let refusedBefore = 0
-    for (const name of ['sh', 'bash', 'zsh', 'dash'])
+  for (const name of GRID_NAMES) {
+    test(`${name}: every form 0.14.1 refuses is still refused (0 loosened over 3 kill placements)`, () => {
+      const loosened: string[] = []
+      let refusedBefore = 0
       for (const form of forms)
         for (const kill of ['S1', 'S2', 'all']) {
           const words = form.map(w => (w === 'S1' || w === 'S2') && (kill === 'all' || kill === w) ? "'kill -1'" : /^S\d$/.test(w) ? `'echo ${w}'` : w)
@@ -442,8 +487,131 @@ describe('killRule: the grid of option forms never loosens against the 0.14.1 re
           const command = `${name} ${words.join(' ')}`
           if (killRule(command) === undefined) loosened.push(command)
         }
-    expect(refusedBefore).toBe(24472)
-    expect(loosened).toEqual([])
+      expect(refusedBefore).toBe(6118)
+      expect({ loosened: loosened.length, first: loosened.slice(0, 3) }).toEqual({ loosened: 0, first: [] })
+    })
+  }
+})
+
+// The refusals of this grid under `sh`, as the reader before busybox ash was added read it: the same 8342 commands, so
+// the ash reading and the new names add no refusal here. The digest is of the refused commands, one per line, in grid
+// order (no grid form throws); a refusal added or dropped changes it.
+// cyrb53: a 53-bit string hash (the hooks module may import nothing but its own files).
+function cyrb53(str: string): number {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i)
+    h1 = Math.imul(h1 ^ ch, 2654435761)
+    h2 = Math.imul(h2 ^ ch, 1597334677)
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909)
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909)
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0)
+}
+const DIGEST = 5974084756761064
+describe('killRule: the grid adds no refusal and every name is read alike', () => {
+  const forms: string[][] = []
+  const grow = (prefix: string[]): void => {
+    if (prefix.length > 0) forms.push([...prefix, 'S1', 'S2'])
+    if (prefix.length < 3) for (const w of GRID_WORDS) grow([...prefix, w])
+  }
+  grow([])
+  // A throw is not a refusal: a form origin refused that now throws fails these tests.
+  const refuses = (command: string): boolean => {
+    try { return killRule(command) !== undefined } catch { return false }
+  }
+  const unreadBy = (command: string): boolean => {
+    try { killRule(command); return false } catch { return true }
+  }
+  const commands: string[] = []
+  for (const form of forms)
+    for (const kill of ['S1', 'S2', 'all'])
+      commands.push(form.map(w => (w === 'S1' || w === 'S2') && (kill === 'all' || kill === w) ? "'kill -1'" : /^S\d$/.test(w) ? `'echo ${w}'` : w).join(' '))
+  test('the refused commands under sh are the 8342 the earlier reader refused', () => {
+    const refused = commands.map(c => `sh ${c}`).filter(refuses)
+    expect(commands.filter(c => unreadBy(`sh ${c}`))).toEqual([])
+    expect(refused.length).toBe(8342)
+    expect(cyrb53(refused.join('\n'))).toBe(DIGEST)
+  })
+  const base = commands.map(c => refuses(`sh ${c}`))
+  for (const name of [...GRID_NAMES.slice(1), 'busybox sh']) {
+    test(`${name} gets the verdict sh gets, for every form`, () => {
+      const differ = commands.filter((c, k) => refuses(`${name} ${c}`) !== base[k]).map(c => `${name} ${c}`)
+      expect({ differing: differ.length, first: differ.slice(0, 3) }).toEqual({ differing: 0, first: [] })
+    })
+  }
+})
+
+// A reading whose string cannot be read (an unclosed `$(`) must not hide a refusal another reading found.
+describe('killRule: a refusal from one reading survives a throw from another', () => {
+  for (const command of [
+    "sh -c-o '$(x' 'kill -1'", "bash -cO '$(x' 'kill -1'", "zsh -c-o '$(x' 'ps; kill 1'",
+    // the throwing string comes first, and the refusal after it
+    "ksh -c '$(x'; kill -1", "busybox sh -c '$(x'; kill -1", "sh -c-o '$(x'; kill -1", "mksh -c '$(x' && kill -1",
+    "yash -c '$(x'; pkill -u dev", "bash -Oc 'kill -1' '$(x'", "busybox ash -c '$(x'; kill -1",
+    "ksh -c '$(((((((((((x)))))))))))'; kill -1", 'xargs busybox '.repeat(9) + 'echo; kill -1',
+  ])
+    test(`refuses ${JSON.stringify(command)} with the kill reason, not a throw`, () => {
+      expect(killRule(command)).toContain('kill rail')
+    })
+  test('control: a harmless unreadable string is still thrown, to be refused as unread by the glue', () => {
+    expect(() => killRule("sh -c-o '$(x' 'echo ok'")).toThrow()
+    expect(() => killRule("bash -cO '$(x' 'echo ok'")).toThrow()
+    expect(() => killRule("ksh -c '$(x'; echo ok")).toThrow()
+    expect(() => killRule("busybox sh -c '$(x'; kill 123")).toThrow()
+  })
+  test('control: the refusal first, then the throwing string, still refuses', () => {
+    expect(killRule("kill -1; ksh -c '$(x'")).toContain('kill rail')
+  })
+  // A throw inside a substitution, or a substitution nested too deep, beside a refusal: each hold in killRead is read.
+  const DEEP = '$('.repeat(10) + 'x' + ')'.repeat(10)
+  for (const command of ['echo $(echo $(x;kill -1)', 'echo $(kill -1; echo $(x)', `echo ${DEEP}; kill -1`, `kill -1; echo ${DEEP}`])
+    test(`refuses ${JSON.stringify(command)} with the kill reason, not a throw`, () => {
+      expect(killRule(command)).toContain('kill rail')
+    })
+  test('known limit: an unclosed $( outside quotes makes its whole string unread, so a refusal before it in the same string is not found', () => {
+    expect(() => killRule('kill -1; echo $(x')).toThrow()
+    expect(killRule('echo $(x; kill -1')).toContain('kill rail')
+  })
+})
+
+// Deliberate false stops: the shell does not run the string, but a reading that finds it as the string refuses.
+describe('killRule: deliberate false stops of the ksh and yash grammar', () => {
+  test("ksh +c 'kill -1' is refused though ksh turns -c off and runs nothing", () => {
+    expect(killRule("ksh +c 'kill -1'")).toContain('kill rail')
+  })
+  test("yash -c + 'kill -1' is refused though yash runs the + as the string", () => {
+    expect(killRule("yash -c + 'kill -1'")).toContain('kill rail')
+  })
+  test('control: the same shapes with a harmless string are allowed', () => {
+    expect(killRule("ksh +c 'echo ok'")).toBeUndefined()
+    expect(killRule("yash -c + 'echo ok'")).toBeUndefined()
+  })
+})
+
+// Throw-first forms: a string no reading can finish (an unclosed `$(`) beside a refusal, in either order, under every
+// runner spelling and several option forms. Every command refused before busybox and the new names were read is in the
+// refused set below (checked against that reader when it was frozen); a form that throws and also carries a refusal
+// fails here, because the refused set would lose it.
+describe('killRule: a throw in a runner string never hides a refusal elsewhere in the call', () => {
+  const NAMES = ['sh', 'bash', 'zsh', 'dash', 'rbash', 'ash', 'static-sh', 'ksh', 'ksh93', 'mksh', 'yash', 'busybox sh', 'busybox ash']
+  const OPTS = ['-c', '-c-o', '-cO', '-c- -e', '-Oc', '-ec']
+  const TAILS = ['; kill -1', ' && kill -1', '; pkill -u dev', '; ps; kill 1', ' | xargs kill -1', '; echo ok']
+  const commands: string[] = []
+  for (const n of NAMES)
+    for (const o of OPTS) {
+      for (const t of TAILS) commands.push(`${n} ${o} '$(x'${t}`)
+      commands.push(`${n} ${o} '$(x' 'kill -1'`, `${n} ${o} 'kill -1' '$(x'`, `${n} ${o} '$(x' 'echo ok'`)
+    }
+  const refused: string[] = []
+  const unread: string[] = []
+  for (const c of commands) {
+    try { if (killRule(c) !== undefined) refused.push(c) } catch { unread.push(c) }
+  }
+  test('702 forms: 507 refused, and the other 195 throw only because nothing in them refuses', () => {
+    expect(commands.length).toBe(702)
+    expect({ refused: refused.length, hash: cyrb53(refused.join('\n')) }).toEqual({ refused: 507, hash: 2828278963702788 })
+    expect({ unread: unread.length, hash: cyrb53(unread.join('\n')) }).toEqual({ unread: 195, hash: 2579890534524799 })
   })
 })
 

@@ -2,6 +2,19 @@
 
 All notable changes to the `seat-mods` plugin.
 
+## 0.15.1 — 2026-11-07
+
+The kill rail reads more shells and `busybox` (#1116). A name it did not read is a miss: the call goes to the model as if the rail were absent.
+
+- Eleven names are now read as shells, up from four: `rbash`, `ash`, `static-sh`, `ksh`, `ksh93`, `mksh` and `yash` join `sh`, `bash`, `zsh` and `dash`. `rbash` is bash by another name and was probed. The others are read with bash's and zsh's grammar by analogy; ksh93, mksh and yash were read from source and not run.
+- `busybox` is a wrapper: the next word is the command, so `busybox sh -c '…'`, `busybox ash -c '…'`, `busybox kill -1`, `busybox killall -u dev`, `busybox xargs kill -1` and `busybox ps; kill 123` reach the existing checks. The last four were misses nobody had recorded.
+- A third reading for Debian and Ubuntu busybox ash, probed on 1:1.37.0-7ubuntu1: a `-` after the first character of a cluster ends it and the options go on (`-c- -e S`, `-c-o S x`). It speaks only for such a cluster, so on the 6174-form grid of 0.14.2 it adds no refusal, and on a 4368-form ash grid it closes the 328 forms the earlier readings missed.
+- README: Alpine's busybox rejects `-c-` and its `sh` reads options as dash does. Only Debian and Ubuntu busybox accepts `-c-`. 0.14.2 said Alpine did.
+- A string the rail cannot finish reading (an unclosed `$(`, a substitution or an `xargs` chain nested too deep) no longer hides a refusal in another reading, segment, runner string or substitution, before it or after it. The rail reads the rest of the call and throws only when nothing refused. One shape is left: an unclosed `$(` outside quotes makes its whole string unread, so `kill -1; echo $(x` still throws (unread on the bash tool, passed on the ambient `eval` path), as it did before. Before, `bash -cO '$(x' 'kill -1'`, `bash -Oc 'kill -1' '$(x'` and, with the new names and the ash reading, `ksh -c '$(x'; kill -1` and `sh -c-o '$(x'; kill -1` threw instead of refusing, so the bash tool gave the generic unreadable stop and the ambient OMP rail's `eval` path passed them. A call that holds an unreadable string and no refusal still throws, as before.
+- Deliberate false stops added: `ksh +c 'kill -1'` and `yash -c + 'kill -1'`, where the shell does not run the string.
+- Known limits. From source, unprobed: ksh93's `-o` with an optional value, mksh's `-T <value>`, yash's `--profile`/`--rcfile` and their prefixes (#1126); fish (#1127). Unprobed, source not read: the pdksh line (`rksh`, `lksh`, `oksh`, `pdksh`) and `posh`. Not a wrapper the rail reads: `toybox`.
+- The omp-roles floor stays at seat-mods 0.14.0. Claude Code and OMP both read the same `killRule`.
+
 ## 0.15.0 — 2026-11-06
 
 The kill rail reaches a plain omp session (#1102). Until now only `omp-seat`'s `-e` loaded seat-mods on OMP, so an

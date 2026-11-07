@@ -242,17 +242,19 @@ It refuses:
 An unquoted `$(…)` or `$((…))` counts as one word of its command, so `kill 123 $(cat p) 0` is read whole. The span is bounded by counting parentheses, not by the shell's grammar: a `case` pattern's `)` or a `)` inside `${…}` ends it early (a known limit), and a `(` inside `${…}` leaves it open, so the call is refused as unread. `command -v NAME` and `command -V NAME` run nothing and pass.
 
 It reads through `sudo` (with its options), `env`, `command`, `builtin`, `exec`, `nohup`, `time`, `timeout`,
-`setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset` and `flock` (each with its common options, and `--`);
+`setsid`, `nice`, `ionice`, `stdbuf`, `chrt`, `taskset`, `flock` and `busybox` (the next word is the applet: `busybox sh -c '…'`, `busybox kill -1`; each with its common options, and `--`);
 through a path (`/bin/kill`), a quoted command word (`'kill'`, `k""ill`) and the shell's reserved heads; and
-into a literal `eval '…'` or `sh|bash|zsh|dash -c '…'` string, once. The string is found twice, as bash reads
+into a literal `eval '…'` or `sh|bash|rbash|zsh|dash|ash|static-sh|ksh|ksh93|mksh|yash -c '…'` string, once. The string is found three ways, as bash reads
 the options (before and after `-c`, one value for each `o` or `O` in a short option cluster wherever it sits, one
 `--`; after `-c`, a bare `-` ends the options and a bare `+` is skipped) and as zsh reads them (`-O` takes no value, `o` takes
 the rest of its cluster, a bare `-`, a bare `+`, `--`, a cluster holding `b` or a cluster ending in `-` ends the options, and a leading
-`--emulate` takes a value), for every one of the four names, and the call is refused if either string is. A refusal says what to do instead: list first, read
+`--emulate` takes a value) and, only when an option word holds a `-` after its first character (a `--name` word included, since busybox ends it at the second `-`: `busybox sh -c -b --rcfile 'kill -1' x` is refused), as Debian and Ubuntu busybox ash reads them (`-c- -e 'kill -1'`, `-c-o 'kill -1' x`: the `-` ends that cluster and the options go on), for every one of the names, and the call is refused if any string is. `rbash` is bash and was probed as such; the grammar of `ksh`, `ksh93`, `mksh` and `yash` is read from their source and not probed (#1126). A refusal says what to do instead: list first, read
 the PIDs, kill by literal PID in a separate call; to stop your own job use `write proc://<id>/kill` (OMP)
 or `TaskStop` (Claude Code). Those two stops are not shell, so the rail never sees them. On OMP a
 guarded role may `write` an exact `proc://<id>/kill` (`^proc://[A-Za-z0-9_-]+/kill$`, as it may `local://<name>`);
 omp scopes a job or agent id to its owner; a service name is stopped project-wide, as `kill <pid>` through bash already allows. Every other spelling, and `edit` of it, is placed as before.
+
+A string the rail cannot finish reading (an unclosed `$(`, a nesting too deep) does not hide a refusal in another reading, segment, runner string or substitution: the rail reads the rest and refuses with the kill reason if any part refuses, and treats the call as unread only when nothing refused. An unclosed `$(` outside quotes still makes its whole string unread, so a refusal earlier in that string (`kill -1; echo $(x`) is not found; the call is unread, as before.
 
 A `bash` command the rail cannot read is refused (on the ambient OMP entry, an `eval` literal it cannot read passes), after a guarded role's own reader has had its say: a
 forged marker, text it throws on, a substitution that never closes, a substitution nested more than 8 deep, and an `xargs` chain more than 8
@@ -265,7 +267,7 @@ refused, though the shell that runs it runs at most one of the strings, and ofte
 A bare `-` before `-c` is also skipped by the bash reading, so `bash - -c 'kill -1'` stays refused as in 0.14.1, though
 no shell runs either string. Both
 readings go into one scan, so `bash -cO 'ps aux' 'kill 123'`, where one reading lists and the other signals,
-is refused as a call that lists and signals.
+is refused as a call that lists and signals. `ksh +c 'kill -1'` and `yash -c + 'kill -1'`, where the shell does not run the string, are refused too.
 
 **Known limits** (the rail does not read these; each is pinned by `tests/kill.test.ts`, except the #1102 items in the first bullet, which are not pinned in this repo; PR #1119's Evidence records a live probe of `--no-extensions` and `omp plugin disable`, and the other items are untested):
 
@@ -280,9 +282,7 @@ is refused as a call that lists and signals.
   written and then run (in this call or an earlier one), a shell string inside a shell string,
   `eval "$VAR"`, `python3 -c`, `node -e`, `perl -e`, `su -c`, `ssh host …`, `watch`, `parallel`,
   `script -c`, `systemd-run`, `find … -exec kill`, `env -S '…'` / `--split-string`, `flock <file> -c '…'`,
-  `coproc`. Shells other than `sh`, `bash`, `zsh` and `dash` are not read at all: `ksh`, `mksh`, `ash`,
-  `busybox sh`, `yash`, `rbash` and `fish -c '…'` are misses (#1116). `sh` on a host where it is busybox ash (Alpine) follows ash's
-  grammar, which neither reading covers: ash accepts `-c-` and keeps reading options, so `sh -c- -e 'kill -1'` is a miss there.
+  `coproc`. Shells other than the eleven names above are not read: `fish -c '…'` (#1127), `rksh`, `lksh`, `oksh`, `pdksh` and `posh` (unprobed, source not read) and `toybox sh -c '…'` are misses. Three grammar points are known from source, unprobed, so these are misses (#1126): ksh93's `-o` with an optional value (`ksh -o -c 'kill -1'`), mksh's `-T <value>` (`mksh -T /dev/tty2 -c 'kill -1'`), and yash's `--profile` and `--rcfile` with a value, under any unambiguous prefix (`yash --profile p -c 'kill -1'`). On Alpine, busybox rejects `-c-` and its `sh` reads options as dash does, so the third reading adds nothing there; Debian and Ubuntu busybox accepts `-c-` (`busybox sh -c- -e 'kill -1'` is refused).
 - **A command word the rail cannot name.** An alias, a function, a word held in a variable
   (`$K -1`) or built by expansion (`kill${IFS}-1`), a word split by a line continuation, and a wrapper
   not in the list above (`doas`, `runuser`, `unshare`).
